@@ -1,0 +1,7 @@
+load("@rules_mx//mx:graph.bzl", "mx_files")
+
+mx_files(
+    name = "check.srcs",
+    srcs = ["ConsumerTest.java"],
+    visibility = ["//tests/gazelle:__pkg__"],
+)

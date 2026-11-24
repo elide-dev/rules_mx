@@ -1,6 +1,6 @@
 load("//mx:gazelle.bzl", "mx_gazelle")
 
-# gazelle:map_kind java_library elide_java_library @rules_elide//elide:defs.bzl
+# gazelle:map_kind java_library elide_java_library @rules_mx//mx:java.bzl
 
 alias(
     name = "mx",

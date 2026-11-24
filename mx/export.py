@@ -62,6 +62,7 @@ _PLAIN_JAVA = {
     "subDir",
     "dir",
     "sourceDirs",
+    "testProject",
     "annotationProcessors",
     "requires",
     "javaCompliance",
@@ -133,15 +134,12 @@ def _processor_plugins(project, mappings, java_deps, pending, plugins):
         deps = _dependency_labels(dist.deps, project.suite, java_deps, pending)
         for processor in classes:
             target = f"mx_plugin.{dist.name}.{processor}"
-            plugins[target] = _rule(
-                "java_plugin",
-                {
-                    "name": target,
-                    "processor_class": processor,
-                    "generates_api": True,
-                    "deps": deps,
-                },
-            )
+            plugins[target] = {
+                "name": target,
+                "processor_class": processor,
+                "generates_api": True,
+                "deps": deps,
+            }
             labels.append(":" + target)
     return list(dict.fromkeys(labels))
 
@@ -156,7 +154,17 @@ def _processor_plugins(project, mappings, java_deps, pending, plugins):
 def bazel_buildfile(args):
     """Emit suite-root BUILD declarations for a plain Java project closure."""
     parser = argparse.ArgumentParser(prog="mx bazel-buildfile")
+    output = parser.add_mutually_exclusive_group()
+    output.add_argument(
+        "--gazelle", action="store_true", help="emit the resolved graph for Gazelle"
+    )
     parser.add_argument(
+        "--whole-project",
+        action="append",
+        default=[],
+        help="retain one compilation for cyclic Java packages",
+    )
+    output.add_argument(
         "--macro", action="store_true", help="emit a reusable .bzl macro"
     )
     parser.add_argument(
@@ -165,9 +173,13 @@ def bazel_buildfile(args):
     parser.add_argument(
         "--processor-plugin", action="append", default=[], metavar="SUITE:NAME=LABEL"
     )
-    parser.add_argument("--java-dep", action="append", default=[], metavar="SUITE:NAME=LABEL")
+    parser.add_argument(
+        "--java-dep", action="append", default=[], metavar="SUITE:NAME=LABEL"
+    )
     parser.add_argument("projects", nargs="+")
     options = parser.parse_args(args)
+    if options.whole_project and not options.gazelle:
+        parser.error("--whole-project requires --gazelle")
     mappings = _mappings(parser, options.processor_plugin, "--processor-plugin")
     java_deps = _mappings(parser, options.java_dep, "--java-dep")
     roots = [mx.project(name) for name in options.projects]
@@ -175,6 +187,7 @@ def bazel_buildfile(args):
     pending = list(roots)
     rules = {}
     plugins = {}
+    graph = {}
     processed = False
     has_resources = False
     while pending:
@@ -196,7 +209,7 @@ def bazel_buildfile(args):
             if not directory.is_dir():
                 mx.abort(f"{project.name}: missing source root {directory}")
             for source in sorted(directory.rglob("*")):
-                if source.is_file():
+                if source.is_file() and source.name not in {"BUILD", "BUILD.bazel"}:
                     path = source.relative_to(suite.dir).as_posix()
                     if source.suffix == ".java":
                         sources.append(path)
@@ -236,17 +249,74 @@ def bazel_buildfile(args):
         if resources:
             has_resources = True
             attrs["resources"] = sorted(resources)
-            root = json.dumps(resource_roots.pop())
+            resource_root = resource_roots.pop()
+            root = json.dumps(resource_root)
             mode = ", repo_relative = True" if processors else ""
-            resource_attr = f"    resource_strip_prefix = mx_resource_prefix({root}{mode}),\n"
+            resource_attr = (
+                f"    resource_strip_prefix = mx_resource_prefix({root}{mode}),\n"
+            )
         if deps:
             attrs["deps"] = deps
+        if options.gazelle:
+            test = project.is_test_project()
+            coarse = bool(
+                processors or resources or test or project.name in options.whole_project
+            )
+            record = {
+                "name": project.name,
+                "options": attrs.get("javac_opts", attrs.get("javacopts")),
+                "release": release,
+                "deps": deps,
+                "roots": sorted(
+                    Path(d).relative_to(suite.dir).as_posix()
+                    for d in project.source_dirs()
+                ),
+                "packages": sorted(project.defined_java_packages()),
+                "dirs": sorted({str(Path(src).parent) for src in sources}),
+            }
+            if coarse:
+                record["sources"] = sorted(sources)
+                if resources:
+                    record["resources"] = sorted(resources)
+                    record["resource_root"] = resource_root
+                if processors:
+                    record["processors"] = processors
+                if test:
+                    record["testonly"] = True
+                    record["tests"] = sorted(
+                        project.find_classes_with_annotations(
+                            None,
+                            [
+                                "@Test",
+                                "@org.junit.Test",
+                                "@RunWith",
+                                "@org.junit.runner.RunWith",
+                            ],
+                        )
+                    )
+            graph[project.name] = record
         rules[project.name] = _rule(
             "java_library" if processors else "elide_java_library", attrs, resource_attr
         )
     if rules.keys() & plugins.keys():
         mx.abort("A generated plugin target conflicts with a project name")
-    rules.update(plugins)
+    if options.gazelle:
+        missing = set(options.whole_project) - graph.keys()
+        if missing:
+            mx.abort(f"Unknown whole project in selected closure: {sorted(missing)}")
+        print(
+            json.dumps(
+                {
+                    "version": 1,
+                    "projects": [graph[n] for n in sorted(graph)],
+                    "plugins": [plugins[n] for n in sorted(plugins)],
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        return
+    rules.update({name: _rule("java_plugin", attrs) for name, attrs in plugins.items()})
     print('load("@rules_mx//mx:java.bzl", "elide_java_library")')
     if processed:
         print(

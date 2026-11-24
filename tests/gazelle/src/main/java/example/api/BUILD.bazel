@@ -1,7 +1,12 @@
-load("@rules_elide//elide:defs.bzl", "elide_java_library")
+load("@rules_mx//mx:java.bzl", "elide_java_library")
 
 elide_java_library(
     name = "api",
     srcs = ["Message.java"],
+    javac_opts = [
+        "--release",
+        "17",
+    ],
+    unified_release = 17,
     visibility = ["//:__subpackages__"],
 )

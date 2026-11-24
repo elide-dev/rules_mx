@@ -1,0 +1,18 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "gazelle",
+    srcs = ["graph.go"],
+    importpath = "github.com/elide-dev/rules_mx/mx/gazelle",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@contrib_rules_jvm//java/gazelle",
+        "@contrib_rules_jvm//java/gazelle/javaconfig",
+        "@gazelle//config",
+        "@gazelle//label",
+        "@gazelle//language",
+        "@gazelle//repo",
+        "@gazelle//resolve",
+        "@gazelle//rule",
+    ],
+)

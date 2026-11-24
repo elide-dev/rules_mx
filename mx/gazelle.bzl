@@ -7,6 +7,6 @@ def mx_gazelle(name = "gazelle"):
     binary = name + "_java"
     gazelle_binary(
         name = binary,
-        languages = [Label("@contrib_rules_jvm//java/gazelle")],
+        languages = [Label("//mx/gazelle")],
     )
     gazelle(name = name, gazelle = ":" + binary)

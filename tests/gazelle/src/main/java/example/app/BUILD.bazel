@@ -1,8 +1,13 @@
-load("@rules_elide//elide:defs.bzl", "elide_java_library")
+load("@rules_mx//mx:java.bzl", "elide_java_library")
 
 elide_java_library(
     name = "app",
     srcs = ["Consumer.java"],
+    javac_opts = [
+        "--release",
+        "17",
+    ],
+    unified_release = 17,
     visibility = ["//:__subpackages__"],
     deps = ["//tests/gazelle/src/main/java/example/api"],
 )

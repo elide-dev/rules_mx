@@ -1,0 +1,32 @@
+load("@rules_mx//mx:graph.bzl", "mx_project", "mx_test_class", "mx_whole_java")
+
+mx_whole_java(
+    name = "check",
+    testonly = True,
+    srcs = ["//tests/gazelle/check/src/example/check:check.srcs"],
+    javac_opts = [
+        "--release",
+        "17",
+    ],
+    unified_release = 17,
+    visibility = ["//tests/gazelle:__subpackages__"],
+    deps = [
+        ":demo",
+        "@contrib_rules_jvm_deps//:junit_junit",
+    ],
+)
+
+mx_test_class(
+    name = "check.example.check.ConsumerTest",
+    project = ":check",
+    test_class = "example.check.ConsumerTest",
+)
+
+mx_project(
+    name = "demo",
+    packages = [
+        "//tests/gazelle/src/main/java/example/api",
+        "//tests/gazelle/src/main/java/example/app",
+    ],
+    visibility = ["//tests/gazelle:__subpackages__"],
+)

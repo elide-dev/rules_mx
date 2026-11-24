@@ -15,4 +15,6 @@ profile=(--config=buildbuddy)
 for arg in "$@"; do
   if [[ "$arg" == --config=buildbuddy-rbe || "$arg" == --config=buildbuddy ]]; then profile=(); break; fi
 done
-bazelisk --nohome_rc --bazelrc="$auth" "$command" ${profile[@]+"${profile[@]}"} "$@"
+startup=()
+if [[ -n "${BAZEL_OUTPUT_USER_ROOT:-}" ]]; then startup+=("--output_user_root=$BAZEL_OUTPUT_USER_ROOT"); fi
+bazelisk ${startup[@]+"${startup[@]}"} --nohome_rc --bazelrc="$auth" "$command" ${profile[@]+"${profile[@]}"} "$@"

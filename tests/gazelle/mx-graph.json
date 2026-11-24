@@ -1,0 +1,54 @@
+{
+  "plugins": [],
+  "projects": [
+    {
+      "deps": [
+        ":demo",
+        "@contrib_rules_jvm_deps//:junit_junit"
+      ],
+      "dirs": [
+        "check/src/example/check"
+      ],
+      "name": "check",
+      "options": [
+        "--release",
+        "17"
+      ],
+      "packages": [
+        "example.check"
+      ],
+      "release": 17,
+      "roots": [
+        "check/src"
+      ],
+      "sources": [
+        "check/src/example/check/ConsumerTest.java"
+      ],
+      "testonly": true,
+      "tests": [
+        "example.check.ConsumerTest"
+      ]
+    },
+    {
+      "deps": [],
+      "dirs": [
+        "src/main/java/example/api",
+        "src/main/java/example/app"
+      ],
+      "name": "demo",
+      "options": [
+        "--release",
+        "17"
+      ],
+      "packages": [
+        "example.api",
+        "example.app"
+      ],
+      "release": 17,
+      "roots": [
+        "src/main/java"
+      ]
+    }
+  ],
+  "version": 1
+}

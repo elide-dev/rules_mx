@@ -10,7 +10,7 @@ Use Bazelisk from the repository root. The module fetches the exact mx revision 
 bazelisk run //:mx -- --version
 bazelisk run --config=elide-python //:mx -- --version
 bazelisk build //:webserver @graal_mx//:com.oracle.mxtool.checkcopy @graal_mx//:com.oracle.mxtool.compilerserver
-bazelisk run //:gazelle -- -mode=diff tests/gazelle
+tools/check-graph
 bazelisk build //tests/gazelle/...
 bazelisk test //mx:export_test
 bazelisk test --config=elide-python //mx:export_test
@@ -58,12 +58,27 @@ The `elide-processors` profile selects the pinned Elide JavaBuilder adapter. It 
 ```starlark
 load("@rules_mx//mx:gazelle.bzl", "mx_gazelle")
 
-# gazelle:map_kind java_library elide_java_library @rules_elide//elide:defs.bzl
+# gazelle:map_kind java_library elide_java_library @rules_mx//mx:java.bzl
 
 mx_gazelle()
 ```
 
 Run `bazelisk run //:gazelle -- path/to/java/tree` for a tree assigned to package-level generation. The checked-in fixture demonstrates two packages with a resolved import edge. Use project-level generation for mutually dependent packages that must be compiled together. For Maven imports, point the Java extension at the consuming workspace's Maven lockfile.
+
+### Import mx project edges into Gazelle
+
+Export a selected project closure once, then run Gazelle on that suite. Both paths below are relative to the Bazel repository root. Keep the graph next to the suite's root BUILD file.
+
+```sh
+bazelisk run //:mx -- -p "$PWD/tests/gazelle" bazel-buildfile --gazelle \
+  --java-dep mx:JUNIT=@contrib_rules_jvm_deps//:junit_junit check > /tmp/demo-graph.json &&
+  cp /tmp/demo-graph.json tests/gazelle/mx-graph.json
+bazelisk run //:gazelle -- -mx_graph=tests/gazelle/mx-graph.json tests/gazelle
+bazelisk query 'deps(//tests/gazelle:check.example.check.ConsumerTest, 3)'
+bazelisk test //tests/gazelle:check.example.check.ConsumerTest
+```
+
+The Java extension resolves source imports. The mx importer preserves declared project dependencies and Java releases and exposes each project by name. Plain Java projects use one library per source package using the configured Gazelle Java naming convention. Test projects, projects with resources, and annotation-processed projects keep one compilation unit. Each discovered JUnit 4 test class gets a runnable label. Add `--whole-project NAME` at export time for packages that must compile together. Run generation across the entire selected suite when the graph changes and review removed targets and any old nested BUILD files when changing granularity.
 
 ## Consume from another Bzlmod root
 
@@ -121,3 +136,5 @@ The module pins Native Image toolchain PR #134 at `9d997fb`, which includes unif
 ## Native Image
 
 Build mx's copyright checker with `bazelisk build //tests/native_image:checkcopy`. For Linux AMD64 remote execution, run `tools/buildbuddy test --config=buildbuddy-rbe --config=native-image-linux //tests/native_image:checkcopy_test`. The target uses the ordinary `rules_graalvm` Native Image rule with the SDK from Elide. Its Java input is the same project JAR used in JVM builds. The root module connects the rulesets with `inject_repo(elide, "rules_graalvm")` and registers `@elide_toolchains//graalvm:all`.
+
+Native C/C++ toolchains use the checksum-pinned `elide-dev/toolchain` LLVM 23 archives also used in Komodo. Linux native actions use the archive's Clang, lld, headers and libc sysroot. The Darwin toolchain requires an installed Apple SDK. To reproduce the Linux build from a Mac, put Bazel's output user root on a case-sensitive volume. For the BuildBuddy wrapper, set `BAZEL_OUTPUT_USER_ROOT` to a directory on that volume. The Linux worker image is pinned by digest and its build actions request network isolation. Downstream roots can select the same compiler registrations with `register_toolchains("@rules_mx//tools/cc:all")`.

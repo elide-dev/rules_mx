@@ -52,6 +52,23 @@ class ExportTest(unittest.TestCase):
         self.assertIn('plugins = ["//third_party:plugin"]', mapped.stdout)
         self.assertNotIn("java_plugin(", mapped.stdout)
 
+    def test_gazelle_processor_graph(self):
+        result = self.run_mx(
+            "bazel-buildfile", "--gazelle", "consumer", suite=self.processor_suite
+        )
+        graph = json.loads(result.stdout)
+        projects = {p["name"]: p for p in graph["projects"]}
+        self.assertEqual(projects["consumer"]["deps"], [":app"])
+        self.assertNotIn("sources", projects["consumer"])
+        self.assertIn("sources", projects["app"])
+        self.assertEqual(projects["proc"]["resource_root"], "proc/src")
+        self.assertEqual(
+            set(projects["app"]["processors"]),
+            {":" + plugin["name"] for plugin in graph["plugins"]},
+        )
+        self.assertEqual(len(graph["plugins"]), 2)
+        self.assertTrue(all(plugin["deps"] == [":proc"] for plugin in graph["plugins"]))
+
     def test_graph_preserves_compliance_range(self):
         result = self.run_mx("bazel-projects", "com.oracle.mxtool.webserver")
         self.assertTrue(result.stdout.startswith("{"), result.stdout)

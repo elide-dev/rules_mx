@@ -1,3 +1,8 @@
+common --enable_platform_specific_config
+build --macos_minimum_os=12.0
+build:macos --features=-macos_minimum_os
+build:macos --host_features=-macos_minimum_os
+common --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 # JVM-only workspaces do not consume a host Android SDK.
 common --repo_env=ANDROID_HOME=
 
@@ -13,8 +18,6 @@ build:rbc --remote_upload_local_results
 
 build:rbe --platforms=//tools:linux_x86_64
 build:rbe --extra_execution_platforms=//tools:linux_x86_64
-build:rbe --extra_toolchains=//tools:rbe_cc
-build:rbe --repo_env=HERMETIC_CC_TOOLCHAIN_CACHE_PREFIX=/tmp/rules-mx-zig
 build:rbe --spawn_strategy=remote
 build:rbe --remote_local_fallback=false
 build:rbe --remote_download_outputs=minimal
@@ -35,4 +38,4 @@ build:buildbuddy-rbe --remote_executor=grpcs://elide-dev.buildbuddy.io
 
 build:elide-unified --@rules_elide//elide:unified_jvm_compile
 build:labsjdk --java_runtime_version=labsjdk_25
-build:native-image-linux --extra_toolchains=//tools/native_image:linux_amd64
+build:native-image-linux --extra_toolchains=//tools/cc:elide_cc_linux_amd64

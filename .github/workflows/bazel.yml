@@ -10,18 +10,15 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest-4-cores
     steps:
-      - name: Make room for Bazel repositories on the ephemeral runner
-        run: |
-          sudo rm -rf /usr/local/lib/android/sdk /usr/share/dotnet /opt/ghc
-          df -h "$GITHUB_WORKSPACE"
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
       - name: Test pull request
         if: github.event_name == 'pull_request'
         run: |
+          tools/check-graph
           bazelisk test --config=elide-processors //...
           bazelisk test --config=elide-python //mx:export_test
       - name: Test on BuildBuddy
@@ -29,6 +26,7 @@ jobs:
         env:
           BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
         run: |
+          tools/check-graph --config=buildbuddy-rbe
           tools/buildbuddy test --config=buildbuddy-rbe --config=elide-processors //...
           tools/buildbuddy test --config=buildbuddy-rbe --config=labsjdk //mx:export_test
           tools/buildbuddy test --config=buildbuddy-rbe --config=elide-python //mx:export_test

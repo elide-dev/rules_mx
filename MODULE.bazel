@@ -39,20 +39,18 @@ mx_sources = use_extension("//mx:extensions.bzl", "mx_sources")
 use_repo(mx_sources, "graal_mx")
 
 bazel_dep(name = "platforms", version = "1.1.0")
-
-bazel_dep(name = "rules_go", version = "0.60.0", dev_dependency = True)
+bazel_dep(name = "rules_go", version = "0.60.0")
 
 go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk", dev_dependency = True)
 go_sdk.download(version = "1.25.6")
 
-bazel_dep(name = "hermetic_cc_toolchain", version = "4.3.0", dev_dependency = True)
+llvm = use_extension("//tools/cc:extensions.bzl", "llvm")
+use_repo(llvm, "elide_toolchain_darwin_arm64", "elide_toolchain_linux_amd64", "elide_toolchain_linux_arm64")
 
-cc = use_extension("@hermetic_cc_toolchain//toolchain:ext.bzl", "toolchains", dev_dependency = True)
-cc.exec_platform(
-    arch = "amd64",
-    os = "linux",
+register_toolchains(
+    "//tools/cc:all",
+    dev_dependency = True,
 )
-use_repo(cc, "zig_sdk", linux_zig = "zig_config-linux-amd64")
 
 labsjdk = use_extension("//mx:labsjdk.bzl", "labsjdk", dev_dependency = True)
 use_repo(
@@ -84,4 +82,10 @@ register_toolchains(
     dev_dependency = True,
 )
 
-bazel_dep(name = "rules_cc", version = "0.2.18", dev_dependency = True)
+bazel_dep(name = "rules_cc", version = "0.2.18")
+
+# Reuse Gazelle's locked JUnit dependency for the mx test suite fixture.
+bazel_dep(name = "rules_jvm_external", version = "6.10", dev_dependency = True)
+
+maven = use_extension("@rules_jvm_external//:extensions.bzl", "maven", dev_dependency = True)
+use_repo(maven, "contrib_rules_jvm_deps")
