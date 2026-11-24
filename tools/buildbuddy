@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -eu
+: "${BUILDBUDDY_API_KEY:?Set BUILDBUDDY_API_KEY to authenticate with BuildBuddy}"
+case "$BUILDBUDDY_API_KEY" in
+  *[!a-zA-Z0-9_.=-]*) echo "Unexpected character in BuildBuddy API key" >&2; exit 2 ;;
+esac
+umask 077
+auth=$(mktemp)
+trap 'rm -f "$auth"' EXIT
+printf 'build:buildbuddy --remote_header=x-buildbuddy-api-key=%s\nbuild:buildbuddy --bes_header=x-buildbuddy-api-key=%s\n' "$BUILDBUDDY_API_KEY" "$BUILDBUDDY_API_KEY" > "$auth"
+unset BUILDBUDDY_API_KEY
+command=${1:?Usage: tools/buildbuddy build-or-test [options] targets}
+shift
+profile=(--config=buildbuddy)
+for arg in "$@"; do
+  if [[ "$arg" == --config=buildbuddy-rbe || "$arg" == --config=buildbuddy ]]; then profile=(); break; fi
+done
+bazelisk --nohome_rc --bazelrc="$auth" "$command" ${profile[@]+"${profile[@]}"} "$@"

@@ -1,0 +1,17 @@
+load("//mx:gazelle.bzl", "mx_gazelle")
+
+# gazelle:map_kind java_library elide_java_library @rules_elide//elide:defs.bzl
+
+alias(
+    name = "mx",
+    actual = "@graal_mx//:mx_cli",
+    visibility = ["//visibility:public"],
+)
+
+alias(
+    name = "webserver",
+    actual = "@graal_mx//:com.oracle.mxtool.webserver",
+    visibility = ["//visibility:public"],
+)
+
+mx_gazelle()

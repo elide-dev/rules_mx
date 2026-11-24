@@ -1,0 +1,7 @@
+load("@rules_elide//elide:defs.bzl", "elide_java_library")
+
+elide_java_library(
+    name = "api",
+    srcs = ["Message.java"],
+    visibility = ["//:__subpackages__"],
+)

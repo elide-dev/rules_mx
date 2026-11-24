@@ -1,0 +1,74 @@
+load("@rules_elide//elide/java:toolchain.bzl", "elide_java_toolchain")
+load("@rules_elide//elide/python:toolchain.bzl", "register_elide_python_toolchain")
+
+register_elide_python_toolchain(
+    name = "linux_amd64",
+    elide = "@elide_linux_amd64//:bin/elide",
+    runtime_files = "@elide_linux_amd64//:elide_python_files",
+    target_compatible_with = [
+        "@platforms//os:linux",
+        "@platforms//cpu:x86_64",
+    ],
+)
+
+register_elide_python_toolchain(
+    name = "linux_arm64",
+    elide = "@elide_linux_arm64//:bin/elide",
+    runtime_files = "@elide_linux_arm64//:elide_python_files",
+    target_compatible_with = [
+        "@platforms//os:linux",
+        "@platforms//cpu:aarch64",
+    ],
+)
+
+register_elide_python_toolchain(
+    name = "macos_arm64",
+    elide = "@elide_macos_arm64//:bin/elide",
+    runtime_files = "@elide_macos_arm64//:elide_python_files",
+    target_compatible_with = [
+        "@platforms//os:macos",
+        "@platforms//cpu:aarch64",
+    ],
+)
+
+platform(
+    name = "linux_x86_64",
+    constraint_values = [
+        "@platforms//os:linux",
+        "@platforms//cpu:x86_64",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+[config_setting(
+    name = "exec_" + platform,
+    constraint_values = constraints,
+) for platform, constraints in {
+    "linux_amd64": [
+        "@platforms//os:linux",
+        "@platforms//cpu:x86_64",
+    ],
+    "linux_arm64": [
+        "@platforms//os:linux",
+        "@platforms//cpu:aarch64",
+    ],
+    "macos_arm64": [
+        "@platforms//os:macos",
+        "@platforms//cpu:aarch64",
+    ],
+}.items()]
+
+elide_java_toolchain(
+    name = "processor_java",
+    elide = select({
+        ":exec_linux_amd64": "@elide_linux_amd64//:elide",
+        ":exec_linux_arm64": "@elide_linux_arm64//:elide",
+        ":exec_macos_arm64": "@elide_macos_arm64//:elide",
+    }),
+    log_routes = True,
+    misc = [
+        "-XDskipDuplicateBridges=true",
+        "-g",
+        "-parameters",
+    ],
+)

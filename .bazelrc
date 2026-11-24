@@ -1,0 +1,36 @@
+# JVM-only workspaces do not consume a host Android SDK.
+common --repo_env=ANDROID_HOME=
+
+build --incompatible_strict_action_env
+build --java_runtime_version=remotejdk_21
+build --tool_java_runtime_version=remotejdk_21
+build --@rules_python//python/config_settings:bootstrap_impl=script
+build --@rules_go//go/config:pure
+
+build:elide-python --extra_toolchains=//tools:macos_arm64,//tools:linux_amd64,//tools:linux_arm64
+
+build:rbc --remote_upload_local_results
+
+build:rbe --platforms=//tools:linux_x86_64
+build:rbe --extra_execution_platforms=//tools:linux_x86_64
+build:rbe --extra_toolchains=@zig_sdk//toolchain/linux-amd64:linux_amd64_musl
+build:rbe --repo_env=HERMETIC_CC_TOOLCHAIN_CACHE_PREFIX=/tmp/rules-mx-zig
+build:rbe --spawn_strategy=remote
+build:rbe --remote_local_fallback=false
+build:rbe --remote_download_outputs=minimal
+
+# Local Java worker optimizations for targets with explicitly modeled processors.
+build:elide-workers --strategy=ElideJavac=worker
+build:elide-workers --@rules_elide//elide:multiplex_workers=true
+build:elide-workers --@rules_elide//config/javac:classpath_cache=true
+build:elide-processors --extra_toolchains=//tools:processor_java_definition,//tools:processor_java_default_definition
+
+build:buildbuddy --bes_backend=grpcs://elide-dev.buildbuddy.io
+build:buildbuddy --bes_results_url=https://elide-dev.buildbuddy.io/invocation/
+build:buildbuddy --remote_cache=grpcs://elide-dev.buildbuddy.io
+build:buildbuddy --remote_instance_name=elide-dev/rules_mx
+build:buildbuddy-rbe --config=buildbuddy
+build:buildbuddy-rbe --config=rbe
+build:buildbuddy-rbe --remote_executor=grpcs://elide-dev.buildbuddy.io
+
+build:elide-unified --@rules_elide//elide:unified_jvm_compile

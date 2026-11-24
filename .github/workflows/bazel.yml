@@ -1,0 +1,29 @@
+name: Bazel
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Test pull request
+        if: github.event_name == 'pull_request'
+        run: |
+          bazelisk test --config=elide-processors //...
+          bazelisk test --config=elide-python //mx:export_test
+      - name: Test on BuildBuddy
+        if: github.event_name != 'pull_request'
+        env:
+          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+        run: |
+          tools/buildbuddy test --config=buildbuddy-rbe --config=elide-processors //...
+          tools/buildbuddy test --config=buildbuddy-rbe --config=elide-python //mx:export_test

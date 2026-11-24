@@ -1,0 +1,33 @@
+load("@rules_python//python:py_test.bzl", "py_test")
+load(":projects.bzl", "mx_java_projects")
+
+# gazelle:ignore
+
+mx_java_projects()
+
+filegroup(
+    name = "fixture",
+    srcs = glob([
+        "**/*.java",
+        "**/*.properties",
+        "proc/src/META-INF/services/*",
+        "mx.processing/*.py",
+    ]) + [
+        ".mx_vcs_root",
+        "projects.bzl",
+    ],
+    visibility = ["//mx:__pkg__"],
+)
+
+exports_files(
+    [".mx_vcs_root"],
+    visibility = ["//mx:__pkg__"],
+)
+
+py_test(
+    name = "outputs_test",
+    size = "small",
+    srcs = ["outputs_test.py"],
+    args = ["$(rootpath :libapp.jar)"],
+    data = [":libapp.jar"],
+)

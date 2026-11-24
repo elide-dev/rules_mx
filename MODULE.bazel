@@ -1,0 +1,55 @@
+module(
+    name = "rules_mx",
+    version = "0.1.0",  # x-release-please-version
+    bazel_compatibility = [">=9.3.3"],
+)
+
+bazel_dep(name = "rules_java", version = "9.9.0")
+bazel_dep(name = "rules_python", version = "1.9.2")
+bazel_dep(name = "rules_elide", version = "0.6.1")
+archive_override(
+    module_name = "rules_elide",
+    integrity = "sha256-4kZAre/mNAg8IJTBJdOP89/07brTMioCLmdpfX3L4gQ=",
+    # Processor option precedence from rules_elide PR 133 atop unified builder PR 132.
+    patch_strip = 1,
+    patches = ["//mx:elide_javabuilder.patch"],
+    strip_prefix = "rules_elide-30ac6d5a189544b4c7c1322d30c679ea91783789",
+    urls = ["https://github.com/elide-dev/rules_elide/archive/30ac6d5a189544b4c7c1322d30c679ea91783789.tar.gz"],
+)
+
+bazel_dep(name = "gazelle", version = "0.54.0")
+bazel_dep(name = "contrib_rules_jvm", version = "0.35.0")
+
+elide = use_extension("@rules_elide//elide:extensions.bzl", "elide", dev_dependency = True)
+elide.install(
+    python = True,
+    version = "1.6.2",
+)
+use_repo(elide, "elide_linux_amd64", "elide_linux_arm64", "elide_macos_arm64", "elide_toolchains")
+
+register_toolchains(
+    "@elide_toolchains//:all",
+    dev_dependency = True,
+)
+
+python = use_extension("@rules_python//python/extensions:python.bzl", "python", dev_dependency = True)
+python.toolchain(python_version = "3.13")
+
+mx_sources = use_extension("//mx:extensions.bzl", "mx_sources")
+use_repo(mx_sources, "graal_mx")
+
+bazel_dep(name = "platforms", version = "1.1.0")
+
+bazel_dep(name = "rules_go", version = "0.60.0", dev_dependency = True)
+
+go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk", dev_dependency = True)
+go_sdk.download(version = "1.25.6")
+
+bazel_dep(name = "hermetic_cc_toolchain", version = "4.3.0", dev_dependency = True)
+
+cc = use_extension("@hermetic_cc_toolchain//toolchain:ext.bzl", "toolchains", dev_dependency = True)
+cc.exec_platform(
+    arch = "amd64",
+    os = "linux",
+)
+use_repo(cc, "zig_sdk")

@@ -1,0 +1,32 @@
+load("@rules_python//python:py_test.bzl", "py_test")
+
+exports_files([
+    "elide_javabuilder.patch",
+    "export.py",
+    "launcher.py.tpl",
+    "register.patch",
+    "upstream.BUILD",
+])
+
+py_test(
+    name = "export_test",
+    size = "small",
+    srcs = ["export_test.py"],
+    args = [
+        "$(rootpath @graal_mx//:mx_cli)",
+        "$(rootpath :projects.bzl)",
+        "$(rootpath //tests/processing:.mx_vcs_root)",
+    ],
+    data = [
+        ":projects.bzl",
+        "//tests/processing:.mx_vcs_root",
+        "//tests/processing:fixture",
+        "@graal_mx//:mx_cli",
+    ],
+)
+
+config_setting(
+    name = "unified_jvm",
+    flag_values = {"@rules_elide//elide:unified_jvm_compile": "true"},
+    visibility = ["//visibility:public"],
+)
