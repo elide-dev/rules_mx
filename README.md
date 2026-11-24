@@ -98,7 +98,7 @@ tools/buildbuddy test --config=buildbuddy-rbe --config=elide-processors //tests/
 
 Both commands use the `elide-dev/rules_mx` cache instance. The second also sends actions to the tenant's Linux AMD64 executors with automatic pool selection.
 
-On pushes to `main` and manual runs, the Bazel workflow uses the repository's `BUILDBUDDY_API_KEY` secret and runs the full processor-enabled suite and the Elide Python exporter test on BuildBuddy. Pull requests run the same tests on the GitHub runner without the cluster credential. Open the invocation link in the job log to inspect remote actions and cache hits.
+On pushes to `main` and manual runs, the Bazel workflow uses the repository's `BUILDBUDDY_API_KEY` secret and runs the full processor-enabled suite and the exporter tests with Labs JDK and Elide Python on BuildBuddy. Pull requests run the same tests on the GitHub runner without the cluster credential. Open the invocation link in the job log to inspect remote actions and cache hits.
 
 ## Releases
 
@@ -113,3 +113,7 @@ The initial Linux x86_64 REAPI smoke build compiled and packaged the real Graal 
 Ordinary Java builds use Elide persistent workers and emit the ABI alongside the class jar for eligible targets. For local builds with explicitly modeled processors, `bazelisk build --config=elide-workers //tests/gazelle/... //:webserver` also enables multiplex workers and digest-keyed classpath reuse. The classpath cache disables implicit processor discovery. Use the separate RBE profile for remote execution.
 
 The module pins unified JVM builder PR #132 at `30ac6d5` and applies the JavaBuilder processor fix from PR #133. With a registered Elide runtime advertising unified JVM request version 1, `--config=elide-unified` enables fused compilation for eligible Elide Java targets. The default Elide 1.6.2 distribution uses the legacy path. Processor consumers use the JavaBuilder adapter via `--config=elide-processors`.
+
+## Labs JDK
+
+`bazelisk run --config=labsjdk //:mx -- --version` selects the Oracle Labs JDK 25 JVMCI build pinned by the bundled mx suite. The profile selects the target Java runtime independently of the JDK used to compile Bazel tools. The extension provides checksum-pinned archives for Linux AMD64, Linux ARM64, and macOS ARM64. Consumers can register the same runtime toolchains using the Labs JDK stanza in MODULE.bazel.

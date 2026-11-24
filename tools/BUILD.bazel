@@ -37,6 +37,9 @@ platform(
         "@platforms//os:linux",
         "@platforms//cpu:x86_64",
     ],
+    exec_properties = {
+        "container-image": "docker://gcr.io/flame-public/rbe-ubuntu24-04@sha256:f7db0d4791247f032fdb4451b7c3ba90e567923a341cc6dc43abfc283436791a",
+    },
     visibility = ["//visibility:public"],
 )
 
@@ -71,4 +74,21 @@ elide_java_toolchain(
         "-g",
         "-parameters",
     ],
+)
+
+# The generated zig_sdk toolchain package path varies with the client host.
+# The Linux execution SDK itself has a stable repository and target.
+toolchain(
+    name = "rbe_cc",
+    exec_compatible_with = [
+        "@platforms//os:linux",
+        "@platforms//cpu:x86_64",
+    ],
+    target_compatible_with = [
+        "@platforms//os:linux",
+        "@platforms//cpu:x86_64",
+        "@zig_sdk//libc:unconstrained",
+    ],
+    toolchain = "@linux_zig//:x86_64-linux-musl_cc",
+    toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
 )

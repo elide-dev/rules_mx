@@ -26,4 +26,5 @@ jobs:
           BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
         run: |
           tools/buildbuddy test --config=buildbuddy-rbe --config=elide-processors //...
+          tools/buildbuddy test --config=buildbuddy-rbe --config=labsjdk //mx:export_test
           tools/buildbuddy test --config=buildbuddy-rbe --config=elide-python //mx:export_test

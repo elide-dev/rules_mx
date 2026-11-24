@@ -13,7 +13,7 @@ build:rbc --remote_upload_local_results
 
 build:rbe --platforms=//tools:linux_x86_64
 build:rbe --extra_execution_platforms=//tools:linux_x86_64
-build:rbe --extra_toolchains=@zig_sdk//toolchain/linux-amd64:linux_amd64_musl
+build:rbe --extra_toolchains=//tools:rbe_cc
 build:rbe --repo_env=HERMETIC_CC_TOOLCHAIN_CACHE_PREFIX=/tmp/rules-mx-zig
 build:rbe --spawn_strategy=remote
 build:rbe --remote_local_fallback=false
@@ -34,3 +34,4 @@ build:buildbuddy-rbe --config=rbe
 build:buildbuddy-rbe --remote_executor=grpcs://elide-dev.buildbuddy.io
 
 build:elide-unified --@rules_elide//elide:unified_jvm_compile
+build:labsjdk --java_runtime_version=labsjdk_25
