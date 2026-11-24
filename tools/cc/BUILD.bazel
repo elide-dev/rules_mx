@@ -1,6 +1,6 @@
 exports_files([
     "toolchain.BUILD",
-    "cc.patch",
+    "cc.sh.tpl",
 ])
 
 [toolchain(

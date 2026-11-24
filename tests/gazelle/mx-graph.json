@@ -4,6 +4,7 @@
     {
       "deps": [
         ":demo",
+        ":client",
         "@contrib_rules_jvm_deps//:junit_junit"
       ],
       "dirs": [
@@ -27,6 +28,26 @@
       "testonly": true,
       "tests": [
         "example.check.ConsumerTest"
+      ]
+    },
+    {
+      "deps": [
+        ":demo"
+      ],
+      "dirs": [
+        "client/src/main/java/example/client"
+      ],
+      "name": "client",
+      "options": [
+        "--release",
+        "17"
+      ],
+      "packages": [
+        "example.client"
+      ],
+      "release": 17,
+      "roots": [
+        "client/src/main/java"
       ]
     },
     {

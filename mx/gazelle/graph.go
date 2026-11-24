@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -125,6 +126,9 @@ func (g *importer) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
 		return labels, nil
 	}
 	for _, p := range graph.Projects {
+		if p == nil || p.Name == "" || len(p.Dirs) == 0 || p.Release < 1 {
+			return fmt.Errorf("%s: expected a Java project with a name, source directories and release", g.filename)
+		}
 		g.projects[p.Name] = p
 		for _, dir := range p.Dirs {
 			if !filepath.IsLocal(dir) {
@@ -174,7 +178,7 @@ func (g *importer) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
 		if len(p.Deps) > 0 {
 			r.SetAttr("deps", p.Deps)
 		}
-		r.SetAttr("visibility", []string{"//" + g.suite + ":__subpackages__"})
+		r.SetAttr("visibility", []string{"//visibility:public"})
 		if err := add(g.suite, r); err != nil {
 			return err
 		}
@@ -190,6 +194,7 @@ func (g *importer) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
 	for _, plugin := range graph.Plugins {
 		r := rule.NewRule("mx_processor", plugin.Name)
 		r.SetAttr("processor_class", plugin.ProcessorClass)
+		r.SetAttr("visibility", []string{"//visibility:public"})
 		r.SetAttr("generates_api", plugin.GeneratesAPI)
 		r.SetAttr("deps", plugin.Deps)
 		if err := add(g.suite, r); err != nil {
@@ -276,6 +281,9 @@ func (g *importer) GenerateRules(a language.GenerateArgs) language.GenerateResul
 				if !graphKind(r.Kind()) {
 					continue
 				}
+				if a.Rel != g.suite && (r.Kind() != "mx_files" || !slices.Contains(r.AttrStrings("visibility"), "//"+g.suite+":__pkg__")) {
+					continue
+				}
 				if kind := current[r.Name()]; kind != "" {
 					if r.Kind() != kind {
 						r.SetKind(kind)
@@ -328,6 +336,11 @@ func (g *importer) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.Rem
 	}
 	for _, d := range p.Deps {
 		if strings.HasPrefix(d, ":") {
+			// Gazelle already resolves imports from source-indexed projects to
+			// their owning packages. The aggregate preserves the full mx edge.
+			if project := g.projects[strings.TrimPrefix(d, ":")]; project != nil && len(project.Sources) == 0 {
+				continue
+			}
 			d = "//" + g.suite + d
 		}
 		deps[d] = true

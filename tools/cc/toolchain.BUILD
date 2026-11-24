@@ -4,6 +4,7 @@
 # fetched only when its platform is selected.
 load("@rules_cc//cc:defs.bzl", "cc_toolchain")
 load("@rules_cc//cc/private/toolchain:unix_cc_toolchain_config.bzl", "cc_toolchain_config")
+load(":sdk_files.bzl", "SDK_FILES")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -46,12 +47,14 @@ filegroup(
     srcs = [
         "cc",
         ":bin",
-    ] + glob(
+    ] + SDK_FILES + glob(
         [
             "lib/clang/**",
             "lib/" + TRIPLE + "/**",
             "sysroot/" + TRIPLE + "/**",
+            "include/*.h",
             "include/c++/**",
+            "include/" + TRIPLE + "/c++/**",
         ],
         allow_empty = True,
     ),
@@ -68,14 +71,13 @@ cc_toolchain_config(
     ],
     compiler = "clang",
     cpu = "darwin_arm64" if DARWIN else "k8" if TRIPLE.startswith("x86_64") else "aarch64",
-    # The bundle's own headers; on macOS, the SDK (located by `cc` through xcrun when SDKROOT is unset).
+    # All accepted system headers are part of the selected toolchain.
     cxx_builtin_include_directories = [
         "%package(@@" + repository_name().lstrip("@") + "//)%/lib/clang",
         "%package(@@" + repository_name().lstrip("@") + "//)%/include",
         "%package(@@" + repository_name().lstrip("@") + "//)%/sysroot",
     ] + ([
-        "/Library/Developer/CommandLineTools/SDKs",
-        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs",
+        "%package(@@" + repository_name().lstrip("@") + "//)%/apple-sdk",
     ] if DARWIN else [
         # BuildBuddy's self-hosted executors report the bundle's headers under their fixed absolute execroot, which
         # Bazel's header inclusion check otherwise rejects ("absolute path inclusion(s) found").

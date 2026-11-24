@@ -9,8 +9,9 @@ mx_whole_java(
         "17",
     ],
     unified_release = 17,
-    visibility = ["//tests/gazelle:__subpackages__"],
+    visibility = ["//visibility:public"],
     deps = [
+        ":client",
         ":demo",
         "@contrib_rules_jvm_deps//:junit_junit",
     ],
@@ -28,5 +29,12 @@ mx_project(
         "//tests/gazelle/src/main/java/example/api",
         "//tests/gazelle/src/main/java/example/app",
     ],
-    visibility = ["//tests/gazelle:__subpackages__"],
+    visibility = ["//visibility:public"],
+)
+
+mx_project(
+    name = "client",
+    packages = ["//tests/gazelle/client/src/main/java/example/client"],
+    visibility = ["//visibility:public"],
+    deps = [":demo"],
 )
