@@ -1,0 +1,50 @@
+load("@rules_cc//cc/toolchains:tool.bzl", "cc_tool")
+load("@rules_cc//cc/toolchains:tool_map.bzl", "cc_tool_map")
+load("@rules_cc//cc/toolchains:toolchain.bzl", "cc_toolchain")
+
+# GraalVM invokes its C driver directly to probe glibc and link the image.
+# The target-prefixed clang finds Elide's adjacent .cfg, sysroot and lld.
+cc_tool(
+    name = "clang",
+    src = "@elide_linux_amd64//:elide_cc_compiler",
+    data = ["@elide_linux_amd64//:elide_cc_files"],
+    tags = ["manual"],
+)
+
+cc_tool(
+    name = "ar",
+    src = "@elide_linux_amd64//:lib/llvm/toolchain/bin/llvm-ar",
+    tags = ["manual"],
+)
+
+cc_tool_map(
+    name = "tools",
+    tags = ["manual"],
+    tools = {
+        "@rules_cc//cc/toolchains/actions:ar_actions": ":ar",
+        "@rules_cc//cc/toolchains/actions:c_compile": ":clang",
+        "@rules_cc//cc/toolchains/actions:link_actions": ":clang",
+    },
+)
+
+cc_toolchain(
+    name = "cc",
+    compiler = "clang",
+    tags = ["manual"],
+    tool_map = ":tools",
+)
+
+toolchain(
+    name = "linux_amd64",
+    exec_compatible_with = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:linux",
+    ],
+    tags = ["manual"],
+    target_compatible_with = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:linux",
+    ],
+    toolchain = ":cc",
+    toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
+)

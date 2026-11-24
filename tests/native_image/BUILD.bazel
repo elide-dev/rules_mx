@@ -1,0 +1,18 @@
+load("@rules_graalvm//graalvm:defs.bzl", "native_image")
+load("@rules_python//python:py_test.bzl", "py_test")
+
+native_image(
+    name = "checkcopy",
+    main_class = "com.oracle.mxtool.checkcopy.CheckCopyright",
+    tags = ["manual"],
+    deps = ["@graal_mx//:com.oracle.mxtool.checkcopy"],
+)
+
+py_test(
+    name = "checkcopy_test",
+    size = "small",
+    srcs = ["checkcopy_test.py"],
+    args = ["$(rootpath :checkcopy)"],
+    data = [":checkcopy"],
+    tags = ["manual"],
+)

@@ -112,8 +112,12 @@ The initial Linux x86_64 REAPI smoke build compiled and packaged the real Graal 
 
 Ordinary Java builds use Elide persistent workers and emit the ABI alongside the class jar for eligible targets. For local builds with explicitly modeled processors, `bazelisk build --config=elide-workers //tests/gazelle/... //:webserver` also enables multiplex workers and digest-keyed classpath reuse. The classpath cache disables implicit processor discovery. Use the separate RBE profile for remote execution.
 
-The module pins unified JVM builder PR #132 at `30ac6d5` and applies the JavaBuilder processor fix from PR #133. With a registered Elide runtime advertising unified JVM request version 1, `--config=elide-unified` enables fused compilation for eligible Elide Java targets. The default Elide 1.6.2 distribution uses the legacy path. Processor consumers use the JavaBuilder adapter via `--config=elide-processors`.
+The module pins Native Image toolchain PR #134 at `9d997fb`, which includes unified JVM builder PR #132 and applies the JavaBuilder processor fix from PR #133. With a registered Elide runtime advertising unified JVM request version 1, `--config=elide-unified` enables fused compilation for eligible Elide Java targets. The default Elide 1.6.2 distribution uses the legacy path. Processor consumers use the JavaBuilder adapter via `--config=elide-processors`.
 
 ## Labs JDK
 
 `bazelisk run --config=labsjdk //:mx -- --version` selects the Oracle Labs JDK 25 JVMCI build pinned by the bundled mx suite. The profile selects the target Java runtime independently of the JDK used to compile Bazel tools. The extension provides checksum-pinned archives for Linux AMD64, Linux ARM64, and macOS ARM64. Consumers can register the same runtime toolchains using the Labs JDK stanza in MODULE.bazel.
+
+## Native Image
+
+Build mx's copyright checker with `bazelisk build //tests/native_image:checkcopy`. For Linux AMD64 remote execution, run `tools/buildbuddy test --config=buildbuddy-rbe --config=native-image-linux //tests/native_image:checkcopy_test`. The target uses the ordinary `rules_graalvm` Native Image rule with the SDK from Elide. Its Java input is the same project JAR used in JVM builds. The root module connects the rulesets with `inject_repo(elide, "rules_graalvm")` and registers `@elide_toolchains//graalvm:all`.

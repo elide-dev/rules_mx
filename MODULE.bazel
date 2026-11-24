@@ -9,12 +9,12 @@ bazel_dep(name = "rules_python", version = "1.9.2")
 bazel_dep(name = "rules_elide", version = "0.6.1")
 archive_override(
     module_name = "rules_elide",
-    integrity = "sha256-4kZAre/mNAg8IJTBJdOP89/07brTMioCLmdpfX3L4gQ=",
+    integrity = "sha256-vQiFTGKzDEn4lj5MinoePBom0oKLyZQKdnBRp8ExnTg=",
     # Processor option precedence from rules_elide PR 133 atop unified builder PR 132.
     patch_strip = 1,
     patches = ["//mx:elide_javabuilder.patch"],
-    strip_prefix = "rules_elide-30ac6d5a189544b4c7c1322d30c679ea91783789",
-    urls = ["https://github.com/elide-dev/rules_elide/archive/30ac6d5a189544b4c7c1322d30c679ea91783789.tar.gz"],
+    strip_prefix = "rules_elide-9d997fb3e0f0a5c95913db16d40d9a3869f813bf",
+    urls = ["https://github.com/elide-dev/rules_elide/archive/9d997fb3e0f0a5c95913db16d40d9a3869f813bf.tar.gz"],
 )
 
 bazel_dep(name = "gazelle", version = "0.54.0")
@@ -68,3 +68,20 @@ register_toolchains(
     "@labsjdk_linux_amd64_toolchain_config_repo//:all",
     dev_dependency = True,
 )
+
+bazel_dep(name = "rules_graalvm", version = "0.12.0", dev_dependency = True)
+archive_override(
+    module_name = "rules_graalvm",
+    integrity = "sha256-KN+4Pwe4X81JnQNLnxDXYfhUwGHAgrULmu2Pt8pTISE=",
+    strip_prefix = "rules_graalvm-bc5d221128382487bb7c2df1fed996114b40ea2e",
+    urls = ["https://github.com/sgammon/rules_graalvm/archive/bc5d221128382487bb7c2df1fed996114b40ea2e.tar.gz"],
+)
+
+inject_repo(elide, "rules_graalvm")
+
+register_toolchains(
+    "@elide_toolchains//graalvm:all",
+    dev_dependency = True,
+)
+
+bazel_dep(name = "rules_cc", version = "0.2.18", dev_dependency = True)
