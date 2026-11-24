@@ -111,7 +111,7 @@ tools/buildbuddy test --config=elide-processors //...
 tools/buildbuddy test --config=buildbuddy-rbe --config=elide-processors //tests/processing:outputs_test
 ```
 
-Both commands use the `elide-dev/rules_mx` cache instance. The second also sends actions to the tenant's Linux AMD64 executors with automatic pool selection.
+Both commands use the `elide-dev/rules_mx` cache instance. The RBE profile fixes the target and execution CPU settings so macOS and Linux clients produce the same Linux output paths. The second also sends actions to the tenant's Linux AMD64 executors with automatic pool selection.
 
 On pushes to `main` and manual runs, the Bazel workflow uses the repository's `BUILDBUDDY_API_KEY` secret and runs the full processor-enabled suite and the exporter tests with Labs JDK and Elide Python on BuildBuddy. Pull requests run the same tests on the GitHub runner without the cluster credential. Open the invocation link in the job log to inspect remote actions and cache hits.
 

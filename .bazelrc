@@ -1,7 +1,7 @@
 common --enable_platform_specific_config
 build --macos_minimum_os=12.0
-build:macos --features=-macos_minimum_os
-build:macos --host_features=-macos_minimum_os
+build --features=-macos_minimum_os
+build --host_features=-macos_minimum_os
 common --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 # JVM-only workspaces do not consume a host Android SDK.
 common --repo_env=ANDROID_HOME=
@@ -16,6 +16,10 @@ build:elide-python --extra_toolchains=//tools:macos_arm64,//tools:linux_amd64,//
 
 build:rbc --remote_upload_local_results
 
+# This profile targets Linux AMD64 on every client. Some rules and output
+# paths still consult the legacy CPU options in addition to platform labels.
+build:rbe --cpu=k8
+build:rbe --host_cpu=k8
 build:rbe --platforms=//tools:linux_x86_64
 build:rbe --extra_execution_platforms=//tools:linux_x86_64
 build:rbe --spawn_strategy=remote
