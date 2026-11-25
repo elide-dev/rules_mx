@@ -291,6 +291,7 @@ SUITES = {
                 "com.oracle.truffle.api.staticobject.test": ["ReturnValueIgnored"],
                 # The fork's requiresConcealed compiles this project with stock javac.
                 "com.oracle.truffle.api.staticobject": ["ReturnValueIgnored"],
+                "com.oracle.truffle.api.modularized.test": ["ReturnValueIgnored"],
                 "com.oracle.truffle.api.instrumentation.test": ["ReturnValueIgnored"],
                 "com.oracle.truffle.api.bytecode.test": [
                     "JUnit4TestNotRun",
