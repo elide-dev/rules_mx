@@ -296,6 +296,68 @@
   },
   "selectedYankedVersions": {},
   "moduleExtensions": {
+    "//graal:visualvm.bzl%visualvm_inputs": {
+      "general": {
+        "bzlTransitiveDigest": "yHp3aC23exUsBqAnSx4lhw0KWtIstbAxfcbO+PDq67o=",
+        "usagesDigest": "5PzQvij732UhJ0yudPex/IeLXkW9Y2XcF42oZimDLps=",
+        "recordedInputs": [
+          "REPO_MAPPING:,bazel_tools bazel_tools",
+          "FILE:@@//graal/visualvm.json accc3da17dbff6a41fc986214ebb908ce1c9ec10f3108449f267d1f419a1aafe"
+        ],
+        "generatedRepoSpecs": {
+          "visualvm_common": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_file",
+            "attributes": {
+              "urls": [
+                "https://lafo.ssw.uni-linz.ac.at/pub/graal-external-deps/visualvm/visualvm-1090.tar.gz"
+              ],
+              "integrity": "sha512-3Ppxn5fFPIaTrAMfj/Oxd4gpbe7vlNL7qzAizIEQ0qdd1Dm4/4+A4YEsu4qL4tSKJ9KJBSFXK7a4eu76YOMi4g==",
+              "downloaded_file_path": "visualvm.tar.gz"
+            }
+          },
+          "visualvm_linux_amd64": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_file",
+            "attributes": {
+              "urls": [
+                "https://lafo.ssw.uni-linz.ac.at/pub/graal-external-deps/visualvm/visualvm-1090-linux-amd64.tar.gz"
+              ],
+              "integrity": "sha512-zSD568Y9PqWuPEbzQHXwKheKb0usppCTu92jWXkn0ggzn291Y66Op1tLFk60lwLToMoIqo2Tsy3YuWe9r3Ofdw==",
+              "downloaded_file_path": "visualvm.tar.gz"
+            }
+          },
+          "visualvm_linux_arm64": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_file",
+            "attributes": {
+              "urls": [
+                "https://lafo.ssw.uni-linz.ac.at/pub/graal-external-deps/visualvm/visualvm-1090-linux-aarch64.tar.gz"
+              ],
+              "integrity": "sha512-OgJALJIxLFOMpqz59OfN53uF4LNwiDUPdy5YLmCm9T5ndJx8wJJgRF8mDPCoQJi8UL4jQsbeICOUVOghhSbNZw==",
+              "downloaded_file_path": "visualvm.tar.gz"
+            }
+          },
+          "visualvm_macos": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_file",
+            "attributes": {
+              "urls": [
+                "https://lafo.ssw.uni-linz.ac.at/pub/graal-external-deps/visualvm/visualvm-1090-macos.tar.gz"
+              ],
+              "integrity": "sha512-WX4ki0zquAbuRyYLelSzea7bKsh3qjGGYMrl8DPWFZDA/dTDwHC08FjfUFM0g1Bd2EZ1sC9M0UM6dK81j2taWQ==",
+              "downloaded_file_path": "visualvm.tar.gz"
+            }
+          },
+          "visualvm_windows_amd64": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_file",
+            "attributes": {
+              "urls": [
+                "https://lafo.ssw.uni-linz.ac.at/pub/graal-external-deps/visualvm/visualvm-1090-windows-amd64.tar.gz"
+              ],
+              "integrity": "sha512-SeSUo45XdcBzhAlmaN9pEGYouFBpasH/paeINReIoIbZIXUHLuLlDj0WkobotI8Leqsaolev2vV8hF1IIiS97A==",
+              "downloaded_file_path": "visualvm.tar.gz"
+            }
+          }
+        }
+      }
+    },
     "//mx:extensions.bzl%mx_sources": {
       "general": {
         "bzlTransitiveDigest": "SqPCxyR+FXtZgdxTDKAZTXtRf3GWZucLe7RTyTjAwig=",
