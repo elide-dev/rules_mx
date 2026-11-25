@@ -3,6 +3,8 @@
 load("@rules_java//java/common:java_common.bzl", "java_common")
 load("@rules_java//java/common:java_info.bzl", "JavaInfo")
 
+_MxJarInfo = provider(fields = ["uses_jvmci"])
+
 _TOOLCHAIN = "@bazel_tools//tools/jdk:toolchain_type"
 
 def _jar_impl(ctx):
@@ -34,10 +36,15 @@ def _jar_impl(ctx):
         args.add("--jmh-metadata")
     if ctx.attr.jni_services:
         args.add("--jni-services")
+    uses_jvmci = ctx.attr.requires_jvmci or any([
+        dep[_MxJarInfo].uses_jvmci
+        for dep in ctx.attr.deps
+        if _MxJarInfo in dep
+    ])
     tools = []
     if ctx.attr.module_name:
-        if ctx.attr.descriptor_toolchain:
-            toolchain = ctx.attr.descriptor_toolchain[java_common.JavaToolchainInfo]
+        if uses_jvmci:
+            toolchain = ctx.attr._labs_jvmci[java_common.JavaToolchainInfo]
             args.add("--system-modules")
         runtime = toolchain.java_runtime
         tools.append(runtime.files)
@@ -59,6 +66,7 @@ def _jar_impl(ctx):
     abi = java_common.run_ijar(ctx.actions, jar, target_label = ctx.label, java_toolchain = toolchain)
     return [
         DefaultInfo(files = depset([jar])),
+        _MxJarInfo(uses_jvmci = uses_jvmci),
         JavaInfo(output_jar = jar, compile_jar = abi, exports = dependencies, add_exports = ctx.attr.add_exports),
         coverage_common.instrumented_files_info(ctx, dependency_attributes = ["contents", "deps"]),
     ]
@@ -66,7 +74,8 @@ def _jar_impl(ctx):
 _jar_dist = rule(
     implementation = _jar_impl,
     attrs = {
-        "descriptor_toolchain": attr.label(cfg = "exec"),
+        "requires_jvmci": attr.bool(),
+        "_labs_jvmci": attr.label(default = Label("//tools:labs_jvmci"), cfg = "exec"),
         "overlays": attr.label_keyed_string_dict(providers = [JavaInfo]),
         "contents": attr.label_list(providers = [JavaInfo], mandatory = True),
         "deps": attr.label_list(providers = [JavaInfo]),
@@ -94,6 +103,6 @@ def mx_jar_dist(name, directives = [], **kwargs):
     _jar_dist(
         name = name,
         directives = directives,
-        descriptor_toolchain = Label("//tools:labs_jvmci") if jvmci else None,
+        requires_jvmci = jvmci,
         **kwargs
     )

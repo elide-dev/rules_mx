@@ -24,6 +24,10 @@ def _libffi_impl(ctx):
     # The pinned GNU/Linux sysroot exposes glibc 2.17 headers. Use libffi's
     # portable fallback for the optional memfd_create API (glibc 2.27+).
     build = build.replace('"HAVE_MEMFD_CREATE": "1"', '"HAVE_MEMFD_CREATE": None')
+    build += """
+alias(name = "ffi_distribution_header", actual = ":ffi_h", visibility = ["//visibility:public"])
+alias(name = "ffitarget_distribution_header", actual = ":ffitarget_h", visibility = ["//visibility:public"])
+"""
     ctx.file("BUILD.bazel", build)
 
 graal_libffi = repository_rule(

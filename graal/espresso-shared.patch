@@ -1,0 +1,382 @@
+diff --git a/espresso-shared/BUILD.bazel b/espresso-shared/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/espresso-shared/BUILD.bazel
+@@ -0,0 +1,112 @@
++load("@rules_mx//graal:espresso.bzl", "espresso_svm")
++load("@rules_mx//mx:graph.bzl", "mx_jar_dist", "mx_whole_java")
++
++espresso_svm(
++    name = "ESPRESSO_SVM",
++    directives = [
++        "exports com.oracle.svm.espresso.classfile to org.graalvm.nativeimage.builder",
++        "exports com.oracle.svm.espresso.classfile.attributes to org.graalvm.nativeimage.builder",
++        "exports com.oracle.svm.espresso.classfile.bytecode to org.graalvm.nativeimage.builder",
++        "exports com.oracle.svm.espresso.classfile.descriptors to org.graalvm.nativeimage.builder",
++        "exports com.oracle.svm.espresso.classfile.perf to org.graalvm.nativeimage.builder",
++        "exports com.oracle.svm.espresso.classfile.tables to org.graalvm.nativeimage.builder",
++        "exports com.oracle.svm.espresso.shared.constraints to org.graalvm.nativeimage.builder",
++        "exports com.oracle.svm.espresso.shared.lookup to org.graalvm.nativeimage.builder",
++        "exports com.oracle.svm.espresso.shared.meta to org.graalvm.nativeimage.builder",
++        "exports com.oracle.svm.espresso.shared.resolver to org.graalvm.nativeimage.builder",
++        "exports com.oracle.svm.espresso.shared.verifier to org.graalvm.nativeimage.builder",
++        "exports com.oracle.svm.espresso.shared.vtable to org.graalvm.nativeimage.builder",
++        "requires org.graalvm.collections",
++    ],
++    module_name = "org.graalvm.espresso.shared.svm",
++    project = "com.oracle.svm.espresso",
++    shade = "{\"packages\": {\"com.oracle.truffle.espresso\": \"com.oracle.svm.espresso\"}, \"patch\": {\"**/*.java\": {\"@CompilationFinal(\\\\(.*?\\\\))?(?!\\\\w)\": \"\", \"@CompilerDirectives\\\\.CompilationFinal(\\\\(.*?\\\\))?(?!\\\\w)\": \"\", \"@CompilerDirectives\\\\.TruffleBoundary(\\\\(.*?\\\\))?(?!\\\\w)\": \"\", \"@ExplodeLoop(\\\\(.*?\\\\))?(?!\\\\w)\": \"\", \"@TruffleBoundary(\\\\(.*?\\\\))?(?!\\\\w)\": \"\", \"^import\\\\s+com\\\\.oracle\\\\.truffle\\\\.api\\\\.CompilerDirectives\\\\.CompilationFinal\\\\s*;\": \"\", \"^import\\\\s+com\\\\.oracle\\\\.truffle\\\\.api\\\\.CompilerDirectives\\\\.TruffleBoundary\\\\s*;\": \"\", \"^import\\\\s+com\\\\.oracle\\\\.truffle\\\\.api\\\\.CompilerDirectives\\\\s*;\": \"\", \"^import\\\\s+com\\\\.oracle\\\\.truffle\\\\.api\\\\.nodes\\\\.ExplodeLoop\\\\s*;\": \"\", \"^import\\\\s+static\\\\ com\\\\.oracle\\\\.truffle\\\\.api\\\\.CompilerDirectives\\\\.CompilationFinal\\\\s*;\": \"\", \"^import\\\\s+static\\\\ com\\\\.oracle\\\\.truffle\\\\.api\\\\.CompilerDirectives\\\\.TruffleBoundary\\\\s*;\": \"\"}}}",
++    shade_inputs = [
++        ":com.oracle.truffle.espresso.classfile",
++        ":com.oracle.truffle.espresso.shared",
++    ],
++)
++
++mx_whole_java(
++    name = "com.oracle.truffle.espresso.classfile",
++    srcs = [
++        "//espresso-shared/src/com.oracle.truffle.espresso.classfile/src/com/oracle/truffle/espresso/classfile:com.oracle.truffle.espresso.classfile.srcs",
++        "//espresso-shared/src/com.oracle.truffle.espresso.classfile/src/com/oracle/truffle/espresso/classfile/attributes:com.oracle.truffle.espresso.classfile.srcs",
++        "//espresso-shared/src/com.oracle.truffle.espresso.classfile/src/com/oracle/truffle/espresso/classfile/bytecode:com.oracle.truffle.espresso.classfile.srcs",
++        "//espresso-shared/src/com.oracle.truffle.espresso.classfile/src/com/oracle/truffle/espresso/classfile/descriptors:com.oracle.truffle.espresso.classfile.srcs",
++        "//espresso-shared/src/com.oracle.truffle.espresso.classfile/src/com/oracle/truffle/espresso/classfile/perf:com.oracle.truffle.espresso.classfile.srcs",
++        "//espresso-shared/src/com.oracle.truffle.espresso.classfile/src/com/oracle/truffle/espresso/classfile/tables:com.oracle.truffle.espresso.classfile.srcs",
++    ],
++    javac_opts = [
++        "--release",
++        "21",
++        "-parameters",
++    ],
++    unified_release = 21,
++    visibility = ["//visibility:public"],
++    deps = [
++        "//sdk:COLLECTIONS",
++        "//truffle:TRUFFLE_API",
++    ],
++)
++
++mx_whole_java(
++    name = "com.oracle.truffle.espresso.shared",
++    srcs = [
++        "//espresso-shared/src/com.oracle.truffle.espresso.shared/src/com/oracle/truffle/espresso/shared/constraints:com.oracle.truffle.espresso.shared.srcs",
++        "//espresso-shared/src/com.oracle.truffle.espresso.shared/src/com/oracle/truffle/espresso/shared/lookup:com.oracle.truffle.espresso.shared.srcs",
++        "//espresso-shared/src/com.oracle.truffle.espresso.shared/src/com/oracle/truffle/espresso/shared/meta:com.oracle.truffle.espresso.shared.srcs",
++        "//espresso-shared/src/com.oracle.truffle.espresso.shared/src/com/oracle/truffle/espresso/shared/resolver:com.oracle.truffle.espresso.shared.srcs",
++        "//espresso-shared/src/com.oracle.truffle.espresso.shared/src/com/oracle/truffle/espresso/shared/verifier:com.oracle.truffle.espresso.shared.srcs",
++        "//espresso-shared/src/com.oracle.truffle.espresso.shared/src/com/oracle/truffle/espresso/shared/vtable:com.oracle.truffle.espresso.shared.srcs",
++    ],
++    javac_opts = [
++        "--release",
++        "21",
++        "-parameters",
++    ],
++    unified_release = 21,
++    visibility = ["//visibility:public"],
++    deps = [":com.oracle.truffle.espresso.classfile"],
++)
++
++mx_jar_dist(
++    name = "ESPRESSO_SHARED",
++    contents = [
++        ":com.oracle.truffle.espresso.classfile",
++        ":com.oracle.truffle.espresso.shared",
++    ],
++    directives = [
++        "exports com.oracle.truffle.espresso.classfile to org.graalvm.espresso",
++        "exports com.oracle.truffle.espresso.classfile.attributes to org.graalvm.espresso",
++        "exports com.oracle.truffle.espresso.classfile.bytecode to org.graalvm.espresso",
++        "exports com.oracle.truffle.espresso.classfile.descriptors to org.graalvm.espresso",
++        "exports com.oracle.truffle.espresso.classfile.perf to org.graalvm.espresso",
++        "exports com.oracle.truffle.espresso.classfile.tables to org.graalvm.espresso",
++        "exports com.oracle.truffle.espresso.shared.constraints to org.graalvm.espresso",
++        "exports com.oracle.truffle.espresso.shared.lookup to org.graalvm.espresso",
++        "exports com.oracle.truffle.espresso.shared.meta to org.graalvm.espresso",
++        "exports com.oracle.truffle.espresso.shared.resolver to org.graalvm.espresso",
++        "exports com.oracle.truffle.espresso.shared.verifier to org.graalvm.espresso",
++        "exports com.oracle.truffle.espresso.shared.vtable to org.graalvm.espresso",
++        "requires org.graalvm.collections",
++        "requires org.graalvm.truffle",
++        "requires transitive org.graalvm.word",
++    ],
++    jni_services = True,
++    manifest = {
++        "Implementation-Vendor": "Oracle Corporation",
++        "Implementation-Version": "25.5.5-dev",
++        "Name": "espresso-shared",
++        "Specification-Vendor": "Oracle Corporation",
++        "Specification-Version": "25.5.5-dev",
++    },
++    module_name = "org.graalvm.espresso.shared",
++    release = 21,
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [
++        "//sdk:COLLECTIONS",
++        "//truffle:TRUFFLE_API",
++    ],
++)
+diff --git a/espresso-shared/src/com.oracle.truffle.espresso.classfile/src/com/oracle/truffle/espresso/classfile/BUILD.bazel b/espresso-shared/src/com.oracle.truffle.espresso.classfile/src/com/oracle/truffle/espresso/classfile/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/espresso-shared/src/com.oracle.truffle.espresso.classfile/src/com/oracle/truffle/espresso/classfile/BUILD.bazel
+@@ -0,0 +1,23 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.espresso.classfile.srcs",
++    srcs = [
++        "ClassfileParser.java",
++        "ClassfileStream.java",
++        "ClasspathEntry.java",
++        "ClasspathFile.java",
++        "ConstantPool.java",
++        "Constants.java",
++        "ExceptionHandler.java",
++        "JavaKind.java",
++        "JavaVersion.java",
++        "ParserConstantPool.java",
++        "ParserException.java",
++        "ParserField.java",
++        "ParserKlass.java",
++        "ParserMethod.java",
++        "ParsingContext.java",
++    ],
++    visibility = ["//espresso-shared:__pkg__"],
++)
+diff --git a/espresso-shared/src/com.oracle.truffle.espresso.classfile/src/com/oracle/truffle/espresso/classfile/attributes/BUILD.bazel b/espresso-shared/src/com.oracle.truffle.espresso.classfile/src/com/oracle/truffle/espresso/classfile/attributes/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/espresso-shared/src/com.oracle.truffle.espresso.classfile/src/com/oracle/truffle/espresso/classfile/attributes/BUILD.bazel
+@@ -0,0 +1,31 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.espresso.classfile.srcs",
++    srcs = [
++        "Attribute.java",
++        "AttributedElement.java",
++        "BootstrapMethodsAttribute.java",
++        "CodeAttribute.java",
++        "ConstantValueAttribute.java",
++        "EnclosingMethodAttribute.java",
++        "ExceptionsAttribute.java",
++        "InnerClassesAttribute.java",
++        "LineNumberTableAttribute.java",
++        "LineNumberTableRef.java",
++        "Local.java",
++        "LocalRef.java",
++        "LocalVariableTable.java",
++        "LocalVariableTableRef.java",
++        "MethodParametersAttribute.java",
++        "NestHostAttribute.java",
++        "NestMembersAttribute.java",
++        "PermittedSubclassesAttribute.java",
++        "RecordAttribute.java",
++        "SignatureAttribute.java",
++        "SourceDebugExtensionAttribute.java",
++        "SourceFileAttribute.java",
++        "StackMapTableAttribute.java",
++    ],
++    visibility = ["//espresso-shared:__pkg__"],
++)
+diff --git a/espresso-shared/src/com.oracle.truffle.espresso.classfile/src/com/oracle/truffle/espresso/classfile/bytecode/BUILD.bazel b/espresso-shared/src/com.oracle.truffle.espresso.classfile/src/com/oracle/truffle/espresso/classfile/bytecode/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/espresso-shared/src/com.oracle.truffle.espresso.classfile/src/com/oracle/truffle/espresso/classfile/bytecode/BUILD.bazel
+@@ -0,0 +1,15 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.espresso.classfile.srcs",
++    srcs = [
++        "BytecodeLookupSwitch.java",
++        "BytecodeStream.java",
++        "BytecodeSwitch.java",
++        "BytecodeTableSwitch.java",
++        "Bytecodes.java",
++        "Bytes.java",
++        "VolatileArrayAccess.java",
++    ],
++    visibility = ["//espresso-shared:__pkg__"],
++)
+diff --git a/espresso-shared/src/com.oracle.truffle.espresso.classfile/src/com/oracle/truffle/espresso/classfile/descriptors/BUILD.bazel b/espresso-shared/src/com.oracle.truffle.espresso.classfile/src/com/oracle/truffle/espresso/classfile/descriptors/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/espresso-shared/src/com.oracle.truffle.espresso.classfile/src/com/oracle/truffle/espresso/classfile/descriptors/BUILD.bazel
+@@ -0,0 +1,26 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.espresso.classfile.srcs",
++    srcs = [
++        "ByteSequence.java",
++        "Descriptor.java",
++        "ErrorUtil.java",
++        "ModifiedUTF8.java",
++        "Name.java",
++        "NameSymbols.java",
++        "ParserSymbols.java",
++        "Signature.java",
++        "SignatureSymbols.java",
++        "StaticSymbols.java",
++        "Symbol.java",
++        "Symbols.java",
++        "SymbolsImpl.java",
++        "Type.java",
++        "TypeSymbols.java",
++        "Utf8Symbols.java",
++        "Validation.java",
++        "ValidationException.java",
++    ],
++    visibility = ["//espresso-shared:__pkg__"],
++)
+diff --git a/espresso-shared/src/com.oracle.truffle.espresso.classfile/src/com/oracle/truffle/espresso/classfile/perf/BUILD.bazel b/espresso-shared/src/com.oracle.truffle.espresso.classfile/src/com/oracle/truffle/espresso/classfile/perf/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/espresso-shared/src/com.oracle.truffle.espresso.classfile/src/com/oracle/truffle/espresso/classfile/perf/BUILD.bazel
+@@ -0,0 +1,13 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.espresso.classfile.srcs",
++    srcs = [
++        "DebugCloseable.java",
++        "DebugCounter.java",
++        "DebugTimer.java",
++        "TimerCollection.java",
++        "TimerCollectionImpl.java",
++    ],
++    visibility = ["//espresso-shared:__pkg__"],
++)
+diff --git a/espresso-shared/src/com.oracle.truffle.espresso.classfile/src/com/oracle/truffle/espresso/classfile/tables/BUILD.bazel b/espresso-shared/src/com.oracle.truffle.espresso.classfile/src/com/oracle/truffle/espresso/classfile/tables/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/espresso-shared/src/com.oracle.truffle.espresso.classfile/src/com/oracle/truffle/espresso/classfile/tables/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.espresso.classfile.srcs",
++    srcs = [
++        "AbstractModuleTable.java",
++        "AbstractPackageTable.java",
++        "EntryTable.java",
++    ],
++    visibility = ["//espresso-shared:__pkg__"],
++)
+diff --git a/espresso-shared/src/com.oracle.truffle.espresso.shared/src/com/oracle/truffle/espresso/shared/constraints/BUILD.bazel b/espresso-shared/src/com.oracle.truffle.espresso.shared/src/com/oracle/truffle/espresso/shared/constraints/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/espresso-shared/src/com.oracle.truffle.espresso.shared/src/com/oracle/truffle/espresso/shared/constraints/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.espresso.shared.srcs",
++    srcs = [
++        "LoadingConstraintViolationException.java",
++        "LoadingConstraintsShared.java",
++    ],
++    visibility = ["//espresso-shared:__pkg__"],
++)
+diff --git a/espresso-shared/src/com.oracle.truffle.espresso.shared/src/com/oracle/truffle/espresso/shared/lookup/BUILD.bazel b/espresso-shared/src/com.oracle.truffle.espresso.shared/src/com/oracle/truffle/espresso/shared/lookup/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/espresso-shared/src/com.oracle.truffle.espresso.shared/src/com/oracle/truffle/espresso/shared/lookup/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.espresso.shared.srcs",
++    srcs = [
++        "LookupMode.java",
++        "LookupSuccessInvocationFailure.java",
++        "MethodLookup.java",
++    ],
++    visibility = ["//espresso-shared:__pkg__"],
++)
+diff --git a/espresso-shared/src/com.oracle.truffle.espresso.shared/src/com/oracle/truffle/espresso/shared/meta/BUILD.bazel b/espresso-shared/src/com.oracle.truffle.espresso.shared/src/com/oracle/truffle/espresso/shared/meta/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/espresso-shared/src/com.oracle.truffle.espresso.shared/src/com/oracle/truffle/espresso/shared/meta/BUILD.bazel
+@@ -0,0 +1,21 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.espresso.shared.srcs",
++    srcs = [
++        "ErrorType.java",
++        "FieldAccess.java",
++        "KnownTypes.java",
++        "MemberAccess.java",
++        "MethodAccess.java",
++        "MethodHandleIntrinsics.java",
++        "ModifiersProvider.java",
++        "Named.java",
++        "RuntimeAccess.java",
++        "SignaturePolymorphicIntrinsic.java",
++        "Signed.java",
++        "SymbolPool.java",
++        "TypeAccess.java",
++    ],
++    visibility = ["//espresso-shared:__pkg__"],
++)
+diff --git a/espresso-shared/src/com.oracle.truffle.espresso.shared/src/com/oracle/truffle/espresso/shared/resolver/BUILD.bazel b/espresso-shared/src/com.oracle.truffle.espresso.shared/src/com/oracle/truffle/espresso/shared/resolver/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/espresso-shared/src/com.oracle.truffle.espresso.shared/src/com/oracle/truffle/espresso/shared/resolver/BUILD.bazel
+@@ -0,0 +1,13 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.espresso.shared.srcs",
++    srcs = [
++        "CallKind.java",
++        "CallSiteType.java",
++        "FieldAccessType.java",
++        "LinkResolver.java",
++        "ResolvedCall.java",
++    ],
++    visibility = ["//espresso-shared:__pkg__"],
++)
+diff --git a/espresso-shared/src/com.oracle.truffle.espresso.shared/src/com/oracle/truffle/espresso/shared/verifier/BUILD.bazel b/espresso-shared/src/com.oracle.truffle.espresso.shared/src/com/oracle/truffle/espresso/shared/verifier/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/espresso-shared/src/com.oracle.truffle.espresso.shared/src/com/oracle/truffle/espresso/shared/verifier/BUILD.bazel
+@@ -0,0 +1,17 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.espresso.shared.srcs",
++    srcs = [
++        "MethodVerifier.java",
++        "Operand.java",
++        "StackFrame.java",
++        "StackMapFrame.java",
++        "StackMapFrameParser.java",
++        "VerificationException.java",
++        "VerificationTypeInfo.java",
++        "Verifier.java",
++        "VerifierError.java",
++    ],
++    visibility = ["//espresso-shared:__pkg__"],
++)
+diff --git a/espresso-shared/src/com.oracle.truffle.espresso.shared/src/com/oracle/truffle/espresso/shared/vtable/BUILD.bazel b/espresso-shared/src/com.oracle.truffle.espresso.shared/src/com/oracle/truffle/espresso/shared/vtable/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/espresso-shared/src/com.oracle.truffle.espresso.shared/src/com/oracle/truffle/espresso/shared/vtable/BUILD.bazel
+@@ -0,0 +1,14 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.espresso.shared.srcs",
++    srcs = [
++        "MethodTableException.java",
++        "PartialType.java",
++        "TableEntry.java",
++        "TableEntryRef.java",
++        "Tables.java",
++        "VTable.java",
++    ],
++    visibility = ["//espresso-shared:__pkg__"],
++)

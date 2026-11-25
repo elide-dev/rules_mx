@@ -1,10 +1,12 @@
 load("@rules_java//java:java_library.bzl", "java_library")
 load("@rules_java//java:java_test.bzl", "java_test")
 load("@rules_python//python:py_binary.bzl", "py_binary")
+load("@rules_python//python:py_test.bzl", "py_test")
 
 exports_files([
     "benchmark_timer.patch",
     "compiler.patch",
+    "espresso-shared.patch",
     "sdk.patch",
     "sl.py.tpl",
     "sl_fixture_test.py",
@@ -12,6 +14,7 @@ exports_files([
     "hsdis.json",
     "libffi.json",
     "truffle.patch",
+    "substratevm.patch",
     "toolchain_test.py",
 ])
 
@@ -123,19 +126,68 @@ java_library(
 )
 
 java_library(
+    name = "mx_junit_launcher",
+    testonly = True,
+    srcs = ["MxJUnitLauncher.java"],
+    visibility = ["//visibility:public"],
+    exports = ["@bazel_tools//tools/jdk:TestRunner"],
+)
+
+java_library(
     name = "compiler_junit",
     testonly = True,
     srcs = [
         "CompilerJUnit.java",
-        "CompilerJUnitLauncher.java",
         "@graal_mx//:junit_runner_sources",
     ],
     add_exports = ["java.base/jdk.internal.module"],
     visibility = ["//visibility:public"],
+    exports = [":mx_junit_launcher"],
     deps = [
         "@bazel_tools//tools/jdk:TestRunner",
         "@contrib_rules_jvm_deps//:junit_junit",
     ],
+)
+
+py_test(
+    name = "truffle_layout_test",
+    size = "small",
+    srcs = ["truffle_layout_test.py"],
+    args = [
+        "$(rootpath @graal//truffle:sl)",
+        "$(rootpath @graal//truffle:SL_BENCHMARKS)",
+        "$(rootpath @graal//truffle:NFI_POLYBENCH_BENCHMARKS)",
+        "$(rootpath @graal//truffle:TRUFFLE_ATTACH_GRAALVM_SUPPORT)",
+        "$(rootpath @graal//truffle:LIBFFI_DIST)",
+        "$(rootpath @graal//truffle:TRUFFLE_NFI_NATIVE)",
+        "$(rootpath @graal//truffle:TRUFFLE_NFI_GRAALVM_SUPPORT)",
+        "$(rootpath @graal//truffle:TRUFFLE_NFI_NATIVE_GRAALVM_SUPPORT)",
+        "$(rootpath @graal//truffle:PMH_BENCHMARK_NATIVE)",
+        "$(rootpath @graal//truffle:TRUFFLE_ICU4J_GRAALVM_SUPPORT)",
+        "$(rootpath @graal//truffle:TRUFFLE_ANTLR4_GRAALVM_SUPPORT)",
+        "$(rootpath @graal//truffle:TRUFFLE_JSON_GRAALVM_SUPPORT)",
+        "$(rootpath @graal//truffle:TRUFFLE_XZ_GRAALVM_SUPPORT)",
+    ],
+    data = [
+        "@graal//truffle:LIBFFI_DIST",
+        "@graal//truffle:NFI_POLYBENCH_BENCHMARKS",
+        "@graal//truffle:PMH_BENCHMARK_NATIVE",
+        "@graal//truffle:SL_BENCHMARKS",
+        "@graal//truffle:TRUFFLE_ANTLR4_GRAALVM_SUPPORT",
+        "@graal//truffle:TRUFFLE_ATTACH_GRAALVM_SUPPORT",
+        "@graal//truffle:TRUFFLE_ICU4J_GRAALVM_SUPPORT",
+        "@graal//truffle:TRUFFLE_JSON_GRAALVM_SUPPORT",
+        "@graal//truffle:TRUFFLE_NFI_GRAALVM_SUPPORT",
+        "@graal//truffle:TRUFFLE_NFI_NATIVE",
+        "@graal//truffle:TRUFFLE_NFI_NATIVE_GRAALVM_SUPPORT",
+        "@graal//truffle:TRUFFLE_XZ_GRAALVM_SUPPORT",
+        "@graal//truffle:sl",
+    ],
+    target_compatible_with = select({
+        "@platforms//os:linux": [],
+        "@platforms//os:macos": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
 )
 
 py_binary(

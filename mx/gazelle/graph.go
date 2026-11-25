@@ -36,6 +36,7 @@ type project struct {
 	ShadeInputs                          []string `json:"shade_inputs"`
 	AddExports                           []string `json:"add_exports"`
 	ResourceRoot                         string   `json:"resource_root"`
+	ResourceRoots                        []string `json:"resource_roots"`
 	TestLauncher                         string   `json:"test_launcher"`
 	ManualTests                          bool     `json:"manual_tests"`
 	TestRuntime                          []string `json:"test_runtime"`
@@ -221,6 +222,9 @@ func (g *importer) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
 			if p.ResourceRoot != "" {
 				r.SetAttr("mx_resource_root", p.ResourceRoot)
 			}
+			if len(p.ResourceRoots) > 0 {
+				r.SetAttr("mx_resource_roots", p.ResourceRoots)
+			}
 		} else {
 			r = rule.NewRule("mx_project", p.Name)
 		}
@@ -347,7 +351,7 @@ func graphKind(k string) bool {
 func (g *importer) Kinds() map[string]rule.KindInfo {
 	kinds := g.javaLanguage.Kinds()
 	managed := map[string]bool{}
-	for _, a := range strings.Fields("overlays shade shade_inputs manifest contents directives release snippets_pattern archived_libraries jmh_metadata jni_services truffle_services graal_services graal_test_services module_name add_exports jni_headers abi_after_javac copies literals srcs deps packages launcher tags data runtime_deps jvm_flags test_class project processor_class generates_api plugins resources mx_resource_root unified_release javac_opts javacopts testonly visibility") {
+	for _, a := range strings.Fields("overlays shade shade_inputs manifest contents directives release snippets_pattern archived_libraries jmh_metadata jni_services truffle_services graal_services graal_test_services module_name add_exports jni_headers abi_after_javac copies literals srcs deps packages launcher tags data runtime_deps jvm_flags test_class project processor_class generates_api plugins resources mx_resource_root mx_resource_roots unified_release javac_opts javacopts testonly visibility") {
 		managed[a] = true
 	}
 	for _, k := range strings.Fields("mx_jvmci_library mx_shaded_java mx_files mx_project mx_whole_java mx_processed_java mx_processor mx_test_class") {

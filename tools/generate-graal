@@ -78,7 +78,51 @@ SUITES = {
         ),
         *SDK,
     ],
+    "espresso-shared": [
+        "--whole-project",
+        "com.oracle.truffle.espresso.classfile",
+        "--whole-project",
+        "com.oracle.truffle.espresso.shared",
+        "--java-dep",
+        "sdk:COLLECTIONS=//sdk:COLLECTIONS",
+        "--java-dep",
+        "truffle:TRUFFLE_API=//truffle:TRUFFLE_API",
+        "--archive-dist",
+        "ESPRESSO_SHARED",
+        "ESPRESSO_SHARED",
+    ],
     "compiler": [
+        "--java-dep",
+        "sdk:NATIVEIMAGE=//sdk:NATIVEIMAGE",
+        "--java-dep",
+        "sdk:VMACCESS_GUEST=//sdk:VMACCESS_GUEST",
+        "--java-dep",
+        "sdk:NATIVEIMAGE_LIBGRAAL=//sdk:NATIVEIMAGE_LIBGRAAL",
+        "--java-dep",
+        "sdk:JNIUTILS=//sdk:JNIUTILS",
+        "--java-dep",
+        "mx:JMH_1_21=:JMH_1_21",
+        "--java-dep",
+        "mx:JOPTSIMPLE_4_6=:JOPTSIMPLE_4_6",
+        "--java-dep",
+        "mx:COMMONS_MATH3_3_2=:COMMONS_MATH3_3_2",
+        "--java-dep",
+        "mx:JMH_GENERATOR_ANNPROCESS_1_21=:JMH_GENERATOR_ANNPROCESS_1_21",
+        "--processor-plugin",
+        "mx:JMH_1_21=:jmh_processor",
+        *[
+            arg
+            for dist in (
+                "GRAAL_MANAGEMENT",
+                "VMACCESS",
+                "HOSTVMACCESS",
+                "LIBGRAAL",
+                "LIBGRAAL_LOADER",
+                "GRAAL_COMPILER_WHITEBOX_MICRO_BENCHMARKS",
+                "GRAAL_COMPILER_MICRO_BENCHMARKS",
+            )
+            for arg in ("--archive-dist", dist)
+        ],
         # The compiler test corpus deliberately exercises invalid and pathological programs.
         "--javac-opt",
         "jdk.graal.compiler.test=-XepDisableAllChecks",
@@ -108,6 +152,9 @@ SUITES = {
                 "jdk.graal.compiler.test",
                 "jdk.graal.compiler.test.compiletime",
                 "jdk.graal.compiler.test.runtime",
+                "jdk.graal.compiler.libgraal",
+                "jdk.graal.compiler.libgraal.loader",
+                "jdk.graal.compiler.microbenchmarks",
             )
             for arg in ("--project-release", project + "=24")
         ],
@@ -148,6 +195,13 @@ SUITES = {
         "GRAAL_PROCESSOR",
         "--archive-dist",
         "GRAAL",
+        "GRAAL_MANAGEMENT",
+        "VMACCESS",
+        "HOSTVMACCESS",
+        "LIBGRAAL",
+        "LIBGRAAL_LOADER",
+        "GRAAL_COMPILER_WHITEBOX_MICRO_BENCHMARKS",
+        "GRAAL_COMPILER_MICRO_BENCHMARKS",
         "GRAAL",
         "org.graalvm.igvutil.test",
         "org.graalvm.profdiff.test",
@@ -389,10 +443,110 @@ SUITES = {
         "TRUFFLE_SL_TCK",
         "TRUFFLE_TEST",
     ],
+    "substratevm": [
+        "--java-dep",
+        "espresso-shared:ESPRESSO_SVM=//espresso-shared:ESPRESSO_SVM",
+        "--java-dep",
+        "truffle:TRUFFLE_API=//truffle:TRUFFLE_API",
+        "--infer-source-deps",
+        "--javac-opt",
+        "com.oracle.svm.configure.test=-Xep:ReturnValueIgnored:WARN",
+        "--javac-opt",
+        "com.oracle.svm.guest.staging=-Xep:IdentityBinaryExpression:WARN",
+        "--javac-opt",
+        "com.oracle.svm.graal=-Xep:CollectionIncompatibleType:WARN",
+        "--test-jvm-flag",
+        "substratevm:com.oracle.svm.configure.test=--add-modules=jdk.internal.vm.ci",
+        "--test-jvm-flag",
+        "substratevm:com.oracle.svm.configure.test=--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
+        *[
+            arg
+            for name in (
+                "GRAAL",
+                "GRAAL_OPTIONS",
+                "GRAAL_PROCESSOR",
+                "VMACCESS",
+                "HOSTVMACCESS",
+            )
+            for arg in ("--java-dep", f"compiler:{name}=//compiler:{name}")
+        ],
+        *[
+            arg
+            for name in ("NATIVEIMAGE", "NATIVEIMAGE_LIBGRAAL", "COLLECTIONS", "WORD")
+            for arg in ("--java-dep", f"sdk:{name}=//sdk:{name}")
+        ],
+        "--java-dep",
+        "mx:JUNIT_TOOL=@contrib_rules_jvm_deps//:junit_junit",
+        "--java-dep",
+        "mx:HAMCREST=@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
+        "--whole-project",
+        "com.oracle.svm.processor",
+        "--project-release",
+        "com.oracle.svm.shared=25",
+        "--labs-javac-project",
+        "com.oracle.svm.shared",
+        "--javac-opt",
+        "com.oracle.objectfile=-Xep:ComparableType:WARN",
+        *[
+            arg
+            for check in (
+                "ReturnValueIgnored",
+                "TypeParameterQualifier",
+                "ArrayToString",
+                "ComparisonOutOfRange",
+                "GetClassOnAnnotation",
+            )
+            for arg in ("--javac-opt", f"com.oracle.svm.hosted=-Xep:{check}:WARN")
+        ],
+        "--javac-opt",
+        "com.oracle.svm.interpreter.metadata=-Xep:ReturnValueIgnored:WARN",
+        "--javac-opt",
+        "com.oracle.svm.core.genscavenge=-Xep:BoxedPrimitiveEquality:WARN",
+        *[
+            arg
+            for check in (
+                "ReturnValueIgnored",
+                "IdentityBinaryExpression",
+                "IsInstanceIncompatibleType",
+                "DoNotCall",
+                "BoxedPrimitiveEquality",
+            )
+            for arg in ("--javac-opt", f"com.oracle.svm.core=-Xep:{check}:WARN")
+        ],
+        *[
+            arg
+            for project in ("com.oracle.svm.configure.test",)
+            for arg in ("--project-release", project + "=24")
+        ],
+        *[
+            arg
+            for dist in (
+                "SVM",
+                "SVM_CAPNPROTO_RUNTIME",
+                "SVM_GUEST_STAGING",
+                "SVM_JVMCI_SHARED",
+                "SVM_JVMCI_GUEST_STAGING",
+                "SVM_PROCESSOR",
+                "SVM_SHARED",
+                "NATIVE_IMAGE_BASE",
+                "SVM_CONFIGURE",
+                "POINTSTO",
+                "OBJECTFILE",
+            )
+            for arg in ("--archive-dist", dist)
+        ],
+        "SVM",
+        "SVM_PROCESSOR",
+        "SVM_CONFIGURE",
+        "POINTSTO",
+        "OBJECTFILE",
+        "com.oracle.svm.configure.test",
+    ],
 }
 
 
 SHADED_PROJECTS = {
+    "substratevm": ("com.oracle.svm.shaded.org.capnproto",),
     "sdk": ("org.graalvm.shadowed.org.jline", "org.graalvm.shadowed.org.jline.jdk22"),
     "truffle": (
         "com.oracle.truffle.api.impl.asm",
@@ -455,14 +609,10 @@ def harness_options(directory):
             arg
             for p in projects
             for arg in (
-                "--test-jvm-flag",
-                f"truffle:{p}=-Dpolyglot.engine.WarnInterpreterOnly=false",
-                "--test-jvm-flag",
-                f"truffle:{p}=--enable-native-access=ALL-UNNAMED",
+                "--test-launcher",
+                f"truffle:{p}=:truffle_junit",
                 "--generated-dep",
                 f"truffle:{p}=@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
-                "--test-runtime",
-                f"truffle:{p}=:TRUFFLE_TEST",
                 "--manual-test-project",
                 p,
             )
@@ -489,6 +639,43 @@ def harness_options(directory):
                 )
             ],
         ]
+    if suite == "substratevm":
+        source = (
+            directory.parent
+            / "compiler/src/jdk.graal.compiler.processor/src"
+            / "META-INF/services/javax.annotation.processing.Processor"
+        )
+        pending = ["SVM"]
+        seen = set()
+        releases = []
+        while pending:
+            name = pending.pop()
+            if name in seen:
+                continue
+            seen.add(name)
+            if project := metadata["projects"].get(name):
+                if (
+                    project.get("javaCompliance") == "24+"
+                    and name != "com.oracle.svm.shared"
+                ):
+                    releases.extend(("--project-release", name + "=24"))
+                pending.extend(project.get("dependencies", []))
+            elif dist := metadata["distributions"].get(name):
+                pending.extend(
+                    dist.get("dependencies", []) + dist.get("distDependencies", [])
+                )
+        return [
+            *releases,
+            *[
+                arg
+                for proc in source.read_text().splitlines()
+                if proc.strip() and not proc.startswith("#")
+                for arg in (
+                    "--processor-plugin",
+                    f"compiler:GRAAL_PROCESSOR=//compiler:mx_plugin.GRAAL_PROCESSOR.{proc}",
+                )
+            ],
+        ]
     return []
 
 
@@ -500,7 +687,9 @@ def shading_inputs(directory):
         inputs.update(jmh_rules(directory)[0])
     for project in SHADED_PROJECTS.get(directory.name, ()):
         for qualified in suite["projects"][project]["shadedDependencies"]:
-            owner, name = qualified.split(":")
+            owner, _, name = qualified.rpartition(":")
+            owner = owner or directory.name
+            qualified = f"{owner}:{name}"
             if owner != directory.name:
                 raise ValueError(f"Unmapped external shaded library {qualified}")
             lib = suite["libraries"][name]
@@ -544,25 +733,24 @@ def hsdis_inputs(directory):
 # CI runs independent upstream tests from each newly imported project. All other
 # discovered classes retain individually addressable labels for explicit runs.
 HARNESS_TESTS = {
-    "com.oracle.truffle.api.test": "ArgumentsTest CallTest ChildNodeTest ChildrenNodesTest FrameTest FrameDescriptorTest RootNodeTest LoopNodeTest NIOFileSystemTest ArrayUtilsTest ArrayUtilsIndexOfWithMaskTest ArrayUtilsRegionEqualsWithMaskTest FinalFieldTest FrameSlotTypeSpecializationTest IndexedFrameTest InterfaceChildFieldTest IteratorTest",
-    "com.oracle.truffle.api.dsl.test": "*",
-    "com.oracle.truffle.api.library.test": "*",
-    "com.oracle.truffle.api.instrumentation.test": "AllocationReporterTest ContextsEventsTest GenerateWrapperTest InstrumentAPITest InputFilterTest InstrumentOptionsTest InstrumentableNodeTest ExecutionListenerTest FindSourcesVisitorNestingTest",
-    "com.oracle.truffle.api.debug.test": "*",
-    "com.oracle.truffle.api.strings.test": "TStringBasicTests TStringUTF8Tests TStringUTF16Tests TStringConstructorTests TStringParseDoubleTest TStringParseIntTest TStringParseLongTest TStringConcatTest TStringSubstringTest TStringSwitchEncodingTest TStringHashCodeTest",
-    "com.oracle.truffle.api.bytecode.test": "*",
-    "com.oracle.truffle.api.object.test": "*",
-    "com.oracle.truffle.api.staticobject.test": "*",
-    "com.oracle.truffle.sandbox.test": "ResourceLimitsTest",
     "jdk.graal.compiler.test": "IntegerDivRemConstantTest IntegerDivPowerOf2Test IntegerSwitchTest IntegerBoxEqualsTest TestAnnotationsOnTypes TestAnnotationsOnMethods TestAnnotationsOnFields TestAnnotationsOnRecordComponents SLCompileASTTestSuite SLCompileBytecodeTestSuite SLCompileImmediatelyASTTestSuite SLCompileImmediatelyBytecodeTestSuite DumpPathTest HotSpotGraalOptionValuesTest CRC32SubstitutionsTest CRC32CSubstitutionsTest BytecodeDisassemblerTest AddModulesTest VectorAPISmokeTest",
 }
 
 
 def qualified_tests(directory):
+    suite = directory.name
+    metadata = runpy.run_path(str(directory / f"mx.{suite}/suite.py"))["suite"]
+    full = (
+        set(metadata["distributions"]["TRUFFLE_TEST"]["dependencies"])
+        if suite == "truffle"
+        else set()
+    )
     projects = json.loads((directory / "mx-graph.json").read_text())["projects"]
     labels = []
     for project in projects:
-        names = HARNESS_TESTS.get(project["name"], "")
+        names = (
+            "*" if project["name"] in full else HARNESS_TESTS.get(project["name"], "")
+        )
         if names == "*":
             labels.extend(":" + project["name"] + "." + cls for cls in project["tests"])
             continue
@@ -614,6 +802,10 @@ def compiler_harness(directory):
         rules.append(
             f'alias(name = "{name}", actual = select({json.dumps(choices)}), visibility = ["//visibility:public"])'
         )
+    inventory = sorted(":" + name for name in metadata["projects"])
+    rules.append(
+        f'filegroup(name = "all_projects", srcs = {json.dumps(inventory)}, testonly = True, visibility = ["//visibility:public"])'
+    )
     # Preserve the individually qualified regression labels from the earlier SL migration.
     for name in (
         "GR35581Test",
@@ -670,6 +862,116 @@ def sdk_native_projects(sdk):
         + "".join(f"    {key} = {json.dumps(value)},\n" for key, value in attrs.items())
         + ")\n\n"
     )
+
+
+def truffle_distribution_layouts(directory, suite):
+    native_project = "com.oracle.truffle.nfi.native"
+    header_dir = "src/" + native_project + "/include"
+    headers = sorted(directory.glob(header_dir + "/*.h"))
+    dependencies = {
+        "libffi/*": [
+            (":libffi_archive", "{target}/libffi.a"),
+            ("@graal_libffi//:ffi_distribution_header", "{target}/include/ffi.h"),
+            (
+                "@graal_libffi//:ffitarget_distribution_header",
+                "{target}/include/ffitarget.h",
+            ),
+        ],
+        "com.oracle.truffle.attach": [
+            (":com.oracle.truffle.attach", "{basename}"),
+        ],
+        native_project + "/*": [
+            (":" + native_project, "{target}/{basename}"),
+            *(
+                (p.relative_to(directory).as_posix(), "include/" + p.name)
+                for p in headers
+            ),
+        ],
+        native_project + "/include/*.h": [
+            (p.relative_to(directory).as_posix(), p.name) for p in headers
+        ],
+        native_project + "/*/<multitarget_libc_selection>/*": [
+            (":" + native_project, "{basename}"),
+        ],
+        "nfi-native": [(":nfi-native", "{basename}")],
+    }
+    rules = [
+        'load("@rules_mx//graal:layout.bzl", "mx_archive_layout", "static_archive")',
+        'static_archive(name = "libffi_archive", library = "@graal_libffi//:libffi")',
+    ]
+    platforms = suite["distributions"]["TRUFFLE_NFI_NATIVE"]["platforms"]
+    prefixes = {}
+    for platform in platforms:
+        os, arch = platform.split("-")
+        constraints = [
+            "@platforms//os:" + {"darwin": "macos"}.get(os, os),
+            "@platforms//cpu:" + {"amd64": "x86_64"}.get(arch, arch),
+        ]
+        label = "layout." + platform
+        rules.append(
+            f'config_setting(name = "{label}", constraint_values = {json.dumps(constraints)})'
+        )
+        prefixes[":" + label] = (
+            platform + "/" + ("glibc" if os == "linux" else "default")
+        )
+    for name, dist in suite["distributions"].items():
+        if "layout" not in dist or name in (
+            "TRUFFLE_API_VERSION",
+            "TRUFFLE_ATTACH_RESOURCES",
+            "TRUFFLE_NFI_RESOURCES",
+        ):
+            continue
+        entries = []
+        for dest, sources in dist["layout"].items():
+            for source in sources if isinstance(sources, list) else [sources]:
+                kind, spec = source.split(":", 1)
+                if kind == "file":
+                    files = [
+                        (p.relative_to(directory).as_posix(), p.name)
+                        for p in sorted(directory.glob(spec))
+                        if p.is_file()
+                    ]
+                elif kind == "dependency":
+                    files = dependencies[spec]
+                else:
+                    raise ValueError(f"Unsupported layout source {source} in {name}")
+                if not files or (not dest.endswith("/") and len(files) != 1):
+                    raise ValueError(f"Unexpected files for {source} in {name}")
+                entries.extend(
+                    (
+                        label,
+                        (dest.removeprefix("./") + member)
+                        if dest.endswith("/")
+                        else dest,
+                    )
+                    for label, member in files
+                )
+        options = ""
+        if any("{target}" in dest for _, dest in entries):
+            options += f", target_prefix = select({json.dumps(prefixes)})"
+        if name == "PMH_BENCHMARK_NATIVE":
+            options += ", testonly = True"
+        if name in (
+            "LIBFFI_DIST",
+            "TRUFFLE_NFI_NATIVE",
+            "TRUFFLE_NFI_NATIVE_GRAALVM_SUPPORT",
+            "PMH_BENCHMARK_NATIVE",
+        ):
+            options += ', target_compatible_with = select({"@platforms//os:linux": [], "@platforms//os:macos": [], "//conditions:default": ["@platforms//:incompatible"]})'
+        members = {}
+        for label, destination in entries:
+            members.setdefault(label, []).append(destination)
+        members = {label: "\n".join(paths) for label, paths in members.items()}
+        format = dist.get("type", "tar" if dist.get("native") else "jar")
+        rules.append(
+            f'mx_archive_layout(name = "{name}", format = "{format}", members = {json.dumps(members)}'
+            f'{options}, visibility = ["//visibility:public"])'
+        )
+    inventory = sorted(":" + name for name in suite["distributions"])
+    rules.append(
+        f'filegroup(name = "all_distributions", srcs = {json.dumps(inventory)}, testonly = True, visibility = ["//visibility:public"])'
+    )
+    return "\n".join(rules) + "\n"
 
 
 def truffle_native_projects(directory):
@@ -775,7 +1077,11 @@ def truffle_native_projects(directory):
     nfi_tests = next(p for p in projects if p["name"] == "com.oracle.truffle.nfi.test")
     return (
         'load("@rules_mx//graal:attach.bzl", "truffle_attach")\n\n'
-        + 'load("@rules_mx//graal:simplelanguage.bzl", "modular_test_runner", "optimizing_junit", "panama_test", "simplelanguage", "sl_fixture_tests")\n'
+        + 'load("@rules_mx//graal:simplelanguage.bzl", "modular_test_runner", "optimizing_junit", "panama_test", "simplelanguage", "sl_fixture_tests", "truffle_test_runner")\n'
+        + 'truffle_test_runner(name = "truffle_junit", jvm_flags = ['
+        + '"--enable-native-access=ALL-UNNAMED", "--add-exports=java.base/jdk.internal.module=ALL-UNNAMED", '
+        + '"-Dpolyglot.engine.WarnInterpreterOnly=false", '
+        + '"-Dpolyglot.ConstantOptionsLanguage.ConstantOption1=configuredValue"])\n'
         + 'modular_test_runner(name = "modular_junit")\n'
         + "".join(
             f'panama_test(name = "panama.{cls.rsplit(".", 1)[-1]}", test_class = "{cls}")\n'
@@ -795,9 +1101,54 @@ def truffle_native_projects(directory):
         )
         + ")\n"
         + f'filegroup(name = "all_projects", srcs = {json.dumps(inventory)}, testonly = True, visibility = ["//visibility:public"])\n'
+        + truffle_distribution_layouts(directory, suite)
         + "truffle_attach(\n"
         + "".join(f"    {key} = {json.dumps(value)},\n" for key, value in attrs.items())
         + ")\n"
+    )
+
+
+def espresso_shared_rules(directory):
+    suite = runpy.run_path(str(directory / "mx.espresso-shared/suite.py"))["suite"]
+    project = suite["projects"]["com.oracle.svm.espresso"]
+    annotation_patches = {}
+    for annotation in project["removeAnnotations"]:
+        pkg, type_name = re.split(r"\.(?=[A-Z])", annotation, maxsplit=1)
+        type_parts = type_name.split(".")
+        imports = [annotation]
+        if len(type_parts) > 1:
+            imports += [pkg + "." + type_parts[0], "static " + annotation]
+        for name in imports:
+            annotation_patches[r"^import\s+" + re.escape(name) + r"\s*;"] = ""
+        for name in sorted({type_name, type_parts[-1]}):
+            annotation_patches[r"@" + re.escape(name) + r"(\(.*?\))?(?!\w)"] = ""
+    spec = json.dumps(
+        {"packages": project["packageMap"], "patch": {"**/*.java": annotation_patches}},
+        sort_keys=True,
+    )
+    sources = [":" + name for name in project["shadedProjects"]]
+    directories = [
+        directory / suite["projects"][name]["subDir"] / name / root
+        for name in project["shadedProjects"]
+        for root in suite["projects"][name]["sourceDirs"]
+    ]
+    packages = sorted(
+        {
+            ".".join(p.parent.relative_to(root).parts).replace(old, new, 1)
+            for root in directories
+            for p in root.rglob("*.java")
+            for old, new in project["packageMap"].items()
+        }
+    )
+    module = suite["distributions"]["ESPRESSO_SVM"]["moduleInfo"]
+    [export] = module["exports"]
+    directives = ["exports " + export.replace("*", pkg) for pkg in packages]
+    directives.append("requires org.graalvm.collections")
+    return (
+        'load("@rules_mx//graal:espresso.bzl", "espresso_svm")\n'
+        'espresso_svm(name = "ESPRESSO_SVM", project = "com.oracle.svm.espresso", '
+        f"shade = {json.dumps(spec)}, shade_inputs = {json.dumps(sources)}, "
+        f"module_name = {json.dumps(module['name'])}, directives = {json.dumps(directives)})\n"
     )
 
 
@@ -843,6 +1194,7 @@ def generate(suite, stage):
     elif suite == "compiler":
         (directory / "BUILD.bazel").write_text(
             library_rules(suite)
+            + jmh_rules(directory)[1]
             + compiler_harness(directory)
             + qualified_tests(directory)
             + 'load("@rules_mx//graal:simplelanguage.bzl", "simplelanguage")\n'
@@ -867,6 +1219,10 @@ def generate(suite, stage):
             + jmh_rules(directory)[1]
             + truffle_native_projects(directory)
         )
+    elif suite == "espresso-shared":
+        (directory / "BUILD.bazel").write_text(espresso_shared_rules(directory))
+    elif suite == "substratevm":
+        (directory / "BUILD.bazel").write_text("")
     subprocess.run(
         [
             "bazelisk",
@@ -938,8 +1294,8 @@ def main():
                     ),
                 )
         shutil.copytree(
-            source / "truffle/benchmarks/nfi-native",
-            stage / "truffle/benchmarks/nfi-native",
+            source / "truffle/benchmarks",
+            stage / "truffle/benchmarks",
             ignore=shutil.ignore_patterns("BUILD", "BUILD.bazel"),
         )
         lib = runpy.run_path(str(stage / "truffle/mx.truffle/suite.py"))["suite"][

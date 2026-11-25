@@ -138,6 +138,13 @@ def _source_dependencies(graph, suite, mappings, distributions):
                 if type(p).__name__ == "JavaProject"
                 for pkg in _source_packages(p)
             }
+            for project in members:
+                if type(project).__name__ == "EspressoSVMShared":
+                    packages[dep].update(
+                        project.substitute_package_name(pkg)
+                        for original in project.shaded_deps()
+                        for pkg in _source_packages(original)
+                    )
         return packages[dep]
 
     for name, record in graph.items():
@@ -323,6 +330,13 @@ def _jar_archive(dist, suite, mappings, pending, release, archives, library_modu
     ):
         mx.abort(f"{dist.name}: unsupported archive member")
     external = [d for d in dist.deps if d not in members] + dist.excludedLibs
+    packaged = {
+        member
+        for dep in external
+        if dep.isJARDistribution()
+        for member in dep.archived_deps()
+    }
+    external = [d for d in external if not (d.isJavaProject() and d in packaged)]
     base = [d for d in members if not getattr(d, "multiReleaseJarVersion", None)]
     overlays = {
         ":" + d.name: str(d.multiReleaseJarVersion) for d in members if d not in base
@@ -637,6 +651,13 @@ def bazel_buildfile(args):
         metavar="PROJECT=RELEASE",
         help="override the selected Java release for one project",
     )
+    parser.add_argument(
+        "--labs-javac-project",
+        action="append",
+        default=[],
+        metavar="PROJECT",
+        help="compile the selected project with the Labs JDK JavaBuilder",
+    )
     parser.add_argument("projects", nargs="+")
     options = parser.parse_args(args)
     library_modules = {}
@@ -662,6 +683,9 @@ def bazel_buildfile(args):
             parser.error("expected --test-jvm-flag SUITE:PROJECT=FLAG")
         test_flags.setdefault(name, []).append(value)
     manual_tests = set(options.manual_test_project)
+    labs_javac = set(options.labs_javac_project)
+    if labs_javac and not options.gazelle:
+        parser.error("--labs-javac-project requires --gazelle")
     project_releases = {}
     for spec in options.project_release:
         name, sep, value = spec.partition("=")
@@ -761,7 +785,11 @@ def bazel_buildfile(args):
         if options.gazelle:
             allowed = allowed | {"requiresConcealed", "generatedDependencies", "uses"}
             if project._orig_attrs.get("jacoco") == "include":
-                allowed = allowed | {"jacoco", "jacocoExcludePackages"}
+                allowed = allowed | {
+                    "jacoco",
+                    "jacocoExcludePackages",
+                    "jacocoExcludePackage",
+                }
             if project._orig_attrs.get("javac.lint.overrides") == "none":
                 allowed = allowed | {"javac.lint.overrides"}
         jni_headers = options.gazelle and project._orig_attrs.get("jniHeaders") is True
@@ -805,9 +833,12 @@ def bazel_buildfile(args):
                 "multiReleaseJarVersion",
                 "ignoreSrcGenForOverlayMap",
             }
-        force_javac = project._orig_attrs.get("forceJavac") is True
+        force_javac = project._orig_attrs.get("forceJavac") in (True, "true")
         if options.gazelle and force_javac:
             allowed = allowed | {"forceJavac"}
+        if project.name in labs_javac:
+            labs_javac.remove(project.name)
+            force_javac = True
         if project._orig_attrs.get("javac.lint.overrides") == "-incubating":
             allowed = allowed | {"javac.lint.overrides"}
         unsupported = sorted(set(project._orig_attrs) - allowed)
@@ -882,7 +913,7 @@ def bazel_buildfile(args):
             attrs["javacopts"] = attrs.pop("javac_opts")
         else:
             attrs["unified_release"] = release
-        if len(resource_roots) > 1:
+        if len(resource_roots) > 1 and (not options.gazelle or shaded):
             mx.abort(
                 f"{project.name}: resources under multiple roots require separate packaging"
             )
@@ -890,12 +921,13 @@ def bazel_buildfile(args):
         if resources:
             has_resources = True
             attrs["resources"] = sorted(resources)
-            resource_root = resource_roots.pop()
-            root = json.dumps(resource_root)
-            mode = ", repo_relative = True" if processors else ""
-            resource_attr = (
-                f"    resource_strip_prefix = mx_resource_prefix({root}{mode}),\n"
-            )
+            if len(resource_roots) == 1:
+                resource_root = next(iter(resource_roots))
+                root = json.dumps(resource_root)
+                mode = ", repo_relative = True" if processors else ""
+                resource_attr = (
+                    f"    resource_strip_prefix = mx_resource_prefix({root}{mode}),\n"
+                )
         if deps:
             attrs["deps"] = deps
         if options.gazelle:
@@ -904,8 +936,12 @@ def bazel_buildfile(args):
             launchers = test_launchers.pop(project.qualifiedName(), [])
             discover_tests = test or bool(test_runtime or launchers)
             concealed = project._orig_attrs.get("requiresConcealed", {})
+            jvmci = "jdk.internal.vm.ci" in concealed or "jdk.internal.vm.ci" in (
+                project._orig_attrs.get("requires", [])
+            )
             coarse = bool(
-                shaded
+                jvmci
+                or shaded
                 or concealed
                 or jni_headers
                 or force_javac
@@ -927,7 +963,7 @@ def bazel_buildfile(args):
             }
             if shaded and not record["dirs"]:
                 record["dirs"] = record["roots"]
-            if "jdk.internal.vm.ci" in concealed:
+            if jvmci:
                 record["jvmci"] = True
             if jni_headers:
                 record["jni_headers"] = True
@@ -937,6 +973,7 @@ def bazel_buildfile(args):
                 record["add_exports"] = [
                     f"{mod}/{pkg}" for mod, pkgs in concealed.items() for pkg in pkgs
                 ]
+            if concealed or jvmci:
                 record["options"] = [
                     "-source",
                     str(release),
@@ -959,13 +996,25 @@ def bazel_buildfile(args):
                 record["spotbugs"] = project._orig_attrs["spotbugs"]
             if jacoco := project._orig_attrs.get("jacoco"):
                 record["jacoco"] = jacoco
-            if exclusions := project._orig_attrs.get("jacocoExcludePackages"):
+            if exclusions := project._orig_attrs.get(
+                "jacocoExcludePackages", project._orig_attrs.get("jacocoExcludePackage")
+            ):
                 record["jacoco_exclude_packages"] = exclusions
             if coarse:
                 record["sources"] = sorted(sources)
                 if resources:
                     record["resources"] = sorted(resources)
-                    record["resource_root"] = resource_root
+                    # Graal’s option processor reads documentation from javac’s source path.
+                    needs_source_resources = processors and any(
+                        "/doc-files/" in path for path in resources
+                    )
+                    if len(resource_roots) > 1 or (
+                        needs_source_resources and not shaded
+                    ):
+                        record["resource_roots"] = sorted(resource_roots)
+                        record["force_javac"] = True
+                    else:
+                        record["resource_root"] = resource_root
                 if processors:
                     record["processors"] = processors
                     matched = javac_only_processors.intersection(
@@ -1004,9 +1053,9 @@ def bazel_buildfile(args):
         rules[project.name] = _rule(
             "java_library" if processors else "elide_java_library", attrs, resource_attr
         )
-    if project_releases or manual_tests:
+    if project_releases or manual_tests or labs_javac:
         mx.abort(
-            f"Unused project configuration: {sorted(project_releases.keys() | manual_tests)}"
+            f"Unused project configuration: {sorted(project_releases.keys() | manual_tests | labs_javac)}"
         )
     if unused_paths := test_paths.keys() - used_test_paths:
         mx.abort(f"Unused test path mappings: {sorted(unused_paths)}")

@@ -51,6 +51,14 @@
     "org/jline/jline-terminal-ffm/3.28.0/jline-terminal-ffm-3.28.0.jar",
     "sha512-5YObBKL9YRmhHGvBbgUgOviFEgOdhVUbGdbofDWKMl7V63BRAioiXiZBNXyZ2cQSGBekeVxQz3mhO2udU3zulg=="
   ],
+  "substratevm_CAPNPROTO_RUNTIME-sources.jar": [
+    "org/capnproto/runtime/0.1.16/runtime-0.1.16-sources.jar",
+    "sha512-pFhlThbEpyNQgTDf0z0tQQodNGlJ/C+CA7MYj3jAHBhQszQ5T2VFNmUvnqbXO4zg0wjUb4d6lEIIw6JIJJ+6dw=="
+  ],
+  "substratevm_CAPNPROTO_RUNTIME.jar": [
+    "org/capnproto/runtime/0.1.16/runtime-0.1.16.jar",
+    "sha512-lKd3ZRHDRNpgoazcNGwTNSKkPCOdBn0NXYbCEpHgJSoZvU+nTksdOpPnXa3UGvZVel0RihWE4500wJJIXOBlsg=="
+  ],
   "truffle_ANTLR4-sources.jar": [
     "org/antlr/antlr4-runtime/4.13.2/antlr4-runtime-4.13.2-sources.jar",
     "sha512-EZeNL7cyKxRBrH5ppMgLM9U0KLnvbPXOrU8mkTp9l7zT2gqFdEeh+gJjUaa7ynZ9tgLblhgHrJVE4pzzhUAkHA=="
