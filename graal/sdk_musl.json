@@ -1,0 +1,14 @@
+{
+  "aarch64": {
+    "integrity": "sha512-CPyuU8/1I9s+I4MFIjHW5khI9jxl5lQ04Uoame5JOdigJujpbpMuBIYkTytvf77A4G7UFLArs8/AdopCmZkCTQ==",
+    "urls": [
+      "https://lafo.ssw.uni-linz.ac.at/pub/toolchain-gcc-musl/toolchain-gcc-10.3.0-zlib-1.2.13-musl-1.2.5.2-linux-aarch64.tar.gz"
+    ]
+  },
+  "amd64": {
+    "integrity": "sha512-F0DZZc4I5YHvBbRnSLVi4FBUvEwme/oRSa1tgMMF76c2ii/T+Km11bqVyGoBHntJSqK2/YvB7FDIn1/ZGySpxA==",
+    "urls": [
+      "https://lafo.ssw.uni-linz.ac.at/pub/toolchain-gcc-musl/toolchain-gcc-10.3.0-zlib-1.2.13-musl-1.2.5.2-linux-amd64.tar.gz"
+    ]
+  }
+}

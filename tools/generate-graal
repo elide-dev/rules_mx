@@ -954,6 +954,74 @@ def sdk_llvm_rules(directory):
     )
 
 
+def sdk_musl_inputs(directory):
+    metadata = runpy.run_path(str(directory / "mx.sdk/suite.py"))["suite"]
+    specs = metadata["libraries"]["MUSL_GCC_TOOLCHAIN"]["os_arch"]["linux"]
+    pins = {}
+    for arch, spec in specs.items():
+        if spec.get("optional"):
+            continue
+        algo, digest = spec["digest"].split(":")
+        pins[arch] = dict(
+            urls=spec["urls"],
+            integrity=algo + "-" + base64.b64encode(bytes.fromhex(digest)).decode(),
+        )
+    return pins
+
+
+def sdk_descriptor_rules(directory):
+    suite = runpy.run_path(str(directory / "mx.sdk/suite.py"))["suite"]
+    template_root = directory.parent
+    gcc = re.sub(
+        r"<[a-z]+:([^>]+)>", r"\1", (template_root / "gcc.ninja_template").read_text()
+    )
+    msvc = re.sub(
+        r"<[a-z]+:([^>]+)>", r"\1", (template_root / "msvc.ninja_template").read_text()
+    )
+    descriptors = {}
+    llvm_platforms = sdk_llvm_inputs(directory).keys() - {"compiler_rt"}
+    for name in (
+        "LLVM_NINJA_TOOLCHAIN",
+        "MUSL_NINJA_TOOLCHAIN",
+        "MUSL_CMAKE_TOOLCHAIN",
+    ):
+        dist = suite["distributions"][name]
+        kind = dist["native_toolchain"]["kind"]
+        configurations = {}
+        if name == "LLVM_NINJA_TOOLCHAIN":
+            for platform in sorted(llvm_platforms):
+                os_name, _, _ = platform.partition("_")
+                configurations[platform] = dist["os"][os_name]
+        else:
+            for cpu, config in dist["os_arch"]["linux"].items():
+                if not cpu.startswith("<"):
+                    configurations["linux_" + cpu] = config
+        platforms = {}
+        for platform, config in configurations.items():
+            content = config["layout"]["toolchain." + kind]["value"]
+            if kind == "cmake":
+                content = content.replace(
+                    "<path:MUSL_GCC_TOOLCHAIN>", "${CMAKE_CURRENT_LIST_DIR}/toolchain"
+                )
+            else:
+                content = content.replace(
+                    "include <ninja-toolchain:GCC_NINJA_TOOLCHAIN>", gcc
+                )
+                content = content.replace(
+                    "include <ninja-toolchain:MSVC_NINJA_TOOLCHAIN>", msvc
+                )
+                content = content.replace("<path:MUSL_GCC_TOOLCHAIN>", "toolchain")
+                content = content.replace("<path:LLVM_TOOLCHAIN>", "toolchain")
+            if re.search(r"<[a-z-]+:[^>]+>", content):
+                raise ValueError(f"Unresolved substitution in {name} for {platform}")
+            platforms[platform] = content
+        descriptors[name] = dict(kind=kind, platforms=platforms)
+    return (
+        'load("@rules_mx//graal:sdk_llvm.bzl", "sdk_toolchain_descriptors")\n'
+        f"sdk_toolchain_descriptors(descriptors = {json.dumps(descriptors)})\n"
+    )
+
+
 def visualvm_inputs(directory):
     metadata = runpy.run_path(str(directory / "mx.tools/suite.py"))["suite"]
     libraries = metadata["libraries"]
@@ -1587,6 +1655,7 @@ def generate(suite, stage):
         (directory / "BUILD.bazel").write_text(
             sdk_native_projects(directory)
             + sdk_llvm_rules(directory)
+            + sdk_descriptor_rules(directory)
             + 'test_suite(name = "tests", visibility = ["//visibility:public"])\n'
         )
     elif suite == "compiler":
@@ -1720,9 +1789,13 @@ def main():
         source = args.graal
         if source is None:
             source = bazel_source("@graal//sdk:BUILD.bazel").parents[1]
-        shutil.copyfile(
-            bazel_source("@graal_mx//:mx.mx/suite.py"), stage / "mx-suite.py"
-        )
+        mx_suite = bazel_source("@graal_mx//:mx.mx/suite.py")
+        shutil.copyfile(mx_suite, stage / "mx-suite.py")
+        for family in ("gcc", "msvc"):
+            name = family + ".ninja_template"
+            shutil.copyfile(
+                mx_suite.parents[1] / "ninja-toolchains" / name, stage / name
+            )
         (stage / ".mx_vcs_root").touch()
         (stage / "WORKSPACE").touch()
         (stage / "BUILD.bazel").write_text(
@@ -1789,6 +1862,15 @@ def main():
                 sys.exit("Regenerate the SDK LLVM pins with tools/generate-graal")
         else:
             sdk_llvm.write_text(sdk_llvm_pins)
+        sdk_musl = ROOT / "graal/sdk_musl.json"
+        sdk_musl_pins = (
+            json.dumps(sdk_musl_inputs(stage / "sdk"), indent=2, sort_keys=True) + "\n"
+        )
+        if args.check:
+            if sdk_musl.read_text() != sdk_musl_pins:
+                sys.exit("Regenerate the SDK musl pins with tools/generate-graal")
+        else:
+            sdk_musl.write_text(sdk_musl_pins)
         visualvm = ROOT / "graal/visualvm.json"
         visualvm_pins = (
             json.dumps(visualvm_inputs(stage / "tools"), indent=2, sort_keys=True)

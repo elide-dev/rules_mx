@@ -20,7 +20,7 @@ The default Python is managed CPython 3.13. The alternate configuration selects 
 
 ## Build upstream GraalVM
 
-The pinned Oracle source tree has native Bazel targets for all projects and distributions in the Truffle, compiler, Regex, Tools and Espresso Shared suites, and for all SDK projects. Run individual upstream tests by Bazel label. Use `tools/graal-coverage --missing` to list the pinned projects and distributions that still need Bazel targets.
+The pinned Oracle source tree has native Bazel targets for all projects and distributions in the Truffle, compiler, Regex, Tools and Espresso Shared suites, and for all SDK projects and distributions. Run individual upstream tests by Bazel label. Use `tools/graal-coverage --missing` to list the pinned projects and distributions that still need Bazel targets.
 
 ```sh
 bazelisk build --config=elide-processors @graal//truffle:all_projects @graal//compiler:all_distributions @graal//regex:all_distributions

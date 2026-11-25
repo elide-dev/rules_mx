@@ -298,11 +298,12 @@
   "moduleExtensions": {
     "//graal:sdk_llvm.bzl%sdk_llvm_inputs": {
       "general": {
-        "bzlTransitiveDigest": "k/E5m3LhGwqvgfGV61aUYuaARrBN+jZ8PY4zPBPlT7w=",
+        "bzlTransitiveDigest": "igSntw1GafexjN3thMg7oJ1kySTxi8XealB9S1d1liI=",
         "usagesDigest": "mdfQkY+sx6AtTtEIwXZiYGzN+1t0M0aErz90qzFE17Q=",
         "recordedInputs": [
           "REPO_MAPPING:,bazel_tools bazel_tools",
-          "FILE:@@//graal/sdk_llvm.json 242cd11fb54cceadd29a537941e15ec5c926a09f2903016816f0751eaeb9dd68"
+          "FILE:@@//graal/sdk_llvm.json 242cd11fb54cceadd29a537941e15ec5c926a09f2903016816f0751eaeb9dd68",
+          "FILE:@@//graal/sdk_musl.json c19c3cb2f2264dcb7f61be4c98479de4565f8d98f6afc6bb0a279f2358f6f3bd"
         ],
         "generatedRepoSpecs": {
           "graal_llvm_compiler_rt": {
@@ -363,6 +364,26 @@
               ],
               "integrity": "sha512-+GjS51L6mEzyVHB7eBwqT4MH3hwinIGnC4M9QsliDJlbdB+ZJyNXBqB6eg868YVpDfgHb/t8XOBOyHRO6JlyKQ==",
               "downloaded_file_path": "llvm.tar.gz"
+            }
+          },
+          "graal_musl_aarch64": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_file",
+            "attributes": {
+              "urls": [
+                "https://lafo.ssw.uni-linz.ac.at/pub/toolchain-gcc-musl/toolchain-gcc-10.3.0-zlib-1.2.13-musl-1.2.5.2-linux-aarch64.tar.gz"
+              ],
+              "integrity": "sha512-CPyuU8/1I9s+I4MFIjHW5khI9jxl5lQ04Uoame5JOdigJujpbpMuBIYkTytvf77A4G7UFLArs8/AdopCmZkCTQ==",
+              "downloaded_file_path": "toolchain.tar.gz"
+            }
+          },
+          "graal_musl_amd64": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_file",
+            "attributes": {
+              "urls": [
+                "https://lafo.ssw.uni-linz.ac.at/pub/toolchain-gcc-musl/toolchain-gcc-10.3.0-zlib-1.2.13-musl-1.2.5.2-linux-amd64.tar.gz"
+              ],
+              "integrity": "sha512-F0DZZc4I5YHvBbRnSLVi4FBUvEwme/oRSa1tgMMF76c2ii/T+Km11bqVyGoBHntJSqK2/YvB7FDIn1/ZGySpxA==",
+              "downloaded_file_path": "toolchain.tar.gz"
             }
           }
         }
