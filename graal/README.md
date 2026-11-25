@@ -14,7 +14,7 @@ tools/buildbuddy test --config=buildbuddy-rbe --config=elide-processors //graal/
 
 | Suite | Native Bazel build | Test coverage |
 | --- | --- | --- |
-| SDK | All 29 declared projects. All 19 Java distributions produce JARs, including Polyglot, Native Bridge, JLine and Launcher Common. Three additional targets expose the version and launcher resource layouts. | All 17 discovered upstream JUnit classes and the C and C++ toolchain probes. Runtime tests verify packaged version resources, JPMS module loading and JLine provider selection on JDK 21 and Labs JDK 25. |
+| SDK | All 29 declared projects. All 19 Java distributions produce JARs, including Polyglot, Native Bridge, JLine and Launcher Common. Three targets expose the version and launcher resource layouts, and two package the pinned LLVM redistributions. | All 17 discovered upstream JUnit classes and the C and C++ toolchain probes. Runtime tests verify packaged version resources, JPMS module loading and JLine provider selection on JDK 21 and Labs JDK 25. |
 | Truffle | All 69 declared projects and all 47 distribution labels, including JNI attach, both NFI backends, the shaded libraries, PolyBench and the JMH benchmarks. Bazel packages the multi-release Truffle API, SL language, SL launcher, Truffle compiler interface and HotSpot runtime as named modules. | 57 guest fixtures run independently. All 30 concrete SL JUnit classes run on the default runtime, including the four interpreter configurations of the upstream fixture runner. Nine TCK classes run on both runtimes. All 570 discovered JUnit classes in `TRUFFLE_TEST` have individual Bazel targets and are included in `harness_tests`. All 31 discovered NFI JUnit classes run on both libffi and Panama. The host-access tests run inside their JPMS test module. |
 | Compiler | All 17 projects and all 20 distributions, including VM access, management, libgraal and its loader, and both JMH suites. | 21 compiler-tool JUnit classes, 19 shared-harness classes, four previously qualified compiler regressions and the last-tier compiled guest probe run by default. |
 | Regex | All three projects and all five distributions, including Native Image metadata archives. | All 20 discovered upstream JUnit classes. |
@@ -82,10 +82,13 @@ Production and test Java compilations preserve method parameter names as mx does
 
 ```sh
 bazelisk build --config=elide-processors @graal//sdk:JLINE3 @graal//sdk:LAUNCHER_COMMON
+bazelisk build @graal//sdk:LLVM_TOOLCHAIN_FULL @graal//sdk:LLVM_TOOLCHAIN
 bazelisk test --config=elide-processors @graal//sdk:org.graalvm.launcher.test.org.graalvm.launcher.test.LauncherTest @graal//sdk:org.graalvm.toolchain.test
 bazelisk test //graal:launcher_modules_test
 bazelisk test --config=labsjdk //graal:launcher_modules_test
 ```
+
+The LLVM redistribution targets select the upstream checksum-pinned archive for the target platform. The filtered distribution applies the suite exclusions and adds the compiler-rt, license and patch inputs.
 
 The SDK graph binds the published JLine binary and source archives by the SHA-512 digests in the pinned suite. Separate actions relocate the sources and resources, apply Graal's patches, compile the base and JDK 22 projects, and assemble the multi-release JAR. The launcher module test loads the exec provider on JDK 21 and additionally loads the foreign-function provider on Labs JDK 25. The C and C++ probes compile the upstream sources with the registered Elide LLVM toolchain and run both binaries, checking their output.
 
@@ -152,7 +155,7 @@ Run `tools/generate-graal --check` to reproduce the checked-in patches from the 
 
 | Next checkpoint | Acceptance under Bazel |
 | --- | --- |
-| SDK toolchain distributions | Assemble the five LLVM, Ninja, CMake and musl redistribution layouts with their upstream contents and platform filters. Their packaged payloads are separate from the Elide LLVM toolchain used for Bazel compilation. |
+| SDK toolchain distributions | Assemble the remaining LLVM Ninja and musl Ninja and CMake toolchain layouts with their upstream contents and platform filters. Their packaged payloads are separate from the Elide LLVM toolchain used for Bazel compilation. |
 | Truffle upstream gates | Qualify the remaining gate configurations, including broader optimized-runtime and platform coverage. |
 | Tools upstream gates | Run the signature checks and qualify the test harness on the named module path. |
 | Compiler test gates | Qualify more classes from the compiler distribution, including architecture-specific backends and VM-specific test configurations. |

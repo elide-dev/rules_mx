@@ -10,6 +10,7 @@ exports_files([
     "compiler.patch",
     "espresso-shared.patch",
     "sdk.patch",
+    "sdk_llvm.json",
     "sl.py.tpl",
     "sl_fixture_test.py",
     "shaded_inputs.json",
@@ -346,4 +347,10 @@ config_setting(
         "@platforms//os:windows",
         "@platforms//cpu:x86_64",
     ],
+)
+
+py_binary(
+    name = "pack_sdk_llvm",
+    srcs = ["pack_sdk_llvm.py"],
+    visibility = ["//visibility:public"],
 )

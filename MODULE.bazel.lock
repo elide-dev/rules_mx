@@ -296,6 +296,78 @@
   },
   "selectedYankedVersions": {},
   "moduleExtensions": {
+    "//graal:sdk_llvm.bzl%sdk_llvm_inputs": {
+      "general": {
+        "bzlTransitiveDigest": "k/E5m3LhGwqvgfGV61aUYuaARrBN+jZ8PY4zPBPlT7w=",
+        "usagesDigest": "mdfQkY+sx6AtTtEIwXZiYGzN+1t0M0aErz90qzFE17Q=",
+        "recordedInputs": [
+          "REPO_MAPPING:,bazel_tools bazel_tools",
+          "FILE:@@//graal/sdk_llvm.json 242cd11fb54cceadd29a537941e15ec5c926a09f2903016816f0751eaeb9dd68"
+        ],
+        "generatedRepoSpecs": {
+          "graal_llvm_compiler_rt": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_file",
+            "attributes": {
+              "urls": [
+                "https://lafo.ssw.uni-linz.ac.at/pub/llvm/compiler-rt-22.1.8-4-g1d96596a53-bg6891668b1e-linux-amd64.tar.gz"
+              ],
+              "integrity": "sha512-X+lZNFXsH4HVNhJH6kZe+jnInDHtXK1dZW3RkMSEx18aiGziyutr43LBe1NvcM4CepBbXb/s1qTk4wZ5yzG6Lw==",
+              "downloaded_file_path": "llvm.tar.gz"
+            }
+          },
+          "graal_llvm_darwin_aarch64": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_file",
+            "attributes": {
+              "urls": [
+                "https://lafo.ssw.uni-linz.ac.at/pub/llvm/llvm-22.1.8-4-g1d96596a53-bg6891668b1e-darwin-aarch64.tar.gz"
+              ],
+              "integrity": "sha512-bAYeYblHVghbjrEEkg4usrQ31h1+AuMOi6PRtQUHufUxd49ynwsd4lT5ue8NesBS0IW1S7R69CWYfinkZZD6qg==",
+              "downloaded_file_path": "llvm.tar.gz"
+            }
+          },
+          "graal_llvm_linux_aarch64": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_file",
+            "attributes": {
+              "urls": [
+                "https://lafo.ssw.uni-linz.ac.at/pub/llvm/llvm-22.1.8-4-g1d96596a53-bg6891668b1e-linux-aarch64.tar.gz"
+              ],
+              "integrity": "sha512-lChwezLKufyoW3Vq6ojaoOfqgYpT1+SnW34O5te6Stguc4dk0EZKByoaRhFDLFnEePB2ETDavKUxH+o9AYZulw==",
+              "downloaded_file_path": "llvm.tar.gz"
+            }
+          },
+          "graal_llvm_linux_amd64": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_file",
+            "attributes": {
+              "urls": [
+                "https://lafo.ssw.uni-linz.ac.at/pub/llvm/llvm-22.1.8-4-g1d96596a53-bg6891668b1e-linux-amd64.tar.gz"
+              ],
+              "integrity": "sha512-p8fbaNk9bURroKj7V8cY+fvtjDAniTpCAbmA82jcejP+RcnpeaHXyVduwVI5tC3gim2G4CCUHxVp5yEo2SKPmg==",
+              "downloaded_file_path": "llvm.tar.gz"
+            }
+          },
+          "graal_llvm_linux_riscv64": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_file",
+            "attributes": {
+              "urls": [
+                "https://lafo.ssw.uni-linz.ac.at/pub/llvm/llvm-22.1.8-4-g1d96596a53-bg6891668b1e-linux-riscv64.tar.gz"
+              ],
+              "integrity": "sha512-+ROcM0yA/RmMa08kuK/tt1bp9IRyT3QevpGI3VqVnRn9bi47CXysB8qPp8SlZVmHtP1QMKEGa8sEUtvyx3pegg==",
+              "downloaded_file_path": "llvm.tar.gz"
+            }
+          },
+          "graal_llvm_windows_amd64": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_file",
+            "attributes": {
+              "urls": [
+                "https://lafo.ssw.uni-linz.ac.at/pub/llvm/llvm-22.1.8-4-g1d96596a53-bg6891668b1e-windows-amd64.tar.gz"
+              ],
+              "integrity": "sha512-+GjS51L6mEzyVHB7eBwqT4MH3hwinIGnC4M9QsliDJlbdB+ZJyNXBqB6eg868YVpDfgHb/t8XOBOyHRO6JlyKQ==",
+              "downloaded_file_path": "llvm.tar.gz"
+            }
+          }
+        }
+      }
+    },
     "//graal:visualvm.bzl%visualvm_inputs": {
       "general": {
         "bzlTransitiveDigest": "yHp3aC23exUsBqAnSx4lhw0KWtIstbAxfcbO+PDq67o=",

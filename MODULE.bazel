@@ -118,6 +118,17 @@ graal_archive(
     urls = ["https://codeload.github.com/oracle/graal/tar.gz/7b7825ae92c83d91bb20d76bc64b68b344449cf3"],
 )
 
+sdk_llvm = use_extension("//graal:sdk_llvm.bzl", "sdk_llvm_inputs", dev_dependency = True)
+use_repo(
+    sdk_llvm,
+    "graal_llvm_compiler_rt",
+    "graal_llvm_darwin_aarch64",
+    "graal_llvm_linux_aarch64",
+    "graal_llvm_linux_amd64",
+    "graal_llvm_linux_riscv64",
+    "graal_llvm_windows_amd64",
+)
+
 visualvm = use_extension("//graal:visualvm.bzl", "visualvm_inputs", dev_dependency = True)
 use_repo(
     visualvm,
