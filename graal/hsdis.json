@@ -1,0 +1,17 @@
+{
+  "darwin_aarch64": {
+    "integrity": "sha512-LOltFoZaGAy2NSN3rqHC5Kheu9i1e9FX6vtVEYjTvQBdHKcRj+mUgMzKD1nRwSjCWlYSvICQd8usPBm2ptQkaw==",
+    "output": "libhsdis-aarch64.dylib",
+    "url": "https://lafo.ssw.uni-linz.ac.at/pub/graal-external-deps/hsdis/hsdis-aarch64-darwin-073b5f6f10a4c8530417f165d03c19093a2c0680.tar.gz"
+  },
+  "linux_aarch64": {
+    "integrity": "sha512-Qi4QeP5dni9xwEyiu+/vTgnPlnXRMsdTHx+xczDisflEFHBUG2bI2y89jhBdFn4lp43BGq2lJO1iOxrppM/e6w==",
+    "output": "libhsdis-aarch64.so",
+    "url": "https://lafo.ssw.uni-linz.ac.at/pub/graal-external-deps/hsdis/hsdis-aarch64-linux-fcc9b70ac91c00db8a50b0d4345490a68e3743e1.tar.gz"
+  },
+  "linux_amd64": {
+    "integrity": "sha512-OMKvICVG0sL9K7aTbwKLH+2opdpA4uN08q2crdtjmYj6wmus+Hkl/3bPf4hTf09VIGxQ4Pnf+ykPDGMJklgudg==",
+    "output": "libhsdis-amd64.so",
+    "url": "https://lafo.ssw.uni-linz.ac.at/pub/graal-external-deps/hsdis/intel/hsdis-amd64-linux-0d031013db9a80d6c88330c42c983fbfa7053193.tar.gz"
+  }
+}

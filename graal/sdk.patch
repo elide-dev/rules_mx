@@ -2,7 +2,7 @@ diff --git a/sdk/BUILD.bazel b/sdk/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/sdk/BUILD.bazel
-@@ -0,0 +1,1082 @@
+@@ -0,0 +1,1103 @@
 +load("@rules_mx//graal:nativebridge.bzl", "nativebridge_launcher")
 +load("@rules_mx//graal:toolchain_test.bzl", "sdk_toolchain_test")
 +load("@rules_mx//mx:graph.bzl", "mx_jar_dist", "mx_processed_java", "mx_processor", "mx_project", "mx_resource_layout", "mx_shaded_java", "mx_test_class", "mx_whole_java")
@@ -89,6 +89,7 @@ new file mode 100644
 +    javac_opts = [
 +        "--release",
 +        "21",
++        "-parameters",
 +    ],
 +    mx_resource_root = "src/org.graalvm.collections/src",
 +    resources = ["//sdk/src/org.graalvm.collections/src/META-INF/native-image/org.graalvm.sdk/collections:org.graalvm.collections.resources"],
@@ -103,6 +104,7 @@ new file mode 100644
 +    javac_opts = [
 +        "--release",
 +        "21",
++        "-parameters",
 +    ],
 +    unified_release = 21,
 +    visibility = ["//visibility:public"],
@@ -193,6 +195,7 @@ new file mode 100644
 +    javac_opts = [
 +        "--release",
 +        "21",
++        "-parameters",
 +    ],
 +    mx_resource_root = "src/org.graalvm.home/src",
 +    resources = ["//sdk/src/org.graalvm.home/src/META-INF/services:org.graalvm.home.resources"],
@@ -208,6 +211,7 @@ new file mode 100644
 +    javac_opts = [
 +        "--release",
 +        "21",
++        "-parameters",
 +    ],
 +    unified_release = 21,
 +    visibility = ["//visibility:public"],
@@ -229,6 +233,7 @@ new file mode 100644
 +    javacopts = [
 +        "--release",
 +        "21",
++        "-parameters",
 +    ],
 +    mx_resource_root = "src/org.graalvm.jniutils/src",
 +    plugins = [":mx_plugin.NATIVEBRIDGE_PROCESSOR.org.graalvm.nativebridge.processor.NativeBridgeProcessor"],
@@ -246,6 +251,7 @@ new file mode 100644
 +        "21",
 +        "-target",
 +        "21",
++        "-parameters",
 +        "--add-modules",
 +        "java.logging",
 +    ],
@@ -265,6 +271,7 @@ new file mode 100644
 +    javac_opts = [
 +        "--release",
 +        "21",
++        "-parameters",
 +    ],
 +    unified_release = 21,
 +    visibility = ["//visibility:public"],
@@ -286,6 +293,7 @@ new file mode 100644
 +    javac_opts = [
 +        "--release",
 +        "21",
++        "-parameters",
 +        "--add-modules",
 +        "java.logging,java.xml",
 +    ],
@@ -302,6 +310,7 @@ new file mode 100644
 +    javacopts = [
 +        "--release",
 +        "21",
++        "-parameters",
 +        "-Xep:ReturnValueIgnored:OFF",
 +    ],
 +    mx_resource_root = "src/org.graalvm.nativebridge/src",
@@ -318,6 +327,7 @@ new file mode 100644
 +    javacopts = [
 +        "--release",
 +        "21",
++        "-parameters",
 +    ],
 +    mx_resource_root = "src/org.graalvm.nativebridge.benchmark/src",
 +    plugins = [":mx_plugin.NATIVEBRIDGE_PROCESSOR.org.graalvm.nativebridge.processor.NativeBridgeProcessor"],
@@ -332,6 +342,7 @@ new file mode 100644
 +    javac_opts = [
 +        "--release",
 +        "21",
++        "-parameters",
 +        "--add-modules",
 +        "java.compiler",
 +    ],
@@ -357,6 +368,7 @@ new file mode 100644
 +    javacopts = [
 +        "--release",
 +        "21",
++        "-parameters",
 +    ],
 +    plugins = [":mx_plugin.NATIVEBRIDGE_PROCESSOR.org.graalvm.nativebridge.processor.NativeBridgeProcessor"],
 +    visibility = ["//visibility:public"],
@@ -389,6 +401,7 @@ new file mode 100644
 +    javac_opts = [
 +        "--release",
 +        "21",
++        "-parameters",
 +    ],
 +    mx_resource_root = "src/org.graalvm.nativeimage/src",
 +    resources = [
@@ -411,6 +424,7 @@ new file mode 100644
 +    javac_opts = [
 +        "--release",
 +        "21",
++        "-parameters",
 +    ],
 +    unified_release = 21,
 +    visibility = ["//visibility:public"],
@@ -424,6 +438,7 @@ new file mode 100644
 +    javac_opts = [
 +        "--release",
 +        "21",
++        "-parameters",
 +    ],
 +    unified_release = 21,
 +    visibility = ["//visibility:public"],
@@ -458,6 +473,7 @@ new file mode 100644
 +    javac_opts = [
 +        "--release",
 +        "21",
++        "-parameters",
 +        "--add-modules",
 +        "java.logging",
 +    ],
@@ -493,6 +509,7 @@ new file mode 100644
 +    javac_opts = [
 +        "--release",
 +        "21",
++        "-parameters",
 +    ],
 +    mx_resource_root = "src/org.graalvm.sdk/src",
 +    resources = ["//sdk/src/org.graalvm.sdk/src/META-INF/native-image/org.graalvm.sdk/graal-sdk:org.graalvm.sdk.resources"],
@@ -515,6 +532,7 @@ new file mode 100644
 +    javacopts = [
 +        "--release",
 +        "17",
++        "-parameters",
 +        "--add-modules",
 +        "java.logging",
 +        "-Xlint:none",
@@ -542,6 +560,7 @@ new file mode 100644
 +    javacopts = [
 +        "--release",
 +        "22",
++        "-parameters",
 +        "--add-modules",
 +        "java.logging",
 +        "-Xlint:none",
@@ -574,6 +593,7 @@ new file mode 100644
 +    javac_opts = [
 +        "--release",
 +        "21",
++        "-parameters",
 +    ],
 +    mx_resource_root = "src/org.graalvm.word/src",
 +    resources = [
@@ -591,6 +611,7 @@ new file mode 100644
 +    javac_opts = [
 +        "--release",
 +        "21",
++        "-parameters",
 +    ],
 +    unified_release = 21,
 +    visibility = ["//visibility:public"],
@@ -1089,7 +1110,7 @@ diff --git a/sdk/src/com.oracle.svm.core.annotate/src/com/oracle/svm/core/annota
 new file mode 100644
 --- /dev/null
 +++ b/sdk/src/com.oracle.svm.core.annotate/src/com/oracle/svm/core/annotate/BUILD.bazel
-@@ -0,0 +1,25 @@
+@@ -0,0 +1,26 @@
 +load("@rules_mx//mx:java.bzl", "elide_java_library")
 +
 +elide_java_library(
@@ -1110,6 +1131,7 @@ new file mode 100644
 +    javac_opts = [
 +        "--release",
 +        "21",
++        "-parameters",
 +    ],
 +    unified_release = 21,
 +    visibility = ["//:__subpackages__"],
@@ -1119,7 +1141,7 @@ diff --git a/sdk/src/jdk.graal.compiler.vmaccess.guest/src/jdk/graal/compiler/vm
 new file mode 100644
 --- /dev/null
 +++ b/sdk/src/jdk.graal.compiler.vmaccess.guest/src/jdk/graal/compiler/vmaccess/guest/BUILD.bazel
-@@ -0,0 +1,12 @@
+@@ -0,0 +1,13 @@
 +load("@rules_mx//mx:java.bzl", "elide_java_library")
 +
 +elide_java_library(
@@ -1128,6 +1150,7 @@ new file mode 100644
 +    javac_opts = [
 +        "--release",
 +        "21",
++        "-parameters",
 +    ],
 +    unified_release = 21,
 +    visibility = ["//:__subpackages__"],
@@ -2132,7 +2155,7 @@ diff --git a/sdk/src/org.graalvm.options/src/org/graalvm/options/BUILD.bazel b/s
 new file mode 100644
 --- /dev/null
 +++ b/sdk/src/org.graalvm.options/src/org/graalvm/options/BUILD.bazel
-@@ -0,0 +1,27 @@
+@@ -0,0 +1,28 @@
 +load("@rules_mx//mx:java.bzl", "elide_java_library")
 +
 +elide_java_library(
@@ -2152,6 +2175,7 @@ new file mode 100644
 +    javac_opts = [
 +        "--release",
 +        "21",
++        "-parameters",
 +    ],
 +    unified_release = 21,
 +    visibility = ["//:__subpackages__"],
@@ -2286,7 +2310,7 @@ diff --git a/sdk/src/org.graalvm.polyglot.tck/src/org/graalvm/polyglot/tck/BUILD
 new file mode 100644
 --- /dev/null
 +++ b/sdk/src/org.graalvm.polyglot.tck/src/org/graalvm/polyglot/tck/BUILD.bazel
-@@ -0,0 +1,26 @@
+@@ -0,0 +1,27 @@
 +load("@rules_mx//mx:java.bzl", "elide_java_library")
 +
 +elide_java_library(
@@ -2304,6 +2328,7 @@ new file mode 100644
 +    javac_opts = [
 +        "--release",
 +        "21",
++        "-parameters",
 +    ],
 +    unified_release = 21,
 +    visibility = ["//:__subpackages__"],
@@ -2317,7 +2342,7 @@ diff --git a/sdk/src/org.graalvm.resourcecopy/src/org/graalvm/resourcecopy/BUILD
 new file mode 100644
 --- /dev/null
 +++ b/sdk/src/org.graalvm.resourcecopy/src/org/graalvm/resourcecopy/BUILD.bazel
-@@ -0,0 +1,24 @@
+@@ -0,0 +1,25 @@
 +load("@rules_java//java:defs.bzl", "java_binary")
 +load("@rules_mx//mx:java.bzl", "elide_java_library")
 +
@@ -2327,6 +2352,7 @@ new file mode 100644
 +    javac_opts = [
 +        "--release",
 +        "21",
++        "-parameters",
 +    ],
 +    unified_release = 21,
 +    visibility = ["//:__subpackages__"],
@@ -2424,7 +2450,7 @@ diff --git a/sdk/src/org.graalvm.webimage.api/src/org/graalvm/webimage/api/BUILD
 new file mode 100644
 --- /dev/null
 +++ b/sdk/src/org.graalvm.webimage.api/src/org/graalvm/webimage/api/BUILD.bazel
-@@ -0,0 +1,25 @@
+@@ -0,0 +1,26 @@
 +load("@rules_mx//mx:java.bzl", "elide_java_library")
 +
 +elide_java_library(
@@ -2446,6 +2472,7 @@ new file mode 100644
 +    javac_opts = [
 +        "--release",
 +        "21",
++        "-parameters",
 +    ],
 +    unified_release = 21,
 +    visibility = ["//:__subpackages__"],

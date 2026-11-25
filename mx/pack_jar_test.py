@@ -49,6 +49,38 @@ class PackJarTest(unittest.TestCase):
                     jar.read("META-INF/services/p.Service"), b"p.Bridge\np.Guest\n"
                 )
 
+    def test_compiler_test_archive_consumes_unpublished_providers(self):
+        with tempfile.TemporaryDirectory() as directory:
+            project = Path(directory) / "classes.jar"
+            out = project.with_name("test.jar")
+            with ZipFile(project, "w") as jar:
+                jar.writestr("META-INF/providers/p.CompilerPlugin", b"p.Plugin")
+                jar.writestr(
+                    "META-INF/versions/24/META-INF/providers/p.Versioned", b"p.Plugin"
+                )
+                jar.writestr("p/Test_OptionDescriptors.class", b"options")
+                jar.writestr("META-INF/truffle-registrations/p.Language", b"p.Provider")
+            subprocess.run(
+                [
+                    PACKER,
+                    "--graal-test-services",
+                    "--truffle-services",
+                    "--input",
+                    project,
+                    "--output",
+                    out,
+                ],
+                check=True,
+            )
+            with ZipFile(out) as jar:
+                self.assertEqual(
+                    set(jar.namelist()),
+                    {"p/Test_OptionDescriptors.class", "META-INF/services/p.Provider"},
+                )
+                self.assertEqual(
+                    jar.read("META-INF/services/p.Provider"), b"p.Language\n"
+                )
+
     def test_accumulates_versioned_providers_and_consumes_markers(self):
         with tempfile.TemporaryDirectory() as directory:
             jar = Path(directory) / "members.jar"

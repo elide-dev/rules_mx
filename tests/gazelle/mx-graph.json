@@ -13,7 +13,8 @@
       "name": "check",
       "options": [
         "--release",
-        "17"
+        "17",
+        "-parameters"
       ],
       "packages": [
         "example.check"
@@ -40,7 +41,8 @@
       "name": "client",
       "options": [
         "--release",
-        "17"
+        "17",
+        "-parameters"
       ],
       "packages": [
         "example.client"
@@ -59,7 +61,8 @@
       "name": "demo",
       "options": [
         "--release",
-        "17"
+        "17",
+        "-parameters"
       ],
       "packages": [
         "example.api",

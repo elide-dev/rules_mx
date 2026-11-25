@@ -15,8 +15,8 @@ tools/buildbuddy test --config=buildbuddy-rbe --config=elide-processors //graal/
 | Suite | Native Bazel build | Test coverage |
 | --- | --- | --- |
 | SDK | All 29 declared projects. All 19 Java distributions produce JARs, including Polyglot, Native Bridge, JLine and Launcher Common. Three additional targets expose the version and launcher resource layouts. | All 17 discovered upstream JUnit classes and the C and C++ toolchain probes. Runtime tests verify packaged version resources, JPMS module loading and JLine provider selection on JDK 21 and Labs JDK 25. |
-| Truffle | 32 of 69 declared projects, including the JNI attach library, host interop and SimpleLanguage. Bazel packages the multi-release Truffle API, SL language, SL launcher, Truffle compiler interface and HotSpot runtime as named modules. | 57 guest fixtures run independently. All 30 concrete SL JUnit classes run on the default runtime, including the four interpreter configurations of the upstream fixture runner. Nine TCK classes run against the SL provider on both the interpreter and the source-built optimizing runtime. |
-| Compiler | 7 of 17 projects, including the compiler processor, options, optimizing compiler, IGV utility and profile comparison tool. | 21 compiler-tool JUnit classes, four selected upstream Truffle compiler regressions on the Labs JDK and a last-tier compiled guest test for both AST and cached-bytecode execution. |
+| Truffle | 44 of 69 declared projects, including the JNI attach library, host interop and SimpleLanguage. Bazel packages the multi-release Truffle API, SL language, SL launcher, Truffle compiler interface and HotSpot runtime as named modules. | 57 guest fixtures run independently. All 30 concrete SL JUnit classes run on the default runtime, including the four interpreter configurations of the upstream fixture runner. Nine TCK classes run on both runtimes. All ten projects in `TRUFFLE_TEST` compile, with 570 discovered JUnit class targets and 277 in the default test selection. |
+| Compiler | 10 of 17 projects, including the complete compiler test project and both versions of its annotation fixtures. | 21 compiler-tool JUnit classes, 19 shared-harness classes, four previously qualified compiler regressions and the last-tier compiled guest probe run by default. |
 
 The SDK and Truffle slice generally targets Java 21. Shaded libraries compile at their declared releases, including the JDK 22 JLine overlay. Some SDK projects declare an older minimum while using newer APIs, including `java.io.Serial`. The libgraal API compiles as one unit because its packages depend on each other. Gazelle keeps project resources, processors and tests with their owning compilations and splits eligible source-only projects by package.
 
@@ -56,7 +56,20 @@ bazelisk test --config=elide-processors @graal//compiler:GR35581Test @graal//com
 
 Each JUnit label supports Bazel test filtering and writes JUnit XML. The TCK loads the SL provider from its distribution JAR and requires it through `-Dtck.language=sl`. At this source pin the TCK reports 16,564 cases per runtime. SL supplies no inline snippets, so `InlineExecutionTest` has zero cases. The SL JUnit suite reports 685 cases, including the 57 upstream programs in each of its four runner configurations.
 
-The four compiler regression labels compile individual files from `jdk.graal.compiler.test`. Their test launchers place the Bazel-built `GRAAL` JAR on the upgrade module path and package generated test language registrations for service loading. The complete compiler test project and its shared harness are still pending.
+## Truffle and compiler test distributions
+
+```sh
+bazelisk build --config=elide-processors @graal//truffle:TRUFFLE_TEST @graal//compiler:GRAAL_TEST
+bazelisk test --config=elide-processors @graal//truffle:harness_tests @graal//compiler:harness_tests
+bazelisk test --config=elide-processors @graal//compiler:jdk.graal.compiler.test.jdk.graal.compiler.annotation.test.TestAnnotationsOnTypes
+bazelisk query 'kind(".*_test rule", filter("jdk[.]graal[.]compiler[.]test[.]jdk", @graal//compiler:*))'
+```
+
+Gazelle emits 570 Truffle and 1,678 compiler JUnit class targets from the new projects. CI runs all discovered classes in the DSL, library, bytecode, debugger, object and static-object projects, plus selected API, instrumentation, string and sandbox tests. The compiler selection exercises code generation, annotation evolution, vector-module loading, subprocesses and four SL compilation configurations. Choose any other generated class explicitly by label. The class targets carry the Bazel `manual` tag so the two explicit suites determine the default workload. Qualification of the remaining classes is ongoing.
+
+The shared compiler launcher puts the source-built `GRAAL` on the Labs JDK upgrade module path. It replaces `GRAAL_TEST_COMPILETIME` with `GRAAL_TEST_RUNTIME` on the test classpath and uses mx's JUnit module support for package access and test annotations. The upstream subprocess harness receives the exact Java command and the target platform's pinned HSDIS library. The ten Truffle test projects share the packaged `TRUFFLE_TEST` classpath, including the shaded JCodings implementation and encoding tables.
+
+Production and test Java compilations preserve method parameter names as mx does. The compiler regression corpus uses Labs javac with its Graal and Truffle processors and the upstream Java 24 source level. Error Prone checks are disabled on this test project because it intentionally contains pathological programs.
 
 ## SDK launchers and toolchain tests
 
@@ -91,8 +104,8 @@ Run `tools/generate-graal --check` to reproduce the checked-in patches from the 
 | Next checkpoint | Acceptance under Bazel |
 | --- | --- |
 | SDK toolchain distributions | Assemble the five LLVM, Ninja, CMake and musl redistribution layouts with their upstream contents and platform filters. Their packaged payloads are separate from the Elide LLVM toolchain used for Bazel compilation. |
-| Complete Truffle | Migrate the broader `TRUFFLE_TEST` Java projects, including API, DSL, instrumentation and library tests with their external dependencies. |
-| Compiler and SubstrateVM | Migrate the upstream Graal compiler test projects and their fixtures. Build the required Espresso Shared dependencies and SubstrateVM, then produce and execute an image with the newly built toolchain. |
+| Complete Truffle | Extend default execution to the remaining API, instrumentation, string and sandbox tests. Migrate Truffle NFI and its native backends. |
+| Compiler and SubstrateVM | Qualify more classes from the full compiler distribution, including architecture-specific backends and VM-specific test configurations. Build the required Espresso Shared dependencies and SubstrateVM, then produce and execute an image with the newly built toolchain. |
 | Languages and tools | Migrate Regex, Sulong, Wasm, Espresso, Espresso Compiler Stub, Tools, Visualizer, Web Image and Sandbox Toolchains with their Java, native and external inputs. Run each suite's upstream tests. |
 | VM assembly | Pin the external components required by each selected VM configuration. Assemble the distribution and run its launchers, component tests and corresponding mx gate equivalents from a clean Linux RBE build. |
 

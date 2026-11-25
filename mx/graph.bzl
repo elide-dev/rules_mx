@@ -72,11 +72,31 @@ def mx_processed_java(name, mx_resource_root = None, abi_after_javac = False, de
         visibility = visibility,
     )
 
-def mx_test_class(name, project = None, test_class = None, runtime_deps = [], jvm_flags = []):
+def _launcher_test_impl(ctx):
+    exe = ctx.actions.declare_file(ctx.label.name)
+    ctx.actions.symlink(output = exe, target_file = ctx.executable.launcher, is_executable = True)
+    return [
+        DefaultInfo(executable = exe, runfiles = ctx.attr.launcher[DefaultInfo].default_runfiles),
+        RunEnvironmentInfo(environment = {"MX_TEST_CLASS": ctx.attr.test_class}),
+    ]
+
+_launcher_test = rule(
+    implementation = _launcher_test_impl,
+    attrs = {
+        "launcher": attr.label(mandatory = True, executable = True, cfg = "target"),
+        "test_class": attr.string(mandatory = True),
+    },
+    test = True,
+)
+
+def mx_test_class(name, project = None, test_class = None, runtime_deps = [], jvm_flags = [], tags = [], launcher = None):
     """Run one mx JUnit 4 test class."""
+    if launcher:
+        _launcher_test(name = name, launcher = launcher, test_class = test_class, tags = tags, size = "medium")
+        return
     if not test_class or not (project or runtime_deps):
         fail("mx_test_class requires test_class and a project or runtime_deps")
-    java_test(name = name, runtime_deps = ([project] if project else []) + runtime_deps, test_class = test_class, jvm_flags = jvm_flags)
+    java_test(name = name, runtime_deps = ([project] if project else []) + runtime_deps, test_class = test_class, jvm_flags = jvm_flags, tags = tags)
 
 def _layout_file_impl(ctx):
     if ctx.file.src:

@@ -78,6 +78,38 @@ SUITES = {
         *SDK,
     ],
     "compiler": [
+        # The compiler test corpus deliberately exercises invalid and pathological programs.
+        "--javac-opt",
+        "jdk.graal.compiler.test=-XepDisableAllChecks",
+        "--java-dep",
+        "mx:HAMCREST=@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
+        *[
+            arg
+            for dist in (
+                "TRUFFLE_TEST",
+                "TRUFFLE_RUNTIME",
+                "TRUFFLE_SL_TEST",
+                "TRUFFLE_API",
+            )
+            for arg in ("--java-dep", f"truffle:{dist}=//truffle:{dist}")
+        ],
+        "--archive-dist",
+        "GRAAL_TEST_COMPILETIME",
+        "--archive-dist",
+        "GRAAL_TEST_RUNTIME",
+        "--archive-dist",
+        "GRAAL_TEST",
+        "--java-dep",
+        "compiler:HSDIS_LIBRARY=:HSDIS_LIBRARY",
+        *[
+            arg
+            for project in (
+                "jdk.graal.compiler.test",
+                "jdk.graal.compiler.test.compiletime",
+                "jdk.graal.compiler.test.runtime",
+            )
+            for arg in ("--project-release", project + "=24")
+        ],
         "--test-jvm-flag",
         "compiler:org.graalvm.profdiff.test=--add-modules=jdk.internal.vm.ci",
         "--test-jvm-flag",
@@ -118,8 +150,18 @@ SUITES = {
         "GRAAL",
         "org.graalvm.igvutil.test",
         "org.graalvm.profdiff.test",
+        "GRAAL_TEST_RUNTIME",
+        "GRAAL_TEST",
     ],
     "truffle": [
+        "--java-dep",
+        "mx:HAMCREST=@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
+        "--archive-dist",
+        "TRUFFLE_DSL_PROCESSOR",
+        "--archive-dist",
+        "TRUFFLE_JCODINGS",
+        "--archive-dist",
+        "TRUFFLE_TEST",
         "--generated-dep",
         "truffle:com.oracle.truffle.sl.test=@contrib_rules_jvm_deps//:junit_junit",
         "--generated-dep",
@@ -228,14 +270,74 @@ SUITES = {
         "TRUFFLE_RUNTIME",
         "TRUFFLE_SL_TEST",
         "TRUFFLE_SL_TCK",
+        "TRUFFLE_TEST",
     ],
 }
 
 
 SHADED_PROJECTS = {
     "sdk": ("org.graalvm.shadowed.org.jline", "org.graalvm.shadowed.org.jline.jdk22"),
-    "truffle": ("com.oracle.truffle.api.impl.asm",),
+    "truffle": ("com.oracle.truffle.api.impl.asm", "org.graalvm.shadowed.org.jcodings"),
 }
+
+
+JAVA_LIBRARIES = {
+    "truffle": ["GUAVA", "JIMFS", "VISUALVM-LIB-JFLUID-HEAP"],
+    "compiler": ["JAVA_ALLOCATION_INSTRUMENTER"],
+}
+
+
+def library_rules(suite):
+    return 'load("@rules_java//java:java_import.bzl", "java_import")\n' + "".join(
+        f'java_import(name = "{name}", jars = ["@graal_shaded_inputs//:{suite}_{name}.jar"], visibility = ["//visibility:public"])\n'
+        for name in JAVA_LIBRARIES[suite]
+    )
+
+
+def harness_options(directory):
+    suite = directory.name
+    metadata = runpy.run_path(str(directory / f"mx.{suite}/suite.py"))["suite"]
+    if suite == "truffle":
+        projects = metadata["distributions"]["TRUFFLE_TEST"]["dependencies"]
+        return [
+            arg
+            for p in projects
+            for arg in (
+                "--test-jvm-flag",
+                f"truffle:{p}=-Dpolyglot.engine.WarnInterpreterOnly=false",
+                "--test-jvm-flag",
+                f"truffle:{p}=--enable-native-access=ALL-UNNAMED",
+                "--generated-dep",
+                f"truffle:{p}=@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
+                "--test-runtime",
+                f"truffle:{p}=:TRUFFLE_TEST",
+                "--manual-test-project",
+                p,
+            )
+        ]
+    if suite == "compiler":
+        service = (
+            directory.parent
+            / "truffle/src/com.oracle.truffle.dsl.processor/src/META-INF/services/javax.annotation.processing.Processor"
+        )
+        return [
+            "--test-launcher",
+            "compiler:jdk.graal.compiler.test=:compiler_junit",
+            "--generated-dep",
+            "compiler:jdk.graal.compiler.test=@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
+            "--manual-test-project",
+            "jdk.graal.compiler.test",
+            *[
+                arg
+                for proc in service.read_text().splitlines()
+                if proc.strip() and not proc.startswith("#")
+                for arg in (
+                    "--processor-plugin",
+                    f"truffle:TRUFFLE_DSL_PROCESSOR=//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.{proc}",
+                )
+            ],
+        ]
+    return []
 
 
 def shading_inputs(directory):
@@ -261,7 +363,131 @@ def shading_inputs(directory):
                 flags.extend(
                     ["--shaded-input", f"{qualified}=@graal_shaded_inputs//:{filename}"]
                 )
+    for name in JAVA_LIBRARIES.get(directory.name, ()):
+        lib = suite["libraries"][name]
+        mvn = lib["maven"]
+        artifact, version = mvn["artifactId"], mvn["version"]
+        path = f"{mvn['groupId'].replace('.', '/')}/{artifact}/{version}/{artifact}-{version}.jar"
+        algo, digest = lib["digest"].split(":")
+        inputs[f"{directory.name}_{name}.jar"] = [
+            path,
+            algo + "-" + base64.b64encode(bytes.fromhex(digest)).decode(),
+        ]
+        flags.extend(["--java-dep", f"{directory.name}:{name}=:{name}"])
     return inputs, flags
+
+
+def hsdis_inputs(directory):
+    suite = runpy.run_path(str(directory / "mx.compiler/suite.py"))["suite"]
+    library = suite["libraries"]["HSDIS"]
+    layouts = suite["distributions"]["HSDIS_LIBRARY"]["os_arch"]
+    pins = {}
+    for os_name, arch in (
+        ("darwin", "aarch64"),
+        ("linux", "amd64"),
+        ("linux", "aarch64"),
+    ):
+        config = library["os_arch"][os_name][arch]
+        ((output, source),) = layouts[os_name]["<others>"]["layout"].items()
+        if source != "file:<path:HSDIS>/*":
+            raise ValueError("Unsupported HSDIS layout")
+        algo, digest = config["digest"].split(":")
+        (url,) = config["urls"]
+        pins[f"{os_name}_{arch}"] = dict(
+            url=url.format(urlbase=library["urlbase"]),
+            integrity=algo + "-" + base64.b64encode(bytes.fromhex(digest)).decode(),
+            output=output.replace("<arch>", arch),
+        )
+    return pins
+
+
+# CI runs independent upstream tests from each newly imported project. All other
+# discovered classes retain individually addressable labels for explicit runs.
+HARNESS_TESTS = {
+    "com.oracle.truffle.api.test": "ArgumentsTest CallTest ChildNodeTest ChildrenNodesTest FrameTest FrameDescriptorTest RootNodeTest LoopNodeTest NIOFileSystemTest",
+    "com.oracle.truffle.api.dsl.test": "*",
+    "com.oracle.truffle.api.library.test": "*",
+    "com.oracle.truffle.api.instrumentation.test": "AllocationReporterTest ContextsEventsTest GenerateWrapperTest InstrumentAPITest",
+    "com.oracle.truffle.api.debug.test": "*",
+    "com.oracle.truffle.api.strings.test": "TStringBasicTests TStringUTF8Tests TStringUTF16Tests TStringConstructorTests",
+    "com.oracle.truffle.api.bytecode.test": "*",
+    "com.oracle.truffle.api.object.test": "*",
+    "com.oracle.truffle.api.staticobject.test": "*",
+    "com.oracle.truffle.sandbox.test": "ResourceLimitsTest",
+    "jdk.graal.compiler.test": "IntegerDivRemConstantTest IntegerDivPowerOf2Test IntegerSwitchTest IntegerBoxEqualsTest TestAnnotationsOnTypes TestAnnotationsOnMethods TestAnnotationsOnFields TestAnnotationsOnRecordComponents SLCompileASTTestSuite SLCompileBytecodeTestSuite SLCompileImmediatelyASTTestSuite SLCompileImmediatelyBytecodeTestSuite DumpPathTest HotSpotGraalOptionValuesTest CRC32SubstitutionsTest CRC32CSubstitutionsTest BytecodeDisassemblerTest AddModulesTest VectorAPISmokeTest",
+}
+
+
+def qualified_tests(directory):
+    projects = json.loads((directory / "mx-graph.json").read_text())["projects"]
+    labels = []
+    for project in projects:
+        names = HARNESS_TESTS.get(project["name"], "")
+        if names == "*":
+            labels.extend(":" + project["name"] + "." + cls for cls in project["tests"])
+            continue
+        for short in names.split():
+            matches = [c for c in project["tests"] if c.rsplit(".", 1)[-1] == short]
+            if len(matches) != 1:
+                raise ValueError(
+                    f"Expected one {short} in {project['name']}, got {matches}"
+                )
+            labels.append(":" + project["name"] + "." + matches[0])
+    return f'test_suite(name = "harness_tests", tests = {json.dumps(sorted(labels))}, visibility = ["//visibility:public"])\n'
+
+
+def compiler_harness(directory):
+    metadata = runpy.run_path(str(directory / "mx.compiler/suite.py"))["suite"]
+    project = metadata["projects"]["jdk.graal.compiler.test"]
+    graph = json.loads((directory / "mx-graph.json").read_text())
+    tests = next(
+        p["tests"] for p in graph["projects"] if p["name"] == "jdk.graal.compiler.test"
+    )
+    flags = [
+        "-XX:-UseJVMCICompiler",
+        "-XX:TypeProfileWidth=8",
+        "-Djdk.graal.TrackNodeSourcePosition=true",
+        "-Dpolyglot.engine.DynamicCompilationThresholds=false",
+        "-Dpolyglot.ConstantOptionKeyPartialEvaluationLanguage.ConstantOption1=true",
+        "--enable-native-access=ALL-UNNAMED",
+    ]
+    flags += [
+        f"--add-opens={mod}/{pkg}=ALL-UNNAMED"
+        for mod, pkgs in project["requiresConcealed"].items()
+        if mod != "jdk.internal.vm.ci"
+        for pkg in pkgs
+    ]
+    rules = [
+        'load("@rules_mx//mx:graph.bzl", "mx_test_class")',
+        'load("@rules_mx//graal:simplelanguage.bzl", "compiler_test_runner")',
+        f'compiler_test_runner(name = "compiler_junit", jvm_flags = {json.dumps(flags)})',
+    ]
+    for name, target in (("HSDIS_LIBRARY", "jar"), ("hsdis_library_file", "library")):
+        choices = {
+            f"@rules_mx//tools:exec_{config}": f"@hsdis_{platform}//:{target}"
+            for config, platform in (
+                ("linux_amd64", "linux_amd64"),
+                ("linux_arm64", "linux_aarch64"),
+                ("macos_arm64", "darwin_aarch64"),
+            )
+        }
+        rules.append(
+            f'alias(name = "{name}", actual = select({json.dumps(choices)}), visibility = ["//visibility:public"])'
+        )
+    # Preserve the individually qualified regression labels from the earlier SL migration.
+    for name in (
+        "GR35581Test",
+        "GR36613Test",
+        "GR42688Test",
+        "TruffleDirectCallNodeTest",
+    ):
+        cls = "jdk.graal.compiler.truffle.test." + name
+        if cls not in tests:
+            raise ValueError(f"Missing compiler regression {cls}")
+        rules.append(
+            f'mx_test_class(name = "{name}", launcher = ":compiler_junit", test_class = "{cls}") # keep'
+        )
+    return "\n".join(rules) + "\n"
 
 
 def sdk_native_projects(sdk):
@@ -385,6 +611,7 @@ def generate(suite, stage):
                 "--release",
                 "21",
                 *shading_inputs(directory)[1],
+                *harness_options(directory),
                 *SUITES[suite],
             ],
             cwd=ROOT,
@@ -407,11 +634,10 @@ def generate(suite, stage):
         )
     elif suite == "compiler":
         (directory / "BUILD.bazel").write_text(
-            'load("@rules_mx//graal:simplelanguage.bzl", "simplelanguage", "truffle_compiler_test")\n\n'
-            'truffle_compiler_test(name = "GR35581Test", processors = ["TruffleProcessor", "LanguageRegistrationProcessor"])\n'
-            'truffle_compiler_test(name = "GR36613Test")\n'
-            'truffle_compiler_test(name = "GR42688Test", processors = ["TruffleProcessor"])\n'
-            'truffle_compiler_test(name = "TruffleDirectCallNodeTest")\n\n'
+            library_rules(suite)
+            + compiler_harness(directory)
+            + qualified_tests(directory)
+            + 'load("@rules_mx//graal:simplelanguage.bzl", "simplelanguage")\n'
             'simplelanguage(name = "sl_jit", compiler = ":GRAAL")\n\n'
             'simplelanguage(name = "sl_compilation_test", compiler = ":GRAAL", probe = "@rules_mx//graal:compiled_guest")\n'
         )
@@ -428,6 +654,8 @@ def generate(suite, stage):
                 }.items()
             )
             + "\n"
+            + library_rules(suite)
+            + qualified_tests(directory)
             + truffle_native_projects(directory)
         )
     subprocess.run(
@@ -496,6 +724,16 @@ def main():
                         "BUILD", "BUILD.bazel", "__pycache__"
                     ),
                 )
+        hsdis = ROOT / "graal/hsdis.json"
+        pins = (
+            json.dumps(hsdis_inputs(stage / "compiler"), indent=2, sort_keys=True)
+            + "\n"
+        )
+        if args.check:
+            if hsdis.read_text() != pins:
+                sys.exit("Regenerate the HSDIS pins with tools/generate-graal")
+        else:
+            hsdis.write_text(pins)
         lock = ROOT / "graal/shaded_inputs.json"
         lock_text = (
             json.dumps(

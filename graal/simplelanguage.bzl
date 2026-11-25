@@ -1,12 +1,9 @@
 """Launch packaged SimpleLanguage modules and run upstream guest programs."""
 
-load("@rules_java//java:java_library.bzl", "java_library")
 load("@rules_java//java/common:java_common.bzl", "java_common")
 load("@rules_java//java/common:java_info.bzl", "JavaInfo")
 load("@rules_python//python:py_binary.bzl", "py_binary")
 load("@rules_python//python:py_test.bzl", "py_test")
-load("//mx:jar.bzl", "mx_jar_dist")
-load("//mx:java.bzl", "elide_java_library")
 
 _RUNTIME = "@bazel_tools//tools/jdk:runtime_toolchain_type"
 
@@ -22,12 +19,15 @@ def _sl_main_impl(ctx):
     if ctx.attr.compiler:
         modules = depset(transitive = [modules, ctx.attr.compiler[JavaInfo].transitive_runtime_jars])
     module_jars = {jar: True for jar in modules.to_list()}
+    if ctx.file.compiletime:
+        module_jars[ctx.file.compiletime] = True
     classpath = [jar for jar in depset(transitive = [dep[JavaInfo].transitive_runtime_jars for dep in ctx.attr.test_classpath]).to_list() if jar not in module_jars]
     probe = ctx.file.probe
     ctx.actions.expand_template(
         template = ctx.file._template,
         output = ctx.outputs.out,
         substitutions = {
+            "{HSDIS}": repr(_runfile(ctx, ctx.file.hsdis)) if ctx.file.hsdis else "None",
             "{JAVA}": repr(_runfile(ctx, binaries[0])),
             "{MODULES}": repr([_runfile(ctx, jar) for jar in modules.to_list()]),
             "{JAVA_VERSION}": str(runtime.version),
@@ -38,11 +38,13 @@ def _sl_main_impl(ctx):
             "{PROBE}": repr(_runfile(ctx, probe)) if probe else "None",
         },
     )
-    return [DefaultInfo(files = depset([ctx.outputs.out]), runfiles = ctx.runfiles(transitive_files = depset(classpath + ([probe] if probe else []), transitive = [modules, runtime.files])))]
+    return [DefaultInfo(files = depset([ctx.outputs.out]), runfiles = ctx.runfiles(transitive_files = depset(classpath + ctx.files.hsdis + ([probe] if probe else []), transitive = [modules, runtime.files])))]
 
 _sl_main = rule(
     implementation = _sl_main_impl,
     attrs = {
+        "compiletime": attr.label(allow_single_file = [".jar"]),
+        "hsdis": attr.label(allow_single_file = True),
         "compiler": attr.label(allow_single_file = [".jar"], providers = [JavaInfo]),
         "jvm_flags": attr.string_list(),
         "test_class": attr.string(),
@@ -87,40 +89,27 @@ def sl_fixture_tests(package, names, inputs = [], prefix = ""):
             size = "small",
         )
 
-def truffle_compiler_test(name, processors = []):
-    """Run an upstream compiler regression on the source-built optimizing runtime."""
-    package = "jdk.graal.compiler.truffle.test"
-    src = "src/jdk.graal.compiler.test/src/" + package.replace(".", "/") + "/" + name + ".java"
-    junit = "@contrib_rules_jvm_deps//:junit_junit"
-    deps = [junit, "//sdk:POLYGLOT", "//truffle:TRUFFLE_API", "//truffle:TRUFFLE_COMPILER", "//truffle:TRUFFLE_RUNTIME"]
-    classes = name + ".classes"
-    if processors:
-        java_library(
-            name = classes,
-            srcs = [src],
-            deps = deps,
-            plugins = ["//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor." + proc for proc in processors],
-            testonly = True,
-        )
-        runtime = name + ".jar_dist"
-        mx_jar_dist(
-            name = runtime,
-            contents = [":" + classes],
-            deps = deps,
-            truffle_services = True,
-            testonly = True,
-        )
-    else:
-        elide_java_library(
-            name = classes,
-            srcs = [src],
-            deps = deps,
-            javac_opts = ["--release", "21"],
-            unified_release = 21,
-            testonly = True,
-        )
-        runtime = classes
-    optimizing_junit(name, package + "." + name, [":" + runtime])
+def compiler_test_runner(name, jvm_flags):
+    """Run compiler JUnit classes with the same runtime annotation substitution as mx."""
+    _sl_main(
+        name = name + ".main",
+        out = name + ".py",
+        modules = ["//truffle:TRUFFLE_SL", "//truffle:TRUFFLE_RUNTIME"],
+        compiler = ":GRAAL",
+        compiletime = ":GRAAL_TEST_COMPILETIME",
+        hsdis = ":hsdis_library_file",
+        labs_runtime = Label("//tools:labs_runtime"),
+        test_classpath = [":GRAAL_TEST", ":GRAAL_TEST_RUNTIME", Label("//graal:compiler_junit")],
+        jvm_flags = jvm_flags,
+        testonly = True,
+    )
+    py_binary(
+        name = name,
+        srcs = [":" + name + ".main"],
+        main = name + ".py",
+        data = [":" + name + ".main"],
+        testonly = True,
+    )
 
 def optimizing_junit(name, test_class, runtime_deps, jvm_flags = []):
     """Run a JUnit class alongside the packaged SL modules on the Labs JDK."""

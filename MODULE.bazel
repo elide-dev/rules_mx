@@ -120,3 +120,26 @@ shaded_inputs(
     dev_dependency = True,
     lock = "//graal:shaded_inputs.json",
 )
+
+hsdis = use_repo_rule("//graal:hsdis.bzl", "hsdis")
+
+hsdis(
+    name = "hsdis_darwin_aarch64",
+    dev_dependency = True,
+    lock = "//graal:hsdis.json",
+    platform = "darwin_aarch64",
+)
+
+hsdis(
+    name = "hsdis_linux_amd64",
+    dev_dependency = True,
+    lock = "//graal:hsdis.json",
+    platform = "linux_amd64",
+)
+
+hsdis(
+    name = "hsdis_linux_aarch64",
+    dev_dependency = True,
+    lock = "//graal:hsdis.json",
+    platform = "linux_aarch64",
+)

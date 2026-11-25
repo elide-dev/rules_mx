@@ -33,3 +33,14 @@ py_binary(
 )
 
 mx_java_projects()
+
+# The JDK 9 overlay replaces the Java 8 module-access implementation.
+filegroup(
+    name = "junit_runner_sources",
+    srcs = glob(
+        ["java/com.oracle.mxtool.junit/src/**/*.java"],
+        exclude = ["**/ModuleSupport.java"],
+    ) + glob([
+        "java/com.oracle.mxtool.junit.jdk9/src/**/*.java",
+    ]),
+)

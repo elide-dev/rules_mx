@@ -29,11 +29,14 @@ type project struct {
 	Options, Dirs, Packages, Tests, Deps []string
 	Sources, Resources, Processors       []string
 	JVMCI                                bool
+	ForceJavac                           bool `json:"force_javac"`
 	ABIAfterJavac                        bool `json:"abi_after_javac"`
 	Shade                                string
 	ShadeInputs                          []string `json:"shade_inputs"`
 	AddExports                           []string `json:"add_exports"`
 	ResourceRoot                         string   `json:"resource_root"`
+	TestLauncher                         string   `json:"test_launcher"`
+	ManualTests                          bool     `json:"manual_tests"`
 	TestRuntime                          []string `json:"test_runtime"`
 	TestJVMFlags                         []string `json:"test_jvm_flags"`
 	Testonly                             bool
@@ -82,6 +85,7 @@ func (g *importer) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
 			AddExports                 []string `json:"add_exports"`
 			SnippetsPattern            string   `json:"snippets_pattern"`
 			ArchivedLibraries          []string `json:"archived_libraries"`
+			GraalTestServices          bool     `json:"graal_test_services"`
 			GraalServices              bool     `json:"graal_services"`
 			TruffleServices            bool     `json:"truffle_services"`
 			JNIServices                bool     `json:"jni_services"`
@@ -170,7 +174,7 @@ func (g *importer) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
 			kind, opts := "mx_whole_java", "javac_opts"
 			if p.Shade != "" {
 				kind, opts = "mx_shaded_java", "javacopts"
-			} else if p.JVMCI {
+			} else if p.JVMCI || p.ForceJavac {
 				kind, opts = "mx_jvmci_library", "javacopts"
 			} else if len(p.Processors) != 0 || len(p.AddExports) != 0 {
 				kind, opts = "mx_processed_java", "javacopts"
@@ -186,7 +190,7 @@ func (g *importer) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
 			}
 			if len(p.Processors) != 0 {
 				r.SetAttr("plugins", p.Processors)
-				if p.ABIAfterJavac && !p.JVMCI {
+				if p.ABIAfterJavac && kind != "mx_jvmci_library" {
 					r.SetAttr("abi_after_javac", true)
 				}
 			} else if kind == "mx_whole_java" {
@@ -223,13 +227,18 @@ func (g *importer) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
 		}
 		for _, class := range p.Tests {
 			t := rule.NewRule("mx_test_class", p.Name+"."+class)
-			if len(p.TestRuntime) > 0 {
+			if p.TestLauncher != "" {
+				t.SetAttr("launcher", p.TestLauncher)
+			} else if len(p.TestRuntime) > 0 {
 				t.SetAttr("runtime_deps", p.TestRuntime)
 			} else {
 				t.SetAttr("project", ":"+p.Name)
 			}
 			if len(p.TestJVMFlags) > 0 {
 				t.SetAttr("jvm_flags", p.TestJVMFlags)
+			}
+			if p.ManualTests {
+				t.SetAttr("tags", []string{"manual"})
 			}
 			t.SetAttr("test_class", class)
 			if err := add(g.suite, t); err != nil {
@@ -261,6 +270,9 @@ func (g *importer) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
 			}
 			if dist.GraalServices {
 				r.SetAttr("graal_services", true)
+				if dist.GraalTestServices {
+					r.SetAttr("graal_test_services", true)
+				}
 			}
 			if dist.TruffleServices {
 				r.SetAttr("truffle_services", true)
@@ -323,7 +335,7 @@ func graphKind(k string) bool {
 func (g *importer) Kinds() map[string]rule.KindInfo {
 	kinds := g.javaLanguage.Kinds()
 	managed := map[string]bool{}
-	for _, a := range strings.Fields("overlays shade shade_inputs manifest contents directives release snippets_pattern archived_libraries jni_services truffle_services graal_services module_name add_exports abi_after_javac copies literals srcs deps packages runtime_deps jvm_flags test_class project processor_class generates_api plugins resources mx_resource_root unified_release javac_opts javacopts testonly visibility") {
+	for _, a := range strings.Fields("overlays shade shade_inputs manifest contents directives release snippets_pattern archived_libraries jni_services truffle_services graal_services graal_test_services module_name add_exports abi_after_javac copies literals srcs deps packages launcher tags runtime_deps jvm_flags test_class project processor_class generates_api plugins resources mx_resource_root unified_release javac_opts javacopts testonly visibility") {
 		managed[a] = true
 	}
 	for _, k := range strings.Fields("mx_jvmci_library mx_shaded_java mx_files mx_project mx_whole_java mx_processed_java mx_processor mx_test_class") {

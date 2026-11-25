@@ -31,6 +31,8 @@ def read_members(inputs, args):
                     r"(?:META-INF/versions/([1-9][0-9]*)/)?META-INF/(jni-entry-points|truffle-registrations|providers)/([^/]+)",
                     name,
                 )
+                if marker and marker[2] == "providers" and args.graal_test_services:
+                    continue
                 if marker and (
                     (args.graal_services and marker[2] == "providers")
                     or (args.jni_services and marker[2] == "jni-entry-points")
@@ -144,6 +146,7 @@ def main():
     parser.add_argument("--output", required=True)
     parser.add_argument("--snippets-pattern")
     parser.add_argument("--archived-library", action="append", default=[])
+    parser.add_argument("--graal-test-services", action="store_true")
     parser.add_argument("--graal-services", action="store_true")
     parser.add_argument("--truffle-services", action="store_true")
     parser.add_argument("--jni-services", action="store_true")

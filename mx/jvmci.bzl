@@ -14,7 +14,7 @@ def _jvmci_impl(ctx):
         java_toolchain = toolchain,
         source_files = ctx.files.srcs,
         resources = ctx.files.resources,
-        javac_opts = ctx.attr.javacopts + ["--add-modules=" + ",".join(modules)] + [
+        javac_opts = ctx.attr.javacopts + (["--add-modules=" + ",".join(modules)] if modules else []) + [
             "--add-exports=" + item + "=ALL-UNNAMED"
             for item in ctx.attr.add_exports
         ],

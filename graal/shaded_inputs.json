@@ -1,4 +1,8 @@
 {
+  "compiler_JAVA_ALLOCATION_INSTRUMENTER.jar": [
+    "com/google/code/java-allocation-instrumenter/java-allocation-instrumenter/3.1.0/java-allocation-instrumenter-3.1.0.jar",
+    "sha512-Jf5XzW0+yrtS9BHIhPgBEJ7ON1cKLdGfoeW4PMIDntAqkHh2AOuTA+qnMKq/DccLUG+5/kDKbDQXQou4nCyJQA=="
+  ],
   "sdk_JLINE_BUILTINS-sources.jar": [
     "org/jline/jline-builtins/3.28.0/jline-builtins-3.28.0-sources.jar",
     "sha512-M/BtfiuyMs5BPYz3I0vbQWw6Z3Dc8YpcF+OImIeyhzeP9fxTF1gUM4PD9QtWYT5b+AK1xJoqCbdIyARWjgVluA=="
@@ -54,5 +58,25 @@
   "truffle_ASM_TREE_9.8.jar": [
     "org/ow2/asm/asm-tree/9.8/asm-tree-9.8.jar",
     "sha512-RJP1c9nwz8iDfbm+Jai2GoJaBqr8DgLwNjh1WE/xhKWhRgDlN5PAmGYwCFnkTxU/r/0OBQ3kp/uhpjtfsBCppw=="
+  ],
+  "truffle_GUAVA.jar": [
+    "com/google/guava/guava/31.0.1-jre/guava-31.0.1-jre.jar",
+    "sha512-yNiqOOb7BMQJw3ki78u+GC9lFWqFP2kdg4HVbuogit8i96KIc7t4lSEOQYV91EEar5UmgqJpIFEiDigZENB5jw=="
+  ],
+  "truffle_JCODINGS_1.0.64-sources.jar": [
+    "org/jruby/jcodings/jcodings/1.0.64/jcodings-1.0.64-sources.jar",
+    "sha512-Uh0h+YWm/6IImTwDYIMfob5djSNjJI6Kwa264/XTOXy97ttRPcrxxXHHE796xBpACdRwCcBGVfsSyUHIcJNx/g=="
+  ],
+  "truffle_JCODINGS_1.0.64.jar": [
+    "org/jruby/jcodings/jcodings/1.0.64/jcodings-1.0.64.jar",
+    "sha512-/qQq/oKkPS5xVWoHgVCTnFKJBwhbCID2DLjgDhOsP2iOKn5f2roVrLc+SP0nJ9PUSRyTUG83AEsB2hzcMBz+ZQ=="
+  ],
+  "truffle_JIMFS.jar": [
+    "com/google/jimfs/jimfs/1.2/jimfs-1.2.jar",
+    "sha512-Cp3yzY4Ac1RVgs7CiTLukcddzWGwbNCjvJq0ZSfRSTedkp6GalR1jmwRBWk1m+wrRbUKl7BGNWAU6DAs2EVE6w=="
+  ],
+  "truffle_VISUALVM-LIB-JFLUID-HEAP.jar": [
+    "org/graalvm/visualvm/modules/org-graalvm-visualvm-lib-jfluid-heap/2.1.4/org-graalvm-visualvm-lib-jfluid-heap-2.1.4.jar",
+    "sha512-bZPN5yj12yQtKrVQkOWylS6HNiXlQgQ9FthZ4UhkM8ke/PPHE9clVpeVHudFzV9mJ2t484xixCLNexAAKRYSrQ=="
   ]
 }

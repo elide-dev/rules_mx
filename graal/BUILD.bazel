@@ -8,6 +8,7 @@ exports_files([
     "sl.py.tpl",
     "sl_fixture_test.py",
     "shaded_inputs.json",
+    "hsdis.json",
     "truffle.patch",
     "toolchain_test.py",
 ])
@@ -116,5 +117,20 @@ java_library(
         "@graal//truffle:TRUFFLE_API",
         "@graal//truffle:TRUFFLE_RUNTIME",
         "@graal//truffle:TRUFFLE_SL",
+    ],
+)
+
+java_library(
+    name = "compiler_junit",
+    testonly = True,
+    srcs = [
+        "CompilerJUnit.java",
+        "@graal_mx//:junit_runner_sources",
+    ],
+    add_exports = ["java.base/jdk.internal.module"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@bazel_tools//tools/jdk:TestRunner",
+        "@contrib_rules_jvm_deps//:junit_junit",
     ],
 )

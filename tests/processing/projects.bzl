@@ -13,6 +13,7 @@ def mx_java_projects():
         javacopts = [
             "--release",
             "17",
+            "-parameters",
         ],
         resources = ["app/src/config.properties"],
         resource_strip_prefix = mx_resource_prefix("app/src", repo_relative = True),
@@ -24,6 +25,7 @@ def mx_java_projects():
         javac_opts = [
             "--release",
             "17",
+            "-parameters",
         ],
         unified_release = 17,
         deps = [":app"],
@@ -52,6 +54,7 @@ def mx_java_projects():
         javac_opts = [
             "--release",
             "17",
+            "-parameters",
         ],
         unified_release = 17,
         resources = ["proc/src/META-INF/services/javax.annotation.processing.Processor"],

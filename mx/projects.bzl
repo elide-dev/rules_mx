@@ -7,6 +7,7 @@ def mx_java_projects():
         javac_opts = [
             "--release",
             "21",
+            "-parameters",
         ],
         unified_release = 21,
     )
@@ -21,6 +22,7 @@ def mx_java_projects():
         javac_opts = [
             "--release",
             "21",
+            "-parameters",
         ],
         unified_release = 21,
     )
@@ -31,6 +33,7 @@ def mx_java_projects():
         javac_opts = [
             "--release",
             "21",
+            "-parameters",
         ],
         unified_release = 21,
     )

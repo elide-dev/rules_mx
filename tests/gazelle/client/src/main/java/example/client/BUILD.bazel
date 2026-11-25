@@ -6,6 +6,7 @@ elide_java_library(
     javac_opts = [
         "--release",
         "17",
+        "-parameters",
     ],
     unified_release = 17,
     visibility = ["//:__subpackages__"],

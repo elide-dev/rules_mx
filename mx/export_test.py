@@ -142,6 +142,26 @@ class ExportTest(unittest.TestCase):
             )
             self.assertEqual(project["test_jvm_flags"], ["-Dtck.language=sl"])
             self.assertFalse(project.get("testonly"))
+            result = self.run_mx(
+                "bazel-buildfile",
+                "--gazelle",
+                "--test-launcher",
+                "published:tck=:runner",
+                "--manual-test-project",
+                "tck",
+                "--release",
+                "21",
+                "--project-release",
+                "tck=17",
+                "tck",
+                suite=suite,
+            )
+            (launched,) = json.loads(result.stdout)["projects"]
+            self.assertEqual(launched["release"], 17)
+            self.assertEqual(launched["tests"], ["example.Concrete"])
+            self.assertEqual(launched["test_launcher"], ":runner")
+            self.assertTrue(launched["manual_tests"])
+            self.assertNotIn("test_runtime", launched)
             invalid = self.run_mx(
                 *args,
                 "--test-runtime",

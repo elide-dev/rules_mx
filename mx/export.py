@@ -293,8 +293,7 @@ def _jar_archive(dist, suite, mappings, pending, release, archives):
     truffle = ("mx_truffle", "TruffleArchiveParticipant")
     graal = ("mx_compiler", "GraalArchiveParticipant")
     if (
-        (graal in participants and dist.is_test_distribution())
-        or participants - {bridge, truffle, graal}
+        participants - {bridge, truffle, graal}
         or type(dist).__name__ != "JARDistribution"
         or dist.overlaps
         or dist.is_stripped()
@@ -337,6 +336,11 @@ def _jar_archive(dist, suite, mappings, pending, release, archives):
         "graal_services": graal in participants,
         "release": release,
     }
+    if any(
+        type(p).__name__ == "GraalArchiveParticipant" and p.isTest
+        for p in dist.archiveparticipants
+    ):
+        result["graal_test_services"] = True
     if pattern := getattr(suite, "snippetsPattern", None):
         result["snippets_pattern"] = pattern
         result["archived_libraries"] = _dependency_labels(
@@ -595,8 +599,29 @@ def bazel_buildfile(args):
         default=[],
         metavar="SUITE:PROJECT=FLAG",
     )
+    parser.add_argument(
+        "--test-launcher",
+        action="append",
+        default=[],
+        metavar="SUITE:PROJECT=LABEL",
+        help="use a shared executable that reads MX_TEST_CLASS",
+    )
+    parser.add_argument(
+        "--manual-test-project",
+        action="append",
+        default=[],
+        help="tag generated JUnit classes for explicit invocation",
+    )
+    parser.add_argument(
+        "--project-release",
+        action="append",
+        default=[],
+        metavar="PROJECT=RELEASE",
+        help="override the selected Java release for one project",
+    )
     parser.add_argument("projects", nargs="+")
     options = parser.parse_args(args)
+    test_launchers = _mappings(parser, options.test_launcher, "--test-launcher")
     test_runtimes = _mappings(parser, options.test_runtime, "--test-runtime")
     test_flags = {}
     for spec in options.test_jvm_flag:
@@ -604,7 +629,22 @@ def bazel_buildfile(args):
         if not sep or ":" not in name or not value.startswith("-"):
             parser.error("expected --test-jvm-flag SUITE:PROJECT=FLAG")
         test_flags.setdefault(name, []).append(value)
-    if (test_runtimes or test_flags) and not options.gazelle:
+    manual_tests = set(options.manual_test_project)
+    project_releases = {}
+    for spec in options.project_release:
+        name, sep, value = spec.partition("=")
+        if (
+            not name
+            or not sep
+            or not value.isdecimal()
+            or int(value) < 1
+            or name in project_releases
+        ):
+            parser.error("expected a unique --project-release PROJECT=RELEASE")
+        project_releases[name] = int(value)
+    if (
+        test_runtimes or test_launchers or test_flags or manual_tests
+    ) and not options.gazelle:
         parser.error("test configuration requires --gazelle")
     project_options = {}
     for spec in options.javac_opt:
@@ -701,6 +741,11 @@ def bazel_buildfile(args):
                 "multiReleaseJarVersion",
                 "ignoreSrcGenForOverlayMap",
             }
+        force_javac = project._orig_attrs.get("forceJavac") is True
+        if options.gazelle and force_javac:
+            allowed = allowed | {"forceJavac"}
+        if project._orig_attrs.get("javac.lint.overrides") == "-incubating":
+            allowed = allowed | {"javac.lint.overrides"}
         unsupported = sorted(set(project._orig_attrs) - allowed)
         if unsupported:
             mx.abort(
@@ -747,6 +792,7 @@ def bazel_buildfile(args):
         )
         if shaded or getattr(project, "multiReleaseJarVersion", None):
             release = project.javaCompliance.value
+        release = project_releases.pop(project.name, release)
         if release not in project.javaCompliance:
             mx.abort(
                 f"{project.name}: release {release} is outside {project.javaCompliance!r}"
@@ -756,12 +802,15 @@ def bazel_buildfile(args):
             "srcs": sorted(sources),
             "javac_opts": ["--release", str(release)],
         }
+        if project.javaCompliance.value >= 8:
+            attrs["javac_opts"].append("-parameters")
         if project._orig_attrs.get("requires"):
             attrs["javac_opts"].extend(
                 ["--add-modules", ",".join(project._orig_attrs["requires"])]
             )
-        if project._orig_attrs.get("javac.lint.overrides") == "none":
-            attrs["javac_opts"].append("-Xlint:none")
+        if lint := project._orig_attrs.get("javac.lint.overrides"):
+            if lint in ("none", "-incubating"):
+                attrs["javac_opts"].append("-Xlint:" + lint)
         attrs["javac_opts"].extend(project_options.pop(project.name, []))
         if processors:
             processed = True
@@ -788,14 +837,16 @@ def bazel_buildfile(args):
         if options.gazelle:
             test = project.is_test_project()
             test_runtime = test_runtimes.pop(project.qualifiedName(), [])
+            launchers = test_launchers.pop(project.qualifiedName(), [])
+            discover_tests = test or bool(test_runtime or launchers)
             concealed = project._orig_attrs.get("requiresConcealed", {})
             coarse = bool(
                 shaded
                 or concealed
+                or force_javac
                 or processors
                 or resources
-                or test
-                or test_runtime
+                or discover_tests
                 or project.name in options.whole_project
             )
             record = {
@@ -813,6 +864,8 @@ def bazel_buildfile(args):
                 record["dirs"] = record["roots"]
             if "jdk.internal.vm.ci" in concealed:
                 record["jvmci"] = True
+            if force_javac:
+                record["force_javac"] = True
             if concealed:
                 record["add_exports"] = [
                     f"{mod}/{pkg}" for mod, pkgs in concealed.items() for pkg in pkgs
@@ -856,8 +909,21 @@ def bazel_buildfile(args):
                         record["abi_after_javac"] = True
                 if test:
                     record["testonly"] = True
-                if test or test_runtime:
+                if discover_tests:
                     record["tests"] = _junit_classes(project)
+                    if launchers:
+                        if (
+                            len(launchers) != 1
+                            or test_runtime
+                            or project.qualifiedName() in test_flags
+                        ):
+                            mx.abort(
+                                f"{project.name}: --test-launcher supplies the entire test runtime"
+                            )
+                        record["test_launcher"] = launchers[0]
+                    if project.name in manual_tests:
+                        manual_tests.remove(project.name)
+                        record["manual_tests"] = True
                     if test_runtime:
                         record["test_runtime"] = test_runtime
                     if flags := test_flags.pop(project.qualifiedName(), []):
@@ -866,9 +932,13 @@ def bazel_buildfile(args):
         rules[project.name] = _rule(
             "java_library" if processors else "elide_java_library", attrs, resource_attr
         )
-    if test_runtimes or test_flags:
+    if project_releases or manual_tests:
         mx.abort(
-            f"Unused test configuration: {sorted(test_runtimes.keys() | test_flags.keys())}"
+            f"Unused project configuration: {sorted(project_releases.keys() | manual_tests)}"
+        )
+    if test_launchers or test_runtimes or test_flags:
+        mx.abort(
+            f"Unused test configuration: {sorted(test_runtimes.keys() | test_flags.keys() | test_launchers.keys())}"
         )
     if generated_deps:
         mx.abort(f"Unknown generated dependency project: {sorted(generated_deps)}")
