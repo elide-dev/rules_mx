@@ -24,9 +24,7 @@ if __name__ == "__main__":
     elif cwd := os.environ.get("BUILD_WORKING_DIRECTORY"):
         os.chdir(cwd)
     hsdis = {HSDIS}
-    test_class = os.environ.get("MX_TEST_CLASS") if hsdis else {TEST_CLASS}
-    if hsdis and not test_class:
-        sys.exit("Run the compiler JUnit class by its Bazel test label.")
+    test_class = {TEST_CLASS}
     probe = {PROBE}
     roots = ["org.graalvm.sl"]
     if compiler:
@@ -39,12 +37,14 @@ if __name__ == "__main__":
                         "org.graalvm.sl/com.oracle.truffle.sl.runtime"):
             options.append("--add-exports=" + package + "=ALL-UNNAMED")
         entry = ["-cp", str(root / probe), "graal.CompiledGuest", str(root / compiler)]
-    elif test_class:
-        options.extend(["-ea", "-esa", "-Dbazel.test_suite=" + test_class,
+    elif hsdis or test_class:
+        options.extend(["-ea", "-esa",
                         "--add-exports=org.graalvm.truffle.compiler/com.oracle.truffle.compiler=ALL-UNNAMED",
                         "--add-exports=org.graalvm.truffle.runtime/com.oracle.truffle.runtime=ALL-UNNAMED"])
         options.extend({JVM_FLAGS})
         classpath = os.pathsep.join(str(root / jar) for jar in {CLASSPATH})
+        if test_class:
+            options.append("-Dbazel.test_suite=" + test_class)
         main = "com.google.testing.junit.runner.BazelTestRunner"
         if hsdis:
             options.append("-Dtest.jdk.graal.compiler.disassembler.path=" + str(root / hsdis))
@@ -54,7 +54,7 @@ if __name__ == "__main__":
         entry = ["-m", "org.graalvm.sl_launcher/com.oracle.truffle.sl.launcher.SLMain"]
     command = [java, *options, "--module-path", modules, "--add-modules", ",".join(roots), *entry, *sys.argv[1:]]
     if hsdis:
-        command_file = Path(os.environ["TEST_TMPDIR"]) / "jvm-command"
-        command_file.write_text("\n".join(command) + "\n")
-        os.environ["MX_SUBPROCESS_COMMAND_FILE"] = str(command_file)
+        # The released Elide Python runtime can start native processes with the
+        # Bazel environment but does not expose all test variables in os.environ.
+        command = [java, "-cp", classpath, "com.oracle.mxtool.junit.CompilerJUnitLauncher", *command]
     os.execv(java, command)

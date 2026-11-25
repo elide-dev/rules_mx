@@ -125,6 +125,7 @@ java_library(
     testonly = True,
     srcs = [
         "CompilerJUnit.java",
+        "CompilerJUnitLauncher.java",
         "@graal_mx//:junit_runner_sources",
     ],
     add_exports = ["java.base/jdk.internal.module"],
