@@ -21,6 +21,16 @@ static_archive = rule(
     attrs = {"library": attr.label(mandatory = True, providers = [CcInfo])},
 )
 
+MxArchiveLayoutInfo = provider(
+    doc = "Mapping of packaged archive paths to their declared Bazel files.",
+    fields = ["entries"],
+)
+
+def _add_entry(entries, path, file):
+    if path in entries:
+        fail("Duplicate archive member: " + path)
+    entries[path] = file
+
 def _layout_impl(ctx):
     output = ctx.actions.declare_file(ctx.label.name.lower().replace("_", "-") + "." + ctx.attr.format)
     entries = {}
@@ -31,9 +41,22 @@ def _layout_impl(ctx):
         source = files[0]
         for destination in destinations.split("\n"):
             path = destination.replace("{basename}", source.basename).replace("{target}", ctx.attr.target_prefix)
-            if path in entries:
-                fail("Duplicate archive member: " + path)
-            entries[path] = source
+            _add_entry(entries, path, source)
+    for target, imports in ctx.attr.archive_imports.items():
+        sources = target[MxArchiveLayoutInfo].entries
+        for spec in imports.split("\n"):
+            source, separator, destination = spec.partition("=")
+            if not separator:
+                fail("Expected an archive member mapping: " + spec)
+            if source:
+                if source not in sources:
+                    fail("No archive member " + source + " in " + str(target.label))
+                _add_entry(entries, destination, sources[source])
+            else:
+                if destination and not destination.endswith("/"):
+                    fail("Expected a destination directory: " + destination)
+                for path, artifact in sources.items():
+                    _add_entry(entries, destination + path, artifact)
     args = ctx.actions.args()
     args.add(output)
     for path in sorted(entries):
@@ -46,13 +69,18 @@ def _layout_impl(ctx):
         outputs = [output],
         mnemonic = "MxArchiveLayout",
     )
-    return [DefaultInfo(files = depset([output]))]
+    return [
+        DefaultInfo(files = depset([output])),
+        MxArchiveLayoutInfo(entries = entries),
+    ]
 
 mx_archive_layout = rule(
     implementation = _layout_impl,
     attrs = {
         # One input can be copied to multiple archive paths.
         "members": attr.label_keyed_string_dict(allow_files = True, mandatory = True),
+        # Map a member to a new path, or use an empty selector to import an entire layout.
+        "archive_imports": attr.label_keyed_string_dict(providers = [MxArchiveLayoutInfo]),
         "format": attr.string(mandatory = True, values = ["jar", "tar"]),
         "target_prefix": attr.string(),
         "_pack": attr.label(default = Label("//mx:pack_layout"), executable = True, cfg = "exec"),

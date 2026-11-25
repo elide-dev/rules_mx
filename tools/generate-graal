@@ -38,6 +38,19 @@ SDK = [
 ]
 
 
+SVM_SUPPORT_JARS = (
+    "JVMTI_AGENT_BASE",
+    "SVM_AGENT",
+    "SVM_DIAGNOSTICS_AGENT",
+    "SVM_LIBJVM",
+    "STANDALONE_POINTSTO",
+    "SVM_NFI_NONE_JAR",
+    "SVM_FOREIGN",
+    "SVM_JDWP_SERVER",
+)
+
+SVM_TEST_JARS = ("SVM_DRIVER_TESTS", "SVM_TEST_TERMINUS", "SVM_TESTS WITH SPACE")
+
 SUITES = {
     "sdk": [
         "--whole-project",
@@ -572,6 +585,14 @@ SUITES = {
         "espresso-shared:ESPRESSO_SVM=//espresso-shared:ESPRESSO_SVM",
         "--java-dep",
         "truffle:TRUFFLE_API=//truffle:TRUFFLE_API",
+        "--javac-opt",
+        "com.oracle.svm.core.foreign=-Xep:IsInstanceIncompatibleType:WARN",
+        "--test-launcher",
+        "substratevm:com.oracle.svm.driver.test=:svm_driver_junit",
+        "--test-launcher",
+        "substratevm:com.oracle.svm.with.space.test=@rules_mx//graal:svm_native_resource_guest",
+        "--manual-test-project",
+        "com.oracle.svm.with.space.test",
         "--infer-source-deps",
         "--javac-opt",
         "com.oracle.svm.configure.test=-Xep:ReturnValueIgnored:WARN",
@@ -645,6 +666,8 @@ SUITES = {
         *[
             arg
             for dist in (
+                *SVM_SUPPORT_JARS,
+                *SVM_TEST_JARS,
                 "SVM_GUEST",
                 "SVM_JVMCI_GUEST",
                 "LIBRARY_SUPPORT",
@@ -663,6 +686,8 @@ SUITES = {
             )
             for arg in ("--archive-dist", dist)
         ],
+        *SVM_SUPPORT_JARS,
+        *SVM_TEST_JARS,
         "SVM_GUEST",
         "SVM_JVMCI_GUEST",
         "LIBRARY_SUPPORT",
@@ -819,6 +844,8 @@ def harness_options(directory):
             / "META-INF/services/javax.annotation.processing.Processor"
         )
         pending = [
+            *SVM_SUPPORT_JARS,
+            *SVM_TEST_JARS,
             "SVM",
             "SVM_DRIVER",
             "LIBRARY_SUPPORT",
@@ -1403,8 +1430,84 @@ def svm_native_rules(directory):
     )
 
 
+def support_layout_rules(directory, names):
+    suite = directory.name
+    metadata = runpy.run_path(str(directory / f"mx.{suite}/suite.py"))["suite"]
+    rules = ['load("@rules_mx//graal:layout.bzl", "mx_archive_layout")']
+    for name in names:
+        members = {}
+        extracts = {}
+        for destination, sources in metadata["distributions"][name]["layout"].items():
+            is_directory = destination.endswith("/")
+            destination = destination.removeprefix("./")
+            if isinstance(sources, str):
+                sources = [sources]
+            for source in sources:
+                kind, _, value = source.partition(":")
+                if kind == "file":
+                    path = (
+                        destination + Path(value).name if is_directory else destination
+                    )
+                    members.setdefault(value, []).append(path)
+                elif kind in ("dependency", "extracted-dependency"):
+                    qualified, _, member = value.partition("/")
+                    owner, colon, dist = qualified.partition(":")
+                    label = f"//{owner}:{dist}" if colon else f":{qualified}"
+                    if kind == "dependency" and not member and not is_directory:
+                        members.setdefault(label, []).append(destination)
+                    elif kind == "extracted-dependency" and is_directory:
+                        path = (
+                            destination + Path(member).name if member else destination
+                        )
+                        extracts.setdefault(label, []).append(member + "=" + path)
+                    else:
+                        raise ValueError(
+                            f"Unsupported {directory.name} dependency layout {source}"
+                        )
+                else:
+                    raise ValueError(f"Unsupported {directory.name} layout {source}")
+        file_paths = {file: "\n".join(paths) for file, paths in members.items()}
+        archive_paths = {
+            archive: "\n".join(paths) for archive, paths in extracts.items()
+        }
+        rules.append(
+            "mx_archive_layout(\n"
+            f'    name = "{name}",\n'
+            '    format = "tar",\n'
+            f"    members = {json.dumps(file_paths)},\n"
+            f"    archive_imports = {json.dumps(archive_paths)},\n"
+            '    visibility = ["//visibility:public"],\n'
+            ")"
+        )
+    return "\n".join(rules) + "\n"
+
+
+def svm_support_layouts(directory):
+    names = (
+        "TRUFFLE_GRAALVM_SUPPORT",
+        "TRUFFLE_SVM_GRAALVM_SUPPORT",
+        "NATIVE_IMAGE_LICENSE_GRAALVM_SUPPORT",
+        "NATIVE_IMAGE_JUNIT_SUPPORT",
+        "SVM_LLVM_GRAALVM_SUPPORT",
+        "SVM_NFI_GRAALVM_SUPPORT",
+        "SVM_TRUFFLE_RUNTIME_GRAALVM_SUPPORT",
+        "TRUFFLE_LANGUAGE_LIBRARY_COMMUNITY_GRAALVM_SUPPORT",
+    )
+    targets = [":" + name for name in (*names, *SVM_SUPPORT_JARS)]
+    tests = [":" + name for name in SVM_TEST_JARS]
+    return support_layout_rules(directory, names) + (
+        f'filegroup(name = "support_distributions", srcs = {json.dumps(targets)}, visibility = ["//visibility:public"])\n'
+        f'filegroup(name = "test_distributions", srcs = {json.dumps(tests)}, testonly = True, visibility = ["//visibility:public"])\n'
+    )
+
+
 def generate(suite, stage):
     directory = stage / suite
+    if suite == "vm":
+        (directory / "BUILD.bazel").write_text(
+            support_layout_rules(directory, ("VM_GRAALVM_SUPPORT",))
+        )
+        return build_patch(directory, stage)
     with (directory / "mx-graph.json").open("w") as graph:
         subprocess.run(
             [
@@ -1507,6 +1610,9 @@ def generate(suite, stage):
             'load("@rules_mx//graal:svm.bzl", "svm_compiler_flags")\n'
             'svm_compiler_flags(name = "svm-compiler-flags-builder", builder = ":SVM", '
             'linux = select({"@platforms//os:linux": True, "//conditions:default": False}))\n'
+            'load("@rules_mx//graal:simplelanguage.bzl", "svm_driver_test_runner")\n'
+            'svm_driver_test_runner(name = "svm_driver_junit")\n'
+            + svm_support_layouts(directory)
             + svm_native_rules(directory)
         )
     subprocess.run(
@@ -1522,6 +1628,10 @@ def generate(suite, stage):
         cwd=ROOT,
         check=True,
     )
+    return build_patch(directory, stage)
+
+
+def build_patch(directory, stage):
     patch = []
     for build in sorted(directory.rglob("BUILD.bazel")):
         path = build.relative_to(stage).as_posix()
@@ -1558,7 +1668,7 @@ def main():
     parser.add_argument(
         "--suite",
         action="append",
-        choices=SUITES,
+        choices=[*SUITES, "vm"],
         help="only regenerate the named BUILD overlays",
     )
     args = parser.parse_args()
@@ -1585,6 +1695,7 @@ def main():
                         "BUILD", "BUILD.bazel", "__pycache__"
                     ),
                 )
+        shutil.copytree(source / "vm/mx.vm", stage / "vm/mx.vm")
         shutil.copytree(
             source / "truffle/benchmarks",
             stage / "truffle/benchmarks",
@@ -1656,7 +1767,7 @@ def main():
                 )
         else:
             lock.write_text(lock_text)
-        for suite in dict.fromkeys(args.suite or SUITES):
+        for suite in dict.fromkeys(args.suite or [*SUITES, "vm"]):
             overlay = ROOT / f"graal/{suite}.patch"
             patch = generate(suite, stage)
             if args.check:

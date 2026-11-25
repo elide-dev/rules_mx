@@ -20,7 +20,8 @@ tools/buildbuddy test --config=buildbuddy-rbe --config=elide-processors //graal/
 | Regex | All three projects and all five distributions, including Native Image metadata archives. | All 20 discovered upstream JUnit classes. |
 | Tools | All 18 projects and all 29 distributions, including the Maven POMs, Native Image support TARs and platform-specific VisualVM support archive. The upstream warmup test project declares dependencies and has an empty source tree. | All 60 discovered JUnit classes. |
 | Espresso Shared | Both named modules, including the source-relocated `ESPRESSO_SVM` used by SubstrateVM. | The SubstrateVM compile exercises the relocated source API. |
-| SubstrateVM | 41 of 70 projects and 16 of 44 distributions, including the `SVM` builder JAR, its processors, staged modules, ObjectFile, Pointsto, Configure and the Native Image driver. | 11 upstream configuration test classes and a smoke test that builds and runs a Java executable on Labs JDK 25. |
+| VM | The VM support TAR packages the upstream README and license texts. | CI builds the support TAR. |
+| SubstrateVM | 53 of 70 projects and 35 of 44 distributions, including the `SVM` builder JAR, its processors, staged modules, ObjectFile, Pointsto, Configure, JVMTI, JDWP, the foreign-function support, and Native Image driver. | 11 configuration and three driver test classes on Labs JDK 25. Native Image smoke tests build and run executables, including the upstream resource test for JAR names containing spaces. |
 
 Run `tools/graal-coverage --missing` for the full project and distribution inventory, or run `tools/graal-coverage --missing substratevm` to narrow it. The audit compares upstream declarations with Bazel labels. CI builds and tests the migrated targets.
 
@@ -137,13 +138,13 @@ Bazel lowers the native TARs and benchmark JARs from the pinned suite layout. Th
 ## SubstrateVM builder
 
 ```sh
-bazelisk build --config=elide-processors --config=labsjdk @graal//substratevm:SVM
+bazelisk build --config=elide-processors --config=labsjdk @graal//substratevm:SVM @graal//substratevm:support_distributions @graal//substratevm:test_distributions @graal//vm:VM_GRAALVM_SUPPORT
 bazelisk test --config=elide-processors --config=labsjdk @graal//substratevm/... //graal:source_native_image_test
 bazelisk build --config=elide-processors --config=labsjdk --output_groups=distribution @graal//substratevm:native-image.root
-bazelisk test --config=source-native-image //graal:source_native_image_action_test
+bazelisk test --config=source-native-image //graal:source_native_image_action_test @graal//substratevm:com.oracle.svm.with.space.test.com.oracle.svm.with.space.test.NativeImageResourceTest
 ```
 
-The builder uses the source-built Graal compiler and the relocated Espresso module. Bazel supplies option help files to javac's annotation processors through a declared source tree. The Native Image launcher uses the source-built driver, its generated JVM flags, the pinned Labs JDK and the Bazel C/C++ toolchain. The `source-native-image` profile registers this SDK as the `rules_graalvm` toolchain and selects Labs JDK 25 for both target and execution configurations. The action test exercises compilation as a Bazel build action.
+The builder uses the source-built Graal compiler and the relocated Espresso module. Bazel supplies option help files to javac's annotation processors through a declared source tree. The Native Image launcher uses the source-built driver, its generated JVM flags, the pinned Labs JDK and the Bazel C/C++ toolchain. The `source-native-image` profile registers this SDK as the `rules_graalvm` toolchain and selects Labs JDK 25 for both target and execution configurations. The action test exercises compilation as a Bazel build action. The SubstrateVM NFI and Truffle runtime support archives select individual inputs from Truffle’s LibFFI and header layouts.
 
 ## Extending the graph
 

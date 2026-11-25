@@ -187,3 +187,35 @@ def panama_test(name, test_class):
         testonly = True,
     )
     py_test(name = name, main = name + ".py", srcs = [":" + name + ".main"], data = [":" + name + ".main"], size = "medium")
+
+def svm_driver_test_runner(name):
+    """Run the driver tests alongside the source-built named Graal compiler."""
+    _sl_main(
+        name = name + ".main",
+        out = name + ".py",
+        modules = ["//truffle:TRUFFLE_RUNTIME"],
+        compiler = "//compiler:GRAAL",
+        root_modules = [],
+        classpath_junit = True,
+        labs_runtime = Label("//tools:labs_runtime"),
+        test_classpath = [":SVM_DRIVER_TESTS", Label("//graal:compiler_junit")],
+        jvm_flags = [
+            "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
+            "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta.annotation=ALL-UNNAMED",
+            "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.code=ALL-UNNAMED",
+            "--add-exports=jdk.graal.compiler/jdk.graal.compiler.core.common.util=ALL-UNNAMED",
+            "--add-exports=jdk.graal.compiler/jdk.graal.compiler.hotspot=ALL-UNNAMED",
+            "--add-exports=jdk.graal.compiler/jdk.graal.compiler.phases.util=ALL-UNNAMED",
+            "--add-exports=jdk.graal.compiler/jdk.graal.compiler.util.json=ALL-UNNAMED",
+            "--add-exports=java.base/jdk.internal.module=ALL-UNNAMED",
+            "--enable-native-access=ALL-UNNAMED",
+        ],
+        testonly = True,
+    )
+    py_binary(
+        name = name,
+        srcs = [":" + name + ".main"],
+        main = name + ".py",
+        data = [":" + name + ".main"],
+        testonly = True,
+    )
