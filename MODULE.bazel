@@ -104,6 +104,7 @@ graal_archive(
     patches = [
         "//graal:benchmark_timer.patch",
         "//graal:sdk.patch",
+        "//graal:compiler.patch",
         "//graal:truffle.patch",
     ],
     sha256 = "a174bfe9204342b53d0e174c9d44a38a73eef2cdd799384cdb59caac95ab738b",

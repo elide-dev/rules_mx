@@ -254,6 +254,9 @@ def _module_directives(dist, members, external, archives, mappings):
 
     directives = {"requires " + req for req in requires.values()}
     directives.update("uses " + entry for entry in info.get("uses", []))
+    directives.update(
+        "uses " + entry for p in members for entry in getattr(p, "uses", [])
+    )
     for kind in ("exports", "opens"):
         packages = {}
         for entry in info.get(kind, []):
@@ -288,8 +291,10 @@ def _jar_archive(dist, suite, mappings, pending, release, archives):
     }
     bridge = ("mx_sdk", "NativeBridgeArchiveParticipant")
     truffle = ("mx_truffle", "TruffleArchiveParticipant")
+    graal = ("mx_compiler", "GraalArchiveParticipant")
     if (
-        participants - {bridge, truffle}
+        (graal in participants and dist.is_test_distribution())
+        or participants - {bridge, truffle, graal}
         or type(dist).__name__ != "JARDistribution"
         or dist.overlaps
         or dist.is_stripped()
@@ -329,6 +334,7 @@ def _jar_archive(dist, suite, mappings, pending, release, archives):
         "testonly": dist.is_test_distribution(),
         "jni_services": bridge in participants,
         "truffle_services": truffle in participants,
+        "graal_services": graal in participants,
         "release": release,
     }
     if pattern := getattr(suite, "snippetsPattern", None):
@@ -438,7 +444,9 @@ def _mappings(parser, values, flag):
     return result
 
 
-def _processor_plugins(project, mappings, java_deps, pending, plugins, classpath_dists):
+def _processor_plugins(
+    project, mappings, java_deps, pending, plugins, classpath_dists, archives
+):
     labels = []
     for dist in project.annotation_processors():
         name = dist.qualifiedName()
@@ -451,15 +459,19 @@ def _processor_plugins(project, mappings, java_deps, pending, plugins, classpath
             or dist.suite != project.suite
             or not classes
             or dist.excludedLibs
-            or dist.archiveparticipants
+            or (dist.archiveparticipants and dist.name not in archives)
             or dist.is_stripped()
         ):
             mx.abort(
                 f"{project.name}: supply --processor-plugin {name}=LABEL for this processor path"
             )
-        deps = _dependency_labels(
-            dist.deps, project.suite, java_deps, pending, classpath_dists
-        )
+        if dist.archiveparticipants and dist.name in archives:
+            pending.append(dist)
+            deps = [":" + dist.name]
+        else:
+            deps = _dependency_labels(
+                dist.deps, project.suite, java_deps, pending, classpath_dists
+            )
         for processor in classes:
             target = f"mx_plugin.{dist.name}.{processor}"
             plugins[target] = {
@@ -626,7 +638,9 @@ def bazel_buildfile(args):
         if options.gazelle and excluded_from_jacoco:
             allowed = allowed | {"jacoco"}
         if options.gazelle:
-            allowed = allowed | {"requiresConcealed", "generatedDependencies"}
+            allowed = allowed | {"requiresConcealed", "generatedDependencies", "uses"}
+            if project._orig_attrs.get("jacoco") == "include":
+                allowed = allowed | {"jacoco", "jacocoExcludePackages"}
             if project._orig_attrs.get("javac.lint.overrides") == "none":
                 allowed = allowed | {"javac.lint.overrides"}
         if shaded:
@@ -650,7 +664,13 @@ def bazel_buildfile(args):
                 f"{project.name}: unsupported mx attributes: {', '.join(unsupported)}"
             )
         processors = _processor_plugins(
-            project, mappings, java_deps, pending, plugins, options.classpath_dists
+            project,
+            mappings,
+            java_deps,
+            pending,
+            plugins,
+            options.classpath_dists,
+            archives,
         )
         sources = []
         resources = []
@@ -772,8 +792,10 @@ def bazel_buildfile(args):
                 record["shade_inputs"] = inputs
             if "spotbugs" in project._orig_attrs:
                 record["spotbugs"] = project._orig_attrs["spotbugs"]
-            if excluded_from_jacoco:
-                record["jacoco"] = "exclude"
+            if jacoco := project._orig_attrs.get("jacoco"):
+                record["jacoco"] = jacoco
+            if exclusions := project._orig_attrs.get("jacocoExcludePackages"):
+                record["jacoco_exclude_packages"] = exclusions
             if coarse:
                 record["sources"] = sorted(sources)
                 if resources:

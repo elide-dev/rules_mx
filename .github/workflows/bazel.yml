@@ -20,7 +20,7 @@ jobs:
         run: |
           tools/check-graph
           tools/generate-graal --check
-          bazelisk test --config=elide-processors //... @graal//sdk/... @graal//truffle/...
+          bazelisk test --config=elide-processors //... @graal//sdk/... @graal//truffle/... @graal//compiler/...
           bazelisk test --config=elide-python //mx:export_test //mx:pack_jar_test //graal/nativebridge:launcher_test //graal:launcher_modules_test @graal//truffle:sl.test.Fibonacci
       - name: Test on BuildBuddy
         if: github.event_name != 'pull_request'
@@ -28,7 +28,7 @@ jobs:
           BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
         run: |
           tools/check-graph --config=buildbuddy-rbe
-          tools/buildbuddy test --config=buildbuddy-rbe --config=elide-processors //... @graal//sdk/... @graal//truffle/...
+          tools/buildbuddy test --config=buildbuddy-rbe --config=elide-processors //... @graal//sdk/... @graal//truffle/... @graal//compiler/...
           tools/buildbuddy test --config=buildbuddy-rbe --config=labsjdk //mx:export_test //graal:launcher_modules_test //graal:truffle_polyglot_test //graal:truffle_runtime_modules_test @graal//truffle:sl.test.Fibonacci
           tools/buildbuddy test --config=buildbuddy-rbe --config=elide-python //mx:export_test //mx:pack_jar_test //graal/nativebridge:launcher_test //graal:launcher_modules_test @graal//truffle:sl.test.Fibonacci
           tools/buildbuddy test --config=buildbuddy-rbe --config=native-image-linux //tests/native_image:checkcopy_test //graal/nativebridge:native_isolate_test

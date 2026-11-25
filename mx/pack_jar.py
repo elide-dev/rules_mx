@@ -28,11 +28,12 @@ def read_members(inputs, args):
                     continue
                 data = src.read(name)
                 marker = re.fullmatch(
-                    r"(?:META-INF/versions/([1-9][0-9]*)/)?META-INF/(jni-entry-points|truffle-registrations)/([^/]+)",
+                    r"(?:META-INF/versions/([1-9][0-9]*)/)?META-INF/(jni-entry-points|truffle-registrations|providers)/([^/]+)",
                     name,
                 )
                 if marker and (
-                    (args.jni_services and marker[2] == "jni-entry-points")
+                    (args.graal_services and marker[2] == "providers")
+                    or (args.jni_services and marker[2] == "jni-entry-points")
                     or (args.truffle_services and marker[2] == "truffle-registrations")
                 ):
                     version, _, provider = marker.groups()
@@ -49,6 +50,21 @@ def read_members(inputs, args):
                     raise ValueError(f"Conflicting archive member {name} in {jar}")
                 else:
                     entries[name] = data
+                    if args.graal_services and name.endswith(
+                        "_OptionDescriptors.class"
+                    ):
+                        version, _, entry = name.removeprefix(
+                            "META-INF/versions/"
+                        ).partition("/")
+                        versioned = name.startswith("META-INF/versions/")
+                        provider = (
+                            (entry if versioned else name)
+                            .removesuffix(".class")
+                            .replace("/", ".")
+                        )
+                        services[int(version) if versioned else 0][
+                            "jdk.graal.compiler.options.OptionDescriptors"
+                        ].add(provider)
     accumulated = defaultdict(set)
     for version, group in sorted(services.items()):
         for service, providers in group.items():
@@ -128,6 +144,7 @@ def main():
     parser.add_argument("--output", required=True)
     parser.add_argument("--snippets-pattern")
     parser.add_argument("--archived-library", action="append", default=[])
+    parser.add_argument("--graal-services", action="store_true")
     parser.add_argument("--truffle-services", action="store_true")
     parser.add_argument("--jni-services", action="store_true")
     parser.add_argument("--manifest-entry", action="append", default=[])

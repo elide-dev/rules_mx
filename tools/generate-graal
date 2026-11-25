@@ -77,6 +77,35 @@ SUITES = {
         ),
         *SDK,
     ],
+    "compiler": [
+        *(
+            arg
+            for check in (
+                "ArrayToString",
+                "BoxedPrimitiveEquality",
+                "ReturnValueIgnored",
+                "SelfAssignment",
+            )
+            for arg in ("--javac-opt", f"jdk.graal.compiler=-Xep:{check}:WARN")
+        ),
+        "--whole-project",
+        "jdk.graal.compiler.options",
+        "--java-dep",
+        "sdk:WORD=//sdk:WORD",
+        "--java-dep",
+        "sdk:COLLECTIONS=//sdk:COLLECTIONS",
+        "--java-dep",
+        "sdk:VERSION=//sdk:VERSION",
+        "--java-dep",
+        "truffle:TRUFFLE_COMPILER=//truffle:TRUFFLE_COMPILER",
+        "--archive-dist",
+        "GRAAL_OPTIONS",
+        "--archive-dist",
+        "GRAAL_PROCESSOR",
+        "--archive-dist",
+        "GRAAL",
+        "GRAAL",
+    ],
     "truffle": [
         "--infer-source-deps",
         "--archive-dist",
@@ -154,7 +183,7 @@ def shading_inputs(directory):
     suite = runpy.run_path(str(directory / f"mx.{directory.name}/suite.py"))["suite"]
     inputs = {}
     flags = []
-    for project in SHADED_PROJECTS[directory.name]:
+    for project in SHADED_PROJECTS.get(directory.name, ()):
         for qualified in suite["projects"][project]["shadedDependencies"]:
             owner, name = qualified.split(":")
             if owner != directory.name:
@@ -295,6 +324,12 @@ def generate(suite, stage):
         (directory / "BUILD.bazel").write_text(
             sdk_native_projects(directory)
             + 'test_suite(name = "tests", visibility = ["//visibility:public"])\n'
+        )
+    elif suite == "compiler":
+        (directory / "BUILD.bazel").write_text(
+            'load("@rules_mx//graal:simplelanguage.bzl", "simplelanguage")\n\n'
+            'simplelanguage(name = "sl_jit", compiler = ":GRAAL")\n\n'
+            'simplelanguage(name = "sl_compilation_test", compiler = ":GRAAL", probe = "@rules_mx//graal:compiled_guest")\n'
         )
     elif suite == "truffle":
         (directory / "BUILD.bazel").write_text(

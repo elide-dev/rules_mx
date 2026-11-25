@@ -26,6 +26,8 @@ def _jar_impl(ctx):
         args.add("--snippets-pattern", ctx.attr.snippets_pattern)
         for lib in ctx.attr.archived_libraries:
             args.add_all(lib.files, before_each = "--archived-library")
+    if ctx.attr.graal_services:
+        args.add("--graal-services")
     if ctx.attr.truffle_services:
         args.add("--truffle-services")
     if ctx.attr.jni_services:
@@ -72,6 +74,7 @@ _jar_dist = rule(
         "directives": attr.string_list(),
         "jni_services": attr.bool(),
         "truffle_services": attr.bool(),
+        "graal_services": attr.bool(),
         "snippets_pattern": attr.string(),
         "archived_libraries": attr.label_list(providers = [JavaInfo]),
         "add_exports": attr.string_list(),

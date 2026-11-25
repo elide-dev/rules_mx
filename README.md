@@ -20,11 +20,12 @@ The default Python is managed CPython 3.13. The alternate configuration selects 
 
 ## Build upstream GraalVM
 
-The pinned Oracle source tree builds every SDK project, the modular Truffle API and the SimpleLanguage interpreter as native Bazel targets. Run the upstream SDK JUnit classes individually or build the selected closures and run their tests together.
+The pinned Oracle source tree builds every SDK project, the modular Truffle runtime and the Graal optimizing compiler as native Bazel targets. Run the upstream SDK JUnit classes individually or build the selected closures and run their tests together.
 
 ```sh
 bazelisk query 'tests(//graal:sdk_tests)'
 bazelisk test @graal//truffle:sl.test.Fibonacci
+bazelisk test --config=elide-processors @graal//compiler:sl_compilation_test
 bazelisk test --config=elide-processors //graal/... @graal//sdk/... @graal//truffle/...
 bazelisk test --config=elide-processors //graal/nativebridge:native_isolate_test
 ```
@@ -144,7 +145,7 @@ The module pins Native Image toolchain PR #134 at `9d997fb`, which includes unif
 
 ## Labs JDK
 
-`bazelisk run --config=labsjdk //:mx -- --version` selects the Oracle Labs JDK 25 JVMCI build pinned by the bundled mx suite. The profile selects the target Java runtime independently of the JDK used to compile Bazel tools. The extension provides checksum-pinned archives for Linux AMD64, Linux ARM64, and macOS ARM64. Consumers can register the same runtime toolchains using the Labs JDK stanza in MODULE.bazel.
+`bazelisk run --config=labsjdk //:mx -- --version` selects the Oracle Labs JDK 25 JVMCI build required by the pinned Graal compiler. The profile selects the target Java runtime independently of the JDK used to compile Bazel tools. The extension provides checksum-pinned archives for Linux AMD64, Linux ARM64, and macOS ARM64. Consumers can register the same runtime toolchains using the Labs JDK stanza in MODULE.bazel.
 
 ## Native Image
 

@@ -1,7 +1,9 @@
+load("@rules_java//java:java_library.bzl", "java_library")
 load("@rules_java//java:java_test.bzl", "java_test")
 
 exports_files([
     "benchmark_timer.patch",
+    "compiler.patch",
     "sdk.patch",
     "sl.py.tpl",
     "sl_fixture_test.py",
@@ -102,4 +104,17 @@ java_test(
     env = {"MODULE_JARS": " ".join(["$(rootpath %s)" % jar for jar in _RUNTIME_MODULES])},
     test_class = "graal.TruffleRuntimeModulesTest",
     deps = ["@contrib_rules_jvm_deps//:junit_junit"],
+)
+
+java_library(
+    name = "compiled_guest",
+    testonly = True,
+    srcs = ["CompiledGuest.java"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@graal//sdk:POLYGLOT",
+        "@graal//truffle:TRUFFLE_API",
+        "@graal//truffle:TRUFFLE_RUNTIME",
+        "@graal//truffle:TRUFFLE_SL",
+    ],
 )

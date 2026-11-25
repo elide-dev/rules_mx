@@ -83,11 +83,17 @@ default_java_toolchain(
     name = "labs_jvmci",
     bootclasspath = [],
     forcibly_disable_header_compilation = True,
-    java_runtime = select({
+    java_runtime = ":labs_runtime",
+    toolchain_definition = False,
+    visibility = ["//visibility:public"],
+)
+
+alias(
+    name = "labs_runtime",
+    actual = select({
         ":exec_linux_amd64": "@labsjdk_linux_amd64//:jdk",
         ":exec_linux_arm64": "@labsjdk_linux_aarch64//:jdk",
         ":exec_macos_arm64": "@labsjdk_darwin_aarch64//:jdk",
     }),
-    toolchain_definition = False,
     visibility = ["//visibility:public"],
 )
