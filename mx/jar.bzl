@@ -32,6 +32,9 @@ def _jar_impl(ctx):
         args.add("--jni-services")
     tools = []
     if ctx.attr.module_name:
+        if ctx.attr.descriptor_toolchain:
+            toolchain = ctx.attr.descriptor_toolchain[java_common.JavaToolchainInfo]
+            args.add("--system-modules")
         runtime = toolchain.java_runtime
         tools.append(runtime.files)
         args.add("--java", runtime.java_executable_exec_path)
@@ -56,9 +59,10 @@ def _jar_impl(ctx):
         coverage_common.instrumented_files_info(ctx, dependency_attributes = ["contents", "deps"]),
     ]
 
-mx_jar_dist = rule(
+_jar_dist = rule(
     implementation = _jar_impl,
     attrs = {
+        "descriptor_toolchain": attr.label(cfg = "exec"),
         "overlays": attr.label_keyed_string_dict(providers = [JavaInfo]),
         "contents": attr.label_list(providers = [JavaInfo], mandatory = True),
         "deps": attr.label_list(providers = [JavaInfo]),
@@ -76,3 +80,13 @@ mx_jar_dist = rule(
     toolchains = [_TOOLCHAIN],
     provides = [JavaInfo],
 )
+
+def mx_jar_dist(name, directives = [], **kwargs):
+    """Use the Labs system image for descriptors that read JVMCI."""
+    jvmci = any([d.split(" ")[-1] == "jdk.internal.vm.ci" for d in directives if d.startswith("requires ")])
+    _jar_dist(
+        name = name,
+        directives = directives,
+        descriptor_toolchain = Label("//tools:labs_jvmci") if jvmci else None,
+        **kwargs
+    )

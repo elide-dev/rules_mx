@@ -101,8 +101,11 @@ def module_descriptor(args, tmp, entries, services, release):
         args.java,
         "-m",
         "jdk.compiler/com.sun.tools.javac.Main",
-        "--release",
-        str(release),
+        *(
+            ["-source", str(release), "-target", str(release)]
+            if args.system_modules
+            else ["--release", str(release)]
+        ),
         "-proc:none",
         "-Xlint:-module",
         "-d",
@@ -131,6 +134,7 @@ def main():
     parser.add_argument("--module")
     parser.add_argument("--directive", action="append", default=[])
     parser.add_argument("--module-jar", action="append", default=[])
+    parser.add_argument("--system-modules", action="store_true")
     parser.add_argument("--release", type=int)
     parser.add_argument("--java")
     args = parser.parse_args()

@@ -1,5 +1,6 @@
 load("@rules_elide//elide/java:toolchain.bzl", "elide_java_toolchain")
 load("@rules_elide//elide/python:toolchain.bzl", "register_elide_python_toolchain")
+load("@rules_java//toolchains:default_java_toolchain.bzl", "default_java_toolchain")
 
 register_elide_python_toolchain(
     name = "linux_amd64",
@@ -75,4 +76,18 @@ elide_java_toolchain(
         "-g",
         "-parameters",
     ],
+)
+
+# JVMCI packages are internal to the Labs JDK and absent from ct.sym.
+default_java_toolchain(
+    name = "labs_jvmci",
+    bootclasspath = [],
+    forcibly_disable_header_compilation = True,
+    java_runtime = select({
+        ":exec_linux_amd64": "@labsjdk_linux_amd64//:jdk",
+        ":exec_linux_arm64": "@labsjdk_linux_aarch64//:jdk",
+        ":exec_macos_arm64": "@labsjdk_darwin_aarch64//:jdk",
+    }),
+    toolchain_definition = False,
+    visibility = ["//visibility:public"],
 )

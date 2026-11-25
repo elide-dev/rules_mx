@@ -80,3 +80,26 @@ java_test(
     test_class = "graal.TruffleArchiveTest",
     deps = ["@contrib_rules_jvm_deps//:junit_junit"],
 )
+
+_RUNTIME_MODULES = ["@graal//sdk:" + name for name in [
+    "WORD",
+    "COLLECTIONS",
+    "NATIVEIMAGE",
+    "NATIVEBRIDGE",
+    "JNIUTILS",
+    "POLYGLOT",
+]] + ["@graal//truffle:" + name for name in [
+    "TRUFFLE_API",
+    "TRUFFLE_COMPILER",
+    "TRUFFLE_RUNTIME",
+]]
+
+java_test(
+    name = "truffle_runtime_modules_test",
+    size = "small",
+    srcs = ["TruffleRuntimeModulesTest.java"],
+    data = _RUNTIME_MODULES,
+    env = {"MODULE_JARS": " ".join(["$(rootpath %s)" % jar for jar in _RUNTIME_MODULES])},
+    test_class = "graal.TruffleRuntimeModulesTest",
+    deps = ["@contrib_rules_jvm_deps//:junit_junit"],
+)

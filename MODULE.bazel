@@ -55,8 +55,11 @@ register_toolchains(
 labsjdk = use_extension("//mx:labsjdk.bzl", "labsjdk", dev_dependency = True)
 use_repo(
     labsjdk,
+    "labsjdk_darwin_aarch64",
     "labsjdk_darwin_aarch64_toolchain_config_repo",
+    "labsjdk_linux_aarch64",
     "labsjdk_linux_aarch64_toolchain_config_repo",
+    "labsjdk_linux_amd64",
     "labsjdk_linux_amd64_toolchain_config_repo",
 )
 

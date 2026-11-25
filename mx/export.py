@@ -203,7 +203,14 @@ def _classpath_distribution(dist, suite, mappings, pending):
 
 def _module_directives(dist, members, external, archives, mappings):
     info = dist.moduleInfo
-    if set(info) - {"name", "requires", "exports", "opens", "uses"}:
+    if set(info) - {
+        "name",
+        "requires",
+        "exports",
+        "opens",
+        "uses",
+        "requiresConcealed",
+    }:
         mx.abort(f"{dist.name}: unsupported moduleInfo fields")
     # mx adds observable distribution modules and preserves transitive reads
     # from their declared module descriptors. Explicit requires take precedence.
@@ -245,20 +252,34 @@ def _module_directives(dist, members, external, archives, mappings):
     for req in info.get("requires", []):
         requires[req.split()[-1]] = req
 
-    def directive(kind, entry):
-        subject, to, targets = " ".join(entry.split()).partition(" to ")
-        if to:
-            targets = ", ".join(dict.fromkeys(t.strip() for t in targets.split(",")))
-        return kind + " " + subject + to + targets
-
-    return sorted(
-        ["requires " + req for req in requires.values()]
-        + [
-            directive(kind, entry)
-            for kind in ("exports", "uses", "opens")
-            for entry in info.get(kind, [])
-        ]
-    )
+    directives = {"requires " + req for req in requires.values()}
+    directives.update("uses " + entry for entry in info.get("uses", []))
+    for kind in ("exports", "opens"):
+        packages = {}
+        for entry in info.get(kind, []):
+            subject, to, names = " ".join(entry.split()).partition(" to ")
+            matches = [subject]
+            if subject.endswith("*"):
+                matches = sorted(
+                    {
+                        pkg
+                        for p in members
+                        if p.isJavaProject()
+                        for pkg in _source_packages(p)
+                        if pkg.startswith(subject[:-1])
+                    }
+                )
+                if not matches:
+                    mx.abort(f"{dist.name}: no packages match {subject}")
+            for package in matches:
+                if not to:
+                    packages[package] = None
+                elif packages.setdefault(package, []) is not None:
+                    packages[package].extend(n.strip() for n in names.split(","))
+        for package, names in packages.items():
+            targets = " to " + ", ".join(dict.fromkeys(names)) if names else ""
+            directives.add(f"{kind} {package}{targets}")
+    return sorted(directives)
 
 
 def _jar_archive(dist, suite, mappings, pending, release, archives):
@@ -316,6 +337,10 @@ def _jar_archive(dist, suite, mappings, pending, release, archives):
             [d for d in base if d.isLibrary()], suite, mappings, pending, True
         )
     concealed = getattr(dist, "requiresConcealed", {})
+    concealed = {
+        **concealed,
+        **getattr(dist, "moduleInfo", {}).get("requiresConcealed", {}),
+    }
     if concealed:
         result["add_exports"] = sorted(
             f"{mod}/{pkg}" for mod, packages in concealed.items() for pkg in packages
@@ -721,6 +746,8 @@ def bazel_buildfile(args):
             }
             if shaded and not record["dirs"]:
                 record["dirs"] = record["roots"]
+            if "jdk.internal.vm.ci" in concealed:
+                record["jvmci"] = True
             if concealed:
                 record["add_exports"] = [
                     f"{mod}/{pkg}" for mod, pkgs in concealed.items() for pkg in pkgs

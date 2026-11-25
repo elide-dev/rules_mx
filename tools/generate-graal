@@ -79,6 +79,10 @@ SUITES = {
     ],
     "truffle": [
         "--infer-source-deps",
+        "--archive-dist",
+        "TRUFFLE_COMPILER",
+        "--archive-dist",
+        "TRUFFLE_RUNTIME",
         "--generated-dep",
         "truffle:com.oracle.truffle.sandbox=:com.oracle.truffle.api.dsl",
         "--generated-dep",
@@ -88,6 +92,8 @@ SUITES = {
             arg
             for project, checks in {
                 "com.oracle.truffle.api.strings": ["ReturnValueIgnored"],
+                "com.oracle.truffle.compiler": ["FormatString"],
+                "com.oracle.truffle.runtime": ["ReturnValueIgnored"],
                 "com.oracle.truffle.sl": ["ReturnValueIgnored"],
                 "com.oracle.truffle.api.instrumentation": [
                     "BoxedPrimitiveEquality",
@@ -133,6 +139,7 @@ SUITES = {
         "TRUFFLE_SL_LAUNCHER",
         "TRUFFLE_SL",
         "TRUFFLE_SL_LAUNCHER",
+        "TRUFFLE_RUNTIME",
     ],
 }
 

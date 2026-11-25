@@ -28,6 +28,7 @@ type project struct {
 	Release                              int
 	Options, Dirs, Packages, Tests, Deps []string
 	Sources, Resources, Processors       []string
+	JVMCI                                bool
 	ABIAfterJavac                        bool `json:"abi_after_javac"`
 	Shade                                string
 	ShadeInputs                          []string `json:"shade_inputs"`
@@ -166,6 +167,8 @@ func (g *importer) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
 			kind, opts := "mx_whole_java", "javac_opts"
 			if p.Shade != "" {
 				kind, opts = "mx_shaded_java", "javacopts"
+			} else if p.JVMCI {
+				kind, opts = "mx_jvmci_library", "javacopts"
 			} else if len(p.Processors) != 0 || len(p.AddExports) != 0 {
 				kind, opts = "mx_processed_java", "javacopts"
 			}
@@ -180,7 +183,7 @@ func (g *importer) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
 			}
 			if len(p.Processors) != 0 {
 				r.SetAttr("plugins", p.Processors)
-				if p.ABIAfterJavac {
+				if p.ABIAfterJavac && !p.JVMCI {
 					r.SetAttr("abi_after_javac", true)
 				}
 			} else if kind == "mx_whole_java" {
@@ -298,7 +301,7 @@ func (g *importer) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
 
 func graphKind(k string) bool {
 	switch k {
-	case "mx_shaded_java", "mx_jar_dist", "mx_resource_layout", "mx_classpath_dist", "mx_files", "mx_project", "mx_whole_java", "mx_processed_java", "mx_processor", "mx_test_class":
+	case "mx_jvmci_library", "mx_shaded_java", "mx_jar_dist", "mx_resource_layout", "mx_classpath_dist", "mx_files", "mx_project", "mx_whole_java", "mx_processed_java", "mx_processor", "mx_test_class":
 		return true
 	}
 	return false
@@ -310,7 +313,7 @@ func (g *importer) Kinds() map[string]rule.KindInfo {
 	for _, a := range strings.Fields("overlays shade shade_inputs manifest contents directives release snippets_pattern archived_libraries jni_services truffle_services module_name add_exports abi_after_javac copies literals srcs deps packages test_class project processor_class generates_api plugins resources mx_resource_root unified_release javac_opts javacopts testonly visibility") {
 		managed[a] = true
 	}
-	for _, k := range strings.Fields("mx_shaded_java mx_files mx_project mx_whole_java mx_processed_java mx_processor mx_test_class") {
+	for _, k := range strings.Fields("mx_jvmci_library mx_shaded_java mx_files mx_project mx_whole_java mx_processed_java mx_processor mx_test_class") {
 		kinds[k] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"srcs": true, "packages": true, "project": true, "processor_class": true}, MergeableAttrs: managed}
 	}
 	kinds["mx_jar_dist"] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"contents": true}, MergeableAttrs: managed}
@@ -328,7 +331,7 @@ func (g *importer) Kinds() map[string]rule.KindInfo {
 	return kinds
 }
 func (g *importer) Loads() []rule.LoadInfo {
-	return append(g.javaLanguage.Loads(), rule.LoadInfo{Name: "@rules_mx//mx:graph.bzl", Symbols: strings.Fields("mx_shaded_java mx_jar_dist mx_classpath_dist mx_resource_layout mx_files mx_processed_java mx_processor mx_project mx_test_class mx_whole_java")})
+	return append(g.javaLanguage.Loads(), rule.LoadInfo{Name: "@rules_mx//mx:graph.bzl", Symbols: strings.Fields("mx_jvmci_library mx_shaded_java mx_jar_dist mx_classpath_dist mx_resource_layout mx_files mx_processed_java mx_processor mx_project mx_test_class mx_whole_java")})
 }
 
 func (g *importer) GenerateRules(a language.GenerateArgs) language.GenerateResult {

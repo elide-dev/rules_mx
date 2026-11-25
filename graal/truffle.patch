@@ -2,8 +2,8 @@ diff --git a/truffle/BUILD.bazel b/truffle/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/truffle/BUILD.bazel
-@@ -0,0 +1,870 @@
-+load("@rules_mx//mx:graph.bzl", "mx_jar_dist", "mx_processed_java", "mx_processor", "mx_project", "mx_resource_layout", "mx_shaded_java", "mx_whole_java")
+@@ -0,0 +1,1035 @@
++load("@rules_mx//mx:graph.bzl", "mx_jar_dist", "mx_jvmci_library", "mx_processed_java", "mx_processor", "mx_project", "mx_resource_layout", "mx_shaded_java", "mx_whole_java")
 +
 +# gazelle:resolve java com.oracle.truffle.api.impl //truffle:com.oracle.truffle.api
 +# gazelle:resolve java com.oracle.truffle.api.impl.asm //truffle:com.oracle.truffle.api.impl.asm
@@ -426,6 +426,31 @@ new file mode 100644
 +    deps = [":com.oracle.truffle.api"],
 +)
 +
++mx_jvmci_library(
++    name = "com.oracle.truffle.compiler",
++    srcs = [
++        "//truffle/src/com.oracle.truffle.compiler/src/com/oracle/truffle/compiler:com.oracle.truffle.compiler.srcs",
++        "//truffle/src/com.oracle.truffle.compiler/src/com/oracle/truffle/compiler/hotspot:com.oracle.truffle.compiler.srcs",
++        "//truffle/src/com.oracle.truffle.compiler/src/com/oracle/truffle/compiler/hotspot/libgraal:com.oracle.truffle.compiler.srcs",
++    ],
++    add_exports = [
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.code",
++    ],
++    javacopts = [
++        "-source",
++        "21",
++        "-target",
++        "21",
++        "--add-modules",
++        "java.logging,jdk.management,jdk.unsupported",
++        "-Xep:FormatString:WARN",
++    ],
++    mx_resource_root = "src/com.oracle.truffle.compiler/src",
++    resources = ["//truffle/src/com.oracle.truffle.compiler/src/META-INF/native-image/org.graalvm.truffle/truffle-compiler:com.oracle.truffle.compiler.resources"],
++    visibility = ["//visibility:public"],
++)
++
 +mx_whole_java(
 +    name = "com.oracle.truffle.dsl.processor",
 +    srcs = [
@@ -561,6 +586,62 @@ new file mode 100644
 +        "//sdk:COLLECTIONS",
 +        "//sdk:JNIUTILS",
 +        "//sdk:NATIVEBRIDGE",
++        "//sdk:NATIVEIMAGE",
++        "//sdk:POLYGLOT",
++    ],
++)
++
++mx_jvmci_library(
++    name = "com.oracle.truffle.runtime",
++    srcs = [
++        "//truffle/src/com.oracle.truffle.runtime/src/com/oracle/truffle/runtime:com.oracle.truffle.runtime.srcs",
++        "//truffle/src/com.oracle.truffle.runtime/src/com/oracle/truffle/runtime/collection:com.oracle.truffle.runtime.srcs",
++        "//truffle/src/com.oracle.truffle.runtime/src/com/oracle/truffle/runtime/debug:com.oracle.truffle.runtime.srcs",
++        "//truffle/src/com.oracle.truffle.runtime/src/com/oracle/truffle/runtime/hotspot:com.oracle.truffle.runtime.srcs",
++        "//truffle/src/com.oracle.truffle.runtime/src/com/oracle/truffle/runtime/hotspot/libgraal:com.oracle.truffle.runtime.srcs",
++        "//truffle/src/com.oracle.truffle.runtime/src/com/oracle/truffle/runtime/jfr:com.oracle.truffle.runtime.srcs",
++        "//truffle/src/com.oracle.truffle.runtime/src/com/oracle/truffle/runtime/jfr/impl:com.oracle.truffle.runtime.srcs",
++        "//truffle/src/com.oracle.truffle.runtime/src/com/oracle/truffle/runtime/serviceprovider:com.oracle.truffle.runtime.srcs",
++    ],
++    add_exports = [
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.services",
++        "jdk.internal.vm.ci/jdk.vm.ci.code",
++        "jdk.internal.vm.ci/jdk.vm.ci.code.stack",
++        "jdk.internal.vm.ci/jdk.vm.ci.common",
++        "jdk.internal.vm.ci/jdk.vm.ci.hotspot",
++        "jdk.internal.vm.ci/jdk.vm.ci.runtime",
++        "java.base/jdk.internal.access",
++    ],
++    javacopts = [
++        "-source",
++        "21",
++        "-target",
++        "21",
++        "--add-modules",
++        "java.logging,jdk.management,jdk.jfr,jdk.unsupported",
++        "-Xep:ReturnValueIgnored:WARN",
++    ],
++    mx_resource_root = "src/com.oracle.truffle.runtime/src",
++    plugins = [
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    resources = [
++        "//truffle/src/com.oracle.truffle.runtime/src/META-INF/native-image/org.graalvm.truffle/truffle-runtime:com.oracle.truffle.runtime.resources",
++        "//truffle/src/com.oracle.truffle.runtime/src/META-INF/services:com.oracle.truffle.runtime.resources",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":TRUFFLE_API",
++        ":TRUFFLE_COMPILER",
++        "//sdk:COLLECTIONS",
 +        "//sdk:NATIVEIMAGE",
 +        "//sdk:POLYGLOT",
 +    ],
@@ -748,6 +829,90 @@ new file mode 100644
 +        "//sdk:JNIUTILS",
 +        "//sdk:NATIVEBRIDGE",
 +        "//sdk:POLYGLOT",
++    ],
++)
++
++mx_jar_dist(
++    name = "TRUFFLE_COMPILER",
++    add_exports = [
++        "jdk.internal.vm.ci/jdk.vm.ci.code",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++    ],
++    contents = [":com.oracle.truffle.compiler"],
++    directives = [
++        "exports com.oracle.truffle.compiler to org.graalvm.truffle.runtime, jdk.graal.compiler, jdk.graal.compiler.libgraal, org.graalvm.nativeimage.builder, com.oracle.graal.graal_enterprise, org.graalvm.truffle.runtime.svm, com.oracle.truffle.enterprise.svm",
++        "exports com.oracle.truffle.compiler.hotspot to org.graalvm.truffle.runtime, jdk.graal.compiler",
++        "exports com.oracle.truffle.compiler.hotspot.libgraal to org.graalvm.truffle.runtime, jdk.graal.compiler, jdk.graal.compiler.libgraal",
++        "requires java.logging",
++        "requires java.management",
++        "requires jdk.management",
++        "requires jdk.unsupported",
++        "requires static jdk.internal.vm.ci",
++    ],
++    manifest = {
++        "Implementation-Vendor": "Oracle Corporation",
++        "Implementation-Version": "25.5.5-dev",
++        "Name": "truffle-compiler",
++        "Specification-Vendor": "Oracle Corporation",
++        "Specification-Version": "25.5.5-dev",
++    },
++    module_name = "org.graalvm.truffle.compiler",
++    release = 21,
++    snippets_pattern = ".*(Snippets|doc-files).*",
++    visibility = ["//visibility:public"],
++)
++
++mx_jar_dist(
++    name = "TRUFFLE_RUNTIME",
++    add_exports = [
++        "jdk.internal.vm.ci/jdk.vm.ci.code",
++        "jdk.internal.vm.ci/jdk.vm.ci.code.stack",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.services",
++    ],
++    contents = [":com.oracle.truffle.runtime"],
++    directives = [
++        "exports com.oracle.truffle.runtime to org.graalvm.truffle, com.oracle.truffle.enterprise, org.graalvm.truffle.runtime.svm, com.oracle.truffle.enterprise.svm",
++        "exports com.oracle.truffle.runtime.collection to org.graalvm.truffle, com.oracle.truffle.enterprise, org.graalvm.truffle.runtime.svm, com.oracle.truffle.enterprise.svm",
++        "exports com.oracle.truffle.runtime.debug to org.graalvm.truffle, com.oracle.truffle.enterprise, org.graalvm.truffle.runtime.svm, com.oracle.truffle.enterprise.svm",
++        "exports com.oracle.truffle.runtime.hotspot to org.graalvm.truffle, com.oracle.truffle.enterprise, org.graalvm.truffle.runtime.svm, com.oracle.truffle.enterprise.svm, jdk.graal.compiler",
++        "exports com.oracle.truffle.runtime.hotspot.libgraal to org.graalvm.truffle, com.oracle.truffle.enterprise, org.graalvm.truffle.runtime.svm, com.oracle.truffle.enterprise.svm",
++        "exports com.oracle.truffle.runtime.jfr to org.graalvm.truffle, com.oracle.truffle.enterprise, org.graalvm.truffle.runtime.svm, com.oracle.truffle.enterprise.svm",
++        "exports com.oracle.truffle.runtime.jfr.impl to org.graalvm.truffle, com.oracle.truffle.enterprise, org.graalvm.truffle.runtime.svm, com.oracle.truffle.enterprise.svm",
++        "exports com.oracle.truffle.runtime.serviceprovider to org.graalvm.truffle, com.oracle.truffle.enterprise, org.graalvm.truffle.runtime.svm, com.oracle.truffle.enterprise.svm",
++        "requires java.logging",
++        "requires java.management",
++        "requires jdk.management",
++        "requires jdk.unsupported",
++        "requires org.graalvm.collections",
++        "requires org.graalvm.nativeimage",
++        "requires org.graalvm.polyglot",
++        "requires org.graalvm.truffle",
++        "requires org.graalvm.truffle.compiler",
++        "requires static jdk.internal.vm.ci",
++        "requires static jdk.jfr",
++        "requires transitive org.graalvm.word",
++        "uses com.oracle.truffle.runtime.FloodControlHandler",
++        "uses com.oracle.truffle.runtime.TruffleTypes",
++        "uses com.oracle.truffle.runtime.jfr.EventFactory.Provider",
++        "uses org.graalvm.home.HomeFinder",
++    ],
++    jni_services = True,
++    manifest = {
++        "Implementation-Vendor": "Oracle Corporation",
++        "Implementation-Version": "25.5.5-dev",
++        "Name": "truffle-runtime",
++        "Specification-Vendor": "Oracle Corporation",
++        "Specification-Version": "25.5.5-dev",
++    },
++    module_name = "org.graalvm.truffle.runtime",
++    release = 21,
++    snippets_pattern = ".*(Snippets|doc-files).*",
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":TRUFFLE_API",
++        ":TRUFFLE_COMPILER",
 +    ],
 +)
 +
@@ -1788,6 +1953,72 @@ new file mode 100644
 +    exports = ["//truffle:com.oracle.truffle.api"],
 +    deps = ["//truffle:com.oracle.truffle.api"],
 +)
+diff --git a/truffle/src/com.oracle.truffle.compiler/src/META-INF/native-image/org.graalvm.truffle/truffle-compiler/BUILD.bazel b/truffle/src/com.oracle.truffle.compiler/src/META-INF/native-image/org.graalvm.truffle/truffle-compiler/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.compiler/src/META-INF/native-image/org.graalvm.truffle/truffle-compiler/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.compiler.resources",
++    srcs = ["native-image.properties"],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.compiler/src/com/oracle/truffle/compiler/BUILD.bazel b/truffle/src/com.oracle.truffle.compiler/src/com/oracle/truffle/compiler/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.compiler/src/com/oracle/truffle/compiler/BUILD.bazel
+@@ -0,0 +1,18 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.compiler.srcs",
++    srcs = [
++        "OptimizedAssumptionDependency.java",
++        "TruffleCompilable.java",
++        "TruffleCompilationSupport.java",
++        "TruffleCompilationTask.java",
++        "TruffleCompiler.java",
++        "TruffleCompilerAssumptionDependency.java",
++        "TruffleCompilerListener.java",
++        "TruffleCompilerOptionDescriptor.java",
++        "TruffleCompilerRuntime.java",
++        "TruffleSourceLanguagePosition.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.compiler/src/com/oracle/truffle/compiler/hotspot/BUILD.bazel b/truffle/src/com.oracle.truffle.compiler/src/com/oracle/truffle/compiler/hotspot/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.compiler/src/com/oracle/truffle/compiler/hotspot/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.compiler.srcs",
++    srcs = ["HotSpotTruffleCompiler.java"],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.compiler/src/com/oracle/truffle/compiler/hotspot/libgraal/BUILD.bazel b/truffle/src/com.oracle.truffle.compiler/src/com/oracle/truffle/compiler/hotspot/libgraal/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.compiler/src/com/oracle/truffle/compiler/hotspot/libgraal/BUILD.bazel
+@@ -0,0 +1,14 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.compiler.srcs",
++    srcs = [
++        "FromLibGraalEntryPointsResolver.java",
++        "FromLibGraalId.java",
++        "TruffleFromLibGraal.java",
++        "TruffleFromLibGraalRepeated.java",
++        "TruffleToLibGraal.java",
++        "Utilities.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
 diff --git a/truffle/src/com.oracle.truffle.dsl.processor/src/META-INF/services/BUILD.bazel b/truffle/src/com.oracle.truffle.dsl.processor/src/META-INF/services/BUILD.bazel
 new file mode 100644
 --- /dev/null
@@ -2486,6 +2717,234 @@ new file mode 100644
 +        "SuppressFBWarnings.java",
 +        "SymbolTable.java",
 +    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.runtime/src/META-INF/native-image/org.graalvm.truffle/truffle-runtime/BUILD.bazel b/truffle/src/com.oracle.truffle.runtime/src/META-INF/native-image/org.graalvm.truffle/truffle-runtime/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.runtime/src/META-INF/native-image/org.graalvm.truffle/truffle-runtime/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.runtime.resources",
++    srcs = ["native-image.properties"],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.runtime/src/META-INF/services/BUILD.bazel b/truffle/src/com.oracle.truffle.runtime/src/META-INF/services/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.runtime/src/META-INF/services/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.runtime.resources",
++    srcs = [
++        "com.oracle.truffle.api.TruffleRuntimeAccess",
++        "com.oracle.truffle.runtime.jfr.EventFactory$Provider",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.runtime/src/com/oracle/truffle/runtime/BUILD.bazel b/truffle/src/com.oracle.truffle.runtime/src/com/oracle/truffle/runtime/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.runtime/src/com/oracle/truffle/runtime/BUILD.bazel
+@@ -0,0 +1,51 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.runtime.srcs",
++    srcs = [
++        "AbstractCompilationTask.java",
++        "AbstractEngineCacheSupport.java",
++        "AbstractGraalTruffleRuntimeListener.java",
++        "AbstractOptimizedLoopNode.java",
++        "BackgroundCompileQueue.java",
++        "BaseOSRRootNode.java",
++        "BytecodeOSRMetadata.java",
++        "BytecodeOSRRootNode.java",
++        "CompilationState.java",
++        "CompilationTask.java",
++        "DebugEngineCacheSupport.java",
++        "EngineCacheSupport.java",
++        "EngineData.java",
++        "FixedPointMath.java",
++        "FloodControlHandler.java",
++        "InlineDecision.java",
++        "LoopNodeFactory.java",
++        "ModulesSupport.java",
++        "OptimizedAssumption.java",
++        "OptimizedBlockNode.java",
++        "OptimizedCallTarget.java",
++        "OptimizedDirectCallNode.java",
++        "OptimizedFastThreadLocal.java",
++        "OptimizedFrameInstance.java",
++        "OptimizedIndirectCallNode.java",
++        "OptimizedLoopNode.java",
++        "OptimizedOSRFrameInstance.java",
++        "OptimizedOSRLoopNode.java",
++        "OptimizedRuntimeAccessor.java",
++        "OptimizedRuntimeOptions.java",
++        "OptimizedRuntimeServiceProvider.java",
++        "OptimizedRuntimeSupport.java",
++        "OptimizedTVMCI.java",
++        "OptimizedTestTVMCI.java",
++        "OptimizedTruffleRuntime.java",
++        "OptimizedTruffleRuntimeListener.java",
++        "OptimizedTruffleRuntimeListenerDispatcher.java",
++        "SuppressFBWarnings.java",
++        "TraversingBlockingQueue.java",
++        "TruffleCallBoundary.java",
++        "TruffleInlining.java",
++        "TruffleSplittingStrategy.java",
++        "TruffleTypes.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.runtime/src/com/oracle/truffle/runtime/collection/BUILD.bazel b/truffle/src/com.oracle.truffle.runtime/src/com/oracle/truffle/runtime/collection/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.runtime/src/com/oracle/truffle/runtime/collection/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.runtime.srcs",
++    srcs = [
++        "ArrayQueue.java",
++        "BTreeQueue.java",
++        "DelegatingBlockingQueue.java",
++        "SerialQueue.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.runtime/src/com/oracle/truffle/runtime/debug/BUILD.bazel b/truffle/src/com.oracle.truffle.runtime/src/com/oracle/truffle/runtime/debug/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.runtime/src/com/oracle/truffle/runtime/debug/BUILD.bazel
+@@ -0,0 +1,14 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.runtime.srcs",
++    srcs = [
++        "JFRListener.java",
++        "StatisticsListener.java",
++        "TraceASTCompilationListener.java",
++        "TraceCompilationListener.java",
++        "TraceCompilationPolymorphismListener.java",
++        "TraceSplittingListener.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.runtime/src/com/oracle/truffle/runtime/hotspot/BUILD.bazel b/truffle/src/com.oracle.truffle.runtime/src/com/oracle/truffle/runtime/hotspot/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.runtime/src/com/oracle/truffle/runtime/hotspot/BUILD.bazel
+@@ -0,0 +1,14 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.runtime.srcs",
++    srcs = [
++        "HotSpotFastThreadLocal.java",
++        "HotSpotOptimizedCallTarget.java",
++        "HotSpotThreadLocalHandshake.java",
++        "HotSpotTruffleRuntime.java",
++        "HotSpotTruffleRuntimeAccess.java",
++        "HotSpotTruffleRuntimeServices.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.runtime/src/com/oracle/truffle/runtime/hotspot/libgraal/BUILD.bazel b/truffle/src/com.oracle.truffle.runtime/src/com/oracle/truffle/runtime/hotspot/libgraal/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.runtime/src/com/oracle/truffle/runtime/hotspot/libgraal/BUILD.bazel
+@@ -0,0 +1,24 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.runtime.srcs",
++    srcs = [
++        "BinaryInput.java",
++        "BinaryOutput.java",
++        "DestroyedIsolateException.java",
++        "LibGraal.java",
++        "LibGraalCompilationResultInfo.java",
++        "LibGraalGraphInfo.java",
++        "LibGraalHotSpotTruffleCompiler.java",
++        "LibGraalIsolate.java",
++        "LibGraalObject.java",
++        "LibGraalScope.java",
++        "LibGraalScopedHandle.java",
++        "LibGraalScopedStringSupplier.java",
++        "LibGraalStringSupplier.java",
++        "LibGraalTruffleCompilationSupport.java",
++        "TruffleFromLibGraalEntryPoints.java",
++        "TruffleToLibGraalCalls.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.runtime/src/com/oracle/truffle/runtime/jfr/BUILD.bazel b/truffle/src/com.oracle.truffle.runtime/src/com/oracle/truffle/runtime/jfr/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.runtime/src/com/oracle/truffle/runtime/jfr/BUILD.bazel
+@@ -0,0 +1,19 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.runtime.srcs",
++    srcs = [
++        "CompilationDequeuedEvent.java",
++        "CompilationEvent.java",
++        "CompilationQueuedEvent.java",
++        "CompilationStartedEvent.java",
++        "CompilationStatisticsEvent.java",
++        "DeoptimizationEvent.java",
++        "Event.java",
++        "EventFactory.java",
++        "InvalidationEvent.java",
++        "ProfileResetEvent.java",
++        "RootFunctionEvent.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.runtime/src/com/oracle/truffle/runtime/jfr/impl/BUILD.bazel b/truffle/src/com.oracle.truffle.runtime/src/com/oracle/truffle/runtime/jfr/impl/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.runtime/src/com/oracle/truffle/runtime/jfr/impl/BUILD.bazel
+@@ -0,0 +1,20 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.runtime.srcs",
++    srcs = [
++        "CompilationDequeuedEventImpl.java",
++        "CompilationEventImpl.java",
++        "CompilationFailureEventImpl.java",
++        "CompilationQueuedEventImpl.java",
++        "CompilationStartedEventImpl.java",
++        "CompilationStatisticsEventImpl.java",
++        "DeoptimizationEventImpl.java",
++        "EventFactoryImpl.java",
++        "InvalidationEventImpl.java",
++        "ProfileResetEventImpl.java",
++        "ProviderImpl.java",
++        "RootFunctionEventImpl.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.runtime/src/com/oracle/truffle/runtime/serviceprovider/BUILD.bazel b/truffle/src/com.oracle.truffle.runtime/src/com/oracle/truffle/runtime/serviceprovider/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.runtime/src/com/oracle/truffle/runtime/serviceprovider/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.runtime.srcs",
++    srcs = ["TruffleRuntimeServices.java"],
 +    visibility = ["//truffle:__pkg__"],
 +)
 diff --git a/truffle/src/com.oracle.truffle.sandbox/src/com/oracle/truffle/sandbox/BUILD.bazel b/truffle/src/com.oracle.truffle.sandbox/src/com/oracle/truffle/sandbox/BUILD.bazel
