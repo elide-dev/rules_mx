@@ -283,6 +283,24 @@ native_image(
     deps = [":source_native_image_guest"],
 )
 
+java_library(
+    name = "native_image_resource_test_guest",
+    testonly = True,
+    srcs = ["NativeImageResourceGuest.java"],
+    tags = ["manual"],
+    deps = ["@graal//substratevm:SVM_TESTS WITH SPACE"],
+)
+
+native_image(
+    name = "svm_native_resource_guest",
+    testonly = True,
+    main_class = "graal.NativeImageResourceGuest",
+    native_features = ["com.oracle.svm.with.space.test.NativeImageResourceUtils$TestFeature"],
+    tags = ["manual"],
+    visibility = ["//visibility:public"],
+    deps = [":native_image_resource_test_guest"],
+)
+
 py_test(
     name = "source_native_image_action_test",
     size = "small",

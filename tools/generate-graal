@@ -589,6 +589,8 @@ SUITES = {
         "com.oracle.svm.core.foreign=-Xep:IsInstanceIncompatibleType:WARN",
         "--test-launcher",
         "substratevm:com.oracle.svm.driver.test=:svm_driver_junit",
+        "--test-launcher",
+        "substratevm:com.oracle.svm.with.space.test=@rules_mx//graal:svm_native_resource_guest",
         "--manual-test-project",
         "com.oracle.svm.with.space.test",
         "--infer-source-deps",

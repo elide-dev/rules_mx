@@ -2870,7 +2870,7 @@ new file mode 100644
 +
 +mx_test_class(
 +    name = "com.oracle.svm.with.space.test.com.oracle.svm.with.space.test.NativeImageResourceTest",
-+    project = ":com.oracle.svm.with.space.test",
++    launcher = "@rules_mx//graal:svm_native_resource_guest",
 +    tags = ["manual"],
 +    test_class = "com.oracle.svm.with.space.test.NativeImageResourceTest",
 +)
