@@ -2,7 +2,7 @@ diff --git a/compiler/BUILD.bazel b/compiler/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/compiler/BUILD.bazel
-@@ -0,0 +1,13555 @@
+@@ -0,0 +1,14108 @@
 +load("@rules_java//java:java_import.bzl", "java_import")
 +load("@rules_java//java:java_plugin.bzl", "java_plugin")
 +load("@rules_mx//graal:layout.bzl", "mx_archive_layout")
@@ -909,6 +909,13 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.api.directives.test.UnconstrainedValueDirectiveTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.api.directives.test.UnconstrainedValueDirectiveTest",
++)
++
++mx_test_class(
 +    name = "jdk.graal.compiler.test.jdk.graal.compiler.api.test.GraalAPITest",
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
@@ -927,6 +934,13 @@ new file mode 100644
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
 +    test_class = "jdk.graal.compiler.asm.aarch64.test.AArch64InstructionEncodingTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.asm.aarch64.test.AArch64LabelRangeTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.asm.aarch64.test.AArch64LabelRangeTest",
 +)
 +
 +mx_test_class(
@@ -1014,6 +1028,13 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.aarch64.test.AArch64LargeTableSwitchTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.core.aarch64.test.AArch64LargeTableSwitchTest",
++)
++
++mx_test_class(
 +    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.aarch64.test.AArch64LogicShiftTest",
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
@@ -1091,6 +1112,13 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.aarch64.test.AArch64SnippetStateTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.core.aarch64.test.AArch64SnippetStateTest",
++)
++
++mx_test_class(
 +    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.aarch64.test.AArch64TestBitAndBranchTest",
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
@@ -1133,6 +1161,13 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.amd64.test.AMD64ArrayIndexOffsetTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.core.amd64.test.AMD64ArrayIndexOffsetTest",
++)
++
++mx_test_class(
 +    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.amd64.test.AMD64ByteMemoryTest",
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
@@ -1165,6 +1200,20 @@ new file mode 100644
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
 +    test_class = "jdk.graal.compiler.core.amd64.test.AMD64MatchRuleTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.amd64.test.AMD64NarrowTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.core.amd64.test.AMD64NarrowTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.amd64.test.AMD64UnsignedByteLoadTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.core.amd64.test.AMD64UnsignedByteLoadTest",
 +)
 +
 +mx_test_class(
@@ -1214,6 +1263,20 @@ new file mode 100644
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
 +    test_class = "jdk.graal.compiler.core.test.AdvancedLockEliminationTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.AllocationEmissionOrderTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.core.test.AllocationEmissionOrderTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.ArrayCompareToIdentityTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.core.test.ArrayCompareToIdentityTest",
 +)
 +
 +mx_test_class(
@@ -1277,6 +1340,20 @@ new file mode 100644
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
 +    test_class = "jdk.graal.compiler.core.test.BytecodeHandlerDispatchAddressTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.BytecodeHandlerExpandedTypeTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.core.test.BytecodeHandlerExpandedTypeTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.BytecodeHandlerFieldValidityTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.core.test.BytecodeHandlerFieldValidityTest",
 +)
 +
 +mx_test_class(
@@ -1347,6 +1424,13 @@ new file mode 100644
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
 +    test_class = "jdk.graal.compiler.core.test.CompareCanonicalizerTest3",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.CompilationCancellationTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.core.test.CompilationCancellationTest",
 +)
 +
 +mx_test_class(
@@ -1581,6 +1665,20 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.ConstantReflectionUtilTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.core.test.ConstantReflectionUtilTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.ConstantTripCountQueryTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.core.test.ConstantTripCountQueryTest",
++)
++
++mx_test_class(
 +    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.ConvertDeoptimizeToGuardPrioritiesTest",
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
@@ -1620,6 +1718,27 @@ new file mode 100644
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
 +    test_class = "jdk.graal.compiler.core.test.CountedLoopTest2",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.DataSectionAlignmentTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.core.test.DataSectionAlignmentTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.DataSectionRoundUpTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.core.test.DataSectionRoundUpTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.DataSectionTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.core.test.DataSectionTest",
 +)
 +
 +mx_test_class(
@@ -1686,6 +1805,13 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.EffectListIteratorContractTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.core.test.EffectListIteratorContractTest",
++)
++
++mx_test_class(
 +    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.EnumSwitchTest",
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
@@ -1728,6 +1854,13 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.FixReadsAddressOffsetTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.core.test.FixReadsAddressOffsetTest",
++)
++
++mx_test_class(
 +    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.FixedGuardSimplificationTest",
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
@@ -1753,6 +1886,13 @@ new file mode 100644
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
 +    test_class = "jdk.graal.compiler.core.test.FloatingReadTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.FrameStateBuilderTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.core.test.FrameStateBuilderTest",
 +)
 +
 +mx_test_class(
@@ -1812,6 +1952,13 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.GraphUtilPredecessorIteratorContractTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.core.test.GraphUtilPredecessorIteratorContractTest",
++)
++
++mx_test_class(
 +    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.GuardPrioritiesTest",
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
@@ -1826,6 +1973,20 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.GuardingNonNullTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.core.test.GuardingNonNullTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.HIRBlockNodeIteratorContractTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.core.test.HIRBlockNodeIteratorContractTest",
++)
++
++mx_test_class(
 +    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.HashCodeTest",
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
@@ -1837,6 +1998,13 @@ new file mode 100644
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
 +    test_class = "jdk.graal.compiler.core.test.HighTierPhaseOrderTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.HypotheticalOperandsCanonicalizationTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.core.test.HypotheticalOperandsCanonicalizationTest",
 +)
 +
 +mx_test_class(
@@ -1882,6 +2050,13 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.InitialIntrinsicFrameStateTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.core.test.InitialIntrinsicFrameStateTest",
++)
++
++mx_test_class(
 +    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.InstalledCodeInvalidationTest",
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
@@ -1900,6 +2075,13 @@ new file mode 100644
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
 +    test_class = "jdk.graal.compiler.core.test.IntegerBoxEqualsTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.IntegerBoxingCacheTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.core.test.IntegerBoxingCacheTest",
 +)
 +
 +mx_test_class(
@@ -1987,6 +2169,13 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.IntrinsicArgumentsTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.core.test.IntrinsicArgumentsTest",
++)
++
++mx_test_class(
 +    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.InvocationPluginsTest",
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
@@ -2012,6 +2201,13 @@ new file mode 100644
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
 +    test_class = "jdk.graal.compiler.core.test.IsArrayTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.JTTPhasePlanFuzzingTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.core.test.JTTPhasePlanFuzzingTest",
 +)
 +
 +mx_test_class(
@@ -2075,6 +2271,20 @@ new file mode 100644
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
 +    test_class = "jdk.graal.compiler.core.test.LoopSafepointStateVerificationTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.LoopUnswitchBudgetTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.core.test.LoopUnswitchBudgetTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.LoopUnswitchFactorTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.core.test.LoopUnswitchFactorTest",
 +)
 +
 +mx_test_class(
@@ -2239,6 +2449,13 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.NodeMapIteratorContractTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.core.test.NodeMapIteratorContractTest",
++)
++
++mx_test_class(
 +    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.NodePosIteratorTest",
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
@@ -2250,6 +2467,13 @@ new file mode 100644
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
 +    test_class = "jdk.graal.compiler.core.test.NodePropertiesTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.NodeSourcePositionIteratorContractTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.core.test.NodeSourcePositionIteratorContractTest",
 +)
 +
 +mx_test_class(
@@ -2278,6 +2502,13 @@ new file mode 100644
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
 +    test_class = "jdk.graal.compiler.core.test.OnStackReplacementTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.OptimizeDivAfterFrameStateAssignmentTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.core.test.OptimizeDivAfterFrameStateAssignmentTest",
 +)
 +
 +mx_test_class(
@@ -2491,6 +2722,13 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.ShiftDistanceAnalysisTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.core.test.ShiftDistanceAnalysisTest",
++)
++
++mx_test_class(
 +    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.ShortCircuitNodeTest",
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
@@ -2607,6 +2845,13 @@ new file mode 100644
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
 +    test_class = "jdk.graal.compiler.core.test.StraighteningTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.StructuredGraphInvokesIteratorContractTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.core.test.StructuredGraphInvokesIteratorContractTest",
 +)
 +
 +mx_test_class(
@@ -2729,6 +2974,13 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.UnreachablePathNodeTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.core.test.UnreachablePathNodeTest",
++)
++
++mx_test_class(
 +    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.UnsafeCompareAndSwapTest",
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
@@ -2785,6 +3037,13 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.UnusedVolatileReadTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.core.test.UnusedVolatileReadTest",
++)
++
++mx_test_class(
 +    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.VectorAPISmokeTest",
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
@@ -2810,6 +3069,13 @@ new file mode 100644
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
 +    test_class = "jdk.graal.compiler.core.test.VerifyDebugUsageTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.VerifyShiftAmountsTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.core.test.VerifyShiftAmountsTest",
 +)
 +
 +mx_test_class(
@@ -3100,6 +3366,13 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.inlining.InliningMutationTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.core.test.inlining.InliningMutationTest",
++)
++
++mx_test_class(
 +    name = "jdk.graal.compiler.test.jdk.graal.compiler.core.test.inlining.InliningTest",
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
@@ -3188,6 +3461,13 @@ new file mode 100644
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
 +    test_class = "jdk.graal.compiler.debug.test.MethodFilterTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.debug.test.ScopeContextIteratorContractTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.debug.test.ScopeContextIteratorContractTest",
 +)
 +
 +mx_test_class(
@@ -3303,6 +3583,13 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.graph.test.EdgesIteratorContractTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.graph.test.EdgesIteratorContractTest",
++)
++
++mx_test_class(
 +    name = "jdk.graal.compiler.test.jdk.graal.compiler.graph.test.GraphMarkTest",
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
@@ -3314,6 +3601,27 @@ new file mode 100644
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
 +    test_class = "jdk.graal.compiler.graph.test.GraphNodeEventListenerTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.graph.test.GraphNodeIteratorContractTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.graph.test.GraphNodeIteratorContractTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.graph.test.NodeBitMapCountContractTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.graph.test.NodeBitMapCountContractTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.graph.test.NodeBitMapInvertIteratorContractTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.graph.test.NodeBitMapInvertIteratorContractTest",
 +)
 +
 +mx_test_class(
@@ -3335,6 +3643,13 @@ new file mode 100644
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
 +    test_class = "jdk.graal.compiler.graph.test.NodeInputListTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.graph.test.NodeListIteratorContractTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.graph.test.NodeListIteratorContractTest",
 +)
 +
 +mx_test_class(
@@ -3989,6 +4304,13 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.hotspot.test.HotSpotStampTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.hotspot.test.HotSpotStampTest",
++)
++
++mx_test_class(
 +    name = "jdk.graal.compiler.test.jdk.graal.compiler.hotspot.test.HotSpotStubsTest",
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
@@ -4241,6 +4563,13 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.hotspot.test.SpeculativeDeoptimizeDirectiveTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.hotspot.test.SpeculativeDeoptimizeDirectiveTest",
++)
++
++mx_test_class(
 +    name = "jdk.graal.compiler.test.jdk.graal.compiler.hotspot.test.StackSlotLimitTest",
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
@@ -4336,6 +4665,13 @@ new file mode 100644
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
 +    test_class = "jdk.graal.compiler.hotspot.test.VectorizedHashCodeTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.hotspot.test.VerifyLockDepthPhaseTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.hotspot.test.VerifyLockDepthPhaseTest",
 +)
 +
 +mx_test_class(
@@ -9848,6 +10184,13 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.lir.jtt.GraphColoringStackSlotAllocatorTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.lir.jtt.GraphColoringStackSlotAllocatorTest",
++)
++
++mx_test_class(
 +    name = "jdk.graal.compiler.test.jdk.graal.compiler.lir.jtt.LIRTestTest",
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
@@ -9869,6 +10212,20 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.lir.test.CallClobberReloadTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.lir.test.CallClobberReloadTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.lir.test.CallClobberSpillTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.lir.test.CallClobberSpillTest",
++)
++
++mx_test_class(
 +    name = "jdk.graal.compiler.test.jdk.graal.compiler.lir.test.CompositeValueReplacementTest1",
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
@@ -9880,6 +10237,13 @@ new file mode 100644
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
 +    test_class = "jdk.graal.compiler.lir.test.GenericValueMapTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.lir.test.SwitchStrategyTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.lir.test.SwitchStrategyTest",
 +)
 +
 +mx_test_class(
@@ -9925,6 +10289,20 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.loop.test.CountedLoopEntryTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.loop.test.CountedLoopEntryTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.loop.test.CountedStripMiningBudgetTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.loop.test.CountedStripMiningBudgetTest",
++)
++
++mx_test_class(
 +    name = "jdk.graal.compiler.test.jdk.graal.compiler.loop.test.CountedStripMiningRegressionTest",
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
@@ -9932,10 +10310,24 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.loop.test.DerivedOffsetInductionVariableCopyTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.loop.test.DerivedOffsetInductionVariableCopyTest",
++)
++
++mx_test_class(
 +    name = "jdk.graal.compiler.test.jdk.graal.compiler.loop.test.IterativeLoopPeelingFrameStateTest",
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
 +    test_class = "jdk.graal.compiler.loop.test.IterativeLoopPeelingFrameStateTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.loop.test.LateRemoveEmptyLoopsTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.loop.test.LateRemoveEmptyLoopsTest",
 +)
 +
 +mx_test_class(
@@ -9957,6 +10349,13 @@ new file mode 100644
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
 +    test_class = "jdk.graal.compiler.loop.test.LoopPeelingAllocationTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.loop.test.LoopRootSafepointTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.loop.test.LoopRootSafepointTest",
 +)
 +
 +mx_test_class(
@@ -10020,6 +10419,13 @@ new file mode 100644
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
 +    test_class = "jdk.graal.compiler.loop.test.RemoveEmptyLoopsFloatingGuardTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.loop.test.RemoveEmptyLoopsOverflowTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.loop.test.RemoveEmptyLoopsOverflowTest",
 +)
 +
 +mx_test_class(
@@ -10090,6 +10496,13 @@ new file mode 100644
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
 +    test_class = "jdk.graal.compiler.nodes.test.ConstantNodeTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.nodes.test.CopySignNodeCanonicalizationTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.nodes.test.CopySignNodeCanonicalizationTest",
 +)
 +
 +mx_test_class(
@@ -10380,6 +10793,13 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.nodes.test.ZeroExtendAnalysisTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.nodes.test.ZeroExtendAnalysisTest",
++)
++
++mx_test_class(
 +    name = "jdk.graal.compiler.test.jdk.graal.compiler.options.test.NestedBooleanOptionKeyTest",
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
@@ -10429,6 +10849,13 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.phases.common.priorityinline.test.PriorityInliningMutationTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.phases.common.priorityinline.test.PriorityInliningMutationTest",
++)
++
++mx_test_class(
 +    name = "jdk.graal.compiler.test.jdk.graal.compiler.phases.common.priorityinline.test.PriorityInliningNoReturnValueTest",
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
@@ -10450,10 +10877,31 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.phases.common.priorityinline.test.PriorityInliningReceiverCheckTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.phases.common.priorityinline.test.PriorityInliningReceiverCheckTest",
++)
++
++mx_test_class(
 +    name = "jdk.graal.compiler.test.jdk.graal.compiler.phases.common.priorityinline.test.PriorityInliningRecursiveTest",
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
 +    test_class = "jdk.graal.compiler.phases.common.priorityinline.test.PriorityInliningRecursiveTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.phases.common.test.MovableWriteStateTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.phases.common.test.MovableWriteStateTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.phases.common.test.PropagateDeoptimizeProbabilityTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.phases.common.test.PropagateDeoptimizeProbabilityTest",
 +)
 +
 +mx_test_class(
@@ -10499,6 +10947,13 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.phases.common.test.WritesOrderingReverseIteratorContractTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.phases.common.test.WritesOrderingReverseIteratorContractTest",
++)
++
++mx_test_class(
 +    name = "jdk.graal.compiler.test.jdk.graal.compiler.phases.schedule.test.PartialRedundancyTest",
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
@@ -10524,6 +10979,13 @@ new file mode 100644
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
 +    test_class = "jdk.graal.compiler.replacements.test.ArrayStoreBytecodeExceptionTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.replacements.test.ArraysCopyOfRawClassTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.replacements.test.ArraysCopyOfRawClassTest",
 +)
 +
 +mx_test_class(
@@ -10590,6 +11052,13 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.replacements.test.DeferredInvocationPluginsTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.replacements.test.DeferredInvocationPluginsTest",
++)
++
++mx_test_class(
 +    name = "jdk.graal.compiler.test.jdk.graal.compiler.replacements.test.DeoptimizeOnExceptionTest",
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
@@ -10636,6 +11105,13 @@ new file mode 100644
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
 +    test_class = "jdk.graal.compiler.replacements.test.EncodeArrayTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.replacements.test.ExplodeLoopNodeTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.replacements.test.ExplodeLoopNodeTest",
 +)
 +
 +mx_test_class(
@@ -10744,6 +11220,13 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.replacements.test.MathPowHalfTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.replacements.test.MathPowHalfTest",
++)
++
++mx_test_class(
 +    name = "jdk.graal.compiler.test.jdk.graal.compiler.replacements.test.MathRoundTest",
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
@@ -10821,6 +11304,13 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.replacements.test.NonNullParameterPluginTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.replacements.test.NonNullParameterPluginTest",
++)
++
++mx_test_class(
 +    name = "jdk.graal.compiler.test.jdk.graal.compiler.replacements.test.NullBytecodeExceptionTest",
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
@@ -10867,6 +11357,13 @@ new file mode 100644
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
 +    test_class = "jdk.graal.compiler.replacements.test.SnippetCountersTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.replacements.test.SnippetParsingContextTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.replacements.test.SnippetParsingContextTest",
 +)
 +
 +mx_test_class(
@@ -11199,6 +11696,20 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.truffle.test.BytecodeDSLUnwindPartialEvaluationTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.truffle.test.BytecodeDSLUnwindPartialEvaluationTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.truffle.test.BytecodeIndexStorageCompilationTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.truffle.test.BytecodeIndexStorageCompilationTest",
++)
++
++mx_test_class(
 +    name = "jdk.graal.compiler.test.jdk.graal.compiler.truffle.test.BytecodeInterpreterPartialEvaluationTest",
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
@@ -11444,6 +11955,13 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.truffle.test.FFMDowncallPartialEvaluationTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.truffle.test.FFMDowncallPartialEvaluationTest",
++)
++
++mx_test_class(
 +    name = "jdk.graal.compiler.test.jdk.graal.compiler.truffle.test.FinalBitSetCompilationTest",
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
@@ -11532,6 +12050,13 @@ new file mode 100644
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
 +    test_class = "jdk.graal.compiler.truffle.test.GenerateInlineCompilationTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.truffle.test.GenericFunctionProxyCompilationTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.truffle.test.GenericFunctionProxyCompilationTest",
 +)
 +
 +mx_test_class(
@@ -11717,6 +12242,13 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.truffle.test.NativeVirtualThreadTruffleTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.truffle.test.NativeVirtualThreadTruffleTest",
++)
++
++mx_test_class(
 +    name = "jdk.graal.compiler.test.jdk.graal.compiler.truffle.test.NeverInlineFailedTest",
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
@@ -11857,6 +12389,13 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.truffle.test.RootNodeCallCompilationTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.truffle.test.RootNodeCallCompilationTest",
++)
++
++mx_test_class(
 +    name = "jdk.graal.compiler.test.jdk.graal.compiler.truffle.test.RootNodeCompilationTest",
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
@@ -11920,10 +12459,24 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.truffle.test.StaticObjectAllocationTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.truffle.test.StaticObjectAllocationTest",
++)
++
++mx_test_class(
 +    name = "jdk.graal.compiler.test.jdk.graal.compiler.truffle.test.StaticObjectCompilationTest",
 +    launcher = ":compiler_junit",
 +    tags = ["manual"],
 +    test_class = "jdk.graal.compiler.truffle.test.StaticObjectCompilationTest",
++)
++
++mx_test_class(
++    name = "jdk.graal.compiler.test.jdk.graal.compiler.truffle.test.StaticObjectEscapeTest",
++    launcher = ":compiler_junit",
++    tags = ["manual"],
++    test_class = "jdk.graal.compiler.truffle.test.StaticObjectEscapeTest",
 +)
 +
 +mx_test_class(
@@ -13104,10 +13657,10 @@ new file mode 100644
 +    graal_services = True,
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
-+        "Implementation-Version": "25.5.5-dev",
++        "Implementation-Version": "25.6.0-dev",
 +        "Name": "compiler",
 +        "Specification-Vendor": "Oracle Corporation",
-+        "Specification-Version": "25.5.5-dev",
++        "Specification-Version": "25.6.0-dev",
 +    },
 +    module_exports = [
 +        "java.base/jdk.internal.misc",
@@ -13227,10 +13780,10 @@ new file mode 100644
 +    graal_services = True,
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
-+        "Implementation-Version": "25.5.5-dev",
++        "Implementation-Version": "25.6.0-dev",
 +        "Name": "compiler-management",
 +        "Specification-Vendor": "Oracle Corporation",
-+        "Specification-Version": "25.5.5-dev",
++        "Specification-Version": "25.6.0-dev",
 +    },
 +    module_name = "jdk.graal.compiler.management",
 +    release = 21,
@@ -13251,10 +13804,10 @@ new file mode 100644
 +    graal_services = True,
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
-+        "Implementation-Version": "25.5.5-dev",
++        "Implementation-Version": "25.6.0-dev",
 +        "Name": "options",
 +        "Specification-Vendor": "Oracle Corporation",
-+        "Specification-Version": "25.5.5-dev",
++        "Specification-Version": "25.6.0-dev",
 +    },
 +    module_name = "jdk.graal.compiler.options",
 +    release = 21,
@@ -13367,10 +13920,10 @@ new file mode 100644
 +    graal_services = True,
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
-+        "Implementation-Version": "25.5.5-dev",
++        "Implementation-Version": "25.6.0-dev",
 +        "Name": "hostvmaccess",
 +        "Specification-Vendor": "Oracle Corporation",
-+        "Specification-Version": "25.5.5-dev",
++        "Specification-Version": "25.6.0-dev",
 +    },
 +    module_exports = [
 +        "java.base/jdk.internal.access",
@@ -13468,10 +14021,10 @@ new file mode 100644
 +    graal_services = True,
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
-+        "Implementation-Version": "25.5.5-dev",
++        "Implementation-Version": "25.6.0-dev",
 +        "Name": "vmaccess",
 +        "Specification-Vendor": "Oracle Corporation",
-+        "Specification-Version": "25.5.5-dev",
++        "Specification-Version": "25.6.0-dev",
 +    },
 +    module_exports = [
 +        "java.base/jdk.internal.module",
@@ -13835,7 +14388,7 @@ new file mode 100644
 +        "CompilationRequestIdentifier.java",
 +        "CompilerProfiler.java",
 +        "CompressEncoding.java",
-+        "ContextClassLoaderScope.java",
++        "EnterpriseCompatibility.java",
 +        "FieldIntrospection.java",
 +        "Fields.java",
 +        "FieldsScanner.java",
@@ -14221,7 +14774,7 @@ diff --git a/compiler/src/jdk.graal.compiler/src/jdk/graal/compiler/duplication/
 new file mode 100644
 --- /dev/null
 +++ b/compiler/src/jdk.graal.compiler/src/jdk/graal/compiler/duplication/phases/simulation/BUILD.bazel
-@@ -0,0 +1,21 @@
+@@ -0,0 +1,22 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -14240,6 +14793,7 @@ new file mode 100644
 +        "SimulationCFGTraversal.java",
 +        "SimulationConfig.java",
 +        "SimulationEndInfo.java",
++        "TailCallDuplicationPhase.java",
 +    ],
 +    visibility = ["//compiler:__pkg__"],
 +)
@@ -14247,7 +14801,7 @@ diff --git a/compiler/src/jdk.graal.compiler/src/jdk/graal/compiler/duplication/
 new file mode 100644
 --- /dev/null
 +++ b/compiler/src/jdk.graal.compiler/src/jdk/graal/compiler/duplication/phases/simulation/opportunity/BUILD.bazel
-@@ -0,0 +1,14 @@
+@@ -0,0 +1,13 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -14258,7 +14812,6 @@ new file mode 100644
 +        "LockCoarseningOpportunity.java",
 +        "PEAOpportunity.java",
 +        "ReadEliminationOpportunity.java",
-+        "TailCallOpportunity.java",
 +    ],
 +    visibility = ["//compiler:__pkg__"],
 +)
@@ -14285,12 +14838,13 @@ diff --git a/compiler/src/jdk.graal.compiler/src/jdk/graal/compiler/graph/BUILD.
 new file mode 100644
 --- /dev/null
 +++ b/compiler/src/jdk.graal.compiler/src/jdk/graal/compiler/graph/BUILD.bazel
-@@ -0,0 +1,38 @@
+@@ -0,0 +1,39 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
 +    name = "jdk.graal.compiler.srcs",
 +    srcs = [
++        "Cancellable.java",
 +        "Edges.java",
 +        "GraalGraphError.java",
 +        "Graph.java",
@@ -15637,7 +16191,7 @@ diff --git a/compiler/src/jdk.graal.compiler/src/jdk/graal/compiler/lir/dfa/BUIL
 new file mode 100644
 --- /dev/null
 +++ b/compiler/src/jdk.graal.compiler/src/jdk/graal/compiler/lir/dfa/BUILD.bazel
-@@ -0,0 +1,13 @@
+@@ -0,0 +1,12 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -15647,7 +16201,6 @@ new file mode 100644
 +        "LocationMarkerPhase.java",
 +        "MarkBasePointersPhase.java",
 +        "RegStackValueSet.java",
-+        "UniqueWorkList.java",
 +    ],
 +    visibility = ["//compiler:__pkg__"],
 +)
@@ -15775,13 +16328,14 @@ diff --git a/compiler/src/jdk.graal.compiler/src/jdk/graal/compiler/lir/stackslo
 new file mode 100644
 --- /dev/null
 +++ b/compiler/src/jdk.graal.compiler/src/jdk/graal/compiler/lir/stackslotalloc/BUILD.bazel
-@@ -0,0 +1,14 @@
+@@ -0,0 +1,15 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
 +    name = "jdk.graal.compiler.srcs",
 +    srcs = [
 +        "FixPointIntervalBuilder.java",
++        "GraphColoringStackSlotAllocator.java",
 +        "LSStackSlotAllocator.java",
 +        "SimpleStackSlotAllocator.java",
 +        "StackInterval.java",
@@ -15794,12 +16348,13 @@ diff --git a/compiler/src/jdk.graal.compiler/src/jdk/graal/compiler/lir/util/BUI
 new file mode 100644
 --- /dev/null
 +++ b/compiler/src/jdk.graal.compiler/src/jdk/graal/compiler/lir/util/BUILD.bazel
-@@ -0,0 +1,13 @@
+@@ -0,0 +1,14 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
 +    name = "jdk.graal.compiler.srcs",
 +    srcs = [
++        "BlockWorkList.java",
 +        "GenericValueMap.java",
 +        "IndexedValueMap.java",
 +        "RegisterMap.java",
@@ -15812,7 +16367,7 @@ diff --git a/compiler/src/jdk.graal.compiler/src/jdk/graal/compiler/loop/phases/
 new file mode 100644
 --- /dev/null
 +++ b/compiler/src/jdk.graal.compiler/src/jdk/graal/compiler/loop/phases/BUILD.bazel
-@@ -0,0 +1,30 @@
+@@ -0,0 +1,31 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -15826,6 +16381,7 @@ new file mode 100644
 +        "InjectLoopCounterStampsPhase.java",
 +        "LoopFullUnrollPhase.java",
 +        "LoopInversionPhase.java",
++        "LoopPartialUnrollPhase.java",
 +        "LoopPeelingPhase.java",
 +        "LoopPhase.java",
 +        "LoopPredicationPhase.java",
@@ -15885,7 +16441,6 @@ new file mode 100644
 +        "BinaryOpLogicNode.java",
 +        "BreakpointNode.java",
 +        "CallTargetNode.java",
-+        "Cancellable.java",
 +        "CanonicalizableLocation.java",
 +        "ChainedPhiAdapterNode.java",
 +        "ChainedPhiValueSplitNode.java",
@@ -15986,6 +16541,7 @@ new file mode 100644
 +        "UnreachableBeginNode.java",
 +        "UnreachableControlSinkNode.java",
 +        "UnreachableNode.java",
++        "UnreachablePathNode.java",
 +        "UnwindNode.java",
 +        "ValueNode.java",
 +        "ValueNodeInterface.java",
@@ -16000,7 +16556,7 @@ diff --git a/compiler/src/jdk.graal.compiler/src/jdk/graal/compiler/nodes/calc/B
 new file mode 100644
 --- /dev/null
 +++ b/compiler/src/jdk.graal.compiler/src/jdk/graal/compiler/nodes/calc/BUILD.bazel
-@@ -0,0 +1,84 @@
+@@ -0,0 +1,85 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -16010,6 +16566,7 @@ new file mode 100644
 +        "AbstractNormalizeCompareNode.java",
 +        "AddNode.java",
 +        "AndNode.java",
++        "ArbitraryValueNode.java",
 +        "BinaryArithmeticNode.java",
 +        "BinaryNode.java",
 +        "CompareNode.java",
@@ -16433,7 +16990,7 @@ diff --git a/compiler/src/jdk.graal.compiler/src/jdk/graal/compiler/nodes/spi/BU
 new file mode 100644
 --- /dev/null
 +++ b/compiler/src/jdk.graal.compiler/src/jdk/graal/compiler/nodes/spi/BUILD.bazel
-@@ -0,0 +1,43 @@
+@@ -0,0 +1,44 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -16445,6 +17002,7 @@ new file mode 100644
 +        "CanonicalizerTool.java",
 +        "CoreProviders.java",
 +        "CoreProvidersDelegate.java",
++        "DelegatingNodeLIRBuilderTool.java",
 +        "DelegatingReplacements.java",
 +        "LIRLowerable.java",
 +        "LimitedValueProxy.java",
@@ -17057,7 +17615,7 @@ diff --git a/compiler/src/jdk.graal.compiler/src/jdk/graal/compiler/replacements
 new file mode 100644
 --- /dev/null
 +++ b/compiler/src/jdk.graal.compiler/src/jdk/graal/compiler/replacements/BUILD.bazel
-@@ -0,0 +1,46 @@
+@@ -0,0 +1,47 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -17066,6 +17624,7 @@ new file mode 100644
 +        "AllocationSnippets.java",
 +        "BigIntegerSnippets.java",
 +        "BoxingSnippets.java",
++        "CallSiteTargetPlugin.java",
 +        "ConstantBindingParameterPlugin.java",
 +        "DefaultJavaLoweringProvider.java",
 +        "DimensionsNode.java",
@@ -17192,7 +17751,7 @@ diff --git a/compiler/src/jdk.graal.compiler/src/jdk/graal/compiler/replacements
 new file mode 100644
 --- /dev/null
 +++ b/compiler/src/jdk.graal.compiler/src/jdk/graal/compiler/replacements/nodes/BUILD.bazel
-@@ -0,0 +1,106 @@
+@@ -0,0 +1,103 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -17238,7 +17797,6 @@ new file mode 100644
 +        "CRC32UpdateBytesNode.java",
 +        "CStringConstant.java",
 +        "CalcStringAttributesForeignCalls.java",
-+        "CalcStringAttributesMacroNode.java",
 +        "CalcStringAttributesNode.java",
 +        "ChaCha20Node.java",
 +        "CipherBlockChainingAESNode.java",
@@ -17260,7 +17818,6 @@ new file mode 100644
 +        "HalfFloatToFloatNode.java",
 +        "IdentityHashCodeNode.java",
 +        "IndexOfZeroForeignCalls.java",
-+        "IndexOfZeroMacroNode.java",
 +        "IndexOfZeroNode.java",
 +        "IntegerPolynomialAssignNode.java",
 +        "IntegerPolynomialP256MontgomeryMultNode.java",
@@ -17286,7 +17843,6 @@ new file mode 100644
 +        "ReverseBitsNode.java",
 +        "ReverseBytesNode.java",
 +        "StringCodepointIndexToByteIndexForeignCalls.java",
-+        "StringCodepointIndexToByteIndexMacroNode.java",
 +        "StringCodepointIndexToByteIndexNode.java",
 +        "ThreadedSwitchNode.java",
 +        "UnaryMathIntrinsicGenerationNode.java",
@@ -18671,7 +19227,7 @@ diff --git a/compiler/src/jdk.graal.compiler.test/src/jdk/graal/compiler/api/dir
 new file mode 100644
 --- /dev/null
 +++ b/compiler/src/jdk.graal.compiler.test/src/jdk/graal/compiler/api/directives/test/BUILD.bazel
-@@ -0,0 +1,18 @@
+@@ -0,0 +1,19 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -18687,6 +19243,7 @@ new file mode 100644
 +        "ProbabilityDirectiveShortCircuitTest.java",
 +        "ProbabilityDirectiveTest.java",
 +        "SwitchCaseProbabilityDirectiveTest.java",
++        "UnconstrainedValueDirectiveTest.java",
 +    ],
 +    visibility = ["//compiler:__pkg__"],
 +)
@@ -18710,7 +19267,7 @@ diff --git a/compiler/src/jdk.graal.compiler.test/src/jdk/graal/compiler/asm/aar
 new file mode 100644
 --- /dev/null
 +++ b/compiler/src/jdk.graal.compiler.test/src/jdk/graal/compiler/asm/aarch64/test/BUILD.bazel
-@@ -0,0 +1,13 @@
+@@ -0,0 +1,14 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -18718,6 +19275,7 @@ new file mode 100644
 +    srcs = [
 +        "AArch64AddressingModeTest.java",
 +        "AArch64InstructionEncodingTest.java",
++        "AArch64LabelRangeTest.java",
 +        "AArch64LoadStoreMergingAssemblerTest.java",
 +        "AArch64MoveConstantTest.java",
 +        "TestProtectedAssembler.java",
@@ -18744,7 +19302,7 @@ diff --git a/compiler/src/jdk.graal.compiler.test/src/jdk/graal/compiler/core/aa
 new file mode 100644
 --- /dev/null
 +++ b/compiler/src/jdk.graal.compiler.test/src/jdk/graal/compiler/core/aarch64/test/BUILD.bazel
-@@ -0,0 +1,32 @@
+@@ -0,0 +1,34 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -18757,6 +19315,7 @@ new file mode 100644
 +        "AArch64CbzTest.java",
 +        "AArch64ConditionalSetTest.java",
 +        "AArch64ElideL2ITest.java",
++        "AArch64LargeTableSwitchTest.java",
 +        "AArch64LogicShiftTest.java",
 +        "AArch64MNegTest.java",
 +        "AArch64MatchRuleTest.java",
@@ -18769,6 +19328,7 @@ new file mode 100644
 +        "AArch64NegateShiftTest.java",
 +        "AArch64PairLoadStoreTest.java",
 +        "AArch64RotationTest.java",
++        "AArch64SnippetStateTest.java",
 +        "AArch64TestBitAndBranchTest.java",
 +        "AArch64TestMacroAssembler.java",
 +        "AArch64UseKillLIRTest.java",
@@ -18781,7 +19341,7 @@ diff --git a/compiler/src/jdk.graal.compiler.test/src/jdk/graal/compiler/core/am
 new file mode 100644
 --- /dev/null
 +++ b/compiler/src/jdk.graal.compiler.test/src/jdk/graal/compiler/core/amd64/test/BUILD.bazel
-@@ -0,0 +1,19 @@
+@@ -0,0 +1,22 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -18789,11 +19349,14 @@ new file mode 100644
 +    srcs = [
 +        "AMD64AddressLoweringTest.java",
 +        "AMD64AllocatorTest.java",
++        "AMD64ArrayIndexOffsetTest.java",
 +        "AMD64ByteMemoryTest.java",
 +        "AMD64FPDivRemOpTest.java",
 +        "AMD64Float16ConversionCompilationTest.java",
 +        "AMD64IntMemoryTest.java",
 +        "AMD64MatchRuleTest.java",
++        "AMD64NarrowTest.java",
++        "AMD64UnsignedByteLoadTest.java",
 +        "AMD64VolatileWriteMembarEliminationTest.java",
 +        "AMD64WordMemoryTest.java",
 +        "ConstantStackMoveTest.java",
@@ -18817,7 +19380,7 @@ diff --git a/compiler/src/jdk.graal.compiler.test/src/jdk/graal/compiler/core/te
 new file mode 100644
 --- /dev/null
 +++ b/compiler/src/jdk.graal.compiler.test/src/jdk/graal/compiler/core/test/BUILD.bazel
-@@ -0,0 +1,290 @@
+@@ -0,0 +1,322 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -18826,6 +19389,8 @@ new file mode 100644
 +        "AbsCanonicalizationTest.java",
 +        "AdvancedLockEliminationTest.java",
 +        "AllocSpy.java",
++        "AllocationEmissionOrderTest.java",
++        "ArrayCompareToIdentityTest.java",
 +        "ArrayCopyVirtualizationTest.java",
 +        "ArrayLengthProviderTest.java",
 +        "BasePhaseBinaryGraphTest.java",
@@ -18835,6 +19400,8 @@ new file mode 100644
 +        "ByteBufferTest.java",
 +        "BytecodeDisassemblerTest.java",
 +        "BytecodeHandlerDispatchAddressTest.java",
++        "BytecodeHandlerExpandedTypeTest.java",
++        "BytecodeHandlerFieldValidityTest.java",
 +        "CacheResetTest.java",
 +        "CanonicalizedConversionTest.java",
 +        "ChainedPhiTest.java",
@@ -18845,6 +19412,7 @@ new file mode 100644
 +        "CompareCanonicalizerTest.java",
 +        "CompareCanonicalizerTest2.java",
 +        "CompareCanonicalizerTest3.java",
++        "CompilationCancellationTest.java",
 +        "CompilationPrinterTest.java",
 +        "CompilationResultTest.java",
 +        "CompilationWatchDogTest.java",
@@ -18879,6 +19447,8 @@ new file mode 100644
 +        "ConditionalEliminationTestBase.java",
 +        "ConditionalNodeTest.java",
 +        "ConstantArrayReadFoldingTest.java",
++        "ConstantReflectionUtilTest.java",
++        "ConstantTripCountQueryTest.java",
 +        "ConvertDeoptimizeToGuardPrioritiesTest.java",
 +        "CopyOfVirtualizationTest.java",
 +        "CountedLoopMaxTripCountPiTest.java",
@@ -18886,6 +19456,9 @@ new file mode 100644
 +        "CountedLoopTest.java",
 +        "CountedLoopTest2.java",
 +        "CustomizedBytecodePattern.java",
++        "DataSectionAlignmentTest.java",
++        "DataSectionRoundUpTest.java",
++        "DataSectionTest.java",
 +        "DeMorganCanonicalizationTest.java",
 +        "DeepUnrollingTest.java",
 +        "DegeneratedLoopsTest.java",
@@ -18895,16 +19468,19 @@ new file mode 100644
 +        "DynamicConstantTest.java",
 +        "EarlyExpandCheckCastTest.java",
 +        "EarlyGVNTest.java",
++        "EffectListIteratorContractTest.java",
 +        "EnumSwitchTest.java",
 +        "EnumValuesTest.java",
 +        "ExceptionHandlerReachabilityTest.java",
 +        "FinalizableSubclassTest.java",
 +        "FindUniqueConcreteMethodBugTest.java",
 +        "FindUniqueDefaultMethodTest.java",
++        "FixReadsAddressOffsetTest.java",
 +        "FixedGuardSimplificationTest.java",
 +        "FloatOptimizationTest.java",
 +        "FloatingDivTest.java",
 +        "FloatingReadTest.java",
++        "FrameStateBuilderTest.java",
 +        "FuzzTest36456.java",
 +        "FuzzTest36457.java",
 +        "GraalCompilerAssumptionsTest.java",
@@ -18916,19 +19492,25 @@ new file mode 100644
 +        "GraphResetDebugTest.java",
 +        "GraphScheduleTest.java",
 +        "GraphUtilOriginalValueTests.java",
++        "GraphUtilPredecessorIteratorContractTest.java",
 +        "GuardPrioritiesTest.java",
 +        "GuardRangeGroupingTest.java",
++        "GuardingNonNullTest.java",
++        "HIRBlockNodeIteratorContractTest.java",
 +        "HashCodeTest.java",
 +        "HighTierPhaseOrderTest.java",
++        "HypotheticalOperandsCanonicalizationTest.java",
 +        "IfCanonicalizerSwapTest.java",
 +        "IfCanonicalizerTest.java",
 +        "IfReorderTest.java",
 +        "ImplicitNullCheckTest.java",
 +        "InfopointReasonTest.java",
 +        "InitMemoryVerificationTest.java",
++        "InitialIntrinsicFrameStateTest.java",
 +        "InstalledCodeInvalidationTest.java",
 +        "InstanceOfCanonicalizationTest.java",
 +        "IntegerBoxEqualsTest.java",
++        "IntegerBoxingCacheTest.java",
 +        "IntegerDivPowerOf2Test.java",
 +        "IntegerDivRemCanonicalizationTest.java",
 +        "IntegerDivRemConstantTest.java",
@@ -18942,10 +19524,12 @@ new file mode 100644
 +        "IntegerSwitchTest.java",
 +        "IntegerTestCanonicalizationTest.java",
 +        "InterfaceMethodHandleTest.java",
++        "IntrinsicArgumentsTest.java",
 +        "InvocationPluginsTest.java",
 +        "InvokeExceptionTest.java",
 +        "InvokeHintsTest.java",
 +        "IsArrayTest.java",
++        "JTTPhasePlanFuzzingTest.java",
 +        "LoadFieldPiCanonicalizationTest.java",
 +        "LoadIndexedSimplificationTest.java",
 +        "LockEliminationTest.java",
@@ -18955,6 +19539,8 @@ new file mode 100644
 +        "LoopPredicationOffsetSignTest.java",
 +        "LoopPredicationScaleOverflowTest.java",
 +        "LoopSafepointStateVerificationTest.java",
++        "LoopUnswitchBudgetTest.java",
++        "LoopUnswitchFactorTest.java",
 +        "LoopUnswitchTest.java",
 +        "LowTierPhaseOrderTest.java",
 +        "MarkUnsafeAccessTest.java",
@@ -18979,12 +19565,15 @@ new file mode 100644
 +        "NewInstanceTest.java",
 +        "NodeCopyWithInputsTest.java",
 +        "NodeMapGraphTest.java",
++        "NodeMapIteratorContractTest.java",
 +        "NodePosIteratorTest.java",
 +        "NodePropertiesTest.java",
++        "NodeSourcePositionIteratorContractTest.java",
 +        "NodesInLoopBranchTest.java",
 +        "ObjectSubstitutionsTest.java",
 +        "OffHeapUnsafeAccessTest.java",
 +        "OnStackReplacementTest.java",
++        "OptimizeDivAfterFrameStateAssignmentTest.java",
 +        "OptimizeDivDoubleTest.java",
 +        "OptimizeDivFloatTest.java",
 +        "OptimizeDivIntTest.java",
@@ -19017,6 +19606,7 @@ new file mode 100644
 +        "ScheduledNodeIteratorBeginTest.java",
 +        "SchedulingTest.java",
 +        "SchedulingTest2.java",
++        "ShiftDistanceAnalysisTest.java",
 +        "ShortCircuitNodeTest.java",
 +        "SimpleCFGTest.java",
 +        "SingleImplementorInterfaceTest.java",
@@ -19034,6 +19624,7 @@ new file mode 100644
 +        "StampMemoryAccessTest.java",
 +        "StaticInterfaceFieldTest.java",
 +        "StraighteningTest.java",
++        "StructuredGraphInvokesIteratorContractTest.java",
 +        "SubWordArrayStoreTest.java",
 +        "SubWordFieldStoreTest.java",
 +        "SubWordInputTest.java",
@@ -19057,6 +19648,7 @@ new file mode 100644
 +        "UnbalancedLockingTest.java",
 +        "UnbalancedMonitorsTest.java",
 +        "UncheckedInterfaceProviderTest.java",
++        "UnreachablePathNodeTest.java",
 +        "UnsafeCompareAndSwapTest.java",
 +        "UnsafeCopyMemoryTest.java",
 +        "UnsafeGetStableArrayElement.java",
@@ -19065,6 +19657,7 @@ new file mode 100644
 +        "UnschedulableGraphTest.java",
 +        "UnsignedLongTest.java",
 +        "UnusedArray.java",
++        "UnusedVolatileReadTest.java",
 +        "VectorAPISmokeTest.java",
 +        "VerifyAArch64RegisterUsages.java",
 +        "VerifyArchUsageInPlugins.java",
@@ -19091,6 +19684,8 @@ new file mode 100644
 +        "VerifyPluginFrameState.java",
 +        "VerifyProfileMethodUsage.java",
 +        "VerifySharedConstantEmptyArray.java",
++        "VerifyShiftAmounts.java",
++        "VerifyShiftAmountsTest.java",
 +        "VerifySnippetProbabilities.java",
 +        "VerifyStatelessPhases.java",
 +        "VerifyStringCaseUsage.java",
@@ -19189,7 +19784,7 @@ diff --git a/compiler/src/jdk.graal.compiler.test/src/jdk/graal/compiler/core/te
 new file mode 100644
 --- /dev/null
 +++ b/compiler/src/jdk.graal.compiler.test/src/jdk/graal/compiler/core/test/inlining/BUILD.bazel
-@@ -0,0 +1,13 @@
+@@ -0,0 +1,14 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -19197,6 +19792,7 @@ new file mode 100644
 +    srcs = [
 +        "ImpreciseArgumentStampInliningTest.java",
 +        "InliningExceptionEdgeTest.java",
++        "InliningMutationTest.java",
 +        "InliningTest.java",
 +        "NestedLoopEffectsPhaseComplexityTest.java",
 +        "NestedLoopEffectsPhaseComplexityTest2.java",
@@ -19236,7 +19832,7 @@ diff --git a/compiler/src/jdk.graal.compiler.test/src/jdk/graal/compiler/debug/t
 new file mode 100644
 --- /dev/null
 +++ b/compiler/src/jdk.graal.compiler.test/src/jdk/graal/compiler/debug/test/BUILD.bazel
-@@ -0,0 +1,25 @@
+@@ -0,0 +1,26 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -19249,6 +19845,7 @@ new file mode 100644
 +        "GraalErrorTest.java",
 +        "LogStreamTest.java",
 +        "MethodFilterTest.java",
++        "ScopeContextIteratorContractTest.java",
 +        "StandardPathUtilitiesProviderTest.java",
 +        "TTYTest.java",
 +        "TimerKeyTest.java",
@@ -19312,18 +19909,23 @@ diff --git a/compiler/src/jdk.graal.compiler.test/src/jdk/graal/compiler/graph/t
 new file mode 100644
 --- /dev/null
 +++ b/compiler/src/jdk.graal.compiler.test/src/jdk/graal/compiler/graph/test/BUILD.bazel
-@@ -0,0 +1,22 @@
+@@ -0,0 +1,27 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
 +    name = "jdk.graal.compiler.test.srcs",
 +    srcs = [
++        "EdgesIteratorContractTest.java",
 +        "GraphMarkTest.java",
 +        "GraphNodeEventListenerTest.java",
++        "GraphNodeIteratorContractTest.java",
 +        "GraphTest.java",
++        "NodeBitMapCountContractTest.java",
++        "NodeBitMapInvertIteratorContractTest.java",
 +        "NodeBitMapTest.java",
 +        "NodeFormatToTest.java",
 +        "NodeInputListTest.java",
++        "NodeListIteratorContractTest.java",
 +        "NodeMapTest.java",
 +        "NodeUnionFindTest.java",
 +        "NodeUsageIterableTest.java",
@@ -19491,7 +20093,7 @@ diff --git a/compiler/src/jdk.graal.compiler.test/src/jdk/graal/compiler/hotspot
 new file mode 100644
 --- /dev/null
 +++ b/compiler/src/jdk.graal.compiler.test/src/jdk/graal/compiler/hotspot/test/BUILD.bazel
-@@ -0,0 +1,117 @@
+@@ -0,0 +1,120 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -19551,6 +20153,7 @@ new file mode 100644
 +        "HotSpotResolvedObjectTypeTest.java",
 +        "HotSpotStackIntrospectionTest.java",
 +        "HotSpotStampMemoryAccessTest.java",
++        "HotSpotStampTest.java",
 +        "HotSpotStubsTest.java",
 +        "HotSpotUnsafeSubstitutionTest.java",
 +        "HsErrLogTest.java",
@@ -19589,6 +20192,7 @@ new file mode 100644
 +        "SecondarySupersLookupTest.java",
 +        "SharedExceptionHandlerLoopTest.java",
 +        "ShenandoahOopHandleBarrierTest.java",
++        "SpeculativeDeoptimizeDirectiveTest.java",
 +        "StackSlotLimitTest.java",
 +        "StringInternConstantTest.java",
 +        "StringUTF16ToBytesGetCharsTest.java",
@@ -19603,6 +20207,7 @@ new file mode 100644
 +        "UnsafeSubstitutionsWithoutLSETest.java",
 +        "UnsafeWritebackMemoryTest.java",
 +        "VectorizedHashCodeTest.java",
++        "VerifyLockDepthPhaseTest.java",
 +        "VirtualThreadCarrierThreadTest.java",
 +        "VirtualThreadJFRTest.java",
 +        "WriteBarrierAdditionTest.java",
@@ -20568,7 +21173,7 @@ diff --git a/compiler/src/jdk.graal.compiler.test/src/jdk/graal/compiler/lir/jtt
 new file mode 100644
 --- /dev/null
 +++ b/compiler/src/jdk.graal.compiler.test/src/jdk/graal/compiler/lir/jtt/BUILD.bazel
-@@ -0,0 +1,15 @@
+@@ -0,0 +1,16 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -20576,6 +21181,7 @@ new file mode 100644
 +    srcs = [
 +        "ConstantStackCastTest.java",
 +        "ForceSpillSplitAtSlowPathTest.java",
++        "GraphColoringStackSlotAllocatorTest.java",
 +        "LIRTest.java",
 +        "LIRTestSpecification.java",
 +        "LIRTestTest.java",
@@ -20588,14 +21194,17 @@ diff --git a/compiler/src/jdk.graal.compiler.test/src/jdk/graal/compiler/lir/tes
 new file mode 100644
 --- /dev/null
 +++ b/compiler/src/jdk.graal.compiler.test/src/jdk/graal/compiler/lir/test/BUILD.bazel
-@@ -0,0 +1,10 @@
+@@ -0,0 +1,13 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
 +    name = "jdk.graal.compiler.test.srcs",
 +    srcs = [
++        "CallClobberReloadTest.java",
++        "CallClobberSpillTest.java",
 +        "CompositeValueReplacementTest1.java",
 +        "GenericValueMapTest.java",
++        "SwitchStrategyTest.java",
 +    ],
 +    visibility = ["//compiler:__pkg__"],
 +)
@@ -20603,7 +21212,7 @@ diff --git a/compiler/src/jdk.graal.compiler.test/src/jdk/graal/compiler/loop/te
 new file mode 100644
 --- /dev/null
 +++ b/compiler/src/jdk.graal.compiler.test/src/jdk/graal/compiler/loop/test/BUILD.bazel
-@@ -0,0 +1,33 @@
+@@ -0,0 +1,39 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -20615,11 +21224,16 @@ new file mode 100644
 +        "AggressivePartialUnrollRegression2Test.java",
 +        "AggressivePartialUnrollRegressionTest.java",
 +        "AggressivePartialUnrollTest.java",
++        "CountedLoopEntryTest.java",
++        "CountedStripMiningBudgetTest.java",
 +        "CountedStripMiningRegressionTest.java",
++        "DerivedOffsetInductionVariableCopyTest.java",
 +        "IterativeLoopPeelingFrameStateTest.java",
++        "LateRemoveEmptyLoopsTest.java",
 +        "LoopFragmentTest.java",
 +        "LoopInversionRegressionTest.java",
 +        "LoopPeelingAllocationTest.java",
++        "LoopRootSafepointTest.java",
 +        "LoopSafepointEliminationTest.java",
 +        "LoopsDataTest.java",
 +        "NonCountedStripMiningTest.java",
@@ -20629,6 +21243,7 @@ new file mode 100644
 +        "RangeCheckEliminationRegressionTest.java",
 +        "RangeCheckEliminationTest.java",
 +        "RemoveEmptyLoopsFloatingGuardTest.java",
++        "RemoveEmptyLoopsOverflowTest.java",
 +        "SimpleLoopPartialUnrollTest.java",
 +        "SimulationBasedLoopPeelingRegressionTest.java",
 +        "SimulationBasedLoopPeelingSwitchTest.java",
@@ -20641,7 +21256,7 @@ diff --git a/compiler/src/jdk.graal.compiler.test/src/jdk/graal/compiler/nodes/t
 new file mode 100644
 --- /dev/null
 +++ b/compiler/src/jdk.graal.compiler.test/src/jdk/graal/compiler/nodes/test/BUILD.bazel
-@@ -0,0 +1,56 @@
+@@ -0,0 +1,58 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -20653,6 +21268,7 @@ new file mode 100644
 +        "CompareZeroExtendWithConstantTest.java",
 +        "ConstantArrayLengthTest.java",
 +        "ConstantNodeTest.java",
++        "CopySignNodeCanonicalizationTest.java",
 +        "ExceptionLivenessTest.java",
 +        "FloatStampTest.java",
 +        "FrameStateTest.java",
@@ -20695,6 +21311,7 @@ new file mode 100644
 +        "SubCanonicalizationTest.java",
 +        "TruncateCanonicalizationTest.java",
 +        "XorNodeCanonicalizationTest.java",
++        "ZeroExtendAnalysisTest.java",
 +    ],
 +    visibility = ["//compiler:__pkg__"],
 +)
@@ -20717,7 +21334,7 @@ diff --git a/compiler/src/jdk.graal.compiler.test/src/jdk/graal/compiler/phases/
 new file mode 100644
 --- /dev/null
 +++ b/compiler/src/jdk.graal.compiler.test/src/jdk/graal/compiler/phases/common/priorityinline/test/BUILD.bazel
-@@ -0,0 +1,24 @@
+@@ -0,0 +1,26 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -20728,9 +21345,11 @@ new file mode 100644
 +        "PriorityInliningBytecodeInterpreterTest.java",
 +        "PriorityInliningDefaultTest.java",
 +        "PriorityInliningMethodDispatchTest.java",
++        "PriorityInliningMutationTest.java",
 +        "PriorityInliningNoReturnValueTest.java",
 +        "PriorityInliningPolicyFactoryTest.java",
 +        "PriorityInliningPolymorphicTest.java",
++        "PriorityInliningReceiverCheckTest.java",
 +        "PriorityInliningRecursiveTest.java",
 +        "PriorityInliningTest.java",
 +    ],
@@ -20746,18 +21365,21 @@ diff --git a/compiler/src/jdk.graal.compiler.test/src/jdk/graal/compiler/phases/
 new file mode 100644
 --- /dev/null
 +++ b/compiler/src/jdk.graal.compiler.test/src/jdk/graal/compiler/phases/common/test/BUILD.bazel
-@@ -0,0 +1,14 @@
+@@ -0,0 +1,17 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
 +    name = "jdk.graal.compiler.test.srcs",
 +    srcs = [
++        "MovableWriteStateTest.java",
++        "PropagateDeoptimizeProbabilityTest.java",
 +        "StampFactoryTest.java",
 +        "WriteSinkingConsistencyTest.java",
 +        "WriteSinkingCoverageTest.java",
 +        "WriteSinkingGR42126IteratorTest.java",
 +        "WriteSinkingRegressionTest.java",
 +        "WriteSinkingWithSpeculationTest.java",
++        "WritesOrderingReverseIteratorContractTest.java",
 +    ],
 +    visibility = ["//compiler:__pkg__"],
 +)
@@ -20777,7 +21399,7 @@ diff --git a/compiler/src/jdk.graal.compiler.test/src/jdk/graal/compiler/replace
 new file mode 100644
 --- /dev/null
 +++ b/compiler/src/jdk.graal.compiler.test/src/jdk/graal/compiler/replacements/test/BUILD.bazel
-@@ -0,0 +1,96 @@
+@@ -0,0 +1,102 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -20786,6 +21408,7 @@ new file mode 100644
 +        "ArrayCopyExceptionSeenTest.java",
 +        "ArrayEqualsConstantLengthTest.java",
 +        "ArrayStoreBytecodeExceptionTest.java",
++        "ArraysCopyOfRawClassTest.java",
 +        "ArraysFillTest.java",
 +        "ArraysFillTestConfig.java",
 +        "ArraysSubstitutionsTest.java",
@@ -20798,6 +21421,7 @@ new file mode 100644
 +        "CompiledExceptionHandlerTest.java",
 +        "CompiledNullPointerExceptionTest.java",
 +        "CountPositivesTest.java",
++        "DeferredInvocationPluginsTest.java",
 +        "DeoptimizeOnExceptionTest.java",
 +        "DeoptimizeOnIntegerExactTest.java",
 +        "DeoptimizeOnVolatileReadTest.java",
@@ -20805,6 +21429,7 @@ new file mode 100644
 +        "DynamicNewArrayTest.java",
 +        "EdgesTest.java",
 +        "EncodeArrayTest.java",
++        "ExplodeLoopNodeTest.java",
 +        "FloatArraysEqualsTest.java",
 +        "HalfFloatTest.java",
 +        "HasNegativesTest.java",
@@ -20820,6 +21445,7 @@ new file mode 100644
 +        "InvokerSignatureMismatchTest.java",
 +        "MathCbrtTest.java",
 +        "MathMultiplyHighTest.java",
++        "MathPowHalfTest.java",
 +        "MathRoundTest.java",
 +        "MathTanhTest.java",
 +        "MethodHandleImplTest.java",
@@ -20832,6 +21458,7 @@ new file mode 100644
 +        "NewArrayTest.java",
 +        "NewInstanceTest.java",
 +        "NewMultiArrayTest.java",
++        "NonNullParameterPluginTest.java",
 +        "NullBytecodeExceptionTest.java",
 +        "ObjectAccessTest.java",
 +        "PEGraphDecoderTest.java",
@@ -20839,6 +21466,7 @@ new file mode 100644
 +        "PointerTrackingTest.java",
 +        "ReplacementsTest.java",
 +        "SnippetCountersTest.java",
++        "SnippetParsingContextTest.java",
 +        "SnippetsTest.java",
 +        "StandardMethodSubstitutionsTest.java",
 +        "StringCompareToAVX512Test.java",
@@ -20912,7 +21540,7 @@ diff --git a/compiler/src/jdk.graal.compiler.test/src/jdk/graal/compiler/truffle
 new file mode 100644
 --- /dev/null
 +++ b/compiler/src/jdk.graal.compiler.test/src/jdk/graal/compiler/truffle/test/BUILD.bazel
-@@ -0,0 +1,168 @@
+@@ -0,0 +1,176 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -20937,6 +21565,8 @@ new file mode 100644
 +        "BytecodeDSLContinuationCompilationTest.java",
 +        "BytecodeDSLOSRTest.java",
 +        "BytecodeDSLPartialEvaluationTest.java",
++        "BytecodeDSLUnwindPartialEvaluationTest.java",
++        "BytecodeIndexStorageCompilationTest.java",
 +        "BytecodeInterpreterPartialEvaluationTest.java",
 +        "BytecodeOSRNodeTest.java",
 +        "CachedLibraryCompilationTest.java",
@@ -20973,6 +21603,7 @@ new file mode 100644
 +        "ExecutionListenerCompilerTest.java",
 +        "ExitDuringCompilationTest.java",
 +        "ExplodeLoopBlockDuplicationTest.java",
++        "FFMDowncallPartialEvaluationTest.java",
 +        "FinalBitSetCompilationTest.java",
 +        "FlushEngineQueueTest.java",
 +        "FrameAccessVerificationTest.java",
@@ -20987,6 +21618,7 @@ new file mode 100644
 +        "GR78847Test.java",
 +        "GR79495Test.java",
 +        "GenerateInlineCompilationTest.java",
++        "GenericFunctionProxyCompilationTest.java",
 +        "GetRootNodeCompilationTest.java",
 +        "GraalTruffleRuntimeListenerTest.java",
 +        "HashCodeIntrinsicTest.java",
@@ -21013,6 +21645,7 @@ new file mode 100644
 +        "MergeExplodeProxyTest.java",
 +        "MultiTierAssumptionInvalidationTest.java",
 +        "MultiTierCompilationTest.java",
++        "NativeVirtualThreadTruffleTest.java",
 +        "NeverInlineFailedTest.java",
 +        "NodeDebugPropertiesTest.java",
 +        "NodeLibraryCompilerTest.java",
@@ -21034,6 +21667,7 @@ new file mode 100644
 +        "PropagateHotnessToLexicalSingleCallerTest.java",
 +        "ResourceLimitsCompilationTest.java",
 +        "RewriteDuringCompilationTest.java",
++        "RootNodeCallCompilationTest.java",
 +        "RootNodeCompilationTest.java",
 +        "SLCompileASTTestSuite.java",
 +        "SLCompileBytecodeTestSuite.java",
@@ -21043,7 +21677,9 @@ new file mode 100644
 +        "SimpleInterpreterTest.java",
 +        "SimplePartialEvaluationTest.java",
 +        "StaleCompilationTaskTest.java",
++        "StaticObjectAllocationTest.java",
 +        "StaticObjectCompilationTest.java",
++        "StaticObjectEscapeTest.java",
 +        "StringNodeInliningCompilationTest.java",
 +        "TestWithPolyglotOptions.java",
 +        "TestWithSynchronousCompiling.java",

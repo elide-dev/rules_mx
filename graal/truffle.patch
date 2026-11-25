@@ -2,7 +2,7 @@ diff --git a/truffle/BUILD.bazel b/truffle/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/truffle/BUILD.bazel
-@@ -0,0 +1,9099 @@
+@@ -0,0 +1,9320 @@
 +load("@rules_mx//mx:graph.bzl", "mx_jar_dist", "mx_jvmci_library", "mx_processed_java", "mx_processor", "mx_project", "mx_resource_layout", "mx_shaded_java", "mx_test_class", "mx_whole_java")
 +
 +# gazelle:resolve java com.oracle.truffle.api.impl //truffle:com.oracle.truffle.api
@@ -41,6 +41,8 @@ new file mode 100644
 +    tests = [
 +        ":com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.BoxingEliminationTest",
 +        ":com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.BoxingEliminationTypeSystemTest",
++        ":com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.BreakpointYieldResumeTest",
++        ":com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.BytecodeIndexLookupTest",
 +        ":com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.ConstantOperandTest",
 +        ":com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.ConstantsBufferTest",
 +        ":com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.CustomReturnTest",
@@ -58,14 +60,19 @@ new file mode 100644
 +        ":com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.InstructionBytecodeSizeTest",
 +        ":com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.InstructionRewriterTest",
 +        ":com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.InstructionTracingTest",
++        ":com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.InstrumentationNodeObjectTest",
 +        ":com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.InstrumentationTest",
 +        ":com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.LazySourceContentTest",
 +        ":com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.LocalHelpersTest",
++        ":com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.ManualBytecodeIndexTransitionTest",
 +        ":com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.NodeOptimizationTest",
++        ":com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.OuterContextConstantTest",
 +        ":com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.PrologEpilogTest",
++        ":com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.ProxyExecutionMetadataTest",
 +        ":com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.QuickeningTest",
 +        ":com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.ReadBytecodeLocationTest",
 +        ":com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.RedundantLimitTest",
++        ":com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.ReportPolymorphismTest",
 +        ":com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.RootNodeOverridesTest",
 +        ":com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.SetTraceFuncTest",
 +        ":com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.ShortCircuitTest",
@@ -78,6 +85,7 @@ new file mode 100644
 +        ":com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.TransitionTracingTest",
 +        ":com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.TypeSystemTest",
 +        ":com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.UncachedYieldTest",
++        ":com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.UnwindExceptionTest",
 +        ":com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.ValueInterceptionTest",
 +        ":com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.basic_interpreter.BasicInterpreterTest",
 +        ":com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.basic_interpreter.BindingsTest",
@@ -333,7 +341,9 @@ new file mode 100644
 +        ":com.oracle.truffle.api.object.test.com.oracle.truffle.api.object.test.PolymorphicPrimitivesTest",
 +        ":com.oracle.truffle.api.object.test.com.oracle.truffle.api.object.test.PropertyGetterTest",
 +        ":com.oracle.truffle.api.object.test.com.oracle.truffle.api.object.test.PropertyMapTest",
++        ":com.oracle.truffle.api.object.test.com.oracle.truffle.api.object.test.PutAllTest",
 +        ":com.oracle.truffle.api.object.test.com.oracle.truffle.api.object.test.RemoveKeyTest",
++        ":com.oracle.truffle.api.object.test.com.oracle.truffle.api.object.test.SetAllPropertyFlagsTest",
 +        ":com.oracle.truffle.api.object.test.com.oracle.truffle.api.object.test.ShapeTest",
 +        ":com.oracle.truffle.api.object.test.com.oracle.truffle.api.object.test.SharedShapeTest",
 +        ":com.oracle.truffle.api.staticobject.test.com.oracle.truffle.api.staticobject.test.BuilderPropertyTest",
@@ -351,6 +361,8 @@ new file mode 100644
 +        ":com.oracle.truffle.api.strings.test.com.oracle.truffle.api.strings.test.TStringFromNativePointerNoContextTest",
 +        ":com.oracle.truffle.api.strings.test.com.oracle.truffle.api.strings.test.TStringFromNativePointerNotAllowedTest",
 +        ":com.oracle.truffle.api.strings.test.com.oracle.truffle.api.strings.test.TStringJCodingsDisabledTest",
++        ":com.oracle.truffle.api.strings.test.com.oracle.truffle.api.strings.test.TStringJavaStringIdentityTest",
++        ":com.oracle.truffle.api.strings.test.com.oracle.truffle.api.strings.test.TStringLargeAllocationTests",
 +        ":com.oracle.truffle.api.strings.test.com.oracle.truffle.api.strings.test.TStringTests",
 +        ":com.oracle.truffle.api.strings.test.com.oracle.truffle.api.strings.test.TStringUTF16Tests",
 +        ":com.oracle.truffle.api.strings.test.com.oracle.truffle.api.strings.test.TStringUTF32Tests",
@@ -425,6 +437,7 @@ new file mode 100644
 +        ":com.oracle.truffle.api.test.com.oracle.truffle.api.test.ArrayUtilsRegionEqualsWithMaskTest",
 +        ":com.oracle.truffle.api.test.com.oracle.truffle.api.test.ArrayUtilsTest",
 +        ":com.oracle.truffle.api.test.com.oracle.truffle.api.test.AssumptionInvalidationTest",
++        ":com.oracle.truffle.api.test.com.oracle.truffle.api.test.CallTargetBytecodeIndexTest",
 +        ":com.oracle.truffle.api.test.com.oracle.truffle.api.test.CallTest",
 +        ":com.oracle.truffle.api.test.com.oracle.truffle.api.test.ChildNodeTest",
 +        ":com.oracle.truffle.api.test.com.oracle.truffle.api.test.ChildrenNodesTest",
@@ -504,6 +517,7 @@ new file mode 100644
 +        ":com.oracle.truffle.api.test.com.oracle.truffle.api.test.polyglot.AutomaticLeaveTest",
 +        ":com.oracle.truffle.api.test.com.oracle.truffle.api.test.polyglot.ByteSequenceTest",
 +        ":com.oracle.truffle.api.test.com.oracle.truffle.api.test.polyglot.ChildContextTest",
++        ":com.oracle.truffle.api.test.com.oracle.truffle.api.test.polyglot.CompositeFileSystemTest",
 +        ":com.oracle.truffle.api.test.com.oracle.truffle.api.test.polyglot.ContextAPITest",
 +        ":com.oracle.truffle.api.test.com.oracle.truffle.api.test.polyglot.ContextAndLanguageReferenceTest",
 +        ":com.oracle.truffle.api.test.com.oracle.truffle.api.test.polyglot.ContextBuilderExtendAPITest",
@@ -529,6 +543,7 @@ new file mode 100644
 +        ":com.oracle.truffle.api.test.com.oracle.truffle.api.test.polyglot.GR52773Test",
 +        ":com.oracle.truffle.api.test.com.oracle.truffle.api.test.polyglot.GR68545Test",
 +        ":com.oracle.truffle.api.test.com.oracle.truffle.api.test.polyglot.GR71109Test",
++        ":com.oracle.truffle.api.test.com.oracle.truffle.api.test.polyglot.GeneratedProxyNativeImageTest",
 +        ":com.oracle.truffle.api.test.com.oracle.truffle.api.test.polyglot.GuestFunctionToHostInterfaceProxyTest",
 +        ":com.oracle.truffle.api.test.com.oracle.truffle.api.test.polyglot.HostAccessTest",
 +        ":com.oracle.truffle.api.test.com.oracle.truffle.api.test.polyglot.HostClassLoadingTest",
@@ -653,6 +668,7 @@ new file mode 100644
 +        "--enable-native-access=ALL-UNNAMED",
 +        "--add-exports=java.base/jdk.internal.module=ALL-UNNAMED",
 +        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "-Dtruffle.DetailedAssertions=true",
 +        "-Dpolyglot.ConstantOptionsLanguage.ConstantOption1=configuredValue",
 +    ],
 +)
@@ -717,6 +733,16 @@ new file mode 100644
 +panama_test(
 +    name = "panama.LoadNFILibraryTest",
 +    test_class = "com.oracle.truffle.nfi.test.LoadNFILibraryTest",
++)
++
++panama_test(
++    name = "panama.ManyArgumentsNFITest",
++    test_class = "com.oracle.truffle.nfi.test.ManyArgumentsNFITest",
++)
++
++panama_test(
++    name = "panama.NFICallOverheadTest",
++    test_class = "com.oracle.truffle.nfi.test.NFICallOverheadTest",
 +)
 +
 +panama_test(
@@ -1621,6 +1647,20 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.BreakpointYieldResumeTest",
++    launcher = ":truffle_junit",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.api.bytecode.test.BreakpointYieldResumeTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.BytecodeIndexLookupTest",
++    launcher = ":truffle_junit",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.api.bytecode.test.BytecodeIndexLookupTest",
++)
++
++mx_test_class(
 +    name = "com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.ConstantOperandTest",
 +    launcher = ":truffle_junit",
 +    tags = ["manual"],
@@ -1740,6 +1780,13 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.InstrumentationNodeObjectTest",
++    launcher = ":truffle_junit",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.api.bytecode.test.InstrumentationNodeObjectTest",
++)
++
++mx_test_class(
 +    name = "com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.InstrumentationTest",
 +    launcher = ":truffle_junit",
 +    tags = ["manual"],
@@ -1761,6 +1808,13 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.ManualBytecodeIndexTransitionTest",
++    launcher = ":truffle_junit",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.api.bytecode.test.ManualBytecodeIndexTransitionTest",
++)
++
++mx_test_class(
 +    name = "com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.NodeOptimizationTest",
 +    launcher = ":truffle_junit",
 +    tags = ["manual"],
@@ -1768,10 +1822,24 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.OuterContextConstantTest",
++    launcher = ":truffle_junit",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.api.bytecode.test.OuterContextConstantTest",
++)
++
++mx_test_class(
 +    name = "com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.PrologEpilogTest",
 +    launcher = ":truffle_junit",
 +    tags = ["manual"],
 +    test_class = "com.oracle.truffle.api.bytecode.test.PrologEpilogTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.ProxyExecutionMetadataTest",
++    launcher = ":truffle_junit",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.api.bytecode.test.ProxyExecutionMetadataTest",
 +)
 +
 +mx_test_class(
@@ -1793,6 +1861,13 @@ new file mode 100644
 +    launcher = ":truffle_junit",
 +    tags = ["manual"],
 +    test_class = "com.oracle.truffle.api.bytecode.test.RedundantLimitTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.ReportPolymorphismTest",
++    launcher = ":truffle_junit",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.api.bytecode.test.ReportPolymorphismTest",
 +)
 +
 +mx_test_class(
@@ -1877,6 +1952,13 @@ new file mode 100644
 +    launcher = ":truffle_junit",
 +    tags = ["manual"],
 +    test_class = "com.oracle.truffle.api.bytecode.test.UncachedYieldTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.api.bytecode.test.com.oracle.truffle.api.bytecode.test.UnwindExceptionTest",
++    launcher = ":truffle_junit",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.api.bytecode.test.UnwindExceptionTest",
 +)
 +
 +mx_test_class(
@@ -4180,10 +4262,24 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "com.oracle.truffle.api.object.test.com.oracle.truffle.api.object.test.PutAllTest",
++    launcher = ":truffle_junit",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.api.object.test.PutAllTest",
++)
++
++mx_test_class(
 +    name = "com.oracle.truffle.api.object.test.com.oracle.truffle.api.object.test.RemoveKeyTest",
 +    launcher = ":truffle_junit",
 +    tags = ["manual"],
 +    test_class = "com.oracle.truffle.api.object.test.RemoveKeyTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.api.object.test.com.oracle.truffle.api.object.test.SetAllPropertyFlagsTest",
++    launcher = ":truffle_junit",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.api.object.test.SetAllPropertyFlagsTest",
 +)
 +
 +mx_test_class(
@@ -4207,13 +4303,25 @@ new file mode 100644
 +    deps = [":com.oracle.truffle.api.dsl"],
 +)
 +
-+mx_project(
++mx_processed_java(
 +    name = "com.oracle.truffle.api.staticobject",
-+    packages = ["//truffle/src/com.oracle.truffle.api.staticobject/src/com/oracle/truffle/api/staticobject"],
++    srcs = ["//truffle/src/com.oracle.truffle.api.staticobject/src/com/oracle/truffle/api/staticobject:com.oracle.truffle.api.staticobject.srcs"],
++    add_exports = ["java.base/jdk.internal.misc"],
++    javacopts = [
++        "-source",
++        "21",
++        "-target",
++        "21",
++        "-parameters",
++        "--add-modules",
++        "jdk.unsupported",
++    ],
 +    visibility = ["//visibility:public"],
 +    deps = [
 +        ":com.oracle.truffle.api",
 +        ":com.oracle.truffle.api.impl.asm",
++        "//sdk:COLLECTIONS",
++        "//sdk:NATIVEIMAGE",
 +    ],
 +)
 +
@@ -4389,7 +4497,9 @@ new file mode 100644
 +    deps = [
 +        ":TRUFFLE_API",
 +        ":TRUFFLE_JCODINGS",
++        ":com.oracle.truffle.api.test",
 +        "//sdk:COLLECTIONS",
++        "//sdk:NATIVEIMAGE",
 +        "//sdk:POLYGLOT",
 +        "@contrib_rules_jvm_deps//:junit_junit",
 +        "@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
@@ -4436,6 +4546,20 @@ new file mode 100644
 +    launcher = ":truffle_junit",
 +    tags = ["manual"],
 +    test_class = "com.oracle.truffle.api.strings.test.TStringJCodingsDisabledTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.api.strings.test.com.oracle.truffle.api.strings.test.TStringJavaStringIdentityTest",
++    launcher = ":truffle_junit",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.api.strings.test.TStringJavaStringIdentityTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.api.strings.test.com.oracle.truffle.api.strings.test.TStringLargeAllocationTests",
++    launcher = ":truffle_junit",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.api.strings.test.TStringLargeAllocationTests",
 +)
 +
 +mx_test_class(
@@ -5023,6 +5147,13 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "com.oracle.truffle.api.test.com.oracle.truffle.api.test.CallTargetBytecodeIndexTest",
++    launcher = ":truffle_junit",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.api.test.CallTargetBytecodeIndexTest",
++)
++
++mx_test_class(
 +    name = "com.oracle.truffle.api.test.com.oracle.truffle.api.test.CallTest",
 +    launcher = ":truffle_junit",
 +    tags = ["manual"],
@@ -5576,6 +5707,13 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "com.oracle.truffle.api.test.com.oracle.truffle.api.test.polyglot.CompositeFileSystemTest",
++    launcher = ":truffle_junit",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.api.test.polyglot.CompositeFileSystemTest",
++)
++
++mx_test_class(
 +    name = "com.oracle.truffle.api.test.com.oracle.truffle.api.test.polyglot.ContextAPITest",
 +    launcher = ":truffle_junit",
 +    tags = ["manual"],
@@ -5748,6 +5886,13 @@ new file mode 100644
 +    launcher = ":truffle_junit",
 +    tags = ["manual"],
 +    test_class = "com.oracle.truffle.api.test.polyglot.GR71109Test",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.api.test.com.oracle.truffle.api.test.polyglot.GeneratedProxyNativeImageTest",
++    launcher = ":truffle_junit",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.api.test.polyglot.GeneratedProxyNativeImageTest",
 +)
 +
 +mx_test_class(
@@ -6791,6 +6936,30 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "com.oracle.truffle.nfi.test.com.oracle.truffle.nfi.test.ManyArgumentsNFITest",
++    data = [":TRUFFLE_TEST_NATIVE"],
++    jvm_flags = [
++        "-Dnative.test.path=$(rootpath :TRUFFLE_TEST_NATIVE)",
++        "--enable-native-access=ALL-UNNAMED",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++    ],
++    test_class = "com.oracle.truffle.nfi.test.ManyArgumentsNFITest",
++    runtime_deps = [":TRUFFLE_NFI_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.nfi.test.com.oracle.truffle.nfi.test.NFICallOverheadTest",
++    data = [":TRUFFLE_TEST_NATIVE"],
++    jvm_flags = [
++        "-Dnative.test.path=$(rootpath :TRUFFLE_TEST_NATIVE)",
++        "--enable-native-access=ALL-UNNAMED",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++    ],
++    test_class = "com.oracle.truffle.nfi.test.NFICallOverheadTest",
++    runtime_deps = [":TRUFFLE_NFI_TEST"],
++)
++
++mx_test_class(
 +    name = "com.oracle.truffle.nfi.test.com.oracle.truffle.nfi.test.NullArrayNFITest",
 +    data = [":TRUFFLE_TEST_NATIVE"],
 +    jvm_flags = [
@@ -7325,6 +7494,7 @@ new file mode 100644
 +        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
 +    ],
 +    resources = [
++        "//truffle/src/com.oracle.truffle.sl.test/src/META-INF/native-image:com.oracle.truffle.sl.test.resources",
 +        "//truffle/src/com.oracle.truffle.sl.test/src/tests:com.oracle.truffle.sl.test.resources",
 +        "//truffle/src/com.oracle.truffle.sl.test/src/tests/error:com.oracle.truffle.sl.test.resources",
 +        "//truffle/src/com.oracle.truffle.sl.test/src/tests_disabled:com.oracle.truffle.sl.test.resources",
@@ -7431,12 +7601,42 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "com.oracle.truffle.sl.test.com.oracle.truffle.sl.test.SLForeignExceptionStackTraceTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.sl.test.SLForeignExceptionStackTraceTest",
++    runtime_deps = [":TRUFFLE_SL_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.sl.test.com.oracle.truffle.sl.test.SLHostExceptionCauseOverrideTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.sl.test.SLHostExceptionCauseOverrideTest",
++    runtime_deps = [":TRUFFLE_SL_TEST"],
++)
++
++mx_test_class(
 +    name = "com.oracle.truffle.sl.test.com.oracle.truffle.sl.test.SLInstrumentTest",
 +    jvm_flags = [
 +        "-Dpolyglot.engine.WarnInterpreterOnly=false",
 +        "--enable-native-access=ALL-UNNAMED",
 +    ],
 +    test_class = "com.oracle.truffle.sl.test.SLInstrumentTest",
++    runtime_deps = [":TRUFFLE_SL_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.sl.test.com.oracle.truffle.sl.test.SLInteropBytecodeIndexTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.sl.test.SLInteropBytecodeIndexTest",
 +    runtime_deps = [":TRUFFLE_SL_TEST"],
 +)
 +
@@ -7581,6 +7781,16 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "com.oracle.truffle.sl.test.com.oracle.truffle.sl.test.SLShenandoahCompilationTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.sl.test.SLShenandoahCompilationTest",
++    runtime_deps = [":TRUFFLE_SL_TEST"],
++)
++
++mx_test_class(
 +    name = "com.oracle.truffle.sl.test.com.oracle.truffle.sl.test.SLTestSuiteAST",
 +    jvm_flags = [
 +        "-Dpolyglot.engine.WarnInterpreterOnly=false",
@@ -7617,6 +7827,16 @@ new file mode 100644
 +        "--enable-native-access=ALL-UNNAMED",
 +    ],
 +    test_class = "com.oracle.truffle.sl.test.SLTestSuiteBytecodeUncached",
++    runtime_deps = [":TRUFFLE_SL_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.sl.test.com.oracle.truffle.sl.test.SLUndefinedFunctionStackTraceTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.sl.test.SLUndefinedFunctionStackTraceTest",
 +    runtime_deps = [":TRUFFLE_SL_TEST"],
 +)
 +
@@ -8190,7 +8410,7 @@ new file mode 100644
 +        "21",
 +        "-parameters",
 +        "--add-modules",
-+        "jdk.unsupported",
++        "java.management,jdk.management,jdk.unsupported",
 +    ],
 +    mx_resource_root = "src/org.graalvm.truffle.benchmark/src",
 +    plugins = [
@@ -8214,6 +8434,7 @@ new file mode 100644
 +        ":TRUFFLE_RUNTIME",
 +        ":TRUFFLE_SL",
 +        ":TRUFFLE_TEST",
++        "//sdk:NATIVEIMAGE",
 +        "//sdk:POLYGLOT",
 +    ],
 +)
@@ -8266,10 +8487,10 @@ new file mode 100644
 +    directives = ["exports org.graalvm.shadowed.org.antlr.v4.runtime*"],
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
-+        "Implementation-Version": "25.5.5-dev",
++        "Implementation-Version": "25.6.0-dev",
 +        "Name": "antlr4",
 +        "Specification-Vendor": "Oracle Corporation",
-+        "Specification-Version": "25.5.5-dev",
++        "Specification-Version": "25.6.0-dev",
 +    },
 +    module_name = "org.graalvm.shadowed.antlr4",
 +    release = 21,
@@ -8333,7 +8554,6 @@ new file mode 100644
 +        "opens com.oracle.truffle.polyglot to org.graalvm.truffle.runtime",
 +        "requires java.logging",
 +        "requires java.management",
-+        "requires java.sql",
 +        "requires jdk.management",
 +        "requires jdk.unsupported",
 +        "requires org.graalvm.collections",
@@ -8341,6 +8561,7 @@ new file mode 100644
 +        "requires org.graalvm.nativeimage",
 +        "requires org.graalvm.polyglot",
 +        "requires static java.desktop",
++        "requires static java.sql",
 +        "requires static org.graalvm.nativebridge",
 +        "requires transitive org.graalvm.word",
 +        "uses com.oracle.truffle.api.TruffleRuntimeAccess",
@@ -8356,10 +8577,10 @@ new file mode 100644
 +    jni_services = True,
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
-+        "Implementation-Version": "25.5.5-dev",
++        "Implementation-Version": "25.6.0-dev",
 +        "Name": "truffle-api",
 +        "Specification-Vendor": "Oracle Corporation",
-+        "Specification-Version": "25.5.5-dev",
++        "Specification-Version": "25.6.0-dev",
 +    },
 +    module_exports = [
 +        "java.base/jdk.internal.access",
@@ -8403,10 +8624,10 @@ new file mode 100644
 +    ],
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
-+        "Implementation-Version": "25.5.5-dev",
++        "Implementation-Version": "25.6.0-dev",
 +        "Name": "truffle-compiler",
 +        "Specification-Vendor": "Oracle Corporation",
-+        "Specification-Version": "25.5.5-dev",
++        "Specification-Version": "25.6.0-dev",
 +    },
 +    module_exports = [
 +        "jdk.internal.vm.ci/jdk.vm.ci.code",
@@ -8427,10 +8648,10 @@ new file mode 100644
 +    ],
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
-+        "Implementation-Version": "25.5.5-dev",
++        "Implementation-Version": "25.6.0-dev",
 +        "Name": "truffle-dsl-processor",
 +        "Specification-Vendor": "Oracle Corporation",
-+        "Specification-Version": "25.5.5-dev",
++        "Specification-Version": "25.6.0-dev",
 +    },
 +    snippets_pattern = ".*(Snippets|doc-files).*",
 +    visibility = ["//visibility:public"],
@@ -8456,10 +8677,10 @@ new file mode 100644
 +    ],
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
-+        "Implementation-Version": "25.5.5-dev",
++        "Implementation-Version": "25.6.0-dev",
 +        "Name": "icu4j",
 +        "Specification-Vendor": "Oracle Corporation",
-+        "Specification-Version": "25.5.5-dev",
++        "Specification-Version": "25.6.0-dev",
 +    },
 +    module_name = "org.graalvm.shadowed.icu4j",
 +    release = 21,
@@ -8490,10 +8711,10 @@ new file mode 100644
 +    jni_services = True,
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
-+        "Implementation-Version": "25.5.5-dev",
++        "Implementation-Version": "25.6.0-dev",
 +        "Name": "jcodings",
 +        "Specification-Vendor": "Oracle Corporation",
-+        "Specification-Version": "25.5.5-dev",
++        "Specification-Version": "25.6.0-dev",
 +    },
 +    module_name = "org.graalvm.shadowed.jcodings",
 +    release = 21,
@@ -8509,10 +8730,10 @@ new file mode 100644
 +    directives = ["exports org.graalvm.shadowed.org.json"],
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
-+        "Implementation-Version": "25.5.5-dev",
++        "Implementation-Version": "25.6.0-dev",
 +        "Name": "json",
 +        "Specification-Vendor": "Oracle Corporation",
-+        "Specification-Version": "25.5.5-dev",
++        "Specification-Version": "25.6.0-dev",
 +    },
 +    module_name = "org.graalvm.shadowed.org.json",
 +    release = 21,
@@ -8613,10 +8834,10 @@ new file mode 100644
 +    jni_services = True,
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
-+        "Implementation-Version": "25.5.5-dev",
++        "Implementation-Version": "25.6.0-dev",
 +        "Name": "truffle-nfi",
 +        "Specification-Vendor": "Oracle Corporation",
-+        "Specification-Version": "25.5.5-dev",
++        "Specification-Version": "25.6.0-dev",
 +    },
 +    module_name = "com.oracle.truffle.truffle_nfi",
 +    release = 21,
@@ -8642,10 +8863,10 @@ new file mode 100644
 +    jni_services = True,
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
-+        "Implementation-Version": "25.5.5-dev",
++        "Implementation-Version": "25.6.0-dev",
 +        "Name": "truffle-nfi-libffi",
 +        "Specification-Vendor": "Oracle Corporation",
-+        "Specification-Version": "25.5.5-dev",
++        "Specification-Version": "25.6.0-dev",
 +    },
 +    module_name = "com.oracle.truffle.truffle_nfi_libffi",
 +    release = 21,
@@ -8666,10 +8887,10 @@ new file mode 100644
 +    jni_services = True,
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
-+        "Implementation-Version": "25.5.5-dev",
++        "Implementation-Version": "25.6.0-dev",
 +        "Name": "truffle-nfi-panama",
 +        "Specification-Vendor": "Oracle Corporation",
-+        "Specification-Version": "25.5.5-dev",
++        "Specification-Version": "25.6.0-dev",
 +    },
 +    module_name = "com.oracle.truffle.truffle_nfi_panama",
 +    overlays = {
@@ -8738,10 +8959,10 @@ new file mode 100644
 +    jni_services = True,
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
-+        "Implementation-Version": "25.5.5-dev",
++        "Implementation-Version": "25.6.0-dev",
 +        "Name": "truffle-runtime",
 +        "Specification-Vendor": "Oracle Corporation",
-+        "Specification-Version": "25.5.5-dev",
++        "Specification-Version": "25.6.0-dev",
 +    },
 +    module_exports = [
 +        "java.base/jdk.internal.access",
@@ -8778,10 +8999,10 @@ new file mode 100644
 +    jni_services = True,
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
-+        "Implementation-Version": "25.5.5-dev",
++        "Implementation-Version": "25.6.0-dev",
 +        "Name": "truffle-sl",
 +        "Specification-Vendor": "Oracle Corporation",
-+        "Specification-Version": "25.5.5-dev",
++        "Specification-Version": "25.6.0-dev",
 +    },
 +    module_name = "org.graalvm.sl",
 +    release = 21,
@@ -8803,10 +9024,10 @@ new file mode 100644
 +    ],
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
-+        "Implementation-Version": "25.5.5-dev",
++        "Implementation-Version": "25.6.0-dev",
 +        "Name": "truffle-sl-launcher",
 +        "Specification-Vendor": "Oracle Corporation",
-+        "Specification-Version": "25.5.5-dev",
++        "Specification-Version": "25.6.0-dev",
 +    },
 +    module_name = "org.graalvm.sl_launcher",
 +    release = 21,
@@ -8821,10 +9042,10 @@ new file mode 100644
 +    jni_services = True,
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
-+        "Implementation-Version": "25.5.5-dev",
++        "Implementation-Version": "25.6.0-dev",
 +        "Name": "sl-truffle-tck",
 +        "Specification-Vendor": "Oracle Corporation",
-+        "Specification-Version": "25.5.5-dev",
++        "Specification-Version": "25.6.0-dev",
 +    },
 +    snippets_pattern = ".*(Snippets|doc-files).*",
 +    truffle_services = True,
@@ -8887,10 +9108,10 @@ new file mode 100644
 +    jni_services = True,
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
-+        "Implementation-Version": "25.5.5-dev",
++        "Implementation-Version": "25.6.0-dev",
 +        "Name": "truffle-tck",
 +        "Specification-Vendor": "Oracle Corporation",
-+        "Specification-Version": "25.5.5-dev",
++        "Specification-Version": "25.6.0-dev",
 +    },
 +    snippets_pattern = ".*(Snippets|doc-files).*",
 +    truffle_services = True,
@@ -8907,10 +9128,10 @@ new file mode 100644
 +    contents = [":com.oracle.truffle.tck.common"],
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
-+        "Implementation-Version": "25.5.5-dev",
++        "Implementation-Version": "25.6.0-dev",
 +        "Name": "truffle-tck-common",
 +        "Specification-Vendor": "Oracle Corporation",
-+        "Specification-Version": "25.5.5-dev",
++        "Specification-Version": "25.6.0-dev",
 +    },
 +    snippets_pattern = ".*(Snippets|doc-files).*",
 +    visibility = ["//visibility:public"],
@@ -8923,10 +9144,10 @@ new file mode 100644
 +    jni_services = True,
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
-+        "Implementation-Version": "25.5.5-dev",
++        "Implementation-Version": "25.6.0-dev",
 +        "Name": "truffle-tck-instrumentation",
 +        "Specification-Vendor": "Oracle Corporation",
-+        "Specification-Version": "25.5.5-dev",
++        "Specification-Version": "25.6.0-dev",
 +    },
 +    snippets_pattern = ".*(Snippets|doc-files).*",
 +    truffle_services = True,
@@ -8944,10 +9165,10 @@ new file mode 100644
 +    jni_services = True,
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
-+        "Implementation-Version": "25.5.5-dev",
++        "Implementation-Version": "25.6.0-dev",
 +        "Name": "truffle-tck-tests",
 +        "Specification-Vendor": "Oracle Corporation",
-+        "Specification-Version": "25.5.5-dev",
++        "Specification-Version": "25.6.0-dev",
 +    },
 +    snippets_pattern = ".*(Snippets|doc-files).*",
 +    truffle_services = True,
@@ -9020,10 +9241,10 @@ new file mode 100644
 +    ],
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
-+        "Implementation-Version": "25.5.5-dev",
++        "Implementation-Version": "25.6.0-dev",
 +        "Name": "xz",
 +        "Specification-Vendor": "Oracle Corporation",
-+        "Specification-Version": "25.5.5-dev",
++        "Specification-Version": "25.6.0-dev",
 +    },
 +    module_name = "org.graalvm.shadowed.xz",
 +    release = 21,
@@ -9188,7 +9409,7 @@ diff --git a/truffle/src/com.oracle.truffle.api/src/com/oracle/truffle/api/impl/
 new file mode 100644
 --- /dev/null
 +++ b/truffle/src/com.oracle.truffle.api/src/com/oracle/truffle/api/impl/BUILD.bazel
-@@ -0,0 +1,38 @@
+@@ -0,0 +1,39 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -9219,6 +9440,7 @@ new file mode 100644
 +        "PolyglotIsolateLanguages.java",
 +        "ReadOnlyArrayList.java",
 +        "ReadOnlyFrame.java",
++        "RuntimeCallTarget.java",
 +        "TVMCI.java",
 +        "ThreadLocalHandshake.java",
 +        "TruffleAPIFeature.java",
@@ -9358,7 +9580,7 @@ diff --git a/truffle/src/com.oracle.truffle.api.bytecode/src/com/oracle/truffle/
 new file mode 100644
 --- /dev/null
 +++ b/truffle/src/com.oracle.truffle.api.bytecode/src/com/oracle/truffle/api/bytecode/BUILD.bazel
-@@ -0,0 +1,63 @@
+@@ -0,0 +1,64 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -9375,6 +9597,7 @@ new file mode 100644
 +        "BytecodeEncodingException.java",
 +        "BytecodeEngineData.java",
 +        "BytecodeFrame.java",
++        "BytecodeIndexMode.java",
 +        "BytecodeLabel.java",
 +        "BytecodeLocal.java",
 +        "BytecodeLocation.java",
@@ -9462,7 +9685,7 @@ diff --git a/truffle/src/com.oracle.truffle.api.bytecode.test/src/com/oracle/tru
 new file mode 100644
 --- /dev/null
 +++ b/truffle/src/com.oracle.truffle.api.bytecode.test/src/com/oracle/truffle/api/bytecode/test/BUILD.bazel
-@@ -0,0 +1,53 @@
+@@ -0,0 +1,62 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -9471,7 +9694,9 @@ new file mode 100644
 +        "AbstractInstructionTest.java",
 +        "BoxingEliminationTest.java",
 +        "BoxingEliminationTypeSystemTest.java",
++        "BreakpointYieldResumeTest.java",
 +        "BytecodeDSLTestLanguage.java",
++        "BytecodeIndexLookupTest.java",
 +        "ConstantOperandTest.java",
 +        "ConstantsBufferTest.java",
 +        "CustomReturnTest.java",
@@ -9492,14 +9717,20 @@ new file mode 100644
 +        "InstructionBytecodeSizeTest.java",
 +        "InstructionRewriterTest.java",
 +        "InstructionTracingTest.java",
++        "InstrumentationNodeObjectTest.java",
 +        "InstrumentationTest.java",
 +        "LazySourceContentTest.java",
 +        "LocalHelpersTest.java",
++        "ManualBytecodeIndexTransitionTest.java",
 +        "NodeOptimizationTest.java",
++        "NotUpdatableBytecodeTest.java",
++        "OuterContextConstantTest.java",
 +        "PrologEpilogTest.java",
++        "ProxyExecutionMetadataTest.java",
 +        "QuickeningTest.java",
 +        "ReadBytecodeLocationTest.java",
 +        "RedundantLimitTest.java",
++        "ReportPolymorphismTest.java",
 +        "RootNodeOverridesTest.java",
 +        "SetTraceFuncTest.java",
 +        "ShortCircuitTest.java",
@@ -9512,6 +9743,7 @@ new file mode 100644
 +        "TransitionTracingTest.java",
 +        "TypeSystemTest.java",
 +        "UncachedYieldTest.java",
++        "UnwindExceptionTest.java",
 +        "ValueInterceptionTest.java",
 +    ],
 +    visibility = ["//truffle:__pkg__"],
@@ -9551,7 +9783,7 @@ diff --git a/truffle/src/com.oracle.truffle.api.bytecode.test/src/com/oracle/tru
 new file mode 100644
 --- /dev/null
 +++ b/truffle/src/com.oracle.truffle.api.bytecode.test/src/com/oracle/truffle/api/bytecode/test/error_tests/BUILD.bazel
-@@ -0,0 +1,12 @@
+@@ -0,0 +1,13 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -9560,6 +9792,7 @@ new file mode 100644
 +        "ErrorTests.java",
 +        "ExpectError.java",
 +        "ExpectWarning.java",
++        "ProxyExecutionMetadataErrorTest.java",
 +        "TestVariantErrorTest.java",
 +    ],
 +    visibility = ["//truffle:__pkg__"],
@@ -10492,7 +10725,7 @@ diff --git a/truffle/src/com.oracle.truffle.api.object.test/src/com/oracle/truff
 new file mode 100644
 --- /dev/null
 +++ b/truffle/src/com.oracle.truffle.api.object.test/src/com/oracle/truffle/api/object/test/BUILD.bazel
-@@ -0,0 +1,37 @@
+@@ -0,0 +1,39 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -10519,7 +10752,9 @@ new file mode 100644
 +        "PolymorphicPrimitivesTest.java",
 +        "PropertyGetterTest.java",
 +        "PropertyMapTest.java",
++        "PutAllTest.java",
 +        "RemoveKeyTest.java",
++        "SetAllPropertyFlagsTest.java",
 +        "ShapeTest.java",
 +        "SharedShapeTest.java",
 +        "TestDynamicObject.java",
@@ -10582,11 +10817,11 @@ diff --git a/truffle/src/com.oracle.truffle.api.staticobject/src/com/oracle/truf
 new file mode 100644
 --- /dev/null
 +++ b/truffle/src/com.oracle.truffle.api.staticobject/src/com/oracle/truffle/api/staticobject/BUILD.bazel
-@@ -0,0 +1,37 @@
-+load("@rules_mx//mx:java.bzl", "elide_java_library")
+@@ -0,0 +1,23 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
 +
-+elide_java_library(
-+    name = "staticobject",
++mx_files(
++    name = "com.oracle.truffle.api.staticobject.srcs",
 +    srcs = [
 +        "ArrayBasedShapeGenerator.java",
 +        "ArrayBasedStaticShape.java",
@@ -10604,21 +10839,7 @@ new file mode 100644
 +        "StaticShape.java",
 +        "package-info.java",
 +    ],
-+    javac_opts = [
-+        "--release",
-+        "21",
-+        "-parameters",
-+        "--add-modules",
-+        "jdk.unsupported",
-+    ],
-+    unified_release = 21,
-+    visibility = ["//:__subpackages__"],
-+    deps = [
-+        "//sdk:COLLECTIONS",
-+        "//sdk:NATIVEIMAGE",
-+        "//truffle:com.oracle.truffle.api",
-+        "//truffle:com.oracle.truffle.api.impl.asm",
-+    ],
++    visibility = ["//truffle:__pkg__"],
 +)
 diff --git a/truffle/src/com.oracle.truffle.api.staticobject.test/src/com/oracle/truffle/api/staticobject/test/BUILD.bazel b/truffle/src/com.oracle.truffle.api.staticobject.test/src/com/oracle/truffle/api/staticobject/test/BUILD.bazel
 new file mode 100644
@@ -10722,7 +10943,7 @@ diff --git a/truffle/src/com.oracle.truffle.api.strings.test/src/com/oracle/truf
 new file mode 100644
 --- /dev/null
 +++ b/truffle/src/com.oracle.truffle.api.strings.test/src/com/oracle/truffle/api/strings/test/BUILD.bazel
-@@ -0,0 +1,23 @@
+@@ -0,0 +1,25 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -10735,6 +10956,8 @@ new file mode 100644
 +        "TStringFromNativePointerNoContextTest.java",
 +        "TStringFromNativePointerNotAllowedTest.java",
 +        "TStringJCodingsDisabledTest.java",
++        "TStringJavaStringIdentityTest.java",
++        "TStringLargeAllocationTests.java",
 +        "TStringTestBase.java",
 +        "TStringTestDummyLanguage.java",
 +        "TStringTestUtil.java",
@@ -10858,7 +11081,7 @@ diff --git a/truffle/src/com.oracle.truffle.api.test/src/com/oracle/truffle/api/
 new file mode 100644
 --- /dev/null
 +++ b/truffle/src/com.oracle.truffle.api.test/src/com/oracle/truffle/api/test/BUILD.bazel
-@@ -0,0 +1,49 @@
+@@ -0,0 +1,50 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -10872,6 +11095,7 @@ new file mode 100644
 +        "ArrayUtilsRegionEqualsWithMaskTest.java",
 +        "ArrayUtilsTest.java",
 +        "AssumptionInvalidationTest.java",
++        "CallTargetBytecodeIndexTest.java",
 +        "CallTest.java",
 +        "ChildNodeTest.java",
 +        "ChildrenNodesTest.java",
@@ -11105,7 +11329,7 @@ diff --git a/truffle/src/com.oracle.truffle.api.test/src/com/oracle/truffle/api/
 new file mode 100644
 --- /dev/null
 +++ b/truffle/src/com.oracle.truffle.api.test/src/com/oracle/truffle/api/test/polyglot/BUILD.bazel
-@@ -0,0 +1,112 @@
+@@ -0,0 +1,114 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -11117,6 +11341,7 @@ new file mode 100644
 +        "AutomaticLeaveTest.java",
 +        "ByteSequenceTest.java",
 +        "ChildContextTest.java",
++        "CompositeFileSystemTest.java",
 +        "ContextAPITest.java",
 +        "ContextAPITestInternalLanguage.java",
 +        "ContextAPITestLanguage.java",
@@ -11146,6 +11371,7 @@ new file mode 100644
 +        "GR52773Test.java",
 +        "GR68545Test.java",
 +        "GR71109Test.java",
++        "GeneratedProxyNativeImageTest.java",
 +        "GuestFunctionToHostInterfaceProxyTest.java",
 +        "HostAccessTest.java",
 +        "HostClassLoadingTest.java",
@@ -11833,7 +12059,7 @@ diff --git a/truffle/src/com.oracle.truffle.host/src/com/oracle/truffle/host/BUI
 new file mode 100644
 --- /dev/null
 +++ b/truffle/src/com.oracle.truffle.host/src/com/oracle/truffle/host/BUILD.bazel
-@@ -0,0 +1,38 @@
+@@ -0,0 +1,39 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -11863,6 +12089,7 @@ new file mode 100644
 +        "HostMethodScope.java",
 +        "HostObject.java",
 +        "HostProxy.java",
++        "HostSqlTypes.java",
 +        "HostTargetMapping.java",
 +        "HostTargetMappingNode.java",
 +        "HostToTypeNode.java",
@@ -12107,7 +12334,7 @@ diff --git a/truffle/src/com.oracle.truffle.nfi.test/src/com/oracle/truffle/nfi/
 new file mode 100644
 --- /dev/null
 +++ b/truffle/src/com.oracle.truffle.nfi.test/src/com/oracle/truffle/nfi/test/BUILD.bazel
-@@ -0,0 +1,35 @@
+@@ -0,0 +1,37 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -12125,6 +12352,8 @@ new file mode 100644
 +        "IsolatedNamespaceTest.java",
 +        "KeyInfoNFITest.java",
 +        "LoadNFILibraryTest.java",
++        "ManyArgumentsNFITest.java",
++        "NFICallOverheadTest.java",
 +        "NFITest.java",
 +        "NullArrayNFITest.java",
 +        "NullNFITest.java",
@@ -12263,7 +12492,7 @@ diff --git a/truffle/src/com.oracle.truffle.polyglot/src/com/oracle/truffle/poly
 new file mode 100644
 --- /dev/null
 +++ b/truffle/src/com.oracle.truffle.polyglot/src/com/oracle/truffle/polyglot/BUILD.bazel
-@@ -0,0 +1,91 @@
+@@ -0,0 +1,96 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -12293,6 +12522,7 @@ new file mode 100644
 +        "PolyglotContextConfig.java",
 +        "PolyglotContextDispatch.java",
 +        "PolyglotContextImpl.java",
++        "PolyglotContextOptions.java",
 +        "PolyglotEngineDispatch.java",
 +        "PolyglotEngineException.java",
 +        "PolyglotEngineImpl.java",
@@ -12306,6 +12536,7 @@ new file mode 100644
 +        "PolyglotFastThreadLocals.java",
 +        "PolyglotFunction.java",
 +        "PolyglotFunctionProxyHandler.java",
++        "PolyglotGeneratedProxy.java",
 +        "PolyglotHostAccess.java",
 +        "PolyglotImpl.java",
 +        "PolyglotInstructionTracers.java",
@@ -12331,6 +12562,9 @@ new file mode 100644
 +        "PolyglotMapEntryAndFunction.java",
 +        "PolyglotObjectProxyHandler.java",
 +        "PolyglotParsedEval.java",
++        "PolyglotProxyClass.java",
++        "PolyglotProxyFeature.java",
++        "PolyglotProxyGenerator.java",
 +        "PolyglotSharingLayer.java",
 +        "PolyglotSourceCache.java",
 +        "PolyglotSourceDispatch.java",
@@ -13058,11 +13292,23 @@ new file mode 100644
 +    ],
 +    visibility = ["//truffle:__pkg__"],
 +)
+diff --git a/truffle/src/com.oracle.truffle.sl.test/src/META-INF/native-image/BUILD.bazel b/truffle/src/com.oracle.truffle.sl.test/src/META-INF/native-image/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.sl.test/src/META-INF/native-image/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.sl.test.resources",
++    srcs = ["reflect-config.json"],
++    visibility = ["//truffle:__pkg__"],
++)
 diff --git a/truffle/src/com.oracle.truffle.sl.test/src/com/oracle/truffle/sl/test/BUILD.bazel b/truffle/src/com.oracle.truffle.sl.test/src/com/oracle/truffle/sl/test/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/truffle/src/com.oracle.truffle.sl.test/src/com/oracle/truffle/sl/test/BUILD.bazel
-@@ -0,0 +1,42 @@
+@@ -0,0 +1,47 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -13078,7 +13324,10 @@ new file mode 100644
 +        "SLExecutionListenerTest.java",
 +        "SLExitTest.java",
 +        "SLFactorialTest.java",
++        "SLForeignExceptionStackTraceTest.java",
++        "SLHostExceptionCauseOverrideTest.java",
 +        "SLInstrumentTest.java",
++        "SLInteropBytecodeIndexTest.java",
 +        "SLInteropControlFlowTest.java",
 +        "SLInteropObjectTest.java",
 +        "SLInteropOperatorTest.java",
@@ -13093,12 +13342,14 @@ new file mode 100644
 +        "SLReadPropertyTest.java",
 +        "SLSeparatedClassLoadersTest.java",
 +        "SLSharedCodeSeparatedEnvTest.java",
++        "SLShenandoahCompilationTest.java",
 +        "SLTestRunner.java",
 +        "SLTestSuite.java",
 +        "SLTestSuiteAST.java",
 +        "SLTestSuiteBytecode.java",
 +        "SLTestSuiteBytecodeCached.java",
 +        "SLTestSuiteBytecodeUncached.java",
++        "SLUndefinedFunctionStackTraceTest.java",
 +        "SLValueSharingTest.java",
 +        "ToStringOfEvalTest.java",
 +        "TruffleTestAssumptions.java",
@@ -13744,12 +13995,15 @@ diff --git a/truffle/src/org.graalvm.truffle.benchmark/src/META-INF/native-image
 new file mode 100644
 --- /dev/null
 +++ b/truffle/src/org.graalvm.truffle.benchmark/src/META-INF/native-image/org.graalvm.truffle/benchmark/BUILD.bazel
-@@ -0,0 +1,7 @@
+@@ -0,0 +1,10 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
 +    name = "org.graalvm.truffle.benchmark.resources",
-+    srcs = ["native-image.properties"],
++    srcs = [
++        "native-image.properties",
++        "reachability-metadata.json",
++    ],
 +    visibility = ["//truffle:__pkg__"],
 +)
 diff --git a/truffle/src/org.graalvm.truffle.benchmark/src/org/graalvm/truffle/benchmark/BUILD.bazel b/truffle/src/org.graalvm.truffle.benchmark/src/org/graalvm/truffle/benchmark/BUILD.bazel
@@ -13786,7 +14040,7 @@ diff --git a/truffle/src/org.graalvm.truffle.benchmark/src/org/graalvm/truffle/b
 new file mode 100644
 --- /dev/null
 +++ b/truffle/src/org.graalvm.truffle.benchmark/src/org/graalvm/truffle/benchmark/bytecode_dsl/BUILD.bazel
-@@ -0,0 +1,17 @@
+@@ -0,0 +1,18 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -13797,6 +14051,7 @@ new file mode 100644
 +        "BranchProfilingBenchmark.java",
 +        "BytecodeBuilderBenchmark.java",
 +        "BytecodeDSLBenchmarkRootNode.java",
++        "BytecodeDSLInterpreterCallBenchmark.java",
 +        "ConstantOperandBenchmark.java",
 +        "ContinuationBytecodeBenchmark.java",
 +        "SimpleBytecodeBenchmark.java",
@@ -13864,7 +14119,7 @@ diff --git a/truffle/src/org.graalvm.truffle.benchmark/src/org/graalvm/truffle/b
 new file mode 100644
 --- /dev/null
 +++ b/truffle/src/org.graalvm.truffle.benchmark/src/org/graalvm/truffle/benchmark/bytecode_dsl/specs/BUILD.bazel
-@@ -0,0 +1,11 @@
+@@ -0,0 +1,12 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -13873,6 +14128,7 @@ new file mode 100644
 +        "BenchmarkSpec.java",
 +        "CalculatorBenchmark.java",
 +        "NestedLoopBenchmark.java",
++        "RecursiveFibonacciBenchmark.java",
 +    ],
 +    visibility = ["//truffle:__pkg__"],
 +)
@@ -13892,14 +14148,18 @@ diff --git a/truffle/src/org.graalvm.truffle.benchmark/src/org/graalvm/truffle/b
 new file mode 100644
 --- /dev/null
 +++ b/truffle/src/org.graalvm.truffle.benchmark/src/org/graalvm/truffle/benchmark/interop/BUILD.bazel
-@@ -0,0 +1,13 @@
+@@ -0,0 +1,17 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
 +    name = "org.graalvm.truffle.benchmark.srcs",
 +    srcs = [
++        "FunctionProxyBenchmark.java",
++        "FunctionProxyBenchmarkLanguage.java",
 +        "HostProxyBenchmark.java",
 +        "HostProxyBenchmarkLanguage.java",
++        "HostToGuestValueBenchmark.java",
++        "HostToGuestValueBenchmarkLanguage.java",
 +        "JavaInteropSpeedBench.java",
 +        "JavaMembersBenchmark.java",
 +        "MembersBenchmarkLanguage.java",

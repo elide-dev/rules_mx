@@ -241,6 +241,11 @@ py_binary(
     srcs = ["jvm_fallbacks.py"],
 )
 
+py_binary(
+    name = "static_symbols",
+    srcs = ["static_symbols.py"],
+)
+
 exports_files(["source_native_image.py.tpl"])
 
 py_binary(

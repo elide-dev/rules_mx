@@ -903,6 +903,13 @@ def bazel_buildfile(args):
         help="tag generated JUnit classes for explicit invocation",
     )
     parser.add_argument(
+        "--manual-test-class",
+        action="append",
+        default=[],
+        metavar="CLASS",
+        help="tag one generated JUnit class, by its fully qualified name, for explicit invocation",
+    )
+    parser.add_argument(
         "--project-release",
         action="append",
         default=[],
@@ -974,6 +981,7 @@ def bazel_buildfile(args):
             parser.error("expected --test-jvm-flag SUITE:PROJECT=FLAG")
         test_flags.setdefault(name, []).append(value)
     manual_tests = set(options.manual_test_project)
+    manual_classes = set(options.manual_test_class)
     labs_javac = set(options.labs_javac_project)
     if labs_javac and not options.gazelle:
         parser.error("--labs-javac-project requires --gazelle")
@@ -990,7 +998,7 @@ def bazel_buildfile(args):
             parser.error("expected a unique --project-release PROJECT=RELEASE")
         project_releases[name] = int(value)
     if (
-        test_runtimes or test_launchers or test_flags or manual_tests
+        test_runtimes or test_launchers or test_flags or manual_tests or manual_classes
     ) and not options.gazelle:
         parser.error("test configuration requires --gazelle")
     project_options = {}
@@ -1429,6 +1437,9 @@ def bazel_buildfile(args):
                     if project.name in manual_tests:
                         manual_tests.remove(project.name)
                         record["manual_tests"] = True
+                    if manual := sorted(manual_classes & set(record["tests"])):
+                        manual_classes.difference_update(manual)
+                        record["manual_test_classes"] = manual
                     if test_runtime:
                         record["test_runtime"] = test_runtime
                     if property_data:
@@ -1444,6 +1455,7 @@ def bazel_buildfile(args):
     if (
         unused_projects := project_releases.keys()
         | manual_tests
+        | manual_classes
         | labs_javac
         | empty_projects
     ):
