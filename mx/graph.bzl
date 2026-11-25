@@ -11,8 +11,6 @@ load(":java.bzl", "elide_java_library", "mx_resource_prefix")
 load(":jvmci.bzl", _mx_jvmci_library = "mx_jvmci_library")
 load(":shade.bzl", _mx_shaded_java = "mx_shaded_java")
 
-mx_jvmci_library = _mx_jvmci_library
-
 mx_shaded_java = _mx_shaded_java
 
 mx_jar_dist = _mx_jar_dist
@@ -51,9 +49,27 @@ def mx_whole_java(mx_resource_root = None, **kwargs):
         kwargs["resource_strip_prefix"] = mx_resource_prefix(mx_resource_root)
     elide_java_library(**kwargs)
 
-def mx_processed_java(name, mx_resource_root = None, abi_after_javac = False, deps = [], testonly = False, visibility = None, **kwargs):
+def _java_headers_impl(ctx):
+    (output,) = ctx.attr.project[JavaInfo].java_outputs
+    if not output.native_headers_jar:
+        fail("Java compiler did not expose JNI headers for " + str(ctx.attr.project.label))
+    return [DefaultInfo(files = depset([output.native_headers_jar]))]
+
+_java_headers = rule(
+    implementation = _java_headers_impl,
+    attrs = {"project": attr.label(providers = [JavaInfo], mandatory = True)},
+)
+
+def mx_jvmci_library(name, mx_resource_root = None, jni_headers = False, testonly = False, visibility = None, **kwargs):
+    _mx_jvmci_library(name = name, mx_resource_root = mx_resource_root, testonly = testonly, visibility = visibility, **kwargs)
+    if jni_headers:
+        _java_headers(name = name + ".jni_headers", project = ":" + name, testonly = testonly, visibility = visibility)
+
+def mx_processed_java(name, mx_resource_root = None, abi_after_javac = False, deps = [], testonly = False, visibility = None, jni_headers = False, **kwargs):
     if mx_resource_root:
         kwargs["resource_strip_prefix"] = mx_resource_prefix(mx_resource_root, repo_relative = True)
+    if jni_headers:
+        _java_headers(name = name + ".jni_headers", project = ":" + (name + ".javac" if abi_after_javac else name), testonly = testonly, visibility = visibility)
     if not abi_after_javac:
         java_library(name = name, deps = deps, testonly = testonly, visibility = visibility, **kwargs)
         return
@@ -89,14 +105,14 @@ _launcher_test = rule(
     test = True,
 )
 
-def mx_test_class(name, project = None, test_class = None, runtime_deps = [], jvm_flags = [], tags = [], launcher = None):
+def mx_test_class(name, project = None, test_class = None, runtime_deps = [], jvm_flags = [], tags = [], launcher = None, data = []):
     """Run one mx JUnit 4 test class."""
     if launcher:
         _launcher_test(name = name, launcher = launcher, test_class = test_class, tags = tags, size = "medium")
         return
     if not test_class or not (project or runtime_deps):
         fail("mx_test_class requires test_class and a project or runtime_deps")
-    java_test(name = name, runtime_deps = ([project] if project else []) + runtime_deps, test_class = test_class, jvm_flags = jvm_flags, tags = tags)
+    java_test(name = name, data = data, runtime_deps = ([project] if project else []) + runtime_deps, test_class = test_class, jvm_flags = jvm_flags, tags = tags)
 
 def _layout_file_impl(ctx):
     if ctx.file.src:

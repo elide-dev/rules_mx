@@ -2,7 +2,7 @@ diff --git a/truffle/BUILD.bazel b/truffle/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/truffle/BUILD.bazel
-@@ -0,0 +1,9056 @@
+@@ -0,0 +1,9852 @@
 +load("@rules_mx//mx:graph.bzl", "mx_jar_dist", "mx_jvmci_library", "mx_processed_java", "mx_processor", "mx_project", "mx_resource_layout", "mx_shaded_java", "mx_test_class", "mx_whole_java")
 +
 +# gazelle:resolve java com.oracle.truffle.api.impl //truffle:com.oracle.truffle.api
@@ -13,6 +13,7 @@ new file mode 100644
 +
 +load("@rules_java//java:java_import.bzl", "java_import")
 +load("@rules_mx//graal:attach.bzl", "truffle_attach")
++load("@rules_mx//graal:nfi.bzl", "nfi_libraries")
 +load("@rules_mx//graal:simplelanguage.bzl", "optimizing_junit", "simplelanguage", "sl_fixture_tests")
 +
 +java_import(
@@ -229,8 +230,13 @@ new file mode 100644
 +        ":com.oracle.truffle.api.dsl.test.com.oracle.truffle.api.dsl.test.examples.RubyCall",
 +        ":com.oracle.truffle.api.instrumentation.test.com.oracle.truffle.api.instrumentation.test.AllocationReporterTest",
 +        ":com.oracle.truffle.api.instrumentation.test.com.oracle.truffle.api.instrumentation.test.ContextsEventsTest",
++        ":com.oracle.truffle.api.instrumentation.test.com.oracle.truffle.api.instrumentation.test.ExecutionListenerTest",
++        ":com.oracle.truffle.api.instrumentation.test.com.oracle.truffle.api.instrumentation.test.FindSourcesVisitorNestingTest",
 +        ":com.oracle.truffle.api.instrumentation.test.com.oracle.truffle.api.instrumentation.test.GenerateWrapperTest",
++        ":com.oracle.truffle.api.instrumentation.test.com.oracle.truffle.api.instrumentation.test.InputFilterTest",
 +        ":com.oracle.truffle.api.instrumentation.test.com.oracle.truffle.api.instrumentation.test.InstrumentAPITest",
++        ":com.oracle.truffle.api.instrumentation.test.com.oracle.truffle.api.instrumentation.test.InstrumentOptionsTest",
++        ":com.oracle.truffle.api.instrumentation.test.com.oracle.truffle.api.instrumentation.test.InstrumentableNodeTest",
 +        ":com.oracle.truffle.api.library.test.com.oracle.truffle.api.library.test.AcceptsTest",
 +        ":com.oracle.truffle.api.library.test.com.oracle.truffle.api.library.test.AcceptsTransitionTest",
 +        ":com.oracle.truffle.api.library.test.com.oracle.truffle.api.library.test.CachedLibrarySharingTest",
@@ -303,12 +309,27 @@ new file mode 100644
 +        ":com.oracle.truffle.api.strings.test.com.oracle.truffle.api.strings.test.TStringConstructorTests",
 +        ":com.oracle.truffle.api.strings.test.com.oracle.truffle.api.strings.test.TStringUTF16Tests",
 +        ":com.oracle.truffle.api.strings.test.com.oracle.truffle.api.strings.test.TStringUTF8Tests",
++        ":com.oracle.truffle.api.strings.test.com.oracle.truffle.api.strings.test.ops.TStringConcatTest",
++        ":com.oracle.truffle.api.strings.test.com.oracle.truffle.api.strings.test.ops.TStringHashCodeTest",
++        ":com.oracle.truffle.api.strings.test.com.oracle.truffle.api.strings.test.ops.TStringParseDoubleTest",
++        ":com.oracle.truffle.api.strings.test.com.oracle.truffle.api.strings.test.ops.TStringParseIntTest",
++        ":com.oracle.truffle.api.strings.test.com.oracle.truffle.api.strings.test.ops.TStringParseLongTest",
++        ":com.oracle.truffle.api.strings.test.com.oracle.truffle.api.strings.test.ops.TStringSubstringTest",
++        ":com.oracle.truffle.api.strings.test.com.oracle.truffle.api.strings.test.ops.TStringSwitchEncodingTest",
 +        ":com.oracle.truffle.api.test.com.oracle.truffle.api.test.ArgumentsTest",
++        ":com.oracle.truffle.api.test.com.oracle.truffle.api.test.ArrayUtilsIndexOfWithMaskTest",
++        ":com.oracle.truffle.api.test.com.oracle.truffle.api.test.ArrayUtilsRegionEqualsWithMaskTest",
++        ":com.oracle.truffle.api.test.com.oracle.truffle.api.test.ArrayUtilsTest",
 +        ":com.oracle.truffle.api.test.com.oracle.truffle.api.test.CallTest",
 +        ":com.oracle.truffle.api.test.com.oracle.truffle.api.test.ChildNodeTest",
 +        ":com.oracle.truffle.api.test.com.oracle.truffle.api.test.ChildrenNodesTest",
++        ":com.oracle.truffle.api.test.com.oracle.truffle.api.test.FinalFieldTest",
 +        ":com.oracle.truffle.api.test.com.oracle.truffle.api.test.FrameDescriptorTest",
++        ":com.oracle.truffle.api.test.com.oracle.truffle.api.test.FrameSlotTypeSpecializationTest",
 +        ":com.oracle.truffle.api.test.com.oracle.truffle.api.test.FrameTest",
++        ":com.oracle.truffle.api.test.com.oracle.truffle.api.test.IndexedFrameTest",
++        ":com.oracle.truffle.api.test.com.oracle.truffle.api.test.InterfaceChildFieldTest",
++        ":com.oracle.truffle.api.test.com.oracle.truffle.api.test.IteratorTest",
 +        ":com.oracle.truffle.api.test.com.oracle.truffle.api.test.LoopNodeTest",
 +        ":com.oracle.truffle.api.test.com.oracle.truffle.api.test.RootNodeTest",
 +        ":com.oracle.truffle.api.test.com.oracle.truffle.api.test.polyglot.NIOFileSystemTest",
@@ -479,6 +500,156 @@ new file mode 100644
 +    runtime_deps = [
 +        ":TRUFFLE_SL_TCK",
 +        ":TRUFFLE_TCK_TESTS",
++    ],
++)
++
++nfi_libraries(
++    name = "com.oracle.truffle.nfi.native",
++    destination = "META-INF/resources/nfi-native/libnfi/<os>/<arch>/bin/",
++    file_list = "META-INF/resources/nfi-native/libnfi/<os>/<arch>/files",
++    hash_entry = "META-INF/resources/nfi-native/libnfi/<os>/<arch>/sha256",
++    headers = [
++        "com_oracle_truffle_nfi_backend_libffi_NativeAllocation.h",
++        "com_oracle_truffle_nfi_backend_libffi_LibFFIContext.h",
++        "com_oracle_truffle_nfi_backend_libffi_ClosureNativePointer.h",
++        "com_oracle_truffle_nfi_backend_libffi_NativeString.h",
++        "com_oracle_truffle_nfi_backend_libffi_NativeLibVersion.h",
++    ],
++    platforms = [
++        "linux-amd64",
++        "linux-aarch64",
++        "darwin-amd64",
++        "darwin-aarch64",
++        "windows-amd64",
++        "windows-aarch64",
++    ],
++    projects = [
++        {
++            "name": "com.oracle.truffle.nfi.native",
++            "deliverable": "trufflenfi",
++            "os_arch": {
++                "windows": {"<others>": {"cflags": ["-O3"]}},
++                "solaris": {"<others>": {
++                    "cflags": [
++                        "-g",
++                        "-O3",
++                        "-Wall",
++                        "-Werror",
++                        "-m64",
++                        "-pthread",
++                    ],
++                    "ldflags": [
++                        "-m64",
++                        "-pthread",
++                    ],
++                    "ldlibs": ["-ldl"],
++                }},
++                "linux": {"<others>": {
++                    "cflags": [
++                        "-g",
++                        "-O3",
++                        "-Wall",
++                        "-Werror",
++                        "-D_GNU_SOURCE",
++                        "-fvisibility=hidden",
++                    ],
++                    "ldlibs": ["-ldl"],
++                }},
++                "<others>": {"<others>": {
++                    "cflags": [
++                        "-g",
++                        "-O3",
++                        "-Wall",
++                        "-Werror",
++                        "-fvisibility=hidden",
++                    ],
++                    "ldlibs": ["-ldl"],
++                }},
++            },
++            "sources": [
++                "src/com.oracle.truffle.nfi.native/src/api.c",
++                "src/com.oracle.truffle.nfi.native/src/closure.c",
++                "src/com.oracle.truffle.nfi.native/src/internal.h",
++                "src/com.oracle.truffle.nfi.native/src/intrinsics.c",
++                "src/com.oracle.truffle.nfi.native/src/jni.c",
++                "src/com.oracle.truffle.nfi.native/src/lookup.c",
++                "src/com.oracle.truffle.nfi.native/src/lookup_win32.c",
++                "src/com.oracle.truffle.nfi.native/src/native.h",
++                "src/com.oracle.truffle.nfi.native/src/signature.c",
++            ],
++        },
++        {
++            "name": "com.oracle.truffle.nfi.test.native",
++            "deliverable": "nativetest",
++            "os_arch": {
++                "windows": {"<others>": {"cflags": ["-O3"]}},
++                "solaris": {"<others>": {
++                    "cflags": [
++                        "-g",
++                        "-O3",
++                        "-Wall",
++                        "-Werror",
++                        "-m64",
++                        "-pthread",
++                    ],
++                    "ldflags": [
++                        "-m64",
++                        "-pthread",
++                    ],
++                    "ldlibs": ["-lm"],
++                }},
++                "<others>": {"<others>": {
++                    "cflags": [
++                        "-g",
++                        "-O3",
++                        "-Wall",
++                        "-Werror",
++                        "-pthread",
++                    ],
++                    "ldflags": ["-pthread"],
++                    "ldlibs": ["-lm"],
++                }},
++            },
++            "sources": [
++                "src/com.oracle.truffle.nfi.test.native/src/array.c",
++                "src/com.oracle.truffle.nfi.test.native/src/common.h",
++                "src/com.oracle.truffle.nfi.test.native/src/errno.c",
++                "src/com.oracle.truffle.nfi.test.native/src/exception.c",
++                "src/com.oracle.truffle.nfi.test.native/src/global.cc",
++                "src/com.oracle.truffle.nfi.test.native/src/null.c",
++                "src/com.oracle.truffle.nfi.test.native/src/numeric.c",
++                "src/com.oracle.truffle.nfi.test.native/src/object.cc",
++                "src/com.oracle.truffle.nfi.test.native/src/package.c",
++                "src/com.oracle.truffle.nfi.test.native/src/string.c",
++                "src/com.oracle.truffle.nfi.test.native/src/thread.cc",
++                "src/com.oracle.truffle.nfi.test.native/src/varargs.c",
++                "src/com.oracle.truffle.nfi.test.native/src/vector.c",
++            ],
++        },
++        {
++            "name": "com.oracle.truffle.nfi.test.native.isolation",
++            "deliverable": "isolationtest",
++            "os_arch": {
++                "windows": {"<others>": {"cflags": ["-O3"]}},
++                "solaris": {"<others>": {"cflags": [
++                    "-g",
++                    "-O3",
++                    "-Wall",
++                    "-Werror",
++                    "-m64",
++                ]}},
++                "<others>": {"<others>": {"cflags": [
++                    "-g",
++                    "-O3",
++                    "-Wall",
++                    "-Werror",
++                ]}},
++            },
++            "sources": [
++                "src/com.oracle.truffle.nfi.test.native.isolation/src/common.h",
++                "src/com.oracle.truffle.nfi.test.native.isolation/src/global.cc",
++            ],
++        },
 +    ],
 +)
 +
@@ -7665,6 +7836,550 @@ new file mode 100644
 +    ],
 +)
 +
++mx_processed_java(
++    name = "com.oracle.truffle.nfi",
++    srcs = ["//truffle/src/com.oracle.truffle.nfi/src/com/oracle/truffle/nfi:com.oracle.truffle.nfi.srcs"],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++    ],
++    plugins = [
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":TRUFFLE_API",
++        ":com.oracle.truffle.api",
++        ":com.oracle.truffle.api.dsl",
++        ":com.oracle.truffle.api.interop",
++        ":com.oracle.truffle.api.library",
++        ":com.oracle.truffle.api.profiles",
++        ":com.oracle.truffle.nfi.api",
++        ":com.oracle.truffle.nfi.backend.spi",
++        "//sdk:POLYGLOT",
++    ],
++)
++
++mx_processed_java(
++    name = "com.oracle.truffle.nfi.api",
++    srcs = ["//truffle/src/com.oracle.truffle.nfi.api/src/com/oracle/truffle/nfi/api:com.oracle.truffle.nfi.api.srcs"],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++    ],
++    mx_resource_root = "src/com.oracle.truffle.nfi.api/src",
++    plugins = [
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    resources = ["//truffle/src/com.oracle.truffle.nfi.api/src/META-INF/native-image/org.graalvm.truffle/truffle-nfi:com.oracle.truffle.nfi.api.resources"],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":com.oracle.truffle.api.dsl",
++        ":com.oracle.truffle.api.interop",
++        ":com.oracle.truffle.api.library",
++        ":com.oracle.truffle.api.utilities",
++    ],
++)
++
++mx_processed_java(
++    name = "com.oracle.truffle.nfi.backend.libffi",
++    srcs = ["//truffle/src/com.oracle.truffle.nfi.backend.libffi/src/com/oracle/truffle/nfi/backend/libffi:com.oracle.truffle.nfi.backend.libffi.srcs"],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++        "--add-modules",
++        "jdk.unsupported",
++    ],
++    jni_headers = True,
++    mx_resource_root = "src/com.oracle.truffle.nfi.backend.libffi/src",
++    plugins = [
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    resources = [
++        "//truffle/src/com.oracle.truffle.nfi.backend.libffi/src/META-INF/native-image/org.graalvm.truffle/truffle-nfi-libffi:com.oracle.truffle.nfi.backend.libffi.resources",
++        "//truffle/src/com.oracle.truffle.nfi.backend.libffi/src/com/oracle/truffle/nfi/backend/libffi/doc-files:com.oracle.truffle.nfi.backend.libffi.resources",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":TRUFFLE_API",
++        ":com.oracle.truffle.api",
++        ":com.oracle.truffle.api.dsl",
++        ":com.oracle.truffle.api.interop",
++        ":com.oracle.truffle.api.library",
++        ":com.oracle.truffle.api.profiles",
++        ":com.oracle.truffle.nfi.api",
++        ":com.oracle.truffle.nfi.backend.spi",
++    ],
++)
++
++mx_processed_java(
++    name = "com.oracle.truffle.nfi.backend.spi",
++    srcs = [
++        "//truffle/src/com.oracle.truffle.nfi.backend.spi/src/com/oracle/truffle/nfi/backend/spi:com.oracle.truffle.nfi.backend.spi.srcs",
++        "//truffle/src/com.oracle.truffle.nfi.backend.spi/src/com/oracle/truffle/nfi/backend/spi/types:com.oracle.truffle.nfi.backend.spi.srcs",
++        "//truffle/src/com.oracle.truffle.nfi.backend.spi/src/com/oracle/truffle/nfi/backend/spi/util:com.oracle.truffle.nfi.backend.spi.srcs",
++    ],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++        "--add-modules",
++        "jdk.unsupported",
++    ],
++    plugins = [
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [":TRUFFLE_API"],
++)
++
++mx_processed_java(
++    name = "com.oracle.truffle.nfi.test",
++    testonly = True,
++    srcs = [
++        "//truffle/src/com.oracle.truffle.nfi.test/src/com/oracle/truffle/nfi/test:com.oracle.truffle.nfi.test.srcs",
++        "//truffle/src/com.oracle.truffle.nfi.test/src/com/oracle/truffle/nfi/test/interop:com.oracle.truffle.nfi.test.srcs",
++        "//truffle/src/com.oracle.truffle.nfi.test/src/com/oracle/truffle/nfi/test/parser:com.oracle.truffle.nfi.test.srcs",
++        "//truffle/src/com.oracle.truffle.nfi.test/src/com/oracle/truffle/nfi/test/parser/backend:com.oracle.truffle.nfi.test.srcs",
++    ],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++        "--add-modules",
++        "jdk.unsupported",
++    ],
++    plugins = [
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":TRUFFLE_API",
++        ":TRUFFLE_NFI",
++        ":TRUFFLE_TCK",
++        ":TRUFFLE_TEST_NATIVE",
++        ":com.oracle.truffle.api.test",
++        "//sdk:POLYGLOT",
++        "@contrib_rules_jvm_deps//:junit_junit",
++        "@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
++    ],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.nfi.test.com.oracle.truffle.nfi.test.ArrayNFITest",
++    data = [":TRUFFLE_TEST_NATIVE"],
++    jvm_flags = [
++        "-Dnative.test.path=$(rootpath :TRUFFLE_TEST_NATIVE)",
++        "--enable-native-access=ALL-UNNAMED",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++    ],
++    test_class = "com.oracle.truffle.nfi.test.ArrayNFITest",
++    runtime_deps = [":TRUFFLE_NFI_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.nfi.test.com.oracle.truffle.nfi.test.DeoptTest",
++    data = [":TRUFFLE_TEST_NATIVE"],
++    jvm_flags = [
++        "-Dnative.test.path=$(rootpath :TRUFFLE_TEST_NATIVE)",
++        "--enable-native-access=ALL-UNNAMED",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++    ],
++    test_class = "com.oracle.truffle.nfi.test.DeoptTest",
++    runtime_deps = [":TRUFFLE_NFI_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.nfi.test.com.oracle.truffle.nfi.test.ErrnoNFITest",
++    data = [":TRUFFLE_TEST_NATIVE"],
++    jvm_flags = [
++        "-Dnative.test.path=$(rootpath :TRUFFLE_TEST_NATIVE)",
++        "--enable-native-access=ALL-UNNAMED",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++    ],
++    test_class = "com.oracle.truffle.nfi.test.ErrnoNFITest",
++    runtime_deps = [":TRUFFLE_NFI_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.nfi.test.com.oracle.truffle.nfi.test.ExceptionNFITest",
++    data = [":TRUFFLE_TEST_NATIVE"],
++    jvm_flags = [
++        "-Dnative.test.path=$(rootpath :TRUFFLE_TEST_NATIVE)",
++        "--enable-native-access=ALL-UNNAMED",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++    ],
++    test_class = "com.oracle.truffle.nfi.test.ExceptionNFITest",
++    runtime_deps = [":TRUFFLE_NFI_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.nfi.test.com.oracle.truffle.nfi.test.FloatingNFITest",
++    data = [":TRUFFLE_TEST_NATIVE"],
++    jvm_flags = [
++        "-Dnative.test.path=$(rootpath :TRUFFLE_TEST_NATIVE)",
++        "--enable-native-access=ALL-UNNAMED",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++    ],
++    test_class = "com.oracle.truffle.nfi.test.FloatingNFITest",
++    runtime_deps = [":TRUFFLE_NFI_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.nfi.test.com.oracle.truffle.nfi.test.ForbiddenNFITest",
++    data = [":TRUFFLE_TEST_NATIVE"],
++    jvm_flags = [
++        "-Dnative.test.path=$(rootpath :TRUFFLE_TEST_NATIVE)",
++        "--enable-native-access=ALL-UNNAMED",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++    ],
++    test_class = "com.oracle.truffle.nfi.test.ForbiddenNFITest",
++    runtime_deps = [":TRUFFLE_NFI_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.nfi.test.com.oracle.truffle.nfi.test.GlobalNFITest",
++    data = [":TRUFFLE_TEST_NATIVE"],
++    jvm_flags = [
++        "-Dnative.test.path=$(rootpath :TRUFFLE_TEST_NATIVE)",
++        "--enable-native-access=ALL-UNNAMED",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++    ],
++    test_class = "com.oracle.truffle.nfi.test.GlobalNFITest",
++    runtime_deps = [":TRUFFLE_NFI_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.nfi.test.com.oracle.truffle.nfi.test.ImplicitConvertNFITest",
++    data = [":TRUFFLE_TEST_NATIVE"],
++    jvm_flags = [
++        "-Dnative.test.path=$(rootpath :TRUFFLE_TEST_NATIVE)",
++        "--enable-native-access=ALL-UNNAMED",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++    ],
++    test_class = "com.oracle.truffle.nfi.test.ImplicitConvertNFITest",
++    runtime_deps = [":TRUFFLE_NFI_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.nfi.test.com.oracle.truffle.nfi.test.IntegerLimitsNFITest",
++    data = [":TRUFFLE_TEST_NATIVE"],
++    jvm_flags = [
++        "-Dnative.test.path=$(rootpath :TRUFFLE_TEST_NATIVE)",
++        "--enable-native-access=ALL-UNNAMED",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++    ],
++    test_class = "com.oracle.truffle.nfi.test.IntegerLimitsNFITest",
++    runtime_deps = [":TRUFFLE_NFI_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.nfi.test.com.oracle.truffle.nfi.test.IsolatedNamespaceTest",
++    data = [":TRUFFLE_TEST_NATIVE"],
++    jvm_flags = [
++        "-Dnative.test.path=$(rootpath :TRUFFLE_TEST_NATIVE)",
++        "--enable-native-access=ALL-UNNAMED",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++    ],
++    test_class = "com.oracle.truffle.nfi.test.IsolatedNamespaceTest",
++    runtime_deps = [":TRUFFLE_NFI_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.nfi.test.com.oracle.truffle.nfi.test.KeyInfoNFITest",
++    data = [":TRUFFLE_TEST_NATIVE"],
++    jvm_flags = [
++        "-Dnative.test.path=$(rootpath :TRUFFLE_TEST_NATIVE)",
++        "--enable-native-access=ALL-UNNAMED",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++    ],
++    test_class = "com.oracle.truffle.nfi.test.KeyInfoNFITest",
++    runtime_deps = [":TRUFFLE_NFI_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.nfi.test.com.oracle.truffle.nfi.test.LoadNFILibraryTest",
++    data = [":TRUFFLE_TEST_NATIVE"],
++    jvm_flags = [
++        "-Dnative.test.path=$(rootpath :TRUFFLE_TEST_NATIVE)",
++        "--enable-native-access=ALL-UNNAMED",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++    ],
++    test_class = "com.oracle.truffle.nfi.test.LoadNFILibraryTest",
++    runtime_deps = [":TRUFFLE_NFI_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.nfi.test.com.oracle.truffle.nfi.test.NullArrayNFITest",
++    data = [":TRUFFLE_TEST_NATIVE"],
++    jvm_flags = [
++        "-Dnative.test.path=$(rootpath :TRUFFLE_TEST_NATIVE)",
++        "--enable-native-access=ALL-UNNAMED",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++    ],
++    test_class = "com.oracle.truffle.nfi.test.NullArrayNFITest",
++    runtime_deps = [":TRUFFLE_NFI_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.nfi.test.com.oracle.truffle.nfi.test.NullNFITest",
++    data = [":TRUFFLE_TEST_NATIVE"],
++    jvm_flags = [
++        "-Dnative.test.path=$(rootpath :TRUFFLE_TEST_NATIVE)",
++        "--enable-native-access=ALL-UNNAMED",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++    ],
++    test_class = "com.oracle.truffle.nfi.test.NullNFITest",
++    runtime_deps = [":TRUFFLE_NFI_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.nfi.test.com.oracle.truffle.nfi.test.NullableNFITest",
++    data = [":TRUFFLE_TEST_NATIVE"],
++    jvm_flags = [
++        "-Dnative.test.path=$(rootpath :TRUFFLE_TEST_NATIVE)",
++        "--enable-native-access=ALL-UNNAMED",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++    ],
++    test_class = "com.oracle.truffle.nfi.test.NullableNFITest",
++    runtime_deps = [":TRUFFLE_NFI_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.nfi.test.com.oracle.truffle.nfi.test.NumericNFITest",
++    data = [":TRUFFLE_TEST_NATIVE"],
++    jvm_flags = [
++        "-Dnative.test.path=$(rootpath :TRUFFLE_TEST_NATIVE)",
++        "--enable-native-access=ALL-UNNAMED",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++    ],
++    test_class = "com.oracle.truffle.nfi.test.NumericNFITest",
++    runtime_deps = [":TRUFFLE_NFI_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.nfi.test.com.oracle.truffle.nfi.test.ObjectNFITest",
++    data = [":TRUFFLE_TEST_NATIVE"],
++    jvm_flags = [
++        "-Dnative.test.path=$(rootpath :TRUFFLE_TEST_NATIVE)",
++        "--enable-native-access=ALL-UNNAMED",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++    ],
++    test_class = "com.oracle.truffle.nfi.test.ObjectNFITest",
++    runtime_deps = [":TRUFFLE_NFI_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.nfi.test.com.oracle.truffle.nfi.test.PointerNFITest",
++    data = [":TRUFFLE_TEST_NATIVE"],
++    jvm_flags = [
++        "-Dnative.test.path=$(rootpath :TRUFFLE_TEST_NATIVE)",
++        "--enable-native-access=ALL-UNNAMED",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++    ],
++    test_class = "com.oracle.truffle.nfi.test.PointerNFITest",
++    runtime_deps = [":TRUFFLE_NFI_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.nfi.test.com.oracle.truffle.nfi.test.RegisterPackageNFITest",
++    data = [":TRUFFLE_TEST_NATIVE"],
++    jvm_flags = [
++        "-Dnative.test.path=$(rootpath :TRUFFLE_TEST_NATIVE)",
++        "--enable-native-access=ALL-UNNAMED",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++    ],
++    test_class = "com.oracle.truffle.nfi.test.RegisterPackageNFITest",
++    runtime_deps = [":TRUFFLE_NFI_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.nfi.test.com.oracle.truffle.nfi.test.SignatureExecuteNFITest",
++    data = [":TRUFFLE_TEST_NATIVE"],
++    jvm_flags = [
++        "-Dnative.test.path=$(rootpath :TRUFFLE_TEST_NATIVE)",
++        "--enable-native-access=ALL-UNNAMED",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++    ],
++    test_class = "com.oracle.truffle.nfi.test.SignatureExecuteNFITest",
++    runtime_deps = [":TRUFFLE_NFI_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.nfi.test.com.oracle.truffle.nfi.test.StringAsInterfaceNFITest",
++    data = [":TRUFFLE_TEST_NATIVE"],
++    jvm_flags = [
++        "-Dnative.test.path=$(rootpath :TRUFFLE_TEST_NATIVE)",
++        "--enable-native-access=ALL-UNNAMED",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++    ],
++    test_class = "com.oracle.truffle.nfi.test.StringAsInterfaceNFITest",
++    runtime_deps = [":TRUFFLE_NFI_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.nfi.test.com.oracle.truffle.nfi.test.StringNFITest",
++    data = [":TRUFFLE_TEST_NATIVE"],
++    jvm_flags = [
++        "-Dnative.test.path=$(rootpath :TRUFFLE_TEST_NATIVE)",
++        "--enable-native-access=ALL-UNNAMED",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++    ],
++    test_class = "com.oracle.truffle.nfi.test.StringNFITest",
++    runtime_deps = [":TRUFFLE_NFI_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.nfi.test.com.oracle.truffle.nfi.test.ThreadErrnoNFITest",
++    data = [":TRUFFLE_TEST_NATIVE"],
++    jvm_flags = [
++        "-Dnative.test.path=$(rootpath :TRUFFLE_TEST_NATIVE)",
++        "--enable-native-access=ALL-UNNAMED",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++    ],
++    test_class = "com.oracle.truffle.nfi.test.ThreadErrnoNFITest",
++    runtime_deps = [":TRUFFLE_NFI_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.nfi.test.com.oracle.truffle.nfi.test.ThreadNFITest",
++    data = [":TRUFFLE_TEST_NATIVE"],
++    jvm_flags = [
++        "-Dnative.test.path=$(rootpath :TRUFFLE_TEST_NATIVE)",
++        "--enable-native-access=ALL-UNNAMED",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++    ],
++    test_class = "com.oracle.truffle.nfi.test.ThreadNFITest",
++    runtime_deps = [":TRUFFLE_NFI_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.nfi.test.com.oracle.truffle.nfi.test.VarargsNFITest",
++    data = [":TRUFFLE_TEST_NATIVE"],
++    jvm_flags = [
++        "-Dnative.test.path=$(rootpath :TRUFFLE_TEST_NATIVE)",
++        "--enable-native-access=ALL-UNNAMED",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++    ],
++    test_class = "com.oracle.truffle.nfi.test.VarargsNFITest",
++    runtime_deps = [":TRUFFLE_NFI_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.nfi.test.com.oracle.truffle.nfi.test.WrappedPrimitiveNFITest",
++    data = [":TRUFFLE_TEST_NATIVE"],
++    jvm_flags = [
++        "-Dnative.test.path=$(rootpath :TRUFFLE_TEST_NATIVE)",
++        "--enable-native-access=ALL-UNNAMED",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++    ],
++    test_class = "com.oracle.truffle.nfi.test.WrappedPrimitiveNFITest",
++    runtime_deps = [":TRUFFLE_NFI_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.nfi.test.com.oracle.truffle.nfi.test.parser.ClosureParseSignatureTest",
++    data = [":TRUFFLE_TEST_NATIVE"],
++    jvm_flags = [
++        "-Dnative.test.path=$(rootpath :TRUFFLE_TEST_NATIVE)",
++        "--enable-native-access=ALL-UNNAMED",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++    ],
++    test_class = "com.oracle.truffle.nfi.test.parser.ClosureParseSignatureTest",
++    runtime_deps = [":TRUFFLE_NFI_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.nfi.test.com.oracle.truffle.nfi.test.parser.ErrorParseSignatureTest",
++    data = [":TRUFFLE_TEST_NATIVE"],
++    jvm_flags = [
++        "-Dnative.test.path=$(rootpath :TRUFFLE_TEST_NATIVE)",
++        "--enable-native-access=ALL-UNNAMED",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++    ],
++    test_class = "com.oracle.truffle.nfi.test.parser.ErrorParseSignatureTest",
++    runtime_deps = [":TRUFFLE_NFI_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.nfi.test.com.oracle.truffle.nfi.test.parser.ParseLibraryDescriptorTest",
++    data = [":TRUFFLE_TEST_NATIVE"],
++    jvm_flags = [
++        "-Dnative.test.path=$(rootpath :TRUFFLE_TEST_NATIVE)",
++        "--enable-native-access=ALL-UNNAMED",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++    ],
++    test_class = "com.oracle.truffle.nfi.test.parser.ParseLibraryDescriptorTest",
++    runtime_deps = [":TRUFFLE_NFI_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.nfi.test.com.oracle.truffle.nfi.test.parser.SimpleParseSignatureTest",
++    data = [":TRUFFLE_TEST_NATIVE"],
++    jvm_flags = [
++        "-Dnative.test.path=$(rootpath :TRUFFLE_TEST_NATIVE)",
++        "--enable-native-access=ALL-UNNAMED",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++    ],
++    test_class = "com.oracle.truffle.nfi.test.parser.SimpleParseSignatureTest",
++    runtime_deps = [":TRUFFLE_NFI_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.nfi.test.com.oracle.truffle.nfi.test.parser.VarargsParseSignatureTest",
++    data = [":TRUFFLE_TEST_NATIVE"],
++    jvm_flags = [
++        "-Dnative.test.path=$(rootpath :TRUFFLE_TEST_NATIVE)",
++        "--enable-native-access=ALL-UNNAMED",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++    ],
++    test_class = "com.oracle.truffle.nfi.test.parser.VarargsParseSignatureTest",
++    runtime_deps = [":TRUFFLE_NFI_TEST"],
++)
++
 +mx_project(
 +    name = "com.oracle.truffle.object",
 +    packages = [
@@ -8724,6 +9439,87 @@ new file mode 100644
 +    truffle_services = True,
 +    visibility = ["//visibility:public"],
 +    deps = [":TRUFFLE_API"],
++)
++
++mx_jar_dist(
++    name = "TRUFFLE_NFI",
++    contents = [
++        ":com.oracle.truffle.nfi.api",
++        ":com.oracle.truffle.nfi.backend.spi",
++        ":com.oracle.truffle.nfi",
++    ],
++    directives = [
++        "exports com.oracle.truffle.nfi.api",
++        "exports com.oracle.truffle.nfi.backend.spi",
++        "exports com.oracle.truffle.nfi.backend.spi.types",
++        "exports com.oracle.truffle.nfi.backend.spi.util",
++        "requires jdk.unsupported",
++        "requires org.graalvm.collections",
++        "requires org.graalvm.polyglot",
++        "requires org.graalvm.truffle",
++        "requires transitive org.graalvm.word",
++    ],
++    jni_services = True,
++    manifest = {
++        "Implementation-Vendor": "Oracle Corporation",
++        "Implementation-Version": "25.5.5-dev",
++        "Name": "truffle-nfi",
++        "Specification-Vendor": "Oracle Corporation",
++        "Specification-Version": "25.5.5-dev",
++    },
++    module_name = "com.oracle.truffle.truffle_nfi",
++    release = 21,
++    snippets_pattern = ".*(Snippets|doc-files).*",
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [":TRUFFLE_API"],
++)
++
++mx_jar_dist(
++    name = "TRUFFLE_NFI_LIBFFI",
++    contents = [
++        ":com.oracle.truffle.nfi.backend.libffi",
++        ":TRUFFLE_NFI_RESOURCES",
++    ],
++    directives = [
++        "opens com.oracle.truffle.nfi.backend.libffi to org.graalvm.truffle.runtime.svm",
++        "requires com.oracle.truffle.truffle_nfi",
++        "requires jdk.unsupported",
++        "requires org.graalvm.truffle",
++        "requires transitive org.graalvm.word",
++    ],
++    jni_services = True,
++    manifest = {
++        "Implementation-Vendor": "Oracle Corporation",
++        "Implementation-Version": "25.5.5-dev",
++        "Name": "truffle-nfi-libffi",
++        "Specification-Vendor": "Oracle Corporation",
++        "Specification-Version": "25.5.5-dev",
++    },
++    module_name = "com.oracle.truffle.truffle_nfi_libffi",
++    release = 21,
++    snippets_pattern = ".*(Snippets|doc-files).*",
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [":TRUFFLE_NFI"],
++)
++
++mx_jar_dist(
++    name = "TRUFFLE_NFI_TEST",
++    testonly = True,
++    contents = [":com.oracle.truffle.nfi.test"],
++    jni_services = True,
++    snippets_pattern = ".*(Snippets|doc-files).*",
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":TRUFFLE_NFI",
++        ":TRUFFLE_NFI_LIBFFI",
++        ":TRUFFLE_TEST",
++        ":TRUFFLE_TEST_NATIVE",
++        "@contrib_rules_jvm_deps//:junit_junit",
++        "@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
++    ],
 +)
 +
 +mx_jar_dist(
@@ -11786,6 +12582,273 @@ new file mode 100644
 +mx_files(
 +    name = "com.oracle.truffle.host.srcs",
 +    srcs = ["HostAdapterServices.java"],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.nfi/src/com/oracle/truffle/nfi/BUILD.bazel b/truffle/src/com.oracle.truffle.nfi/src/com/oracle/truffle/nfi/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.nfi/src/com/oracle/truffle/nfi/BUILD.bazel
+@@ -0,0 +1,31 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.nfi.srcs",
++    srcs = [
++        "API.java",
++        "CallSignatureNode.java",
++        "ConvertTypeNode.java",
++        "Lexer.java",
++        "LongDoubleUtil.java",
++        "NFIClosure.java",
++        "NFIContext.java",
++        "NFILanguage.java",
++        "NFILibrary.java",
++        "NFIOptions.java",
++        "NFIParserException.java",
++        "NFIPointer.java",
++        "NFIPreBindException.java",
++        "NFIRootNode.java",
++        "NFISignature.java",
++        "NFISymbol.java",
++        "NFIType.java",
++        "NFIUnsupportedTypeException.java",
++        "NativeSource.java",
++        "Parser.java",
++        "SignatureRootNode.java",
++        "SignatureTypeCachedState.java",
++        "SimpleTypeCachedState.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.nfi.api/src/META-INF/native-image/org.graalvm.truffle/truffle-nfi/BUILD.bazel b/truffle/src/com.oracle.truffle.nfi.api/src/META-INF/native-image/org.graalvm.truffle/truffle-nfi/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.nfi.api/src/META-INF/native-image/org.graalvm.truffle/truffle-nfi/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.nfi.api.resources",
++    srcs = ["native-image.properties"],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.nfi.api/src/com/oracle/truffle/nfi/api/BUILD.bazel b/truffle/src/com.oracle.truffle.nfi.api/src/com/oracle/truffle/nfi/api/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.nfi.api/src/com/oracle/truffle/nfi/api/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.nfi.api.srcs",
++    srcs = [
++        "NativePointerLibrary.java",
++        "SerializableLibrary.java",
++        "SignatureLibrary.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.nfi.backend.libffi/src/META-INF/native-image/org.graalvm.truffle/truffle-nfi-libffi/BUILD.bazel b/truffle/src/com.oracle.truffle.nfi.backend.libffi/src/META-INF/native-image/org.graalvm.truffle/truffle-nfi-libffi/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.nfi.backend.libffi/src/META-INF/native-image/org.graalvm.truffle/truffle-nfi-libffi/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.nfi.backend.libffi.resources",
++    srcs = ["native-image.properties"],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.nfi.backend.libffi/src/com/oracle/truffle/nfi/backend/libffi/BUILD.bazel b/truffle/src/com.oracle.truffle.nfi.backend.libffi/src/com/oracle/truffle/nfi/backend/libffi/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.nfi.backend.libffi/src/com/oracle/truffle/nfi/backend/libffi/BUILD.bazel
+@@ -0,0 +1,31 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.nfi.backend.libffi.srcs",
++    srcs = [
++        "AbstractNativePointer.java",
++        "ClosureArgumentNode.java",
++        "ClosureNativePointer.java",
++        "FunctionExecuteNode.java",
++        "LibFFIClosure.java",
++        "LibFFIContext.java",
++        "LibFFILanguage.java",
++        "LibFFILibrary.java",
++        "LibFFINFIBackend.java",
++        "LibFFISignature.java",
++        "LibFFISymbol.java",
++        "LibFFIType.java",
++        "LibNFIResource.java",
++        "LoadFlags.java",
++        "NFIUnsatisfiedLinkError.java",
++        "NFIUnsupportedException.java",
++        "NativeAllocation.java",
++        "NativeArgumentBuffer.java",
++        "NativeBuffer.java",
++        "NativeLibVersion.java",
++        "NativePointer.java",
++        "NativeString.java",
++        "SerializeArgumentNode.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.nfi.backend.libffi/src/com/oracle/truffle/nfi/backend/libffi/doc-files/BUILD.bazel b/truffle/src/com.oracle.truffle.nfi.backend.libffi/src/com/oracle/truffle/nfi/backend/libffi/doc-files/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.nfi.backend.libffi/src/com/oracle/truffle/nfi/backend/libffi/doc-files/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.nfi.backend.libffi.resources",
++    srcs = ["native-alloc.svg"],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.nfi.backend.spi/src/com/oracle/truffle/nfi/backend/spi/BUILD.bazel b/truffle/src/com.oracle.truffle.nfi.backend.spi/src/com/oracle/truffle/nfi/backend/spi/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.nfi.backend.spi/src/com/oracle/truffle/nfi/backend/spi/BUILD.bazel
+@@ -0,0 +1,15 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.nfi.backend.spi.srcs",
++    srcs = [
++        "BackendNativePointerLibrary.java",
++        "NFIBackend.java",
++        "NFIBackendFactory.java",
++        "NFIBackendLibrary.java",
++        "NFIBackendSignatureBuilderLibrary.java",
++        "NFIBackendSignatureLibrary.java",
++        "NFIState.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.nfi.backend.spi/src/com/oracle/truffle/nfi/backend/spi/types/BUILD.bazel b/truffle/src/com.oracle.truffle.nfi.backend.spi/src/com/oracle/truffle/nfi/backend/spi/types/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.nfi.backend.spi/src/com/oracle/truffle/nfi/backend/spi/types/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.nfi.backend.spi.srcs",
++    srcs = [
++        "NativeLibraryDescriptor.java",
++        "NativeSimpleType.java",
++        "TypeFactory.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.nfi.backend.spi/src/com/oracle/truffle/nfi/backend/spi/util/BUILD.bazel b/truffle/src/com.oracle.truffle.nfi.backend.spi/src/com/oracle/truffle/nfi/backend/spi/util/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.nfi.backend.spi/src/com/oracle/truffle/nfi/backend/spi/util/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.nfi.backend.spi.srcs",
++    srcs = ["ProfiledArrayBuilder.java"],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.nfi.test/src/com/oracle/truffle/nfi/test/BUILD.bazel b/truffle/src/com.oracle.truffle.nfi.test/src/com/oracle/truffle/nfi/test/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.nfi.test/src/com/oracle/truffle/nfi/test/BUILD.bazel
+@@ -0,0 +1,35 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.nfi.test.srcs",
++    srcs = [
++        "ArrayNFITest.java",
++        "DeoptTest.java",
++        "ErrnoNFITest.java",
++        "ExceptionNFITest.java",
++        "FloatingNFITest.java",
++        "ForbiddenNFITest.java",
++        "GlobalNFITest.java",
++        "ImplicitConvertNFITest.java",
++        "IntegerLimitsNFITest.java",
++        "IsolatedNamespaceTest.java",
++        "KeyInfoNFITest.java",
++        "LoadNFILibraryTest.java",
++        "NFITest.java",
++        "NullArrayNFITest.java",
++        "NullNFITest.java",
++        "NullableNFITest.java",
++        "NumericNFITest.java",
++        "ObjectNFITest.java",
++        "PointerNFITest.java",
++        "RegisterPackageNFITest.java",
++        "SignatureExecuteNFITest.java",
++        "StringAsInterfaceNFITest.java",
++        "StringNFITest.java",
++        "ThreadErrnoNFITest.java",
++        "ThreadNFITest.java",
++        "VarargsNFITest.java",
++        "WrappedPrimitiveNFITest.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.nfi.test/src/com/oracle/truffle/nfi/test/interop/BUILD.bazel b/truffle/src/com.oracle.truffle.nfi.test/src/com/oracle/truffle/nfi/test/interop/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.nfi.test/src/com/oracle/truffle/nfi/test/interop/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.nfi.test.srcs",
++    srcs = [
++        "BoxedPrimitive.java",
++        "NativeVector.java",
++        "NullObject.java",
++        "TestCallback.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.nfi.test/src/com/oracle/truffle/nfi/test/parser/BUILD.bazel b/truffle/src/com.oracle.truffle.nfi.test/src/com/oracle/truffle/nfi/test/parser/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.nfi.test/src/com/oracle/truffle/nfi/test/parser/BUILD.bazel
+@@ -0,0 +1,14 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.nfi.test.srcs",
++    srcs = [
++        "ClosureParseSignatureTest.java",
++        "ErrorParseSignatureTest.java",
++        "ParseLibraryDescriptorTest.java",
++        "ParseSignatureTest.java",
++        "SimpleParseSignatureTest.java",
++        "VarargsParseSignatureTest.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.nfi.test/src/com/oracle/truffle/nfi/test/parser/backend/BUILD.bazel b/truffle/src/com.oracle.truffle.nfi.test/src/com/oracle/truffle/nfi/test/parser/backend/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.nfi.test/src/com/oracle/truffle/nfi/test/parser/backend/BUILD.bazel
+@@ -0,0 +1,14 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.nfi.test.srcs",
++    srcs = [
++        "NFITestBackend.java",
++        "TestCallInfo.java",
++        "TestClosure.java",
++        "TestLibrary.java",
++        "TestSignature.java",
++        "TestSymbol.java",
++    ],
 +    visibility = ["//truffle:__pkg__"],
 +)
 diff --git a/truffle/src/com.oracle.truffle.object/src/com/oracle/truffle/object/BUILD.bazel b/truffle/src/com.oracle.truffle.object/src/com/oracle/truffle/object/BUILD.bazel

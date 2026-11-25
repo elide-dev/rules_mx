@@ -6,6 +6,7 @@ import base64
 import difflib
 import json
 import os
+import re
 import runpy
 from pathlib import Path
 import shutil
@@ -155,6 +156,28 @@ SUITES = {
     ],
     "truffle": [
         "--java-dep",
+        "truffle:TRUFFLE_NFI_RESOURCES=:TRUFFLE_NFI_RESOURCES",
+        "--generated-dep",
+        "truffle:com.oracle.truffle.nfi.api=:com.oracle.truffle.api.utilities",
+        "--generated-dep",
+        "truffle:com.oracle.truffle.nfi.test=@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
+        "--java-dep",
+        "truffle:TRUFFLE_TEST_NATIVE=:TRUFFLE_TEST_NATIVE",
+        "--test-path",
+        "truffle:TRUFFLE_TEST_NATIVE=:TRUFFLE_TEST_NATIVE",
+        "--archive-dist",
+        "TRUFFLE_NFI",
+        "--archive-dist",
+        "TRUFFLE_NFI_LIBFFI",
+        "--archive-dist",
+        "TRUFFLE_NFI_TEST",
+        "--test-runtime",
+        "truffle:com.oracle.truffle.nfi.test=:TRUFFLE_NFI_TEST",
+        "--test-jvm-flag",
+        "truffle:com.oracle.truffle.nfi.test=--enable-native-access=ALL-UNNAMED",
+        "--test-jvm-flag",
+        "truffle:com.oracle.truffle.nfi.test=-Dpolyglot.engine.WarnInterpreterOnly=false",
+        "--java-dep",
         "mx:HAMCREST=@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
         "--archive-dist",
         "TRUFFLE_DSL_PROCESSOR",
@@ -265,6 +288,8 @@ SUITES = {
         "TRUFFLE_SL",
         "--archive-dist",
         "TRUFFLE_SL_LAUNCHER",
+        "TRUFFLE_NFI_LIBFFI",
+        "TRUFFLE_NFI_TEST",
         "TRUFFLE_SL",
         "TRUFFLE_SL_LAUNCHER",
         "TRUFFLE_RUNTIME",
@@ -404,12 +429,12 @@ def hsdis_inputs(directory):
 # CI runs independent upstream tests from each newly imported project. All other
 # discovered classes retain individually addressable labels for explicit runs.
 HARNESS_TESTS = {
-    "com.oracle.truffle.api.test": "ArgumentsTest CallTest ChildNodeTest ChildrenNodesTest FrameTest FrameDescriptorTest RootNodeTest LoopNodeTest NIOFileSystemTest",
+    "com.oracle.truffle.api.test": "ArgumentsTest CallTest ChildNodeTest ChildrenNodesTest FrameTest FrameDescriptorTest RootNodeTest LoopNodeTest NIOFileSystemTest ArrayUtilsTest ArrayUtilsIndexOfWithMaskTest ArrayUtilsRegionEqualsWithMaskTest FinalFieldTest FrameSlotTypeSpecializationTest IndexedFrameTest InterfaceChildFieldTest IteratorTest",
     "com.oracle.truffle.api.dsl.test": "*",
     "com.oracle.truffle.api.library.test": "*",
-    "com.oracle.truffle.api.instrumentation.test": "AllocationReporterTest ContextsEventsTest GenerateWrapperTest InstrumentAPITest",
+    "com.oracle.truffle.api.instrumentation.test": "AllocationReporterTest ContextsEventsTest GenerateWrapperTest InstrumentAPITest InputFilterTest InstrumentOptionsTest InstrumentableNodeTest ExecutionListenerTest FindSourcesVisitorNestingTest",
     "com.oracle.truffle.api.debug.test": "*",
-    "com.oracle.truffle.api.strings.test": "TStringBasicTests TStringUTF8Tests TStringUTF16Tests TStringConstructorTests",
+    "com.oracle.truffle.api.strings.test": "TStringBasicTests TStringUTF8Tests TStringUTF16Tests TStringConstructorTests TStringParseDoubleTest TStringParseIntTest TStringParseLongTest TStringConcatTest TStringSubstringTest TStringSwitchEncodingTest TStringHashCodeTest",
     "com.oracle.truffle.api.bytecode.test": "*",
     "com.oracle.truffle.api.object.test": "*",
     "com.oracle.truffle.api.staticobject.test": "*",
@@ -561,6 +586,40 @@ def truffle_native_projects(directory):
         file_list=dist["fileListEntry"],
         hash_entry=dist["hashEntry"],
     )
+    native = "com.oracle.truffle.nfi.native"
+    test = suite["distributions"]["TRUFFLE_TEST_NATIVE"]
+    nfi = suite["distributions"]["TRUFFLE_NFI_RESOURCES"]
+    [(dest, member)] = nfi["layout"].items()
+    if member != f"dependency:{native}/*/<multitarget_libc_selection>/*":
+        raise ValueError("Unsupported NFI internal-resource layout")
+    projects = []
+    for project_name in [native, *test["dependencies"]]:
+        project = suite["projects"][project_name]
+        if project["native"] != "shared_lib":
+            raise ValueError(f"Expected a shared library for {project_name}")
+        sources = directory / project["subDir"] / project_name / "src"
+        projects.append(
+            dict(
+                name=project_name,
+                deliverable=project["deliverable"],
+                os_arch=project["os_arch"],
+                sources=sorted(
+                    p.relative_to(directory).as_posix()
+                    for p in sources.iterdir()
+                    if p.suffix in {".c", ".cc", ".h"}
+                ),
+            )
+        )
+    header = directory / "src" / native / "src/native.h"
+    nfi_attrs = dict(
+        name=native,
+        projects=projects,
+        headers=re.findall(r'^#include "(.*?\.h)"', header.read_text(), re.M),
+        platforms=nfi["platforms"],
+        destination=dest,
+        file_list=nfi["fileListEntry"],
+        hash_entry=nfi["hashEntry"],
+    )
     fixture_rules = []
     fixture_root = directory / "src/com.oracle.truffle.sl.test/src/tests"
     for parent in sorted({p.parent for p in fixture_root.rglob("*.sl")}):
@@ -587,6 +646,12 @@ def truffle_native_projects(directory):
             f'runtime_deps = {json.dumps(tck["test_runtime"])}, jvm_flags = ["-Dtck.language=sl"])\n'
             for cls in tck["tests"]
         )
+        + 'load("@rules_mx//graal:nfi.bzl", "nfi_libraries")\n'
+        + "nfi_libraries(\n"
+        + "".join(
+            f"    {key} = {json.dumps(value)},\n" for key, value in nfi_attrs.items()
+        )
+        + ")\n"
         + "truffle_attach(\n"
         + "".join(f"    {key} = {json.dumps(value)},\n" for key, value in attrs.items())
         + ")\n"
@@ -724,6 +789,29 @@ def main():
                         "BUILD", "BUILD.bazel", "__pycache__"
                     ),
                 )
+        lib = runpy.run_path(str(stage / "truffle/mx.truffle/suite.py"))["suite"][
+            "libraries"
+        ]["LIBFFI_SOURCES"]
+        algorithm, digest = lib["digest"].split(":")
+        libffi = ROOT / "graal/libffi.json"
+        pin = (
+            json.dumps(
+                dict(
+                    version=lib["version"],
+                    urls=[u.format(**lib) for u in lib["urls"]],
+                    integrity=algorithm
+                    + "-"
+                    + base64.b64encode(bytes.fromhex(digest)).decode(),
+                ),
+                indent=2,
+            )
+            + "\n"
+        )
+        if args.check:
+            if libffi.read_text() != pin:
+                sys.exit("Regenerate the libffi pin with tools/generate-graal")
+        else:
+            libffi.write_text(pin)
         hsdis = ROOT / "graal/hsdis.json"
         pins = (
             json.dumps(hsdis_inputs(stage / "compiler"), indent=2, sort_keys=True)

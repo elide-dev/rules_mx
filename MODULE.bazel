@@ -143,3 +143,14 @@ hsdis(
     lock = "//graal:hsdis.json",
     platform = "linux_aarch64",
 )
+
+bazel_dep(name = "bazel_skylib", version = "1.9.2", dev_dependency = True)
+bazel_dep(name = "rules_license", version = "1.0.0", dev_dependency = True)
+
+libffi = use_repo_rule("//graal:libffi.bzl", "graal_libffi")
+
+libffi(
+    name = "graal_libffi",
+    dev_dependency = True,
+    lock = "//graal:libffi.json",
+)

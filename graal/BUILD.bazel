@@ -1,5 +1,6 @@
 load("@rules_java//java:java_library.bzl", "java_library")
 load("@rules_java//java:java_test.bzl", "java_test")
+load("@rules_python//python:py_binary.bzl", "py_binary")
 
 exports_files([
     "benchmark_timer.patch",
@@ -9,6 +10,7 @@ exports_files([
     "sl_fixture_test.py",
     "shaded_inputs.json",
     "hsdis.json",
+    "libffi.json",
     "truffle.patch",
     "toolchain_test.py",
 ])
@@ -134,4 +136,9 @@ java_library(
         "@bazel_tools//tools/jdk:TestRunner",
         "@contrib_rules_jvm_deps//:junit_junit",
     ],
+)
+
+py_binary(
+    name = "native_test_layout",
+    srcs = ["native_test_layout.py"],
 )

@@ -77,6 +77,11 @@ def truffle_attach(name, deliverable, srcs, cflags, ldlibs, resource, platforms,
         )
         libraries[constraint] = ":" + filename
     native.alias(name = name, actual = select(libraries), visibility = ["//visibility:public"])
+    truffle_resource(resource, ":" + name, platforms, destination, file_list, hash_entry)
+
+def truffle_resource(resource, library, platforms, destination, file_list, hash_entry):
+    """Package a target shared library at mx's platform-qualified internal resource path."""
+    os_labels = {"darwin": "macos", "linux": "linux", "windows": "windows"}
     paths = {template: {} for template in [destination, file_list, hash_entry]}
     for platform in platforms:
         os, cpu = platform.split("-")
@@ -92,7 +97,7 @@ def truffle_attach(name, deliverable, srcs, cflags, ldlibs, resource, platforms,
             choices[":" + config] = template.replace("<os>", os).replace("<arch>", cpu)
     _resource(
         name = resource,
-        library = ":" + name,
+        library = library,
         destination = select(paths[destination]),
         file_list = select(paths[file_list]),
         hash_entry = select(paths[hash_entry]),
