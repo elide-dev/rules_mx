@@ -35,7 +35,7 @@ bazelisk test --config=labsjdk --config=elide-processors //graal:source_native_i
 bazelisk run --config=labsjdk --config=elide-processors @graal//substratevm:native-image -- --version
 ```
 
-The source-built Native Image launcher assembles the selected Labs JDK with the Bazel-built compiler, SubstrateVM jars and native helper libraries. The smoke test compiles and runs a Java executable on Linux x86_64 and macOS arm64.
+The source-built Native Image launcher assembles the selected Labs JDK with the Bazel-built compiler, SubstrateVM jars and native helper libraries. Use `--config=source-native-image` to select it for `rules_graalvm` Native Image actions in this workspace. The smoke test compiles and runs a Java executable on Linux x86_64 and macOS arm64.
 
 The Native Bridge test builds a shared library and exercises the generated JNI bindings in the JVM process and through the C++ launcher. The migration notes cover the standalone benchmark, BuildBuddy commands and remaining suites. [GraalVM migration](graal/README.md)
 

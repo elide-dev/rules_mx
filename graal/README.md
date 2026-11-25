@@ -140,9 +140,10 @@ Bazel lowers the native TARs and benchmark JARs from the pinned suite layout. Th
 bazelisk build --config=elide-processors --config=labsjdk @graal//substratevm:SVM
 bazelisk test --config=elide-processors --config=labsjdk @graal//substratevm/... //graal:source_native_image_test
 bazelisk build --config=elide-processors --config=labsjdk --output_groups=distribution @graal//substratevm:native-image.root
+bazelisk test --config=source-native-image //graal:source_native_image_action_test
 ```
 
-The builder uses the source-built Graal compiler and the relocated Espresso module. Bazel supplies option help files to javac's annotation processors through a declared source tree. The Native Image launcher uses the source-built driver, its generated JVM flags, the pinned Labs JDK and the Bazel C/C++ toolchain.
+The builder uses the source-built Graal compiler and the relocated Espresso module. Bazel supplies option help files to javac's annotation processors through a declared source tree. The Native Image launcher uses the source-built driver, its generated JVM flags, the pinned Labs JDK and the Bazel C/C++ toolchain. The `source-native-image` profile registers this SDK as the `rules_graalvm` toolchain and selects Labs JDK 25 for both target and execution configurations. The action test exercises compilation as a Bazel build action.
 
 ## Extending the graph
 

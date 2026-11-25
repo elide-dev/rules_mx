@@ -7,7 +7,18 @@ import sys
 from tempfile import TemporaryDirectory
 
 
-def main(builder, guest):
+def check_output(executable):
+    result = subprocess.run(
+        [executable.absolute()], check=True, capture_output=True, text=True
+    )
+    if result.stdout != "built from source\n":
+        raise AssertionError(f"Unexpected image output: {result.stdout!r}")
+
+
+def main(builder, guest=None):
+    if guest is None:
+        check_output(Path(builder))
+        return
     with TemporaryDirectory(dir=os.environ.get("TEST_TMPDIR")) as tmp:
         output = Path(tmp) / "from-source"
         subprocess.run(
@@ -23,9 +34,7 @@ def main(builder, guest):
             check=True,
             cwd=tmp,
         )
-        result = subprocess.run([output], check=True, capture_output=True, text=True)
-        if result.stdout != "built from source\n":
-            raise AssertionError(f"Unexpected image output: {result.stdout!r}")
+        check_output(output)
 
 
 if __name__ == "__main__":
