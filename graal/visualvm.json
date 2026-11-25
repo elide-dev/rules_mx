@@ -1,0 +1,32 @@
+{
+  "common": {
+    "integrity": "sha512-3Ppxn5fFPIaTrAMfj/Oxd4gpbe7vlNL7qzAizIEQ0qdd1Dm4/4+A4YEsu4qL4tSKJ9KJBSFXK7a4eu76YOMi4g==",
+    "urls": [
+      "https://lafo.ssw.uni-linz.ac.at/pub/graal-external-deps/visualvm/visualvm-1090.tar.gz"
+    ]
+  },
+  "linux_amd64": {
+    "integrity": "sha512-zSD568Y9PqWuPEbzQHXwKheKb0usppCTu92jWXkn0ggzn291Y66Op1tLFk60lwLToMoIqo2Tsy3YuWe9r3Ofdw==",
+    "urls": [
+      "https://lafo.ssw.uni-linz.ac.at/pub/graal-external-deps/visualvm/visualvm-1090-linux-amd64.tar.gz"
+    ]
+  },
+  "linux_arm64": {
+    "integrity": "sha512-OgJALJIxLFOMpqz59OfN53uF4LNwiDUPdy5YLmCm9T5ndJx8wJJgRF8mDPCoQJi8UL4jQsbeICOUVOghhSbNZw==",
+    "urls": [
+      "https://lafo.ssw.uni-linz.ac.at/pub/graal-external-deps/visualvm/visualvm-1090-linux-aarch64.tar.gz"
+    ]
+  },
+  "macos": {
+    "integrity": "sha512-WX4ki0zquAbuRyYLelSzea7bKsh3qjGGYMrl8DPWFZDA/dTDwHC08FjfUFM0g1Bd2EZ1sC9M0UM6dK81j2taWQ==",
+    "urls": [
+      "https://lafo.ssw.uni-linz.ac.at/pub/graal-external-deps/visualvm/visualvm-1090-macos.tar.gz"
+    ]
+  },
+  "windows_amd64": {
+    "integrity": "sha512-SeSUo45XdcBzhAlmaN9pEGYouFBpasH/paeINReIoIbZIXUHLuLlDj0WkobotI8Leqsaolev2vV8hF1IIiS97A==",
+    "urls": [
+      "https://lafo.ssw.uni-linz.ac.at/pub/graal-external-deps/visualvm/visualvm-1090-windows-amd64.tar.gz"
+    ]
+  }
+}

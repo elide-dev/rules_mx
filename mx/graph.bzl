@@ -25,7 +25,7 @@ def _mx_project_impl(ctx):
         java_common.merge([member[JavaInfo] for member in members]),
         coverage_common.instrumented_files_info(ctx, dependency_attributes = ["packages", "deps"]),
         DefaultInfo(
-            files = depset(transitive = [pkg[DefaultInfo].files for pkg in ctx.attr.packages]),
+            files = depset(transitive = [pkg[DefaultInfo].files for pkg in (ctx.attr.packages or ctx.attr.deps)]),
             runfiles = ctx.runfiles().merge_all([member[DefaultInfo].default_runfiles for member in members]),
         ),
     ]
@@ -34,7 +34,7 @@ mx_project = rule(
     implementation = _mx_project_impl,
     doc = "Build the package jars of an mx project and expose their combined JavaInfo.",
     attrs = {
-        "packages": attr.label_list(providers = [JavaInfo], mandatory = True),
+        "packages": attr.label_list(providers = [JavaInfo]),
         "deps": attr.label_list(providers = [JavaInfo]),
     },
     provides = [JavaInfo],
@@ -151,3 +151,23 @@ def mx_resource_layout(name, literals = {}, copies = {}, testonly = False, **kwa
         testonly = testonly,
         **kwargs
     )
+
+def _pom_dist_impl(ctx):
+    ctx.actions.write(ctx.outputs.out, ctx.attr.content)
+    deps = ctx.attr.deps
+    return [
+        DefaultInfo(
+            files = depset([ctx.outputs.out]),
+            runfiles = ctx.runfiles(transitive_files = depset(transitive = [dep.files for dep in deps])),
+        ),
+        java_common.merge([dep[JavaInfo] for dep in deps]),
+    ]
+
+mx_pom_dist = rule(
+    implementation = _pom_dist_impl,
+    attrs = {
+        "content": attr.string(mandatory = True),
+        "deps": attr.label_list(providers = [JavaInfo]),
+        "out": attr.output(mandatory = True),
+    },
+)

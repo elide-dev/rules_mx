@@ -16,6 +16,8 @@ exports_files([
     "truffle.patch",
     "substratevm.patch",
     "regex.patch",
+    "tools.patch",
+    "visualvm.json",
     "toolchain_test.py",
 ])
 
@@ -260,4 +262,26 @@ py_test(
         "@graal//substratevm:native-image",
     ],
     tags = ["manual"],
+)
+
+py_binary(
+    name = "pack_visualvm",
+    srcs = ["pack_visualvm.py"],
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
+    name = "visualvm_macos_x86_64",
+    constraint_values = [
+        "@platforms//os:macos",
+        "@platforms//cpu:x86_64",
+    ],
+)
+
+config_setting(
+    name = "visualvm_windows_x86_64",
+    constraint_values = [
+        "@platforms//os:windows",
+        "@platforms//cpu:x86_64",
+    ],
 )

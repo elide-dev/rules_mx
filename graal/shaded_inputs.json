@@ -59,6 +59,14 @@
     "org/capnproto/runtime/0.1.16/runtime-0.1.16.jar",
     "sha512-lKd3ZRHDRNpgoazcNGwTNSKkPCOdBn0NXYbCEpHgJSoZvU+nTksdOpPnXa3UGvZVel0RihWE4500wJJIXOBlsg=="
   ],
+  "tools_JAVA_WEBSOCKET-sources.jar": [
+    "org/java-websocket/Java-WebSocket/1.6.0/Java-WebSocket-1.6.0-sources.jar",
+    "sha512-QqE3ZvfkGgV5rDHB1iBN4KL2LOjXXMhALojG4iF4eT7bWr9/8mUELbfoiDWAH+TCsKe6N8dxeDlpuWkirnA0hg=="
+  ],
+  "tools_JAVA_WEBSOCKET.jar": [
+    "org/java-websocket/Java-WebSocket/1.6.0/Java-WebSocket-1.6.0.jar",
+    "sha512-A6IbPh9j5/TTXbfrXeb18l0D+oK0079N33jdxKZluDx3Lz9FGcOKqSu4FVH+s/4EKH7gp1kN/+wfElsGUgoPxA=="
+  ],
   "truffle_ANTLR4-sources.jar": [
     "org/antlr/antlr4-runtime/4.13.2/antlr4-runtime-4.13.2-sources.jar",
     "sha512-EZeNL7cyKxRBrH5ppMgLM9U0KLnvbPXOrU8mkTp9l7zT2gqFdEeh+gJjUaa7ynZ9tgLblhgHrJVE4pzzhUAkHA=="

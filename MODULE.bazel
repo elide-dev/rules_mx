@@ -109,11 +109,22 @@ graal_archive(
         "//graal:truffle.patch",
         "//graal:substratevm.patch",
         "//graal:regex.patch",
+        "//graal:tools.patch",
     ],
     sha256 = "a174bfe9204342b53d0e174c9d44a38a73eef2cdd799384cdb59caac95ab738b",
     strip_prefix = "graal-7b7825ae92c83d91bb20d76bc64b68b344449cf3",
     type = "tar.gz",
     urls = ["https://codeload.github.com/oracle/graal/tar.gz/7b7825ae92c83d91bb20d76bc64b68b344449cf3"],
+)
+
+visualvm = use_extension("//graal:visualvm.bzl", "visualvm_inputs", dev_dependency = True)
+use_repo(
+    visualvm,
+    "visualvm_common",
+    "visualvm_linux_amd64",
+    "visualvm_linux_arm64",
+    "visualvm_macos",
+    "visualvm_windows_amd64",
 )
 
 shaded_inputs = use_repo_rule("//graal:shaded_inputs.bzl", "shaded_inputs")

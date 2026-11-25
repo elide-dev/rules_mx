@@ -8,6 +8,7 @@ import textwrap
 from pathlib import Path
 
 import mx
+from mx._impl.mx_maven import _genPom
 
 
 @mx.optional_suite_context
@@ -185,14 +186,22 @@ def _source_dependencies(graph, suite, mappings, distributions):
         record["deps"] += sorted(direct.difference(record["deps"]))
 
 
+def _module_info(dist):
+    info = getattr(dist, "moduleInfo", None)
+    if info:
+        return info
+    name = getattr(dist, "moduleName", None)
+    return {"name": name} if name else {}
+
+
 def _module_reads_from_projects(graph, suite, mappings, distributions):
     """Promote direct module reads from the compiled project dependencies."""
     module_by_label = {}
     for qualified, labels in mappings.items():
         dep = mx.dependency(qualified)
-        if dep.isJARDistribution() and getattr(dep, "moduleInfo", None):
+        if dep.isJARDistribution() and _module_info(dep):
             for label in labels:
-                module_by_label[label] = dep.moduleInfo["name"]
+                module_by_label[label] = _module_info(dep)["name"]
     for name, record in distributions.items():
         if "module" in record:
             module_by_label[":" + name] = record["module"]
@@ -205,9 +214,9 @@ def _module_reads_from_projects(graph, suite, mappings, distributions):
         pending = list(dist.deps)
         while pending:
             dep = pending.pop()
-            if not dep.isJARDistribution() or not getattr(dep, "moduleInfo", None):
+            if not dep.isJARDistribution() or not _module_info(dep):
                 continue
-            module = dep.moduleInfo["name"]
+            module = _module_info(dep)["name"]
             if module not in available:
                 available.add(module)
                 pending.extend(dep.deps)
@@ -252,7 +261,7 @@ def _classpath_distribution(dist, suite, mappings, pending):
 
 
 def _module_directives(dist, members, external, archives, mappings, library_modules):
-    info = dist.moduleInfo
+    info = _module_info(dist)
     if set(info) - {
         "name",
         "requires",
@@ -271,8 +280,8 @@ def _module_directives(dist, members, external, archives, mappings, library_modu
         if dep in seen:
             return
         seen.add(dep)
-        if (dep.suite == dist.suite and dep.name not in archives) or not getattr(
-            dep, "moduleInfo", None
+        if (dep.suite == dist.suite and dep.name not in archives) or not _module_info(
+            dep
         ):
             mx.abort(
                 f"{dist.name}: module path needs an explicit --archive-dist {dep.name}"
@@ -289,10 +298,11 @@ def _module_directives(dist, members, external, archives, mappings, library_modu
             requires[module] = module
         else:
             visit(dep)
-            requires[dep.moduleInfo["name"]] = dep.moduleInfo["name"]
-    observable = {d.moduleInfo["name"] for d in seen}
+            module = _module_info(dep)["name"]
+            requires[module] = module
+    observable = {_module_info(d)["name"] for d in seen}
     for dep in seen:
-        for req in dep.moduleInfo.get("requires", []):
+        for req in _module_info(dep).get("requires", []):
             if req.split()[-1] in observable and "transitive" in req.split()[:-1]:
                 requires[req.split()[-1]] = req
     for project in members:
@@ -310,9 +320,17 @@ def _module_directives(dist, members, external, archives, mappings, library_modu
     directives.update(
         "uses " + entry for p in members for entry in getattr(p, "uses", [])
     )
-    for kind in ("exports", "opens"):
+    exports = info.get("exports", [])
+    if not getattr(dist, "moduleInfo", None):
+        exports = [
+            entry
+            for project in members
+            if project.isJavaProject()
+            for entry in getattr(project, "exports", sorted(_source_packages(project)))
+        ]
+    for kind, entries in (("exports", exports), ("opens", info.get("opens", []))):
         packages = {}
-        for entry in info.get(kind, []):
+        for entry in entries:
             subject, to, names = " ".join(entry.split()).partition(" to ")
             matches = [subject]
             # Shaded package names are known after source relocation and compilation.
@@ -421,7 +439,7 @@ def _jar_archive(dist, suite, mappings, pending, release, archives, library_modu
         result["add_exports"] = sorted(
             f"{mod}/{pkg}" for mod, packages in concealed.items() for pkg in packages
         )
-    if getattr(dist, "moduleInfo", None):
+    if _module_info(dist):
         project_exports = {
             f"{module}/{package}"
             for project in members
@@ -433,7 +451,7 @@ def _jar_archive(dist, suite, mappings, pending, release, archives, library_modu
         }
         if project_exports:
             result["module_exports"] = sorted(project_exports)
-        result["module"] = dist.moduleInfo["name"]
+        result["module"] = _module_info(dist)["name"]
         result["directives"] = _module_directives(
             dist, members, external, archives, mappings, library_modules
         )
@@ -717,8 +735,18 @@ def bazel_buildfile(args):
         metavar="PROJECT",
         help="compile the selected project with the Labs JDK JavaBuilder",
     )
+    parser.add_argument(
+        "--empty-java-project",
+        action="append",
+        default=[],
+        metavar="PROJECT",
+        help="export an upstream Java project without sources as a dependency target",
+    )
     parser.add_argument("projects", nargs="+")
     options = parser.parse_args(args)
+    empty_projects = set(options.empty_java_project)
+    if empty_projects and not options.gazelle:
+        parser.error("--empty-java-project requires --gazelle")
     library_modules = {}
     for spec in options.library_module:
         name, sep, module = spec.partition("=")
@@ -820,6 +848,18 @@ def bazel_buildfile(args):
                     project, suite, java_deps, pending
                 )
                 continue
+            if project.isPOMDistribution():
+                distributions[project.name] = {
+                    "name": project.name,
+                    "deps": _dependency_labels(
+                        project.deps, suite, java_deps, pending, True
+                    ),
+                    "pom": _genPom(
+                        project, lambda owner: owner.release_version_from_suite()
+                    ),
+                    "pom_filename": project.maven_artifact_id() + ".pom",
+                }
+                continue
             if type(project).__name__ == "LayoutDirDistribution":
                 layouts[project.name] = _resource_layout(project, pending, java_deps)
                 continue
@@ -842,7 +882,12 @@ def bazel_buildfile(args):
         if options.gazelle and excluded_from_jacoco:
             allowed = allowed | {"jacoco"}
         if options.gazelle:
-            allowed = allowed | {"requiresConcealed", "generatedDependencies", "uses"}
+            allowed = allowed | {
+                "requiresConcealed",
+                "generatedDependencies",
+                "uses",
+                "exports",
+            }
             if project._orig_attrs.get("jacoco") == "include":
                 allowed = allowed | {
                     "jacoco",
@@ -935,6 +980,20 @@ def bazel_buildfile(args):
                     else:
                         resources.append(path)
                         resource_roots.add(directory.relative_to(suite.dir).as_posix())
+        if project.name in empty_projects:
+            if sources or resources:
+                mx.abort(f"{project.name}: project now contains sources or resources")
+            empty_projects.remove(project.name)
+            graph[project.name] = {
+                "name": project.name,
+                "release": project.javaCompliance.value,
+                "empty": True,
+                "testonly": project.is_test_project(),
+                "deps": _dependency_labels(
+                    project.deps, suite, java_deps, pending, options.classpath_dists
+                ),
+            }
+            continue
         if not sources and not shaded:
             mx.abort(f"{project.name}: no Java sources")
         deps = _dependency_labels(
@@ -1112,10 +1171,13 @@ def bazel_buildfile(args):
         rules[project.name] = _rule(
             "java_library" if processors else "elide_java_library", attrs, resource_attr
         )
-    if project_releases or manual_tests or labs_javac:
-        mx.abort(
-            f"Unused project configuration: {sorted(project_releases.keys() | manual_tests | labs_javac)}"
-        )
+    if (
+        unused_projects := project_releases.keys()
+        | manual_tests
+        | labs_javac
+        | empty_projects
+    ):
+        mx.abort(f"Unused project configuration: {sorted(unused_projects)}")
     if unused_paths := test_paths.keys() - used_test_paths:
         mx.abort(f"Unused test path mappings: {sorted(unused_paths)}")
     if test_launchers or test_runtimes or test_flags:

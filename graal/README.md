@@ -18,10 +18,11 @@ tools/buildbuddy test --config=buildbuddy-rbe --config=elide-processors //graal/
 | Truffle | All 69 declared projects and all 47 distribution labels, including JNI attach, both NFI backends, the shaded libraries, PolyBench and the JMH benchmarks. Bazel packages the multi-release Truffle API, SL language, SL launcher, Truffle compiler interface and HotSpot runtime as named modules. | 57 guest fixtures run independently. All 30 concrete SL JUnit classes run on the default runtime, including the four interpreter configurations of the upstream fixture runner. Nine TCK classes run on both runtimes. All 570 discovered JUnit classes in `TRUFFLE_TEST` have individual Bazel targets and are included in `harness_tests`. All 31 discovered NFI JUnit classes run on both libffi and Panama. The host-access tests run inside their JPMS test module. |
 | Compiler | All 17 projects and all 20 distributions, including VM access, management, libgraal and its loader, and both JMH suites. | 21 compiler-tool JUnit classes, 19 shared-harness classes, four previously qualified compiler regressions and the last-tier compiled guest probe run by default. |
 | Regex | All three projects and all five distributions, including Native Image metadata archives. | All 20 discovered upstream JUnit classes. |
+| Tools | All 18 projects and all 29 distributions, including the Maven POMs, Native Image support TARs and platform-specific VisualVM support archive. The upstream warmup test project declares dependencies and has an empty source tree. | All 60 discovered JUnit classes. |
 | Espresso Shared | Both named modules, including the source-relocated `ESPRESSO_SVM` used by SubstrateVM. | The SubstrateVM compile exercises the relocated source API. |
 | SubstrateVM | 41 of 70 projects and 16 of 44 distributions, including the `SVM` builder JAR, its processors, staged modules, ObjectFile, Pointsto, Configure and the Native Image driver. | 11 upstream configuration test classes and a smoke test that builds and runs a Java executable on Labs JDK 25. |
 
-Run `tools/graal-coverage --missing` for the full project and distribution inventory, or add `--suite substratevm` to narrow it. The audit compares upstream declarations with Bazel labels. CI builds and tests the migrated targets.
+Run `tools/graal-coverage --missing` for the full project and distribution inventory, or run `tools/graal-coverage --missing substratevm` to narrow it. The audit compares upstream declarations with Bazel labels. CI builds and tests the migrated targets.
 
 The SDK and Truffle slice generally targets Java 21. Shaded libraries compile at their declared releases, including the JDK 22 JLine overlay. Some SDK projects declare an older minimum while using newer APIs, including `java.io.Serial`. The libgraal API compiles as one unit because its packages depend on each other. Gazelle keeps project resources, processors and tests with their owning compilations and splits eligible source-only projects by package.
 
@@ -151,9 +152,10 @@ Run `tools/generate-graal --check` to reproduce the checked-in patches from the 
 | --- | --- |
 | SDK toolchain distributions | Assemble the five LLVM, Ninja, CMake and musl redistribution layouts with their upstream contents and platform filters. Their packaged payloads are separate from the Elide LLVM toolchain used for Bazel compilation. |
 | Truffle upstream gates | Qualify the remaining gate configurations, including broader optimized-runtime and platform coverage. |
+| Tools upstream gates | Run the signature checks and qualify the test harness on the named module path. |
 | Compiler test gates | Qualify more classes from the compiler distribution, including architecture-specific backends and VM-specific test configurations. |
 | SubstrateVM distributions and gates | Package the remaining support layouts and platform variants, and qualify more upstream Native Image tests. |
-| Languages and tools | Migrate Sulong, Wasm, Espresso, Espresso Compiler Stub, Tools, Visualizer, Web Image and Sandbox Toolchains with their Java, native and external inputs. Run each suite's upstream tests. |
+| Languages and tools | Migrate Sulong, Wasm, Espresso, Espresso Compiler Stub, Visualizer, Web Image and Sandbox Toolchains with their Java, native and external inputs. Run each suite's upstream tests. |
 | VM assembly | Pin the external components required by each selected VM configuration. Assemble the distribution and run its launchers, component tests and corresponding mx gate equivalents from a clean Linux RBE build. |
 
 The migration is complete when all GraalVM distributions can be built from source, their upstream test gates run, and their packaging and runtime behavior match the reference mx builds.

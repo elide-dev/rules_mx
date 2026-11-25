@@ -4,6 +4,7 @@
 import argparse
 import base64
 import difflib
+from graphlib import TopologicalSorter
 import json
 import os
 import re
@@ -502,6 +503,50 @@ SUITES = {
         "TREGEX_TEST_DUMMY_LANG",
         "TREGEX_UNIT_TESTS",
     ],
+    "tools": [
+        "--java-dep",
+        "truffle:TRUFFLE_RUNTIME=//truffle:TRUFFLE_RUNTIME",
+        *[
+            arg
+            for name in ("chromeinspector", "dap", "profiler")
+            for arg in (
+                "--generated-dep",
+                f"tools:com.oracle.truffle.tools.{name}.test=//truffle:TRUFFLE_JSON",
+            )
+        ],
+        "--generated-dep",
+        "tools:com.oracle.truffle.tools.chromeinspector.test=:com.oracle.truffle.tools.utils.java_websocket",
+        "--empty-java-project",
+        "com.oracle.truffle.tools.warmup.test",
+        *[
+            arg
+            for flag in (
+                "-Dpolyglot.engine.WarnInterpreterOnly=false",
+                "-Dpolyglot.engine.AssertProbes=true",
+                "-Dpolyglot.engine.AllowExperimentalOptions=true",
+            )
+            for arg in (
+                "--test-jvm-flag",
+                "tools:com.oracle.truffle.tools.chromeinspector.test=" + flag,
+            )
+        ],
+        "--infer-source-deps",
+        *[
+            arg
+            for name in ("TRUFFLE_API", "TRUFFLE_TEST", "TRUFFLE_SL", "TRUFFLE_JSON")
+            for arg in ("--java-dep", f"truffle:{name}=//truffle:{name}")
+        ],
+        "--java-dep",
+        "sdk:POLYGLOT=//sdk:POLYGLOT",
+        "--java-dep",
+        "sdk:COLLECTIONS=//sdk:COLLECTIONS",
+        "--java-dep",
+        "mx:JUNIT=@contrib_rules_jvm_deps//:junit_junit",
+        "--java-dep",
+        "mx:HAMCREST=@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
+        "--javac-only-processor",
+        "truffle:TRUFFLE_DSL_PROCESSOR",
+    ],
     "substratevm": [
         "--java-dep",
         "substratevm:svm-compiler-flags-builder=:svm-compiler-flags-builder",
@@ -615,6 +660,7 @@ SUITES = {
 
 
 SHADED_PROJECTS = {
+    "tools": ("com.oracle.truffle.tools.utils.java_websocket",),
     "substratevm": ("com.oracle.svm.shaded.org.capnproto",),
     "sdk": ("org.graalvm.shadowed.org.jline", "org.graalvm.shadowed.org.jline.jdk22"),
     "truffle": (
@@ -686,7 +732,7 @@ def harness_options(directory):
                 p,
             )
         ]
-    if suite in ("compiler", "regex"):
+    if suite in ("compiler", "regex", "tools"):
         service = (
             directory.parent
             / "truffle/src/com.oracle.truffle.dsl.processor/src/META-INF/services/javax.annotation.processing.Processor"
@@ -700,6 +746,43 @@ def harness_options(directory):
                 f"truffle:TRUFFLE_DSL_PROCESSOR=//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.{proc}",
             )
         ]
+        if suite == "tools":
+            roots = []
+            distributions = {
+                name: dist
+                for name, dist in metadata["distributions"].items()
+                if not dist.get("layout") and dist.get("type") != "pom"
+            }
+            graph = {
+                name: [
+                    dep
+                    for dep in dist.get("distDependencies", [])
+                    if dep in distributions
+                ]
+                for name, dist in distributions.items()
+            }
+            for name in TopologicalSorter(graph).static_order():
+                dist = distributions[name]
+                processors.extend(("--archive-dist", name))
+                for project in dist.get("dependencies", []):
+                    if project.endswith(".test"):
+                        processors.extend(
+                            ("--test-runtime", f"tools:{project}=:{name}")
+                        )
+                roots.append(name)
+            return (
+                processors
+                + roots
+                + [
+                    "com.oracle.truffle.tools.warmup",
+                    "com.oracle.truffle.tools.warmup.test",
+                ]
+                + [
+                    name
+                    for name, dist in metadata["distributions"].items()
+                    if dist.get("type") == "pom"
+                ]
+            )
         if suite == "regex":
             return processors
         return [
@@ -782,6 +865,26 @@ def shading_inputs(directory):
         inputs[f"{directory.name}_{name}.jar"] = maven_pin(lib)
         flags.extend(["--java-dep", f"{directory.name}:{name}=:{name}"])
     return inputs, flags
+
+
+def visualvm_inputs(directory):
+    metadata = runpy.run_path(str(directory / "mx.tools/suite.py"))["suite"]
+    libraries = metadata["libraries"]
+    platform = libraries["VISUALVM_PLATFORM_SPECIFIC"]["os_arch"]
+    pins = {}
+    for name, spec in {
+        "common": libraries["VISUALVM_COMMON"],
+        "linux_amd64": platform["linux"]["amd64"],
+        "linux_arm64": platform["linux"]["aarch64"],
+        "macos": platform["darwin"]["aarch64"],
+        "windows_amd64": platform["windows"]["amd64"],
+    }.items():
+        algo, digest = spec["digest"].split(":")
+        pins[name] = dict(
+            urls=spec["urls"],
+            integrity=algo + "-" + base64.b64encode(bytes.fromhex(digest)).decode(),
+        )
+    return pins
 
 
 def hsdis_inputs(directory):
@@ -1300,8 +1403,9 @@ def generate(suite, stage):
                 "--release",
                 "21",
                 *shading_inputs(directory)[1],
+                *(SUITES[suite] if suite == "tools" else []),
                 *harness_options(directory),
-                *SUITES[suite],
+                *(SUITES[suite] if suite != "tools" else []),
             ],
             cwd=ROOT,
             check=True,
@@ -1351,14 +1455,21 @@ def generate(suite, stage):
         )
     elif suite == "espresso-shared":
         (directory / "BUILD.bazel").write_text(espresso_shared_rules(directory))
-    elif suite == "regex":
-        metadata = runpy.run_path(str(directory / "mx.regex/suite.py"))["suite"]
+    elif suite in ("regex", "tools"):
+        metadata = runpy.run_path(str(directory / f"mx.{suite}/suite.py"))["suite"]
         layouts = ['load("@rules_mx//graal:layout.bzl", "mx_archive_layout")']
+        if suite == "tools":
+            layouts.extend(
+                [
+                    'load("@rules_mx//graal:visualvm.bzl", "visualvm_support")',
+                    'visualvm_support(name = "VISUALVM_GRAALVM_SUPPORT")',
+                ]
+            )
         for name, dist in metadata["distributions"].items():
-            if "layout" in dist:
+            if "layout" in dist and name != "VISUALVM_GRAALVM_SUPPORT":
                 [(destination, source)] = dist["layout"].items()
                 if not source.startswith("file:"):
-                    raise ValueError(f"Unsupported Regex layout {name}")
+                    raise ValueError(f"Unsupported {suite} layout {name}")
                 members = {source.removeprefix("file:"): destination}
                 layouts.append(
                     f'mx_archive_layout(name = "{name}", format = "tar", members = {json.dumps(members)}, visibility = ["//visibility:public"])'
@@ -1369,7 +1480,7 @@ def generate(suite, stage):
         ]
         (directory / "BUILD.bazel").write_text(
             'load("@rules_java//java:java_import.bzl", "java_import")\n'
-            + jmh_rules(directory)[1]
+            + (jmh_rules(directory)[1] if suite == "regex" else "")
             + "\n".join(layouts + inventories)
             + "\n"
         )
@@ -1497,6 +1608,16 @@ def main():
                 sys.exit("Regenerate the HSDIS pins with tools/generate-graal")
         else:
             hsdis.write_text(pins)
+        visualvm = ROOT / "graal/visualvm.json"
+        visualvm_pins = (
+            json.dumps(visualvm_inputs(stage / "tools"), indent=2, sort_keys=True)
+            + "\n"
+        )
+        if args.check:
+            if visualvm.read_text() != visualvm_pins:
+                sys.exit("Regenerate the VisualVM pins with tools/generate-graal")
+        else:
+            visualvm.write_text(visualvm_pins)
         lock = ROOT / "graal/shaded_inputs.json"
         lock_text = (
             json.dumps(
