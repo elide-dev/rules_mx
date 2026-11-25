@@ -6,6 +6,7 @@ load("@rules_java//java/common:java_info.bzl", "JavaInfo")
 load("@rules_python//python:py_binary.bzl", "py_binary")
 load("@rules_python//python:py_test.bzl", "py_test")
 load("//mx:jar.bzl", "mx_jar_dist")
+load("//mx:java.bzl", "elide_java_library")
 
 _RUNTIME = "@bazel_tools//tools/jdk:runtime_toolchain_type"
 
@@ -92,21 +93,34 @@ def truffle_compiler_test(name, processors = []):
     src = "src/jdk.graal.compiler.test/src/" + package.replace(".", "/") + "/" + name + ".java"
     junit = "@contrib_rules_jvm_deps//:junit_junit"
     deps = [junit, "//sdk:POLYGLOT", "//truffle:TRUFFLE_API", "//truffle:TRUFFLE_COMPILER", "//truffle:TRUFFLE_RUNTIME"]
-    java_library(
-        name = name + ".classes",
-        srcs = [src],
-        deps = deps,
-        plugins = ["//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor." + proc for proc in processors],
-        testonly = True,
-    )
-    mx_jar_dist(
-        name = name + ".jar_dist",
-        contents = [":" + name + ".classes"],
-        deps = deps,
-        truffle_services = True,
-        testonly = True,
-    )
-    optimizing_junit(name, package + "." + name, [":" + name + ".jar_dist"])
+    classes = name + ".classes"
+    if processors:
+        java_library(
+            name = classes,
+            srcs = [src],
+            deps = deps,
+            plugins = ["//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor." + proc for proc in processors],
+            testonly = True,
+        )
+        runtime = name + ".jar_dist"
+        mx_jar_dist(
+            name = runtime,
+            contents = [":" + classes],
+            deps = deps,
+            truffle_services = True,
+            testonly = True,
+        )
+    else:
+        elide_java_library(
+            name = classes,
+            srcs = [src],
+            deps = deps,
+            javac_opts = ["--release", "21"],
+            unified_release = 21,
+            testonly = True,
+        )
+        runtime = classes
+    optimizing_junit(name, package + "." + name, [":" + runtime])
 
 def optimizing_junit(name, test_class, runtime_deps, jvm_flags = []):
     """Run a JUnit class alongside the packaged SL modules on the Labs JDK."""
