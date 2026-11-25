@@ -20,9 +20,10 @@ The default Python is managed CPython 3.13. The alternate configuration selects 
 
 ## Build upstream GraalVM
 
-The pinned Oracle source tree builds every SDK project, the modular Truffle runtime and the Graal optimizing compiler as native Bazel targets. Run individual upstream SDK, SimpleLanguage, TCK and compiler regression tests by Bazel label.
+The pinned Oracle source tree builds all 29 SDK projects, all 69 Truffle projects and the Graal optimizing compiler as native Bazel targets. Run individual upstream SDK, SimpleLanguage, TCK and compiler regression tests by Bazel label.
 
 ```sh
+bazelisk build --config=elide-processors @graal//truffle:all_projects
 bazelisk test --config=elide-processors @graal//truffle:harness_tests @graal//compiler:harness_tests
 bazelisk query 'tests(//graal:sdk_tests)'
 bazelisk test @graal//truffle:sl.test.Fibonacci
@@ -54,7 +55,7 @@ bazelisk run //:mx -- bazel-buildfile --macro --release 21 \
 diff -u mx/projects.bzl /tmp/mx-projects.bzl
 ```
 
-The exporter handles plain Java projects and a single resource strip root per project. It exports annotation processor distributions backed by Java projects. External Java libraries and previously migrated distributions can be bound with --java-dep SUITE:NAME=LABEL. It diagnoses custom project types and unhandled project attributes. Mapping those features is part of migrating the rest of GraalVM. The generated suite-root targets assume their files share one Bazel package. Introducing nested BUILD files changes ownership of the sources.
+The exporter handles plain Java projects and a single resource strip root per project. It exports annotation processor distributions backed by Java projects. External Java libraries and previously migrated distributions can be bound with --java-dep SUITE:NAME=LABEL. Use `--library-module SUITE:LIB=MODULE` to name a mapped automatic module when building a JPMS distribution. It diagnoses custom project types and unhandled project attributes. Mapping those features is part of migrating the rest of GraalVM. The generated suite-root targets assume their files share one Bazel package. Introducing nested BUILD files changes ownership of the sources.
 
 ## Annotation processors
 

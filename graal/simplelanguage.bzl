@@ -11,7 +11,7 @@ def _runfile(ctx, f):
     return f.short_path[3:] if f.short_path.startswith("../") else ctx.workspace_name + "/" + f.short_path
 
 def _sl_main_impl(ctx):
-    runtime = ctx.attr.labs_runtime[java_common.JavaRuntimeInfo] if ctx.attr.compiler else ctx.toolchains[_RUNTIME].java_runtime
+    runtime = ctx.attr.labs_runtime[java_common.JavaRuntimeInfo] if ctx.attr.labs_runtime else ctx.toolchains[_RUNTIME].java_runtime
     binaries = [f for f in runtime.files.to_list() if f.path == runtime.java_executable_exec_path]
     if len(binaries) != 1:
         fail("SimpleLanguage requires a file-backed Java runtime")
@@ -33,12 +33,15 @@ def _sl_main_impl(ctx):
             "{JAVA_VERSION}": str(runtime.version),
             "{COMPILER}": repr(_runfile(ctx, ctx.file.compiler)) if ctx.attr.compiler else "None",
             "{JVM_FLAGS}": repr(ctx.attr.jvm_flags),
+            "{ROOT_MODULES}": repr(ctx.attr.root_modules),
+            "{NAMED_JUNIT}": repr(ctx.attr.named_junit),
+            "{NATIVE_TEST}": repr(_runfile(ctx, ctx.file.native_test)) if ctx.file.native_test else "None",
             "{TEST_CLASS}": repr(ctx.attr.test_class),
             "{CLASSPATH}": repr([_runfile(ctx, jar) for jar in classpath]),
             "{PROBE}": repr(_runfile(ctx, probe)) if probe else "None",
         },
     )
-    return [DefaultInfo(files = depset([ctx.outputs.out]), runfiles = ctx.runfiles(transitive_files = depset(classpath + ctx.files.hsdis + ([probe] if probe else []), transitive = [modules, runtime.files])))]
+    return [DefaultInfo(files = depset([ctx.outputs.out]), runfiles = ctx.runfiles(transitive_files = depset(classpath + ctx.files.hsdis + ctx.files.native_test + ([probe] if probe else []), transitive = [modules, runtime.files])))]
 
 _sl_main = rule(
     implementation = _sl_main_impl,
@@ -48,6 +51,9 @@ _sl_main = rule(
         "compiler": attr.label(allow_single_file = [".jar"], providers = [JavaInfo]),
         "jvm_flags": attr.string_list(),
         "test_class": attr.string(),
+        "root_modules": attr.string_list(default = ["org.graalvm.sl"]),
+        "named_junit": attr.bool(),
+        "native_test": attr.label(allow_single_file = True),
         "test_classpath": attr.label_list(providers = [JavaInfo]),
         "probe": attr.label(allow_single_file = [".jar"]),
         "labs_runtime": attr.label(),
@@ -131,3 +137,32 @@ def optimizing_junit(name, test_class, runtime_deps, jvm_flags = []):
         data = [":" + name + ".main"],
         size = "medium",
     )
+
+def modular_test_runner(name):
+    """Load the modularized host-access tests and their dependencies on the module path."""
+    _sl_main(
+        name = name + ".main",
+        out = name + ".py",
+        modules = [":TRUFFLE_MODULARIZED_TEST"],
+        root_modules = ["com.oracle.trufflemodtest"],
+        named_junit = True,
+        test_classpath = [Label("//graal:named_module_junit")],
+        testonly = True,
+    )
+    py_binary(name = name, main = name + ".py", srcs = [":" + name + ".main"], data = [":" + name + ".main"], testonly = True)
+
+def panama_test(name, test_class):
+    """Run an upstream NFI test with the JDK 22+ FFM backend on the pinned Labs runtime."""
+    _sl_main(
+        name = name + ".main",
+        out = name + ".py",
+        modules = [],
+        root_modules = [],
+        labs_runtime = Label("//tools:labs_runtime"),
+        test_class = test_class,
+        native_test = ":TRUFFLE_TEST_NATIVE",
+        test_classpath = [":TRUFFLE_NFI_TEST", ":TRUFFLE_NFI_PANAMA", "@bazel_tools//tools/jdk:TestRunner"],
+        jvm_flags = ["-Dnative.test.backend=panama", "--enable-native-access=ALL-UNNAMED"],
+        testonly = True,
+    )
+    py_test(name = name, main = name + ".py", srcs = [":" + name + ".main"], data = [":" + name + ".main"], size = "medium")

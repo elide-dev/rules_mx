@@ -26,7 +26,7 @@ if __name__ == "__main__":
     hsdis = {HSDIS}
     test_class = {TEST_CLASS}
     probe = {PROBE}
-    roots = ["org.graalvm.sl"]
+    roots = {ROOT_MODULES}
     if compiler:
         options += ["-XX:+UnlockExperimentalVMOptions", "-XX:+EnableJVMCI", "-XX:-UseJVMCINativeLibrary",
                     "--upgrade-module-path", str(root / compiler)]
@@ -37,22 +37,30 @@ if __name__ == "__main__":
                         "org.graalvm.sl/com.oracle.truffle.sl.runtime"):
             options.append("--add-exports=" + package + "=ALL-UNNAMED")
         entry = ["-cp", str(root / probe), "graal.CompiledGuest", str(root / compiler)]
-    elif hsdis or test_class:
-        options.extend(["-ea", "-esa",
-                        "--add-exports=org.graalvm.truffle.compiler/com.oracle.truffle.compiler=ALL-UNNAMED",
-                        "--add-exports=org.graalvm.truffle.runtime/com.oracle.truffle.runtime=ALL-UNNAMED"])
+    elif hsdis or test_class or {NAMED_JUNIT}:
+        options.extend(["-ea", "-esa"])
+        if compiler:
+            options.extend([
+                "--add-exports=org.graalvm.truffle.compiler/com.oracle.truffle.compiler=ALL-UNNAMED",
+                "--add-exports=org.graalvm.truffle.runtime/com.oracle.truffle.runtime=ALL-UNNAMED",
+            ])
         options.extend({JVM_FLAGS})
         classpath = os.pathsep.join(str(root / jar) for jar in {CLASSPATH})
         if test_class:
             options.append("-Dbazel.test_suite=" + test_class)
-        main = "com.google.testing.junit.runner.BazelTestRunner"
+        main = "graal.NamedModuleJUnit" if {NAMED_JUNIT} else "com.google.testing.junit.runner.BazelTestRunner"
+        native_test = {NATIVE_TEST}
+        if native_test:
+            options.append("-Dnative.test.path.panama=" + str(root / native_test))
         if hsdis:
             options.append("-Dtest.jdk.graal.compiler.disassembler.path=" + str(root / hsdis))
             main = "com.oracle.mxtool.junit.CompilerJUnit"
         entry = ["-cp", classpath, main]
     else:
         entry = ["-m", "org.graalvm.sl_launcher/com.oracle.truffle.sl.launcher.SLMain"]
-    command = [java, *options, "--module-path", modules, "--add-modules", ",".join(roots), *entry, *sys.argv[1:]]
+    if modules:
+        options.extend(["--module-path", modules, "--add-modules", ",".join(roots)])
+    command = [java, *options, *entry, *sys.argv[1:]]
     if hsdis:
         # The released Elide Python runtime can start native processes with the
         # Bazel environment but does not expose all test variables in os.environ.

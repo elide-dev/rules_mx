@@ -48,6 +48,11 @@ def read_members(inputs, args):
                     for line in data.decode().splitlines():
                         if provider := line.partition("#")[0].strip():
                             providers.add(provider)
+                elif args.jmh_metadata and name in {
+                    "META-INF/BenchmarkList",
+                    "META-INF/CompilerHints",
+                }:
+                    entries[name] = entries.get(name, b"") + data
                 elif name in entries and entries[name] != data:
                     raise ValueError(f"Conflicting archive member {name} in {jar}")
                 else:
@@ -97,7 +102,22 @@ def module_descriptor(args, tmp, entries, services, release):
         raise ValueError(
             "Multi-release module descriptors require per-release compilation"
         )
-    directives = set(args.directive)
+    directives = set()
+    packages = {
+        name.rpartition("/")[0].replace("/", ".")
+        for name in entries
+        if name.endswith(".class") and "/" in name and not name.startswith("META-INF/")
+    }
+    for directive in args.directive:
+        wildcard = re.fullmatch(r"(opens|exports) ([\w.]+)\*(.*)", directive)
+        if wildcard:
+            kind, prefix, targets = wildcard.groups()
+            matches = [p for p in packages if p.startswith(prefix)]
+            if not matches:
+                raise ValueError(f"No compiled packages match {directive}")
+            directives.update(f"{kind} {p}{targets}" for p in matches)
+        else:
+            directives.add(directive)
     for service, providers in services.get(0, {}).items():
         source_name = service.replace("$", ".")
         if service.replace(".", "/") + ".class" in entries:
@@ -149,6 +169,7 @@ def main():
     parser.add_argument("--graal-test-services", action="store_true")
     parser.add_argument("--graal-services", action="store_true")
     parser.add_argument("--truffle-services", action="store_true")
+    parser.add_argument("--jmh-metadata", action="store_true")
     parser.add_argument("--jni-services", action="store_true")
     parser.add_argument("--manifest-entry", action="append", default=[])
     parser.add_argument("--module")
@@ -172,7 +193,16 @@ def main():
             )
         for version, jars in sorted(releases.items()):
             layer, layer_services = read_members(jars, args)
-            if layer_services or any(n.startswith("META-INF/") for n in layer):
+            if any(layer_services):
+                raise ValueError("An overlay cannot contain nested versioned providers")
+            for service, providers in layer_services.get(0, {}).items():
+                member = "META-INF/services/" + service
+                del layer[member]
+                services[0][service].update(providers)
+                entries[f"META-INF/_versions/{version}/{member}"] = (
+                    "\n".join(sorted(services[0][service])) + "\n"
+                ).encode()
+            if any(n.startswith("META-INF/") for n in layer):
                 raise ValueError(
                     "Overlay META-INF resources need an explicit versioned layout"
                 )

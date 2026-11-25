@@ -56,13 +56,13 @@ _directory = rule(
     },
 )
 
-def nfi_libraries(name, projects, headers, platforms, destination, file_list, hash_entry):
+def nfi_libraries(name, projects, benchmark, headers, platforms, destination, file_list, hash_entry):
     """Compile the NFI backend and test libraries using the target C/C++ toolchain."""
     _headers(name = "nfi_jni_files", jar = ":com.oracle.truffle.nfi.backend.libffi.jni_headers", headers = headers)
     cc_library(name = "nfi_jni", hdrs = [":nfi_jni_files"], strip_include_prefix = "nfi-jni", deps = ["@rules_java//toolchains:jni"])
     cc_library(name = "nfi_api_headers", hdrs = ["src/com.oracle.truffle.nfi.native/include/trufflenfi.h"], strip_include_prefix = "src/com.oracle.truffle.nfi.native/include")
     native.alias(name = "libffi", actual = "@graal_libffi//:libffi", visibility = ["//visibility:public"])
-    for project in projects:
+    for project in projects + [benchmark]:
         libraries = {}
         for os, ext in [("linux", ".so"), ("darwin", ".dylib")]:
             constraint = "@platforms//os:" + ("macos" if os == "darwin" else os)
@@ -75,11 +75,12 @@ def nfi_libraries(name, projects, headers, platforms, destination, file_list, ha
                 linkopts = options.get("ldflags", []) + options.get("ldlibs", []),
                 linkshared = True,
                 linkstatic = True,
+                testonly = project == benchmark,
                 target_compatible_with = [constraint],
                 deps = [":nfi_api_headers"] + ([":nfi_jni", ":libffi"] if project["name"] == name else []),
             )
             libraries[constraint] = ":" + filename
-        native.alias(name = project["name"], actual = select(libraries), visibility = ["//visibility:public"])
+        native.alias(name = project["name"], actual = select(libraries), testonly = project == benchmark, visibility = ["//visibility:public"])
     truffle_resource("TRUFFLE_NFI_RESOURCES", ":" + name, platforms, destination, file_list, hash_entry)
     _directory(
         name = "TRUFFLE_TEST_NATIVE",

@@ -30,6 +30,8 @@ def _jar_impl(ctx):
         args.add("--graal-test-services" if ctx.attr.graal_test_services else "--graal-services")
     if ctx.attr.truffle_services:
         args.add("--truffle-services")
+    if ctx.attr.jmh_metadata:
+        args.add("--jmh-metadata")
     if ctx.attr.jni_services:
         args.add("--jni-services")
     tools = []
@@ -73,6 +75,7 @@ _jar_dist = rule(
         "release": attr.int(),
         "directives": attr.string_list(),
         "jni_services": attr.bool(),
+        "jmh_metadata": attr.bool(),
         "truffle_services": attr.bool(),
         "graal_services": attr.bool(),
         "graal_test_services": attr.bool(),

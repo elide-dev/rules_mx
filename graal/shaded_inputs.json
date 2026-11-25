@@ -3,6 +3,22 @@
     "com/google/code/java-allocation-instrumenter/java-allocation-instrumenter/3.1.0/java-allocation-instrumenter-3.1.0.jar",
     "sha512-Jf5XzW0+yrtS9BHIhPgBEJ7ON1cKLdGfoeW4PMIDntAqkHh2AOuTA+qnMKq/DccLUG+5/kDKbDQXQou4nCyJQA=="
   ],
+  "mx_COMMONS_MATH3_3_2.jar": [
+    "org/apache/commons/commons-math3/3.2/commons-math3-3.2.jar",
+    "sha512-gPtmpRaIxCR7lX+Xh5IeWsuRRNcaSrCwOyww9GQn5QxT5uMcpd2wTass9efA7trhaBA8cZ+AdL5GSRirLk1ubQ=="
+  ],
+  "mx_JMH_1_21.jar": [
+    "org/openjdk/jmh/jmh-core/1.21/jmh-core-1.21.jar",
+    "sha512-gbypOIvdBhL6ZcqFzK7FugFzjX5F526pD2TfuJU5rU2/ygZBidzAWkPw8/G9C2EkZ2loqVP/eYmwYjL/jQBXSw=="
+  ],
+  "mx_JMH_GENERATOR_ANNPROCESS_1_21.jar": [
+    "org/openjdk/jmh/jmh-generator-annprocess/1.21/jmh-generator-annprocess-1.21.jar",
+    "sha512-NS3rUwStVNgIlIXOBm5AnGiQEqDe5a9P2FEUAs01Yk3Uyr1Qe4dhFTBMDJgkuDfpYChQDieboWRIDhGVp1e0XA=="
+  ],
+  "mx_JOPTSIMPLE_4_6.jar": [
+    "net/sf/jopt-simple/jopt-simple/4.6/jopt-simple-4.6.jar",
+    "sha512-GL9ZGR16RW52dchB34QR6+Ql2kBTLhA9uVSDvl0qdVENijitl1XN1OC+J6/nz9CzWFmTiKhPzsHuJ+icqjf1rw=="
+  ],
   "sdk_JLINE_BUILTINS-sources.jar": [
     "org/jline/jline-builtins/3.28.0/jline-builtins-3.28.0-sources.jar",
     "sha512-M/BtfiuyMs5BPYz3I0vbQWw6Z3Dc8YpcF+OImIeyhzeP9fxTF1gUM4PD9QtWYT5b+AK1xJoqCbdIyARWjgVluA=="
@@ -35,6 +51,14 @@
     "org/jline/jline-terminal-ffm/3.28.0/jline-terminal-ffm-3.28.0.jar",
     "sha512-5YObBKL9YRmhHGvBbgUgOviFEgOdhVUbGdbofDWKMl7V63BRAioiXiZBNXyZ2cQSGBekeVxQz3mhO2udU3zulg=="
   ],
+  "truffle_ANTLR4-sources.jar": [
+    "org/antlr/antlr4-runtime/4.13.2/antlr4-runtime-4.13.2-sources.jar",
+    "sha512-EZeNL7cyKxRBrH5ppMgLM9U0KLnvbPXOrU8mkTp9l7zT2gqFdEeh+gJjUaa7ynZ9tgLblhgHrJVE4pzzhUAkHA=="
+  ],
+  "truffle_ANTLR4.jar": [
+    "org/antlr/antlr4-runtime/4.13.2/antlr4-runtime-4.13.2.jar",
+    "sha512-HD5HtrXcQMoTknp64u0Yf0cLj0Bs6jJec8ehivjge5raBIQxLdYR8iXwMLVYWSSTLHAv2TJsFDpibicWgrK5Xg=="
+  ],
   "truffle_ASM_9.8-sources.jar": [
     "org/ow2/asm/asm/9.8/asm-9.8-sources.jar",
     "sha512-MpZj1z8WXH4AaiDdJLtvW0rBB5CX2DyRdw/Z/FN2VaOExMxA5YNfgA1kU9OTtq281Rxuq2/pDNjh6Oh7m1E8xA=="
@@ -63,6 +87,22 @@
     "com/google/guava/guava/31.0.1-jre/guava-31.0.1-jre.jar",
     "sha512-yNiqOOb7BMQJw3ki78u+GC9lFWqFP2kdg4HVbuogit8i96KIc7t4lSEOQYV91EEar5UmgqJpIFEiDigZENB5jw=="
   ],
+  "truffle_ICU4J-CHARSET-sources.jar": [
+    "com/ibm/icu/icu4j-charset/78.2/icu4j-charset-78.2-sources.jar",
+    "sha512-Lb/Gca/1+eGjNaCea/OpJqPEeQh/SvMv+g1B5ush/7NVxBiYtKYqZPl5DyZX40hPYdSWAcyV0ypL0UX9ne7d5A=="
+  ],
+  "truffle_ICU4J-CHARSET.jar": [
+    "com/ibm/icu/icu4j-charset/78.2/icu4j-charset-78.2.jar",
+    "sha512-IV911zQI75dsmAGNFE2iujQinWrwgXEtg0SgEpkESON6knonrIp1Cu1PFPh9qr7FqKeNQVxiNqEBiBgp3svQzw=="
+  ],
+  "truffle_ICU4J-sources.jar": [
+    "com/ibm/icu/icu4j/78.2/icu4j-78.2-sources.jar",
+    "sha512-Ge5FQ+hCQdtyjlx7eeoqa8rpZhXGmOFtRKAE38+wGvaZMI1dUhuxldAibj5UyiIhGc4pk8fw3xBNUVXiYoH5Ag=="
+  ],
+  "truffle_ICU4J.jar": [
+    "com/ibm/icu/icu4j/78.2/icu4j-78.2.jar",
+    "sha512-YXUBGbNiuBRi5hxxW3C4gu2YMeiUr/bCbHmZf1Kra6fyVugK4cjR5orvZTtZeyNZavHXjZEi1pk0RQmv3FNrgQ=="
+  ],
   "truffle_JCODINGS_1.0.64-sources.jar": [
     "org/jruby/jcodings/jcodings/1.0.64/jcodings-1.0.64-sources.jar",
     "sha512-Uh0h+YWm/6IImTwDYIMfob5djSNjJI6Kwa264/XTOXy97ttRPcrxxXHHE796xBpACdRwCcBGVfsSyUHIcJNx/g=="
@@ -75,8 +115,24 @@
     "com/google/jimfs/jimfs/1.2/jimfs-1.2.jar",
     "sha512-Cp3yzY4Ac1RVgs7CiTLukcddzWGwbNCjvJq0ZSfRSTedkp6GalR1jmwRBWk1m+wrRbUKl7BGNWAU6DAs2EVE6w=="
   ],
+  "truffle_JSON-sources.jar": [
+    "org/json/json/20250517/json-20250517-sources.jar",
+    "sha512-sco6MPu3cAFakgwBbO3LMV/3ocAUW3dpRgQ13RJk2IIO56nBUSm9tC8orpdPo8AQ6ZpTEXc/17FF+T0CHRrY5g=="
+  ],
+  "truffle_JSON.jar": [
+    "org/json/json/20250517/json-20250517.jar",
+    "sha512-SGRZRQ4T8eKRuauPpigpEyFx+BArcFHpBMFmqflY8EFJYD2Ko+PJOTASJv1bUo1ZAK/5rLeVO0yH6GTJfBkvyw=="
+  ],
   "truffle_VISUALVM-LIB-JFLUID-HEAP.jar": [
     "org/graalvm/visualvm/modules/org-graalvm-visualvm-lib-jfluid-heap/2.1.4/org-graalvm-visualvm-lib-jfluid-heap-2.1.4.jar",
     "sha512-bZPN5yj12yQtKrVQkOWylS6HNiXlQgQ9FthZ4UhkM8ke/PPHE9clVpeVHudFzV9mJ2t484xixCLNexAAKRYSrQ=="
+  ],
+  "truffle_XZ-1.12-sources.jar": [
+    "org/tukaani/xz/1.12/xz-1.12-sources.jar",
+    "sha512-jJbh0Dsnr31ILLrnATavRa5WQDuiv+A1V4G6kxyE4Vos2RplRT8w8t+95Xic41Ke5xtknNIvpIhwQfZY/18SRw=="
+  ],
+  "truffle_XZ-1.12.jar": [
+    "org/tukaani/xz/1.12/xz-1.12.jar",
+    "sha512-qFTcZd9aB/uwJvYk0rEJAfb12VogCRxSv7ZPiMFFZe8btlczQ2/9WyqdFjKeUjtlAIX9TDahuzhNQHiOcnweYA=="
   ]
 }

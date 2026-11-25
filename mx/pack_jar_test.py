@@ -49,6 +49,28 @@ class PackJarTest(unittest.TestCase):
                     jar.read("META-INF/services/p.Service"), b"p.Bridge\np.Guest\n"
                 )
 
+    def test_jmh_participant_combines_registry_and_hints(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            command = [PACKER, "--output", root / "out.jar", "--jmh-metadata"]
+            for project in ("first", "second"):
+                jar = root / (project + ".jar")
+                with ZipFile(jar, "w") as archive:
+                    archive.writestr("META-INF/BenchmarkList", project + "\n")
+                    archive.writestr(
+                        "META-INF/CompilerHints", "inline " + project + "\n"
+                    )
+                command.extend(["--input", jar])
+            subprocess.run(command, check=True)
+            with ZipFile(root / "out.jar") as result:
+                self.assertEqual(
+                    result.read("META-INF/BenchmarkList"), b"first\nsecond\n"
+                )
+                self.assertEqual(
+                    result.read("META-INF/CompilerHints"),
+                    b"inline first\ninline second\n",
+                )
+
     def test_compiler_test_archive_consumes_unpublished_providers(self):
         with tempfile.TemporaryDirectory() as directory:
             project = Path(directory) / "classes.jar"
