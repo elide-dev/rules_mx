@@ -11,6 +11,7 @@ exports_files([
     "espresso-shared.patch",
     "sdk.patch",
     "sdk_llvm.json",
+    "sdk_musl.json",
     "sl.py.tpl",
     "sl_fixture_test.py",
     "shaded_inputs.json",
@@ -353,4 +354,31 @@ py_binary(
     name = "pack_sdk_llvm",
     srcs = ["pack_sdk_llvm.py"],
     visibility = ["//visibility:public"],
+)
+
+py_binary(
+    name = "assemble_sdk_toolchain",
+    srcs = ["assemble_sdk_toolchain.py"],
+)
+
+py_test(
+    name = "sdk_toolchain_descriptors_test",
+    size = "large",
+    srcs = ["sdk_toolchain_descriptors_test.py"],
+    args = [
+        "$(rootpath @graal//sdk:LLVM_NINJA_TOOLCHAIN)",
+        "$(rootpath @graal//sdk:MUSL_NINJA_TOOLCHAIN)",
+        "$(rootpath @graal//sdk:MUSL_CMAKE_TOOLCHAIN)",
+    ],
+    data = [
+        "@graal//sdk:LLVM_NINJA_TOOLCHAIN",
+        "@graal//sdk:MUSL_CMAKE_TOOLCHAIN",
+        "@graal//sdk:MUSL_NINJA_TOOLCHAIN",
+    ],
+    tags = ["manual"],
+    target_compatible_with = select({
+        "//tools:exec_linux_amd64": [],
+        "//tools:exec_linux_arm64": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
 )

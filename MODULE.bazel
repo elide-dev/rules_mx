@@ -127,6 +127,8 @@ use_repo(
     "graal_llvm_linux_amd64",
     "graal_llvm_linux_riscv64",
     "graal_llvm_windows_amd64",
+    "graal_musl_aarch64",
+    "graal_musl_amd64",
 )
 
 visualvm = use_extension("//graal:visualvm.bzl", "visualvm_inputs", dev_dependency = True)

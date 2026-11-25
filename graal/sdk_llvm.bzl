@@ -2,15 +2,19 @@
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
 
-def _inputs_impl(ctx):
-    pins = json.decode(ctx.read(Label("//graal:sdk_llvm.json")))
+def _register_archives(ctx, lock, prefix, filename):
+    pins = json.decode(ctx.read(Label(lock)))
     for name, pin in pins.items():
         http_file(
-            name = "graal_llvm_" + name,
+            name = prefix + name,
             urls = pin["urls"],
             integrity = pin["integrity"],
-            downloaded_file_path = "llvm.tar.gz",
+            downloaded_file_path = filename,
         )
+
+def _inputs_impl(ctx):
+    _register_archives(ctx, "//graal:sdk_llvm.json", "graal_llvm_", "llvm.tar.gz")
+    _register_archives(ctx, "//graal:sdk_musl.json", "graal_musl_", "toolchain.tar.gz")
 
 sdk_llvm_inputs = module_extension(implementation = _inputs_impl)
 
@@ -82,3 +86,44 @@ def sdk_llvm_distributions(exclude, license_file, patches):
         target_compatible_with = compatibility,
         visibility = ["//visibility:public"],
     )
+
+def _descriptor_impl(ctx):
+    configuration = ctx.actions.declare_file(ctx.label.name.lower() + "." + ctx.attr.kind)
+    ctx.actions.write(configuration, ctx.attr.content)
+    root = ctx.actions.declare_directory(ctx.label.name.lower())
+    ctx.actions.run(
+        executable = ctx.executable._assemble,
+        inputs = [ctx.file.payload, configuration],
+        outputs = [root],
+        arguments = [root.path, ctx.file.payload.path, configuration.path, "toolchain." + ctx.attr.kind],
+        mnemonic = "MxSDKToolchain",
+    )
+    return [DefaultInfo(files = depset([root]))]
+
+_descriptor = rule(
+    implementation = _descriptor_impl,
+    attrs = {
+        "payload": attr.label(allow_single_file = True, mandatory = True),
+        "content": attr.string(mandatory = True),
+        "kind": attr.string(values = ["ninja", "cmake"], mandatory = True),
+        "_assemble": attr.label(default = Label("//graal:assemble_sdk_toolchain"), executable = True, cfg = "exec"),
+    },
+)
+
+def sdk_toolchain_descriptors(descriptors):
+    for name, definition in descriptors.items():
+        kind = definition["kind"]
+        variants = {":llvm_" + target: content for target, content in definition["platforms"].items()}
+        payload = ":LLVM_TOOLCHAIN" if name == "LLVM_NINJA_TOOLCHAIN" else select({
+            ":llvm_linux_amd64": "@graal_musl_amd64//file",
+            ":llvm_linux_aarch64": "@graal_musl_aarch64//file",
+        })
+        _descriptor(
+            name = name,
+            kind = kind,
+            content = select(variants),
+            payload = payload,
+            tags = ["manual"],
+            target_compatible_with = select({setting: [] for setting in variants} | {"//conditions:default": ["@platforms//:incompatible"]}),
+            visibility = ["//visibility:public"],
+        )
