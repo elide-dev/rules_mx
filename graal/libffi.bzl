@@ -19,7 +19,12 @@ def _libffi_impl(ctx):
         ctx.download(url = _OVERLAY + path, output = path, integrity = integrity)
 
     # This repository follows the mx source version independently of the BCR module.
-    ctx.file("BUILD.bazel", ctx.read("BUILD.bazel").replace("module_version()", repr(pin["version"])))
+    build = ctx.read("BUILD.bazel").replace("module_version()", repr(pin["version"]))
+
+    # The pinned GNU/Linux sysroot exposes glibc 2.17 headers. Use libffi's
+    # portable fallback for the optional memfd_create API (glibc 2.27+).
+    build = build.replace('"HAVE_MEMFD_CREATE": "1"', '"HAVE_MEMFD_CREATE": None')
+    ctx.file("BUILD.bazel", build)
 
 graal_libffi = repository_rule(
     implementation = _libffi_impl,
