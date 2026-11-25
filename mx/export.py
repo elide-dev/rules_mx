@@ -882,11 +882,14 @@ def bazel_buildfile(args):
         if options.gazelle and excluded_from_jacoco:
             allowed = allowed | {"jacoco"}
         if options.gazelle:
+            # JavaProject.deps has the resolved compilation edges. Distribution
+            # membership is resolved separately when exporting each archive.
             allowed = allowed | {
                 "requiresConcealed",
                 "generatedDependencies",
                 "uses",
                 "exports",
+                "distDependencies",
             }
             if project._orig_attrs.get("jacoco") == "include":
                 allowed = allowed | {

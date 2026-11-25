@@ -108,6 +108,7 @@ graal_archive(
         "//graal:espresso-shared.patch",
         "//graal:truffle.patch",
         "//graal:substratevm.patch",
+        "//graal:vm.patch",
         "//graal:regex.patch",
         "//graal:tools.patch",
     ],

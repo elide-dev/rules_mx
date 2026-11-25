@@ -17,6 +17,7 @@ exports_files([
     "libffi.json",
     "truffle.patch",
     "substratevm.patch",
+    "vm.patch",
     "regex.patch",
     "tools.patch",
     "visualvm.json",

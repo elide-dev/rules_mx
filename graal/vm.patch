@@ -1,0 +1,13 @@
+diff --git a/vm/BUILD.bazel b/vm/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/vm/BUILD.bazel
+@@ -0,0 +1,8 @@
++load("@rules_mx//graal:layout.bzl", "mx_archive_layout")
++mx_archive_layout(
++    name = "VM_GRAALVM_SUPPORT",
++    format = "tar",
++    members = {"GRAALVM-README.md": "GRAALVM-README.md", "LICENSE_GRAALVM_CE": "LICENSE.txt", "THIRD_PARTY_LICENSE_CE.txt": "THIRD_PARTY_LICENSE.txt"},
++    archive_imports = {},
++    visibility = ["//visibility:public"],
++)
