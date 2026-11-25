@@ -110,7 +110,7 @@ cc_toolchain_config(
     target_libc = "macosx" if DARWIN else "glibc_2.34",
     target_system_name = TRIPLE,
     tool_paths = {
-        "ar": "bin/llvm-ar",
+        "ar": "bin/llvm-libtool-darwin" if DARWIN else "bin/llvm-ar",
         "cpp": "bin/clang-cpp",
         "dwp": "bin/llvm-dwp",
         "gcc": "cc",

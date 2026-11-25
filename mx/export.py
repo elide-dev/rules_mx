@@ -594,6 +594,13 @@ def bazel_buildfile(args):
         help="discover JUnit classes and run them against these packaged runtime dependencies",
     )
     parser.add_argument(
+        "--test-path",
+        action="append",
+        default=[],
+        metavar="SUITE:DIST=LABEL",
+        help="bind mx test Java properties using <path:DIST> to Bazel data",
+    )
+    parser.add_argument(
         "--test-jvm-flag",
         action="append",
         default=[],
@@ -623,6 +630,8 @@ def bazel_buildfile(args):
     options = parser.parse_args(args)
     test_launchers = _mappings(parser, options.test_launcher, "--test-launcher")
     test_runtimes = _mappings(parser, options.test_runtime, "--test-runtime")
+    test_paths = _mappings(parser, options.test_path, "--test-path")
+    used_test_paths = set()
     test_flags = {}
     for spec in options.test_jvm_flag:
         name, sep, value = spec.partition("=")
@@ -726,6 +735,32 @@ def bazel_buildfile(args):
                 allowed = allowed | {"jacoco", "jacocoExcludePackages"}
             if project._orig_attrs.get("javac.lint.overrides") == "none":
                 allowed = allowed | {"javac.lint.overrides"}
+        jni_headers = options.gazelle and project._orig_attrs.get("jniHeaders") is True
+        if jni_headers:
+            allowed = allowed | {"jniHeaders"}
+        # Solaris is outside the native target platforms served by this migration.
+        if options.gazelle and project._orig_attrs.get("os_arch") == {
+            "solaris": {"<others>": {"ignore": "temporarily disabled"}},
+            "<others>": {"<others>": {"ignore": False}},
+        }:
+            allowed = allowed | {"os_arch"}
+        property_flags = []
+        property_data = []
+        if (
+            options.gazelle
+            and project.is_test_project()
+            and project._orig_attrs.get("javaProperties")
+        ):
+            for key, value in project._orig_attrs["javaProperties"].items():
+                match = re.fullmatch(r"<path:([^>]+)>", value)
+                dep = mx.dependency(match[1], context=project) if match else None
+                labels = test_paths.get(dep.qualifiedName(), []) if dep else []
+                if len(labels) != 1:
+                    mx.abort(f"{project.name}: bind {key}={value} using --test-path")
+                used_test_paths.add(dep.qualifiedName())
+                property_data.append(labels[0])
+                property_flags.append(f"-D{key}=$(rootpath {labels[0]})")
+            allowed = allowed | {"javaProperties"}
         if shaded:
             allowed = allowed | {
                 "class",
@@ -843,6 +878,7 @@ def bazel_buildfile(args):
             coarse = bool(
                 shaded
                 or concealed
+                or jni_headers
                 or force_javac
                 or processors
                 or resources
@@ -864,6 +900,8 @@ def bazel_buildfile(args):
                 record["dirs"] = record["roots"]
             if "jdk.internal.vm.ci" in concealed:
                 record["jvmci"] = True
+            if jni_headers:
+                record["jni_headers"] = True
             if force_javac:
                 record["force_javac"] = True
             if concealed:
@@ -915,6 +953,7 @@ def bazel_buildfile(args):
                         if (
                             len(launchers) != 1
                             or test_runtime
+                            or property_data
                             or project.qualifiedName() in test_flags
                         ):
                             mx.abort(
@@ -926,7 +965,11 @@ def bazel_buildfile(args):
                         record["manual_tests"] = True
                     if test_runtime:
                         record["test_runtime"] = test_runtime
-                    if flags := test_flags.pop(project.qualifiedName(), []):
+                    if property_data:
+                        record["test_data"] = sorted(set(property_data))
+                    if flags := property_flags + test_flags.pop(
+                        project.qualifiedName(), []
+                    ):
                         record["test_jvm_flags"] = flags
             graph[project.name] = record
         rules[project.name] = _rule(
@@ -936,6 +979,8 @@ def bazel_buildfile(args):
         mx.abort(
             f"Unused project configuration: {sorted(project_releases.keys() | manual_tests)}"
         )
+    if unused_paths := test_paths.keys() - used_test_paths:
+        mx.abort(f"Unused test path mappings: {sorted(unused_paths)}")
     if test_launchers or test_runtimes or test_flags:
         mx.abort(
             f"Unused test configuration: {sorted(test_runtimes.keys() | test_flags.keys() | test_launchers.keys())}"

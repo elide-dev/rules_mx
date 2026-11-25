@@ -15,7 +15,7 @@ tools/buildbuddy test --config=buildbuddy-rbe --config=elide-processors //graal/
 | Suite | Native Bazel build | Test coverage |
 | --- | --- | --- |
 | SDK | All 29 declared projects. All 19 Java distributions produce JARs, including Polyglot, Native Bridge, JLine and Launcher Common. Three additional targets expose the version and launcher resource layouts. | All 17 discovered upstream JUnit classes and the C and C++ toolchain probes. Runtime tests verify packaged version resources, JPMS module loading and JLine provider selection on JDK 21 and Labs JDK 25. |
-| Truffle | 44 of 69 declared projects, including the JNI attach library, host interop and SimpleLanguage. Bazel packages the multi-release Truffle API, SL language, SL launcher, Truffle compiler interface and HotSpot runtime as named modules. | 57 guest fixtures run independently. All 30 concrete SL JUnit classes run on the default runtime, including the four interpreter configurations of the upstream fixture runner. Nine TCK classes run on both runtimes. All ten projects in `TRUFFLE_TEST` compile, with 570 discovered JUnit class targets and 277 in the default test selection. |
+| Truffle | 53 of 69 declared projects, including JNI attach, host interop, SimpleLanguage and NFI with its libffi backend. Bazel packages the multi-release Truffle API, SL language, SL launcher, Truffle compiler interface and HotSpot runtime as named modules. | 57 guest fixtures run independently. All 30 concrete SL JUnit classes run on the default runtime, including the four interpreter configurations of the upstream fixture runner. Nine TCK classes run on both runtimes. All ten projects in `TRUFFLE_TEST` compile, with 570 discovered JUnit class targets and 297 in the default test selection. All 31 discovered NFI JUnit classes also run by default. |
 | Compiler | 10 of 17 projects, including the complete compiler test project and both versions of its annotation fixtures. | 21 compiler-tool JUnit classes, 19 shared-harness classes, four previously qualified compiler regressions and the last-tier compiled guest probe run by default. |
 
 The SDK and Truffle slice generally targets Java 21. Shaded libraries compile at their declared releases, including the JDK 22 JLine overlay. Some SDK projects declare an older minimum while using newer APIs, including `java.io.Serial`. The libgraal API compiles as one unit because its packages depend on each other. Gazelle keeps project resources, processors and tests with their owning compilations and splits eligible source-only projects by package.
@@ -97,6 +97,15 @@ The launcher uses the target JDK's JNI headers, the registered C++ toolchain and
 
 The benchmark accepts `no-isolation`, `internal-isolation` and `external-isolation`. Omitting the mode runs all three. The pinned benchmark includes a timing patch so a batch shorter than one millisecond still reports throughput.
 
+## Truffle NFI
+
+Bazel compiles the mx-pinned libffi 3.4.8 sources with the Elide C/C++ toolchain and links them into Truffle’s JNI library. The backend JAR contains the shared library, platform file list and hash that Truffle uses to extract it. The upstream tests receive their two fixture libraries through the declared `TRUFFLE_TEST_NATIVE` directory. Each JUnit class has its own target, including the callback round trip.
+
+```sh
+bazelisk build --config=elide-processors @graal//truffle:TRUFFLE_NFI_LIBFFI @graal//truffle:TRUFFLE_TEST_NATIVE
+bazelisk test --config=elide-processors @graal//truffle:com.oracle.truffle.nfi.test.com.oracle.truffle.nfi.test.GlobalNFITest
+```
+
 ## Extending the graph
 
 Run `tools/generate-graal --check` to reproduce the checked-in patches from the pinned archive. Add suite roots and external dependency bindings to `tools/generate-graal`, regenerate, and inspect the BUILD diff. To try an upstream revision before changing the pin, pass a checkout path to the generator. Make the archive pin, patches and regression tests part of the same change.
@@ -104,7 +113,7 @@ Run `tools/generate-graal --check` to reproduce the checked-in patches from the 
 | Next checkpoint | Acceptance under Bazel |
 | --- | --- |
 | SDK toolchain distributions | Assemble the five LLVM, Ninja, CMake and musl redistribution layouts with their upstream contents and platform filters. Their packaged payloads are separate from the Elide LLVM toolchain used for Bazel compilation. |
-| Complete Truffle | Extend default execution to the remaining API, instrumentation, string and sandbox tests. Migrate Truffle NFI and its native backends. |
+| Complete Truffle | Extend default execution to the remaining API, instrumentation, string and sandbox tests. Migrate the Panama NFI backend and its JDK 22 overlay. |
 | Compiler and SubstrateVM | Qualify more classes from the full compiler distribution, including architecture-specific backends and VM-specific test configurations. Build the required Espresso Shared dependencies and SubstrateVM, then produce and execute an image with the newly built toolchain. |
 | Languages and tools | Migrate Regex, Sulong, Wasm, Espresso, Espresso Compiler Stub, Tools, Visualizer, Web Image and Sandbox Toolchains with their Java, native and external inputs. Run each suite's upstream tests. |
 | VM assembly | Pin the external components required by each selected VM configuration. Assemble the distribution and run its launchers, component tests and corresponding mx gate equivalents from a clean Linux RBE build. |
