@@ -12,6 +12,8 @@ exports_files([
 py_test(
     name = "export_test",
     size = "small",
+    # This integration test launches a fresh mx process for each CLI invocation.
+    timeout = "moderate",
     srcs = ["export_test.py"],
     args = [
         "$(rootpath @graal_mx//:mx_cli)",
