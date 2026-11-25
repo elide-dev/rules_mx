@@ -1,0 +1,38 @@
+{
+  "compiler_rt": {
+    "integrity": "sha512-X+lZNFXsH4HVNhJH6kZe+jnInDHtXK1dZW3RkMSEx18aiGziyutr43LBe1NvcM4CepBbXb/s1qTk4wZ5yzG6Lw==",
+    "urls": [
+      "https://lafo.ssw.uni-linz.ac.at/pub/llvm/compiler-rt-22.1.8-4-g1d96596a53-bg6891668b1e-linux-amd64.tar.gz"
+    ]
+  },
+  "darwin_aarch64": {
+    "integrity": "sha512-bAYeYblHVghbjrEEkg4usrQ31h1+AuMOi6PRtQUHufUxd49ynwsd4lT5ue8NesBS0IW1S7R69CWYfinkZZD6qg==",
+    "urls": [
+      "https://lafo.ssw.uni-linz.ac.at/pub/llvm/llvm-22.1.8-4-g1d96596a53-bg6891668b1e-darwin-aarch64.tar.gz"
+    ]
+  },
+  "linux_aarch64": {
+    "integrity": "sha512-lChwezLKufyoW3Vq6ojaoOfqgYpT1+SnW34O5te6Stguc4dk0EZKByoaRhFDLFnEePB2ETDavKUxH+o9AYZulw==",
+    "urls": [
+      "https://lafo.ssw.uni-linz.ac.at/pub/llvm/llvm-22.1.8-4-g1d96596a53-bg6891668b1e-linux-aarch64.tar.gz"
+    ]
+  },
+  "linux_amd64": {
+    "integrity": "sha512-p8fbaNk9bURroKj7V8cY+fvtjDAniTpCAbmA82jcejP+RcnpeaHXyVduwVI5tC3gim2G4CCUHxVp5yEo2SKPmg==",
+    "urls": [
+      "https://lafo.ssw.uni-linz.ac.at/pub/llvm/llvm-22.1.8-4-g1d96596a53-bg6891668b1e-linux-amd64.tar.gz"
+    ]
+  },
+  "linux_riscv64": {
+    "integrity": "sha512-+ROcM0yA/RmMa08kuK/tt1bp9IRyT3QevpGI3VqVnRn9bi47CXysB8qPp8SlZVmHtP1QMKEGa8sEUtvyx3pegg==",
+    "urls": [
+      "https://lafo.ssw.uni-linz.ac.at/pub/llvm/llvm-22.1.8-4-g1d96596a53-bg6891668b1e-linux-riscv64.tar.gz"
+    ]
+  },
+  "windows_amd64": {
+    "integrity": "sha512-+GjS51L6mEzyVHB7eBwqT4MH3hwinIGnC4M9QsliDJlbdB+ZJyNXBqB6eg868YVpDfgHb/t8XOBOyHRO6JlyKQ==",
+    "urls": [
+      "https://lafo.ssw.uni-linz.ac.at/pub/llvm/llvm-22.1.8-4-g1d96596a53-bg6891668b1e-windows-amd64.tar.gz"
+    ]
+  }
+}

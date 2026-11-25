@@ -912,6 +912,48 @@ def shading_inputs(directory):
     return inputs, flags
 
 
+def sdk_llvm_inputs(directory):
+    metadata = runpy.run_path(str(directory / "mx.sdk/suite.py"))["suite"]
+    libraries = metadata["libraries"]
+    llvm = libraries["LLVM_ORG"]
+    variants = {
+        f"{os_name}_{arch}": {**llvm, **config}
+        for os_name, arches in llvm["os_arch"].items()
+        for arch, config in arches.items()
+        if not config.get("optional", False)
+    }
+    variants["compiler_rt"] = libraries["LLVM_ORG_COMPILER_RT_LINUX"]
+    pins = {}
+    for name, spec in variants.items():
+        algo, digest = spec["digest"].split(":")
+        pins[name] = dict(
+            urls=[url.format(**spec) for url in spec["urls"]],
+            integrity=algo + "-" + base64.b64encode(bytes.fromhex(digest)).decode(),
+        )
+    return pins
+
+
+def sdk_llvm_rules(directory):
+    metadata = runpy.run_path(str(directory / "mx.sdk/suite.py"))["suite"]
+    layout = metadata["distributions"]["LLVM_TOOLCHAIN"]["layout"]
+    extract, compiler_rt, license_file = layout["./"]
+    if (
+        extract["source_type"] != "extracted-dependency"
+        or extract["dependency"] != "LLVM_ORG"
+        or extract["path"] != "*"
+        or compiler_rt != "extracted-dependency:LLVM_ORG_COMPILER_RT_LINUX"
+        or not license_file.startswith("file:")
+        or not layout["./patches/"].startswith("file:")
+    ):
+        raise ValueError("Unsupported SDK LLVM distribution layout")
+    return (
+        'load("@rules_mx//graal:sdk_llvm.bzl", "sdk_llvm_distributions")\n'
+        f"sdk_llvm_distributions(exclude = {json.dumps(extract['exclude'])}, "
+        f"license_file = {json.dumps(license_file.removeprefix('file:'))}, "
+        f"patches = {json.dumps(layout['./patches/'].removeprefix('file:'))})\n"
+    )
+
+
 def visualvm_inputs(directory):
     metadata = runpy.run_path(str(directory / "mx.tools/suite.py"))["suite"]
     libraries = metadata["libraries"]
@@ -1544,6 +1586,7 @@ def generate(suite, stage):
     if suite == "sdk":
         (directory / "BUILD.bazel").write_text(
             sdk_native_projects(directory)
+            + sdk_llvm_rules(directory)
             + 'test_suite(name = "tests", visibility = ["//visibility:public"])\n'
         )
     elif suite == "compiler":
@@ -1737,6 +1780,15 @@ def main():
                 sys.exit("Regenerate the HSDIS pins with tools/generate-graal")
         else:
             hsdis.write_text(pins)
+        sdk_llvm = ROOT / "graal/sdk_llvm.json"
+        sdk_llvm_pins = (
+            json.dumps(sdk_llvm_inputs(stage / "sdk"), indent=2, sort_keys=True) + "\n"
+        )
+        if args.check:
+            if sdk_llvm.read_text() != sdk_llvm_pins:
+                sys.exit("Regenerate the SDK LLVM pins with tools/generate-graal")
+        else:
+            sdk_llvm.write_text(sdk_llvm_pins)
         visualvm = ROOT / "graal/visualvm.json"
         visualvm_pins = (
             json.dumps(visualvm_inputs(stage / "tools"), indent=2, sort_keys=True)
