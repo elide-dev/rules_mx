@@ -203,6 +203,8 @@ def svm_native_projects(projects):
         glibc = target.startswith("linux-")
         prefix = target + ("/glibc/" if glibc else "/")
         selected = ["libchelper", "jvm.posix", "libcontainer" if glibc else "darwin"]
+        if "libzstd" in projects:
+            selected.append("libzstd")
         members[setting] = common_headers | {
             archive_paths[short][0]: prefix + archive_paths[short][1]
             for short in selected
@@ -248,6 +250,9 @@ def _native_image_root_impl(ctx):
         [jar] = target.files.to_list()
         entries["lib/svm/" + name + ".jar"] = jar
     entries["lib/svm/builder/lib/" + ctx.file.reporter.basename] = ctx.file.reporter
+    for target, name in ctx.attr.builder_libs.items():
+        [jar] = target[JavaInfo].runtime_output_jars
+        entries["lib/svm/builder/lib/" + name] = jar
     flags = ctx.actions.declare_file(ctx.label.name + ".exports")
     exports = sorted(driver[MxJarInfo].required_exports.to_list())
     ctx.actions.write(flags, "\n".join(exports) + "\n")
@@ -291,6 +296,7 @@ _native_image_root = rule(
         "management": attr.label(providers = [JavaInfo], mandatory = True),
         "guest": attr.label_keyed_string_dict(providers = [JavaInfo], mandatory = True),
         "reporter": attr.label(allow_single_file = True, mandatory = True),
+        "builder_libs": attr.label_keyed_string_dict(providers = [JavaInfo]),
         "native_archive": attr.label(allow_single_file = [".tar"], mandatory = True),
         "_jdk": attr.label(default = Label("//tools:labs_runtime")),
         "_assemble": attr.label(default = Label("//graal:assemble_svm"), executable = True, cfg = "exec"),
@@ -300,7 +306,13 @@ _native_image_root = rule(
     toolchains = use_cc_toolchain(),
 )
 
-def svm_launcher(name):
+def svm_launcher(name, builder_libs = {}):
+    """Assemble a Native Image distribution root and its launcher.
+
+    Args:
+      name: launcher name.
+      builder_libs: JARs that the builder loads from lib/svm/builder/lib, keyed to their file names.
+    """
     _native_image_root(
         name = name + ".root",
         out = name + ".py",
@@ -317,6 +329,7 @@ def svm_launcher(name):
             "//sdk:VMACCESS_GUEST": "vmaccess-guest",
         },
         reporter = ":com.oracle.svm.native.reporterchelper",
+        builder_libs = builder_libs,
         native_archive = ":SVM_HOSTED_NATIVE",
         visibility = ["//visibility:public"],
     )
