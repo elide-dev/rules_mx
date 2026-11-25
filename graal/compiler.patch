@@ -12632,20 +12632,20 @@ new file mode 100644
 +
 +mx_test_class(
 +    name = "org.graalvm.igvutil.test.org.graalvm.igvutil.test.FlattenerTest",
-+    project = ":org.graalvm.igvutil.test",
 +    test_class = "org.graalvm.igvutil.test.FlattenerTest",
++    runtime_deps = [":GRAAL_IGVUTIL_TEST"],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.igvutil.test.org.graalvm.igvutil.test.JsonExporterTest",
-+    project = ":org.graalvm.igvutil.test",
 +    test_class = "org.graalvm.igvutil.test.JsonExporterTest",
++    runtime_deps = [":GRAAL_IGVUTIL_TEST"],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.igvutil.test.org.graalvm.igvutil.test.PrinterTest",
-+    project = ":org.graalvm.igvutil.test",
 +    test_class = "org.graalvm.igvutil.test.PrinterTest",
++    runtime_deps = [":GRAAL_IGVUTIL_TEST"],
 +)
 +
 +mx_processed_java(
@@ -12714,8 +12714,8 @@ new file mode 100644
 +        "--add-modules=jdk.internal.vm.ci",
 +        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
 +    ],
-+    project = ":org.graalvm.profdiff.test",
 +    test_class = "org.graalvm.profdiff.test.ArgumentParserTest",
++    runtime_deps = [":GRAAL_PROFDIFF_TEST"],
 +)
 +
 +mx_test_class(
@@ -12724,8 +12724,8 @@ new file mode 100644
 +        "--add-modules=jdk.internal.vm.ci",
 +        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
 +    ],
-+    project = ":org.graalvm.profdiff.test",
 +    test_class = "org.graalvm.profdiff.test.CompilationFragmentTest",
++    runtime_deps = [":GRAAL_PROFDIFF_TEST"],
 +)
 +
 +mx_test_class(
@@ -12734,8 +12734,8 @@ new file mode 100644
 +        "--add-modules=jdk.internal.vm.ci",
 +        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
 +    ],
-+    project = ":org.graalvm.profdiff.test",
 +    test_class = "org.graalvm.profdiff.test.CompilationUnitTest",
++    runtime_deps = [":GRAAL_PROFDIFF_TEST"],
 +)
 +
 +mx_test_class(
@@ -12744,8 +12744,8 @@ new file mode 100644
 +        "--add-modules=jdk.internal.vm.ci",
 +        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
 +    ],
-+    project = ":org.graalvm.profdiff.test",
 +    test_class = "org.graalvm.profdiff.test.ConcatListTest",
++    runtime_deps = [":GRAAL_PROFDIFF_TEST"],
 +)
 +
 +mx_test_class(
@@ -12754,8 +12754,8 @@ new file mode 100644
 +        "--add-modules=jdk.internal.vm.ci",
 +        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
 +    ],
-+    project = ":org.graalvm.profdiff.test",
 +    test_class = "org.graalvm.profdiff.test.DeltaTreeTest",
++    runtime_deps = [":GRAAL_PROFDIFF_TEST"],
 +)
 +
 +mx_test_class(
@@ -12764,8 +12764,8 @@ new file mode 100644
 +        "--add-modules=jdk.internal.vm.ci",
 +        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
 +    ],
-+    project = ":org.graalvm.profdiff.test",
 +    test_class = "org.graalvm.profdiff.test.ExperimentPairTest",
++    runtime_deps = [":GRAAL_PROFDIFF_TEST"],
 +)
 +
 +mx_test_class(
@@ -12774,8 +12774,8 @@ new file mode 100644
 +        "--add-modules=jdk.internal.vm.ci",
 +        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
 +    ],
-+    project = ":org.graalvm.profdiff.test",
 +    test_class = "org.graalvm.profdiff.test.ExperimentParserTest",
++    runtime_deps = [":GRAAL_PROFDIFF_TEST"],
 +)
 +
 +mx_test_class(
@@ -12784,8 +12784,8 @@ new file mode 100644
 +        "--add-modules=jdk.internal.vm.ci",
 +        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
 +    ],
-+    project = ":org.graalvm.profdiff.test",
 +    test_class = "org.graalvm.profdiff.test.ExplanationWriterTest",
++    runtime_deps = [":GRAAL_PROFDIFF_TEST"],
 +)
 +
 +mx_test_class(
@@ -12794,8 +12794,8 @@ new file mode 100644
 +        "--add-modules=jdk.internal.vm.ci",
 +        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
 +    ],
-+    project = ":org.graalvm.profdiff.test",
 +    test_class = "org.graalvm.profdiff.test.HotCompilationUnitPolicyTest",
++    runtime_deps = [":GRAAL_PROFDIFF_TEST"],
 +)
 +
 +mx_test_class(
@@ -12804,8 +12804,8 @@ new file mode 100644
 +        "--add-modules=jdk.internal.vm.ci",
 +        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
 +    ],
-+    project = ":org.graalvm.profdiff.test",
 +    test_class = "org.graalvm.profdiff.test.InliningPathTest",
++    runtime_deps = [":GRAAL_PROFDIFF_TEST"],
 +)
 +
 +mx_test_class(
@@ -12814,8 +12814,8 @@ new file mode 100644
 +        "--add-modules=jdk.internal.vm.ci",
 +        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
 +    ],
-+    project = ":org.graalvm.profdiff.test",
 +    test_class = "org.graalvm.profdiff.test.InliningTreeTest",
++    runtime_deps = [":GRAAL_PROFDIFF_TEST"],
 +)
 +
 +mx_test_class(
@@ -12824,8 +12824,8 @@ new file mode 100644
 +        "--add-modules=jdk.internal.vm.ci",
 +        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
 +    ],
-+    project = ":org.graalvm.profdiff.test",
 +    test_class = "org.graalvm.profdiff.test.MainTest",
++    runtime_deps = [":GRAAL_PROFDIFF_TEST"],
 +)
 +
 +mx_test_class(
@@ -12834,8 +12834,8 @@ new file mode 100644
 +        "--add-modules=jdk.internal.vm.ci",
 +        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
 +    ],
-+    project = ":org.graalvm.profdiff.test",
 +    test_class = "org.graalvm.profdiff.test.MethodTest",
++    runtime_deps = [":GRAAL_PROFDIFF_TEST"],
 +)
 +
 +mx_test_class(
@@ -12844,8 +12844,8 @@ new file mode 100644
 +        "--add-modules=jdk.internal.vm.ci",
 +        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
 +    ],
-+    project = ":org.graalvm.profdiff.test",
 +    test_class = "org.graalvm.profdiff.test.OptimizationContextTreeTest",
++    runtime_deps = [":GRAAL_PROFDIFF_TEST"],
 +)
 +
 +mx_test_class(
@@ -12854,8 +12854,8 @@ new file mode 100644
 +        "--add-modules=jdk.internal.vm.ci",
 +        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
 +    ],
-+    project = ":org.graalvm.profdiff.test",
 +    test_class = "org.graalvm.profdiff.test.OptimizationTreeTest",
++    runtime_deps = [":GRAAL_PROFDIFF_TEST"],
 +)
 +
 +mx_test_class(
@@ -12864,8 +12864,8 @@ new file mode 100644
 +        "--add-modules=jdk.internal.vm.ci",
 +        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
 +    ],
-+    project = ":org.graalvm.profdiff.test",
 +    test_class = "org.graalvm.profdiff.test.PositionTest",
++    runtime_deps = [":GRAAL_PROFDIFF_TEST"],
 +)
 +
 +mx_test_class(
@@ -12874,8 +12874,8 @@ new file mode 100644
 +        "--add-modules=jdk.internal.vm.ci",
 +        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
 +    ],
-+    project = ":org.graalvm.profdiff.test",
 +    test_class = "org.graalvm.profdiff.test.TreeMatcherTest",
++    runtime_deps = [":GRAAL_PROFDIFF_TEST"],
 +)
 +
 +mx_test_class(
@@ -12884,8 +12884,8 @@ new file mode 100644
 +        "--add-modules=jdk.internal.vm.ci",
 +        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
 +    ],
-+    project = ":org.graalvm.profdiff.test",
 +    test_class = "org.graalvm.profdiff.test.TreeNodeTest",
++    runtime_deps = [":GRAAL_PROFDIFF_TEST"],
 +)
 +
 +mx_jar_dist(

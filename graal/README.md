@@ -152,7 +152,9 @@ The builder uses the source-built Graal compiler and the relocated Espresso modu
 
 ## Extending the graph
 
-Run `tools/generate-graal --check` to reproduce the checked-in patches from the pinned archive. Add suite roots and external dependency bindings to `tools/generate-graal`, regenerate, and inspect the BUILD diff. To try an upstream revision before changing the pin, pass a checkout path to the generator. Make the archive pin, patches and regression tests part of the same change.
+The generator exports the selected suites from mx and runs Gazelle once across the suite graphs. SDK, Truffle, compiler, Regex, Tools and Espresso Shared select their roots from the resolved suite inventory. Suites with dynamically registered product configurations can select just their declared roots and still retain the resolved dependencies. Suite-specific settings bind custom native actions, artifacts and test launchers.
+
+Run `tools/generate-graal --check` to reproduce the checked-in patches from the pinned archive. Add suite or external dependency bindings to `tools/generate-graal` as needed, regenerate, and inspect the BUILD diff. To try an upstream revision before changing the pin, pass a checkout path to the generator. Make the archive pin, patches and regression tests part of the same change.
 
 | Next checkpoint | Acceptance under Bazel |
 | --- | --- |

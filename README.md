@@ -61,6 +61,20 @@ diff -u mx/projects.bzl /tmp/mx-projects.bzl
 
 The standalone BUILD exporter handles plain Java projects with a single resource root per project. The Gazelle exporter also handles multiple source and resource roots. It exports annotation processor distributions backed by Java projects. External Java libraries and previously migrated distributions can be bound with --java-dep SUITE:NAME=LABEL. Use `--library-module SUITE:LIB=MODULE` to name a mapped automatic module when building a JPMS distribution. It diagnoses custom project types and unhandled project attributes. Mapping those features is part of migrating the rest of GraalVM. The generated suite-root targets assume their files share one Bazel package. Introducing nested BUILD files changes ownership of the sources.
 
+### Generate a whole suite
+
+`bazel-graph --imports` emits the resolved projects, distributions and libraries for the primary suite and its loaded imports. It includes the dependency edge kinds, Java archive membership, and distribution layout data. This command discovers inputs without fetching or building the suite's artifacts.
+
+`bazel-buildfile --gazelle --all` takes its roots from the resolved primary suite. It exports supported Java projects, JARs, POMs, resource layouts and TARs with explicit file and archive inputs. It also discovers JUnit classes. If a test project belongs to exactly one test JAR, the generated tests use that packaged runtime. Explicit test bindings take precedence.
+
+```sh
+bazelisk run //:mx -- -p "$PWD/tests/processing" bazel-graph --imports
+bazelisk run //:mx -- -p "$PWD/tests/processing" bazel-buildfile --gazelle --all > tests/processing/mx-graph.json
+bazelisk run //:gazelle -- -mx_graph=tests/processing/mx-graph.json tests/processing
+```
+
+Repeat `-mx_graph` to generate several suite roots in one Gazelle invocation. Use `--suite-package SUITE=//PACKAGE` to resolve Java edges to imported suites whose Bazel targets are already available. Individual `--java-dep` bindings take precedence. Use `--provided-target NAME` for a suite constituent implemented by an existing Bazel rule at the same label. Suite-wide export fails when a root needs an unsupported lowering. Use `--declared-only` to select roots declared in `suite.py` when the suite also registers product configurations dynamically. The exporter still follows the resolved dependencies of those roots.
+
 ## Annotation processors
 
 For each mx-declared processor distribution, the exporter uses mx's resolved service-provider list and emits one native `java_plugin` per processor class. A processed project becomes a rules_java `java_library` with explicit plugins. Bazel runs the processors on its execution platform and exposes generated API to downstream Java compilations. Processor implementation projects and ordinary consumers still use `elide_java_library`.

@@ -2,62 +2,12 @@ diff --git a/tools/BUILD.bazel b/tools/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/tools/BUILD.bazel
-@@ -0,0 +1,1556 @@
+@@ -0,0 +1,1569 @@
 +load("@rules_java//java:java_import.bzl", "java_import")
-+load("@rules_mx//graal:layout.bzl", "mx_archive_layout")
 +load("@rules_mx//graal:visualvm.bzl", "visualvm_support")
-+load("@rules_mx//mx:graph.bzl", "mx_jar_dist", "mx_pom_dist", "mx_processed_java", "mx_project", "mx_shaded_java", "mx_test_class")
++load("@rules_mx//mx:graph.bzl", "mx_exported_tar", "mx_jar_dist", "mx_pom_dist", "mx_processed_java", "mx_project", "mx_shaded_java", "mx_test_class")
 +
 +visualvm_support(name = "VISUALVM_GRAALVM_SUPPORT")
-+
-+mx_archive_layout(
-+    name = "CHROMEINSPECTOR_GRAALVM_SUPPORT",
-+    format = "tar",
-+    members = {"mx.tools/tools-chromeinspector.properties": "native-image.properties"},
-+    visibility = ["//visibility:public"],
-+)
-+
-+mx_archive_layout(
-+    name = "INSIGHT_GRAALVM_SUPPORT",
-+    format = "tar",
-+    members = {"mx.tools/tools-insight.properties": "native-image.properties"},
-+    visibility = ["//visibility:public"],
-+)
-+
-+mx_archive_layout(
-+    name = "INSIGHT_HEAP_GRAALVM_SUPPORT",
-+    format = "tar",
-+    members = {"mx.tools/tools-insight.properties": "native-image.properties"},
-+    visibility = ["//visibility:public"],
-+)
-+
-+mx_archive_layout(
-+    name = "TRUFFLE_PROFILER_GRAALVM_SUPPORT",
-+    format = "tar",
-+    members = {"mx.tools/tools-profiler.properties": "native-image.properties"},
-+    visibility = ["//visibility:public"],
-+)
-+
-+mx_archive_layout(
-+    name = "TRUFFLE_COVERAGE_GRAALVM_SUPPORT",
-+    format = "tar",
-+    members = {"mx.tools/tools-coverage.properties": "native-image.properties"},
-+    visibility = ["//visibility:public"],
-+)
-+
-+mx_archive_layout(
-+    name = "DAP_GRAALVM_SUPPORT",
-+    format = "tar",
-+    members = {"mx.tools/tools-dap.properties": "native-image.properties"},
-+    visibility = ["//visibility:public"],
-+)
-+
-+mx_archive_layout(
-+    name = "LSP_GRAALVM_SUPPORT",
-+    format = "tar",
-+    members = {"mx.tools/tools-lsp.properties": "native-image.properties"},
-+    visibility = ["//visibility:public"],
-+)
 +
 +filegroup(
 +    name = "all_projects",
@@ -1558,6 +1508,69 @@ new file mode 100644
 +        "@contrib_rules_jvm_deps//:junit_junit",
 +        "@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
 +    ],
++)
++
++mx_exported_tar(
++    name = "CHROMEINSPECTOR_GRAALVM_SUPPORT",
++    format = "tar",
++    members = {
++        "mx.tools/tools-chromeinspector.properties": "native-image.properties",
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_exported_tar(
++    name = "DAP_GRAALVM_SUPPORT",
++    format = "tar",
++    members = {
++        "mx.tools/tools-dap.properties": "native-image.properties",
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_exported_tar(
++    name = "INSIGHT_GRAALVM_SUPPORT",
++    format = "tar",
++    members = {
++        "mx.tools/tools-insight.properties": "native-image.properties",
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_exported_tar(
++    name = "INSIGHT_HEAP_GRAALVM_SUPPORT",
++    format = "tar",
++    members = {
++        "mx.tools/tools-insight.properties": "native-image.properties",
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_exported_tar(
++    name = "LSP_GRAALVM_SUPPORT",
++    format = "tar",
++    members = {
++        "mx.tools/tools-lsp.properties": "native-image.properties",
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_exported_tar(
++    name = "TRUFFLE_COVERAGE_GRAALVM_SUPPORT",
++    format = "tar",
++    members = {
++        "mx.tools/tools-coverage.properties": "native-image.properties",
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_exported_tar(
++    name = "TRUFFLE_PROFILER_GRAALVM_SUPPORT",
++    format = "tar",
++    members = {
++        "mx.tools/tools-profiler.properties": "native-image.properties",
++    },
++    visibility = ["//visibility:public"],
 +)
 diff --git a/tools/src/com.oracle.truffle.tools.agentscript/src/com/oracle/truffle/tools/agentscript/impl/BUILD.bazel b/tools/src/com.oracle.truffle.tools.agentscript/src/com/oracle/truffle/tools/agentscript/impl/BUILD.bazel
 new file mode 100644

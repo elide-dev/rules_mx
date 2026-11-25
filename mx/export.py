@@ -47,6 +47,73 @@ def bazel_projects(args):
     print(json.dumps({"version": 1, "projects": result}, indent=2, sort_keys=True))
 
 
+@mx.optional_suite_context
+@mx.command(
+    "mx", "bazel-graph", "[--imports]", props={"keepUnsatisfiedDependencies": True}
+)
+def bazel_graph(args):
+    """Describe the resolved suite graph without resolving artifact files."""
+    parser = argparse.ArgumentParser(prog="mx bazel-graph")
+    parser.add_argument(
+        "--imports", action="store_true", help="include loaded imported suites"
+    )
+    options = parser.parse_args(args)
+    primary = mx.primary_suite() or mx.suite("mx")
+    suites = mx.suites(include_mx=True) if options.imports else [primary]
+    result = {}
+    for suite in sorted(suites, key=lambda item: item.name):
+        nodes = {}
+        for kind, dependencies in (
+            ("project", suite.projects),
+            ("distribution", suite.dists),
+            ("library", suite.libs + suite.jreLibs + suite.jdkLibs),
+        ):
+            for dep in dependencies:
+                edges = {}
+
+                def edge(_, target, relation):
+                    edges.setdefault(relation.kind, []).append(target.qualifiedName())
+
+                dep.walk_deps(
+                    preVisit=lambda _, relation: relation is None,
+                    visitEdge=edge,
+                    ignoredEdges=[],
+                )
+                node = {
+                    "kind": kind,
+                    "type": type(dep).__name__,
+                    "edges": edges,
+                    "platform_dependent": dep.isPlatformDependent(),
+                }
+                if kind == "project":
+                    root = Path(suite.dir)
+                    node["path"] = Path(dep.dir).relative_to(root).as_posix()
+                    node["source_roots"] = [
+                        Path(path).relative_to(root).as_posix()
+                        for path in dep.source_dirs()
+                    ]
+                if dep.isJavaProject():
+                    node["compliance"] = repr(dep.javaCompliance)
+                    node["testonly"] = dep.is_test_project()
+                if dep.isDistribution():
+                    node["testonly"] = dep.is_test_distribution()
+                    if dep.isJARDistribution():
+                        node["archive_members"] = [
+                            member.qualifiedName() for member in dep.archived_deps()
+                        ]
+                    if hasattr(dep, "layout"):
+                        node["layout"] = dep.layout
+                nodes[dep.qualifiedName()] = node
+        result[suite.name] = nodes
+    print(
+        json.dumps(
+            {"version": 1, "primary_suite": primary.name, "suites": result},
+            indent=2,
+            sort_keys=True,
+        )
+    )
+
+
 def _starlark_value(value):
     if isinstance(value, bool):
         return str(value)
@@ -408,6 +475,9 @@ def _jar_archive(dist, suite, mappings, pending, release, archives, library_modu
         ":" + d.name: str(d.multiReleaseJarVersion) for d in members if d not in base
     }
     pending.extend(d for d in members if d not in base)
+    if release is None:
+        compliance = dist.maxJavaCompliance()
+        release = max(9, compliance.value) if compliance else 9
     result = {
         "name": dist.name,
         "overlays": overlays,
@@ -475,6 +545,110 @@ def _resource_path(path):
         part not in (".", "..") and re.fullmatch(r"[a-zA-Z0-9._+-]+", part)
         for part in path.split("/")
     )
+
+
+def _is_shaded_project(dep):
+    return (type(dep).__module__, type(dep).__name__) == (
+        "mx_sdk_shaded",
+        "ShadedLibraryProject",
+    )
+
+
+def _can_lower_root(dep):
+    return (
+        type(dep).__name__
+        in ("JavaProject", "LayoutDirDistribution", "LayoutTARDistribution")
+        or _is_shaded_project(dep)
+        or dep.isJARDistribution()
+        or dep.isPOMDistribution()
+    )
+
+
+def _tar_layout(dist, pending, mappings):
+    if (
+        dist.isPlatformDependent()
+        or dist.compress
+        or dist.deps
+        or dist.excludedLibs
+        or dist.fileListEntry
+        or dist.fileListPurpose
+        or dist.hashEntry
+        or dist._removed_deps
+    ):
+        mx.abort(
+            f"{dist.name}: TAR layout needs a Bazel implementation bound with --provided-target"
+        )
+    members = {}
+    imports = {}
+    destinations = set()
+    inputs = set()
+    for destination, source in dist._walk_layout():
+        path = source.get("path")
+        kind = source["source_type"]
+        keys = set(source) - {"_str_", "source_type"}
+        directory = destination.endswith("/")
+        destination = destination.removeprefix("./")
+        if kind == "file" and keys == {"path"} and _resource_path(path):
+            if not (Path(dist.suite.dir) / path).is_file():
+                mx.abort(f"{dist.name}: missing TAR input {path}")
+            target = path
+            if directory:
+                destination += Path(path).name
+        elif (
+            kind in ("dependency", "extracted-dependency")
+            and keys == {"dependency", "path", "optional"}
+            and not source["optional"]
+        ):
+            dep = mx.dependency(source["dependency"], context=dist)
+            inputs.add(dep)
+            labels = mappings.get(dep.qualifiedName())
+            if labels is None and dep.suite == dist.suite and dep.isDistribution():
+                pending.append(dep)
+                labels = [":" + dep.name]
+            if not labels or len(labels) != 1:
+                mx.abort(
+                    f"{dist.name}: bind {dep.qualifiedName()} to one Bazel artifact"
+                )
+            target = labels[0]
+            if kind == "extracted-dependency" and (not path or _resource_path(path)):
+                if directory and path:
+                    destination += Path(path).name
+                elif directory and not path:
+                    if destination and not _resource_path(destination.rstrip("/")):
+                        mx.abort(
+                            f"{dist.name}: invalid TAR import destination {destination!r}"
+                        )
+                    imports.setdefault(target, []).append("=" + destination)
+                    continue
+                elif not path:
+                    mx.abort(
+                        f"{dist.name}: extracting a full archive needs a destination directory"
+                    )
+                if not _resource_path(destination) or destination in destinations:
+                    mx.abort(
+                        f"{dist.name}: expected a unique TAR member path: {destination!r}"
+                    )
+                destinations.add(destination)
+                imports.setdefault(target, []).append(path + "=" + destination)
+                continue
+            if kind != "dependency" or path or directory:
+                mx.abort(f"{dist.name}: unsupported TAR input {source['_str_']}")
+        else:
+            mx.abort(f"{dist.name}: unsupported TAR input {source['_str_']}")
+        if not _resource_path(destination) or destination in destinations:
+            mx.abort(f"{dist.name}: expected a unique TAR member path: {destination!r}")
+        destinations.add(destination)
+        members.setdefault(target, []).append(destination)
+    if not (members or imports) or inputs != set(dist.buildDependencies):
+        mx.abort(f"{dist.name}: expected a nonempty TAR layout with explicit inputs")
+    return {
+        "name": dist.name,
+        "members": {target: "\n".join(entries) for target, entries in members.items()},
+        "archive_imports": {
+            target: "\n".join(entries) for target, entries in imports.items()
+        },
+        "testonly": dist.is_test_distribution(),
+    }
 
 
 def _resource_layout(dist, pending, mappings):
@@ -608,7 +782,7 @@ def _processor_plugins(
 @mx.command(
     "mx",
     "bazel-buildfile",
-    "project [project ...]",
+    "[--all | project ...]",
     props={"keepUnsatisfiedDependencies": True},
 )
 def bazel_buildfile(args):
@@ -639,6 +813,13 @@ def bazel_buildfile(args):
         default=[],
         metavar="SUITE:LIB=MODULE",
         help="JPMS name of a mapped automatic module",
+    )
+    parser.add_argument(
+        "--suite-package",
+        action="append",
+        default=[],
+        metavar="SUITE=//PACKAGE",
+        help="resolve Java dependencies in an imported suite to its Bazel package",
     )
     parser.add_argument(
         "--java-dep", action="append", default=[], metavar="SUITE:NAME=LABEL"
@@ -742,8 +923,31 @@ def bazel_buildfile(args):
         metavar="PROJECT",
         help="export an upstream Java project without sources as a dependency target",
     )
-    parser.add_argument("projects", nargs="+")
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="generate every project and distribution in the primary suite",
+    )
+    parser.add_argument(
+        "--declared-only",
+        action="store_true",
+        help="limit --all roots to suite.py declarations; still export their resolved dependencies",
+    )
+    parser.add_argument(
+        "--provided-target",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help="existing Bazel target implementing a project or distribution in --all mode",
+    )
+    parser.add_argument("projects", nargs="*")
     options = parser.parse_args(args)
+    if options.all:
+        if not options.gazelle or options.projects:
+            parser.error("--all requires --gazelle and takes no project arguments")
+        options.classpath_dists = True
+    elif not options.projects or options.provided_target or options.declared_only:
+        parser.error("select projects or use --all")
     empty_projects = set(options.empty_java_project)
     if empty_projects and not options.gazelle:
         parser.error("--empty-java-project requires --gazelle")
@@ -810,15 +1014,77 @@ def bazel_buildfile(args):
         parser.error("--classpath-dists requires --gazelle")
     mappings = _mappings(parser, options.processor_plugin, "--processor-plugin")
     java_deps = _mappings(parser, options.java_dep, "--java-dep")
-    lookup = mx.dependency if options.classpath_dists else mx.project
-    roots = [lookup(name) for name in options.projects]
-    suite = roots[0].suite
+    if options.suite_package and not options.classpath_dists:
+        parser.error("--suite-package requires --classpath-dists or --all")
+    for mapping in options.suite_package:
+        name, sep, package = mapping.partition("=")
+        if not sep or not re.fullmatch(
+            r"(?:@[A-Za-z0-9_.+-]+)?//[A-Za-z0-9_./+-]*", package
+        ):
+            parser.error("expected --suite-package SUITE=//PACKAGE")
+        imported = mx.suite(name)
+        for dep in imported.projects + imported.dists:
+            if (
+                dep.isJavaProject()
+                or dep.isJARDistribution()
+                or type(dep).__name__ == "LayoutDirDistribution"
+            ):
+                java_deps.setdefault(dep.qualifiedName(), [f"{package}:{dep.name}"])
+    provided = set()
+    auto_test_runtimes = {}
+    if options.all:
+        suite = mx.primary_suite() or mx.suite("mx")
+        provided = set(options.provided_target)
+        candidates = suite.projects + suite.dists
+        if options.declared_only:
+            declarations = (
+                suite.suiteDict.get("projects", {}).keys()
+                | suite.suiteDict.get("distributions", {}).keys()
+            )
+            candidates = [dep for dep in candidates if dep.name in declarations]
+        if unknown := provided - {dep.name for dep in candidates}:
+            parser.error(f"unknown --provided-target names: {sorted(unknown)}")
+        for name in provided:
+            java_deps.setdefault(f"{suite.name}:{name}", [":" + name])
+        roots = [dep for dep in candidates if dep.name not in provided]
+        unsupported = sorted(
+            f"{dep.qualifiedName()} ({type(dep).__name__})"
+            for dep in roots
+            if not _can_lower_root(dep)
+        )
+        if unsupported:
+            mx.abort(
+                "Bazel lowerings required for these suite roots (bind existing rules with --provided-target):\n"
+                + "\n".join(unsupported)
+            )
+        archives.update(dep.name for dep in candidates if dep.isJARDistribution())
+        for dist in roots:
+            if not (dist.isJARDistribution() and dist.is_test_distribution()):
+                continue
+            for project in dist.archived_deps():
+                if (
+                    project.suite == suite
+                    and project.name not in provided
+                    and project.isJavaProject()
+                    and project.is_test_project()
+                ):
+                    auto_test_runtimes.setdefault(project.qualifiedName(), []).append(
+                        ":" + dist.name
+                    )
+        for name, labels in auto_test_runtimes.items():
+            if len(labels) == 1 and name not in test_launchers:
+                test_runtimes.setdefault(name, labels)
+    else:
+        lookup = mx.dependency if options.classpath_dists else mx.project
+        roots = [lookup(name) for name in options.projects]
+        suite = roots[0].suite
     pending = list(roots)
     rules = {}
     plugins = {}
     graph = {}
     distributions = {}
     layouts = {}
+    tar_layouts = {}
     javac_only_processors = set(options.javac_only_processor)
     used_javac_only = set()
     processed = False
@@ -829,6 +1095,7 @@ def bazel_buildfile(args):
             project.name in rules
             or project.name in distributions
             or project.name in layouts
+            or project.name in tar_layouts
         ):
             continue
         if options.classpath_dists and project.suite == suite:
@@ -860,13 +1127,13 @@ def bazel_buildfile(args):
                     "pom_filename": project.maven_artifact_id() + ".pom",
                 }
                 continue
+            if type(project).__name__ == "LayoutTARDistribution":
+                tar_layouts[project.name] = _tar_layout(project, pending, java_deps)
+                continue
             if type(project).__name__ == "LayoutDirDistribution":
                 layouts[project.name] = _resource_layout(project, pending, java_deps)
                 continue
-        shaded = options.gazelle and (
-            type(project).__module__,
-            type(project).__name__,
-        ) == ("mx_sdk_shaded", "ShadedLibraryProject")
+        shaded = options.gazelle and _is_shaded_project(project)
         if (
             not shaded and type(project).__name__ != "JavaProject"
         ) or project.suite != suite:
@@ -1194,10 +1461,8 @@ def bazel_buildfile(args):
     if rules.keys() & plugins.keys():
         mx.abort("A generated plugin target conflicts with a project name")
     if options.gazelle:
-        if archives - distributions.keys():
-            mx.abort(
-                f"Unknown archive in selected closure: {sorted(archives - distributions.keys())}"
-            )
+        if missing_archives := archives - distributions.keys() - provided:
+            mx.abort(f"Unknown archive in selected closure: {sorted(missing_archives)}")
         unmatched = javac_only_processors - used_javac_only
         if unmatched:
             mx.abort(
@@ -1214,10 +1479,19 @@ def bazel_buildfile(args):
             "projects": [graph[n] for n in sorted(graph)],
             "plugins": [plugins[n] for n in sorted(plugins)],
         }
+        if options.all:
+            result["suite_targets"] = {
+                "projects": sorted(dep.name for dep in candidates if dep.isProject()),
+                "distributions": sorted(
+                    dep.name for dep in candidates if dep.isDistribution()
+                ),
+            }
         if distributions:
             result["distributions"] = [distributions[n] for n in sorted(distributions)]
         if layouts:
             result["layouts"] = [layouts[n] for n in sorted(layouts)]
+        if tar_layouts:
+            result["tar_layouts"] = [tar_layouts[n] for n in sorted(tar_layouts)]
         print(json.dumps(result, indent=2, sort_keys=True))
         return
     rules.update({name: _rule("java_plugin", attrs) for name, attrs in plugins.items()})

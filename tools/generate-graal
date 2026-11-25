@@ -4,7 +4,6 @@
 import argparse
 import base64
 import difflib
-from graphlib import TopologicalSorter
 import json
 import os
 import re
@@ -16,28 +15,6 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-SDK = [
-    "org.graalvm.collections.test",
-    "org.graalvm.word.test",
-    "org.graalvm.nativeimage.test",
-    "NATIVEIMAGE_LIBGRAAL",
-    "GRAAL_SDK",
-    "WEBIMAGE_PREVIEW",
-    "org.graalvm.polyglot.tck",
-    "RESOURCECOPY",
-    "org.graalvm.home.test",
-    "NATIVEBRIDGE_PROCESSOR_TEST",
-    "NATIVEBRIDGE_BENCHMARK",
-    "NATIVEBRIDGE_PROCESSOR",
-    "MAVEN_DOWNLOADER",
-    "org.graalvm.launcher.test",
-    "LAUNCHER_COMMON",
-    "VMACCESS_GUEST",
-    "SDK_TEST",
-    "POLYGLOT_TCK",
-]
-
-
 SVM_SUPPORT_JARS = (
     "JVMTI_AGENT_BASE",
     "SVM_AGENT",
@@ -67,32 +44,22 @@ SUITES = {
         # JLine 3.28 uses explicit type arguments on Comparator.thenComparingInt.
         "--javac-opt",
         "org.graalvm.shadowed.org.jline=-Xep:UnnecessaryTypeArgument:OFF",
-        *(
+        "--all",
+        "--declared-only",
+        *[
             arg
-            for dist in (
-                "WORD",
-                "NATIVEIMAGE",
-                "COLLECTIONS",
-                "JNIUTILS",
-                "NATIVEBRIDGE",
-                "NATIVEBRIDGE_PROCESSOR",
-                "NATIVEBRIDGE_PROCESSOR_TEST",
-                "NATIVEBRIDGE_BENCHMARK",
-                "JLINE3",
-                "POLYGLOT",
-                "LAUNCHER_COMMON",
-                "POLYGLOT_TCK",
-                "SDK_TEST",
-                "VMACCESS_GUEST",
-                "GRAAL_SDK",
-                "NATIVEIMAGE_LIBGRAAL",
-                "WEBIMAGE_PREVIEW",
-                "MAVEN_DOWNLOADER",
-                "RESOURCECOPY",
+            for name in (
+                "org.graalvm.nativebridge.launcher",
+                "org.graalvm.toolchain.test",
+                "NATIVEBRIDGE_LAUNCHER_RESOURCES",
+                "LLVM_TOOLCHAIN",
+                "LLVM_TOOLCHAIN_FULL",
+                "LLVM_NINJA_TOOLCHAIN",
+                "MUSL_NINJA_TOOLCHAIN",
+                "MUSL_CMAKE_TOOLCHAIN",
             )
-            for arg in ("--archive-dist", dist)
-        ),
-        *SDK,
+            for arg in ("--provided-target", name)
+        ],
     ],
     "espresso-shared": [
         "--whole-project",
@@ -103,9 +70,12 @@ SUITES = {
         "sdk:COLLECTIONS=//sdk:COLLECTIONS",
         "--java-dep",
         "truffle:TRUFFLE_API=//truffle:TRUFFLE_API",
-        "--archive-dist",
-        "ESPRESSO_SHARED",
-        "ESPRESSO_SHARED",
+        "--all",
+        "--declared-only",
+        "--provided-target",
+        "com.oracle.svm.espresso",
+        "--provided-target",
+        "ESPRESSO_SVM",
     ],
     "compiler": [
         "--java-dep",
@@ -126,29 +96,6 @@ SUITES = {
         "mx:JMH_GENERATOR_ANNPROCESS_1_21=:JMH_GENERATOR_ANNPROCESS_1_21",
         "--processor-plugin",
         "mx:JMH_1_21=:jmh_processor",
-        *[
-            arg
-            for dist in (
-                "GRAAL_MANAGEMENT",
-                "VMACCESS",
-                "HOSTVMACCESS",
-                "LIBGRAAL",
-                "LIBGRAAL_LOADER",
-                "GRAAL_COMPILER_WHITEBOX_MICRO_BENCHMARKS",
-                "GRAAL_COMPILER_MICRO_BENCHMARKS",
-            )
-            for arg in ("--archive-dist", dist)
-        ],
-        *[
-            arg
-            for dist in (
-                "GRAAL_IGVUTIL",
-                "GRAAL_PROFDIFF",
-                "GRAAL_IGVUTIL_TEST",
-                "GRAAL_PROFDIFF_TEST",
-            )
-            for arg in ("--archive-dist", dist)
-        ],
         # This benchmark intentionally measures self-normalization.
         "--javac-opt",
         "org.graalvm.micro.benchmarks=-Xep:IdentityBinaryExpression:WARN",
@@ -167,12 +114,6 @@ SUITES = {
             )
             for arg in ("--java-dep", f"truffle:{dist}=//truffle:{dist}")
         ],
-        "--archive-dist",
-        "GRAAL_TEST_COMPILETIME",
-        "--archive-dist",
-        "GRAAL_TEST_RUNTIME",
-        "--archive-dist",
-        "GRAAL_TEST",
         "--java-dep",
         "compiler:HSDIS_LIBRARY=:HSDIS_LIBRARY",
         *[
@@ -218,26 +159,12 @@ SUITES = {
         "sdk:VERSION=//sdk:VERSION",
         "--java-dep",
         "truffle:TRUFFLE_COMPILER=//truffle:TRUFFLE_COMPILER",
-        "--archive-dist",
-        "GRAAL_OPTIONS",
-        "--archive-dist",
-        "GRAAL_PROCESSOR",
-        "--archive-dist",
-        "GRAAL",
-        "GRAAL_MANAGEMENT",
-        "VMACCESS",
-        "HOSTVMACCESS",
-        "LIBGRAAL",
-        "LIBGRAAL_LOADER",
-        "GRAAL_COMPILER_WHITEBOX_MICRO_BENCHMARKS",
-        "GRAAL_COMPILER_MICRO_BENCHMARKS",
-        "GRAAL",
-        "GRAAL_IGVUTIL_TEST",
-        "GRAAL_PROFDIFF_TEST",
-        "org.graalvm.igvutil.test",
-        "org.graalvm.profdiff.test",
-        "GRAAL_TEST_RUNTIME",
-        "GRAAL_TEST",
+        "--all",
+        "--declared-only",
+        "--provided-target",
+        "HSDIS_LIBRARY",
+        "--provided-target",
+        "HSDIS_GRAALVM_SUPPORT",
     ],
     "truffle": [
         "--java-dep",
@@ -270,26 +197,6 @@ SUITES = {
         "truffle:com.oracle.truffle.st.test=:TRUFFLE_ST_TEST",
         "--test-runtime",
         "truffle:com.oracle.truffle.st.test=:TRUFFLE_SL",
-        *[
-            arg
-            for dist in (
-                "TRUFFLE_NFI_PANAMA",
-                "TRUFFLE_MODULARIZED_TEST",
-                "TRUFFLE_MODULARIZED_TEST_SEPARATE_MODULE_TEST",
-                "TRUFFLE_TCK_TESTS_LANGUAGE",
-                "TRUFFLE_ST",
-                "TRUFFLE_ST_TEST",
-                "TRUFFLE_MICRO_BENCHMARKS",
-                "POLYBENCH",
-                "POLYBENCH_INSTRUMENTS",
-                "PMH",
-                "TRUFFLE_JSON",
-                "TRUFFLE_ICU4J",
-                "TRUFFLE_XZ",
-                "TRUFFLE_ANTLR4",
-            )
-            for arg in ("--archive-dist", dist)
-        ],
         "--java-dep",
         "truffle:TRUFFLE_NFI_RESOURCES=:TRUFFLE_NFI_RESOURCES",
         "--generated-dep",
@@ -300,12 +207,6 @@ SUITES = {
         "truffle:TRUFFLE_TEST_NATIVE=:TRUFFLE_TEST_NATIVE",
         "--test-path",
         "truffle:TRUFFLE_TEST_NATIVE=:TRUFFLE_TEST_NATIVE",
-        "--archive-dist",
-        "TRUFFLE_NFI",
-        "--archive-dist",
-        "TRUFFLE_NFI_LIBFFI",
-        "--archive-dist",
-        "TRUFFLE_NFI_TEST",
         "--test-runtime",
         "truffle:com.oracle.truffle.nfi.test=:TRUFFLE_NFI_TEST",
         "--test-jvm-flag",
@@ -314,12 +215,6 @@ SUITES = {
         "truffle:com.oracle.truffle.nfi.test=-Dpolyglot.engine.WarnInterpreterOnly=false",
         "--java-dep",
         "mx:HAMCREST=@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
-        "--archive-dist",
-        "TRUFFLE_DSL_PROCESSOR",
-        "--archive-dist",
-        "TRUFFLE_JCODINGS",
-        "--archive-dist",
-        "TRUFFLE_TEST",
         "--generated-dep",
         "truffle:com.oracle.truffle.sl.test=@contrib_rules_jvm_deps//:junit_junit",
         "--generated-dep",
@@ -352,23 +247,7 @@ SUITES = {
         "com.oracle.truffle.tck.common",
         "--whole-project",
         "com.oracle.truffle.tck.tests",
-        *(
-            arg
-            for dist in (
-                "TRUFFLE_TCK",
-                "TRUFFLE_TCK_COMMON",
-                "TRUFFLE_TCK_TESTS",
-                "TRUFFLE_TCK_INSTRUMENTATION",
-                "TRUFFLE_SL_TCK",
-                "TRUFFLE_SL_TEST",
-            )
-            for arg in ("--archive-dist", dist)
-        ),
         "--infer-source-deps",
-        "--archive-dist",
-        "TRUFFLE_COMPILER",
-        "--archive-dist",
-        "TRUFFLE_RUNTIME",
         "--generated-dep",
         "truffle:com.oracle.truffle.sandbox=:com.oracle.truffle.api.dsl",
         "--generated-dep",
@@ -449,46 +328,32 @@ SUITES = {
         "sdk:JNIUTILS=//sdk:JNIUTILS",
         "--java-dep",
         "truffle:TRUFFLE_ATTACH_RESOURCES=:TRUFFLE_ATTACH_RESOURCES",
-        "--archive-dist",
-        "TRUFFLE_API",
-        "--archive-dist",
-        "TRUFFLE_SL",
-        "--archive-dist",
-        "TRUFFLE_SL_LAUNCHER",
-        "TRUFFLE_MODULARIZED_TEST",
-        "TRUFFLE_TCK_TESTS_LANGUAGE",
-        "TRUFFLE_ST_TEST",
-        "TRUFFLE_MICRO_BENCHMARKS",
-        "POLYBENCH",
-        "POLYBENCH_INSTRUMENTS",
-        "PMH",
-        "TRUFFLE_ICU4J",
-        "TRUFFLE_JSON",
-        "TRUFFLE_ANTLR4",
-        "TRUFFLE_NFI_LIBFFI",
-        "TRUFFLE_NFI_TEST",
-        "TRUFFLE_SL",
-        "TRUFFLE_SL_LAUNCHER",
-        "TRUFFLE_RUNTIME",
-        "TRUFFLE_SL_TEST",
-        "TRUFFLE_SL_TCK",
-        "TRUFFLE_TEST",
+        "--all",
+        "--declared-only",
+        *[
+            arg
+            for name in (
+                "libffi",
+                "TRUFFLE_TEST_NATIVE",
+                "com.oracle.truffle.nfi.native",
+                "com.oracle.truffle.nfi.test.native",
+                "com.oracle.truffle.nfi.test.native.isolation",
+                "com.oracle.truffle.attach",
+                "nfi-native",
+            )
+            for arg in ("--provided-target", name)
+        ],
     ],
     "regex": [
         "--infer-source-deps",
-        "--java-dep",
-        "sdk:POLYGLOT=//sdk:POLYGLOT",
-        "--java-dep",
-        "sdk:COLLECTIONS=//sdk:COLLECTIONS",
+        "--suite-package",
+        "sdk=//sdk",
+        "--suite-package",
+        "truffle=//truffle",
         "--generated-dep",
         "regex:com.oracle.truffle.regex.test.dummylang=//truffle:TRUFFLE_API",
         "--generated-dep",
         "regex:com.oracle.truffle.regex.test.dummylang=//sdk:POLYGLOT",
-        *[
-            arg
-            for name in ("TRUFFLE_API", "TRUFFLE_ICU4J")
-            for arg in ("--java-dep", f"truffle:{name}=//truffle:{name}")
-        ],
         "--java-dep",
         "mx:JUNIT=@contrib_rules_jvm_deps//:junit_junit",
         "--java-dep",
@@ -509,16 +374,12 @@ SUITES = {
         "truffle:TRUFFLE_DSL_PROCESSOR",
         "--test-runtime",
         "regex:com.oracle.truffle.regex.test=:TREGEX_UNIT_TESTS",
-        *[
-            arg
-            for name in ("TREGEX", "TREGEX_TEST_DUMMY_LANG", "TREGEX_UNIT_TESTS")
-            for arg in ("--archive-dist", name)
-        ],
-        "TREGEX",
-        "TREGEX_TEST_DUMMY_LANG",
-        "TREGEX_UNIT_TESTS",
+        "--all",
     ],
     "tools": [
+        "--all",
+        "--provided-target",
+        "VISUALVM_GRAALVM_SUPPORT",
         "--java-dep",
         "truffle:TRUFFLE_RUNTIME=//truffle:TRUFFLE_RUNTIME",
         *[
@@ -803,44 +664,7 @@ def harness_options(directory):
                 f"truffle:TRUFFLE_DSL_PROCESSOR=//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.{proc}",
             )
         ]
-        if suite == "tools":
-            roots = []
-            distributions = {
-                name: dist
-                for name, dist in metadata["distributions"].items()
-                if not dist.get("layout") and dist.get("type") != "pom"
-            }
-            graph = {
-                name: [
-                    dep
-                    for dep in dist.get("distDependencies", [])
-                    if dep in distributions
-                ]
-                for name, dist in distributions.items()
-            }
-            for name in TopologicalSorter(graph).static_order():
-                dist = distributions[name]
-                processors.extend(("--archive-dist", name))
-                for project in dist.get("dependencies", []):
-                    if project.endswith(".test"):
-                        processors.extend(
-                            ("--test-runtime", f"tools:{project}=:{name}")
-                        )
-                roots.append(name)
-            return (
-                processors
-                + roots
-                + [
-                    "com.oracle.truffle.tools.warmup",
-                    "com.oracle.truffle.tools.warmup.test",
-                ]
-                + [
-                    name
-                    for name, dist in metadata["distributions"].items()
-                    if dist.get("type") == "pom"
-                ]
-            )
-        if suite == "regex":
+        if suite in ("regex", "tools"):
             return processors
         return [
             "--test-launcher",
@@ -1236,6 +1060,14 @@ def sdk_native_projects(sdk):
     )
 
 
+def truffle_layout_distributions(suite):
+    return {
+        name: dist
+        for name, dist in suite["distributions"].items()
+        if "layout" in dist and name != "TRUFFLE_API_VERSION"
+    }
+
+
 def truffle_distribution_layouts(directory, suite):
     native_project = "com.oracle.truffle.nfi.native"
     header_dir = "src/" + native_project + "/include"
@@ -1286,12 +1118,8 @@ def truffle_distribution_layouts(directory, suite):
         prefixes[":" + label] = (
             platform + "/" + ("glibc" if os == "linux" else "default")
         )
-    for name, dist in suite["distributions"].items():
-        if "layout" not in dist or name in (
-            "TRUFFLE_API_VERSION",
-            "TRUFFLE_ATTACH_RESOURCES",
-            "TRUFFLE_NFI_RESOURCES",
-        ):
+    for name, dist in truffle_layout_distributions(suite).items():
+        if name in ("TRUFFLE_ATTACH_RESOURCES", "TRUFFLE_NFI_RESOURCES"):
             continue
         entries = []
         for dest, sources in dist["layout"].items():
@@ -1647,13 +1475,24 @@ def svm_support_layouts(directory):
     )
 
 
-def generate(suite, stage):
+def prepare_suite(suite, stage):
     directory = stage / suite
     if suite == "vm":
         (directory / "BUILD.bazel").write_text(
             support_layout_rules(directory, ("VM_GRAALVM_SUPPORT",))
         )
-        return build_patch(directory, stage)
+        return
+    export_options = SUITES[suite]
+    if suite == "truffle":
+        metadata = runpy.run_path(str(directory / "mx.truffle/suite.py"))["suite"]
+        export_options = [
+            *export_options,
+            *(
+                arg
+                for name in truffle_layout_distributions(metadata)
+                for arg in ("--provided-target", name)
+            ),
+        ]
     with (directory / "mx-graph.json").open("w") as graph:
         subprocess.run(
             [
@@ -1670,9 +1509,8 @@ def generate(suite, stage):
                 "--release",
                 "21",
                 *shading_inputs(directory)[1],
-                *(SUITES[suite] if suite == "tools" else []),
                 *harness_options(directory),
-                *(SUITES[suite] if suite != "tools" else []),
+                *export_options,
             ],
             cwd=ROOT,
             check=True,
@@ -1725,8 +1563,8 @@ def generate(suite, stage):
     elif suite == "espresso-shared":
         (directory / "BUILD.bazel").write_text(espresso_shared_rules(directory))
     elif suite in ("regex", "tools"):
-        metadata = runpy.run_path(str(directory / f"mx.{suite}/suite.py"))["suite"]
-        layouts = ['load("@rules_mx//graal:layout.bzl", "mx_archive_layout")']
+        targets = json.loads((directory / "mx-graph.json").read_text())["suite_targets"]
+        layouts = []
         if suite == "tools":
             layouts.extend(
                 [
@@ -1734,17 +1572,8 @@ def generate(suite, stage):
                     'visualvm_support(name = "VISUALVM_GRAALVM_SUPPORT")',
                 ]
             )
-        for name, dist in metadata["distributions"].items():
-            if "layout" in dist and name != "VISUALVM_GRAALVM_SUPPORT":
-                [(destination, source)] = dist["layout"].items()
-                if not source.startswith("file:"):
-                    raise ValueError(f"Unsupported {suite} layout {name}")
-                members = {source.removeprefix("file:"): destination}
-                layouts.append(
-                    f'mx_archive_layout(name = "{name}", format = "tar", members = {json.dumps(members)}, visibility = ["//visibility:public"])'
-                )
         inventories = [
-            f'filegroup(name = "all_{kind}", srcs = {json.dumps(sorted(":" + name for name in metadata[kind]))}, testonly = True, visibility = ["//visibility:public"])'
+            f'filegroup(name = "all_{kind}", srcs = {json.dumps([":" + name for name in targets[kind]])}, testonly = True, visibility = ["//visibility:public"])'
             for kind in ("projects", "distributions")
         ]
         (directory / "BUILD.bazel").write_text(
@@ -1763,6 +1592,12 @@ def generate(suite, stage):
             + svm_support_layouts(directory)
             + svm_native_rules(directory)
         )
+
+
+def generate_build_files(suites, stage):
+    suites = [suite for suite in suites if suite != "vm"]
+    if not suites:
+        return
     subprocess.run(
         [
             "bazelisk",
@@ -1770,13 +1605,12 @@ def generate(suite, stage):
             "//:gazelle",
             "--",
             "-repo_root=" + str(stage),
-            f"-mx_graph={suite}/mx-graph.json",
-            str(directory),
+            *(f"-mx_graph={suite}/mx-graph.json" for suite in suites),
+            *(str(stage / suite) for suite in suites),
         ],
         cwd=ROOT,
         check=True,
     )
-    return build_patch(directory, stage)
 
 
 def build_patch(directory, stage):
@@ -1937,9 +1771,13 @@ def main():
                 )
         else:
             lock.write_text(lock_text)
-        for suite in dict.fromkeys(args.suite or [*SUITES, "vm"]):
+        selected = list(dict.fromkeys(args.suite or [*SUITES, "vm"]))
+        for suite in selected:
+            prepare_suite(suite, stage)
+        generate_build_files(selected, stage)
+        for suite in selected:
             overlay = ROOT / f"graal/{suite}.patch"
-            patch = generate(suite, stage)
+            patch = build_patch(stage / suite, stage)
             if args.check:
                 if overlay.read_text() != patch:
                     sys.exit(

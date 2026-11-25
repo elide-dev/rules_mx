@@ -5,7 +5,7 @@ bazel=bazelisk
 if [[ ${1:-} == --config=buildbuddy-rbe ]]; then bazel=tools/buildbuddy; fi
 snapshot=$(mktemp)
 trap 'rm -f "$snapshot"' EXIT
-"$bazel" run "$@" //:mx -- -p "$PWD/tests/gazelle" bazel-buildfile --gazelle \
-  --java-dep mx:JUNIT=@contrib_rules_jvm_deps//:junit_junit check > "$snapshot"
+"$bazel" run "$@" //:mx -- -p "$PWD/tests/gazelle" bazel-buildfile --gazelle --all \
+  --java-dep mx:JUNIT=@contrib_rules_jvm_deps//:junit_junit > "$snapshot"
 diff -u tests/gazelle/mx-graph.json "$snapshot"
 "$bazel" run "$@" //:gazelle -- -mx_graph=tests/gazelle/mx-graph.json -mode=diff tests/gazelle

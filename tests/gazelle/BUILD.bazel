@@ -1,4 +1,4 @@
-load("@rules_mx//mx:graph.bzl", "mx_project", "mx_test_class", "mx_whole_java")
+load("@rules_mx//mx:graph.bzl", "mx_exported_tar", "mx_project", "mx_test_class", "mx_whole_java")
 
 mx_whole_java(
     name = "check",
@@ -38,4 +38,25 @@ mx_project(
     packages = ["//tests/gazelle/client/src/main/java/example/client"],
     visibility = ["//visibility:public"],
     deps = [":demo"],
+)
+
+mx_exported_tar(
+    name = "BASE_LAYOUT",
+    format = "tar",
+    members = {
+        "mx.demo/suite.py": "docs/suite.py",
+    },
+    visibility = ["//visibility:public"],
+)
+
+mx_exported_tar(
+    name = "NESTED_LAYOUT",
+    archive_imports = {
+        ":BASE_LAYOUT": "docs/suite.py=share/suite.py",
+    },
+    format = "tar",
+    members = {
+        ":BASE_LAYOUT": "archives/base.tar",
+    },
+    visibility = ["//visibility:public"],
 )
