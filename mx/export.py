@@ -1,6 +1,7 @@
 """mx extension for inspecting the resolved graph of a loaded suite."""
 
 import argparse
+from functools import cache
 import json
 import re
 import textwrap
@@ -112,6 +113,17 @@ def _dependency_labels(deps, suite, mappings, pending, classpath_dists=False):
     return list(dict.fromkeys(labels))
 
 
+@cache
+def _source_packages(project):
+    """Index checked-in Java packages without resolving binary library contents."""
+    packages = set()
+    for directory in map(Path, project.source_dirs()):
+        for source in directory.rglob("*.java"):
+            if source.name != "module-info.java" and source.parent != directory:
+                packages.add(".".join(source.relative_to(directory).parts[:-1]))
+    return frozenset(packages)
+
+
 def _source_dependencies(graph, suite, mappings, distributions):
     """Promote imported types from the resolved mx classpath to direct Bazel deps."""
     imports = re.compile(r"^\s*import\s+(?:static\s+)?([\w.$*]+)\s*;", re.MULTILINE)
@@ -124,7 +136,7 @@ def _source_dependencies(graph, suite, mappings, distributions):
                 pkg
                 for p in members
                 if type(p).__name__ == "JavaProject"
-                for pkg in p.defined_java_packages()
+                for pkg in _source_packages(p)
             }
         return packages[dep]
 
@@ -672,7 +684,7 @@ def bazel_buildfile(args):
                 "roots": sorted(
                     Path(d).relative_to(suite.dir).as_posix() for d in source_dirs
                 ),
-                "packages": [] if shaded else sorted(project.defined_java_packages()),
+                "packages": [] if shaded else sorted(_source_packages(project)),
                 "dirs": sorted({str(Path(src).parent) for src in sources}),
             }
             if shaded and not record["dirs"]:

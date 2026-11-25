@@ -5,6 +5,7 @@ import argparse
 import base64
 import difflib
 import json
+import os
 import runpy
 from pathlib import Path
 import shutil
@@ -219,6 +220,13 @@ def generate(suite, stage):
             cwd=ROOT,
             check=True,
             stdout=graph,
+            env={**os.environ, "MX_CACHE_DIR": str(stage / ".mx-cache")},
+        )
+    if (stage / ".mx-cache").exists() and any(
+        p.is_file() for p in (stage / ".mx-cache").rglob("*")
+    ):
+        raise RuntimeError(
+            "Graph discovery unexpectedly populated the mx artifact cache"
         )
     # An implicit Bazel test_suite includes the generated JUnit targets in
     # this package, so new test classes join the CI qualification on regeneration.
