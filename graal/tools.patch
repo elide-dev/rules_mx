@@ -1,0 +1,2727 @@
+diff --git a/tools/BUILD.bazel b/tools/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/BUILD.bazel
+@@ -0,0 +1,1556 @@
++load("@rules_java//java:java_import.bzl", "java_import")
++load("@rules_mx//graal:layout.bzl", "mx_archive_layout")
++load("@rules_mx//graal:visualvm.bzl", "visualvm_support")
++load("@rules_mx//mx:graph.bzl", "mx_jar_dist", "mx_pom_dist", "mx_processed_java", "mx_project", "mx_shaded_java", "mx_test_class")
++
++visualvm_support(name = "VISUALVM_GRAALVM_SUPPORT")
++
++mx_archive_layout(
++    name = "CHROMEINSPECTOR_GRAALVM_SUPPORT",
++    format = "tar",
++    members = {"mx.tools/tools-chromeinspector.properties": "native-image.properties"},
++    visibility = ["//visibility:public"],
++)
++
++mx_archive_layout(
++    name = "INSIGHT_GRAALVM_SUPPORT",
++    format = "tar",
++    members = {"mx.tools/tools-insight.properties": "native-image.properties"},
++    visibility = ["//visibility:public"],
++)
++
++mx_archive_layout(
++    name = "INSIGHT_HEAP_GRAALVM_SUPPORT",
++    format = "tar",
++    members = {"mx.tools/tools-insight.properties": "native-image.properties"},
++    visibility = ["//visibility:public"],
++)
++
++mx_archive_layout(
++    name = "TRUFFLE_PROFILER_GRAALVM_SUPPORT",
++    format = "tar",
++    members = {"mx.tools/tools-profiler.properties": "native-image.properties"},
++    visibility = ["//visibility:public"],
++)
++
++mx_archive_layout(
++    name = "TRUFFLE_COVERAGE_GRAALVM_SUPPORT",
++    format = "tar",
++    members = {"mx.tools/tools-coverage.properties": "native-image.properties"},
++    visibility = ["//visibility:public"],
++)
++
++mx_archive_layout(
++    name = "DAP_GRAALVM_SUPPORT",
++    format = "tar",
++    members = {"mx.tools/tools-dap.properties": "native-image.properties"},
++    visibility = ["//visibility:public"],
++)
++
++mx_archive_layout(
++    name = "LSP_GRAALVM_SUPPORT",
++    format = "tar",
++    members = {"mx.tools/tools-lsp.properties": "native-image.properties"},
++    visibility = ["//visibility:public"],
++)
++
++filegroup(
++    name = "all_projects",
++    testonly = True,
++    srcs = [
++        ":com.oracle.truffle.tools.agentscript",
++        ":com.oracle.truffle.tools.chromeinspector",
++        ":com.oracle.truffle.tools.chromeinspector.test",
++        ":com.oracle.truffle.tools.coverage",
++        ":com.oracle.truffle.tools.coverage.test",
++        ":com.oracle.truffle.tools.dap",
++        ":com.oracle.truffle.tools.dap.test",
++        ":com.oracle.truffle.tools.profiler",
++        ":com.oracle.truffle.tools.profiler.test",
++        ":com.oracle.truffle.tools.utils.java_websocket",
++        ":com.oracle.truffle.tools.warmup",
++        ":com.oracle.truffle.tools.warmup.test",
++        ":org.graalvm.tools.api.lsp",
++        ":org.graalvm.tools.insight",
++        ":org.graalvm.tools.insight.heap",
++        ":org.graalvm.tools.insight.test",
++        ":org.graalvm.tools.lsp",
++        ":org.graalvm.tools.lsp.test",
++    ],
++    visibility = ["//visibility:public"],
++)
++
++filegroup(
++    name = "all_distributions",
++    testonly = True,
++    srcs = [
++        ":CHROMEINSPECTOR",
++        ":CHROMEINSPECTOR_GRAALVM_SUPPORT",
++        ":CHROMEINSPECTOR_TEST",
++        ":COVERAGE_POM",
++        ":DAP",
++        ":DAP_GRAALVM_SUPPORT",
++        ":DAP_POM",
++        ":DAP_TEST",
++        ":HEAP_POM",
++        ":INSIGHT",
++        ":INSIGHT_GRAALVM_SUPPORT",
++        ":INSIGHT_HEAP",
++        ":INSIGHT_HEAP_GRAALVM_SUPPORT",
++        ":INSIGHT_POM",
++        ":INSIGHT_TEST",
++        ":INSPECT_POM",
++        ":LSP",
++        ":LSP_API",
++        ":LSP_GRAALVM_SUPPORT",
++        ":LSP_POM",
++        ":LSP_TEST",
++        ":PROFILER_POM",
++        ":TRUFFLE_COVERAGE",
++        ":TRUFFLE_COVERAGE_GRAALVM_SUPPORT",
++        ":TRUFFLE_COVERAGE_TEST",
++        ":TRUFFLE_PROFILER",
++        ":TRUFFLE_PROFILER_GRAALVM_SUPPORT",
++        ":TRUFFLE_PROFILER_TEST",
++        ":VISUALVM_GRAALVM_SUPPORT",
++    ],
++    visibility = ["//visibility:public"],
++)
++
++mx_processed_java(
++    name = "com.oracle.truffle.tools.agentscript",
++    srcs = ["//tools/src/com.oracle.truffle.tools.agentscript/src/com/oracle/truffle/tools/agentscript/impl:com.oracle.truffle.tools.agentscript.srcs"],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++        "--add-modules",
++        "jdk.unsupported",
++        "-Xep:ImpossibleNullComparison:WARN",
++    ],
++    plugins = [
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":org.graalvm.tools.insight",
++        "//sdk:COLLECTIONS",
++        "//sdk:POLYGLOT",
++        "//truffle:TRUFFLE_API",
++    ],
++)
++
++mx_processed_java(
++    name = "com.oracle.truffle.tools.chromeinspector",
++    srcs = [
++        "//tools/src/com.oracle.truffle.tools.chromeinspector/src/com/oracle/truffle/tools/chromeinspector:com.oracle.truffle.tools.chromeinspector.srcs",
++        "//tools/src/com.oracle.truffle.tools.chromeinspector/src/com/oracle/truffle/tools/chromeinspector/client:com.oracle.truffle.tools.chromeinspector.srcs",
++        "//tools/src/com.oracle.truffle.tools.chromeinspector/src/com/oracle/truffle/tools/chromeinspector/commands:com.oracle.truffle.tools.chromeinspector.srcs",
++        "//tools/src/com.oracle.truffle.tools.chromeinspector/src/com/oracle/truffle/tools/chromeinspector/domains:com.oracle.truffle.tools.chromeinspector.srcs",
++        "//tools/src/com.oracle.truffle.tools.chromeinspector/src/com/oracle/truffle/tools/chromeinspector/events:com.oracle.truffle.tools.chromeinspector.srcs",
++        "//tools/src/com.oracle.truffle.tools.chromeinspector/src/com/oracle/truffle/tools/chromeinspector/instrument:com.oracle.truffle.tools.chromeinspector.srcs",
++        "//tools/src/com.oracle.truffle.tools.chromeinspector/src/com/oracle/truffle/tools/chromeinspector/objects:com.oracle.truffle.tools.chromeinspector.srcs",
++        "//tools/src/com.oracle.truffle.tools.chromeinspector/src/com/oracle/truffle/tools/chromeinspector/server:com.oracle.truffle.tools.chromeinspector.srcs",
++        "//tools/src/com.oracle.truffle.tools.chromeinspector/src/com/oracle/truffle/tools/chromeinspector/types:com.oracle.truffle.tools.chromeinspector.srcs",
++        "//tools/src/com.oracle.truffle.tools.chromeinspector/src/com/oracle/truffle/tools/chromeinspector/util:com.oracle.truffle.tools.chromeinspector.srcs",
++    ],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++        "--add-modules",
++        "java.logging,jdk.unsupported",
++        "-Xep:BoxedPrimitiveEquality:WARN",
++    ],
++    mx_resource_root = "src/com.oracle.truffle.tools.chromeinspector/src",
++    plugins = [
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    resources = ["//tools/src/com.oracle.truffle.tools.chromeinspector/src/META-INF/native-image/com.oracle.truffle.tools.chromeinspector:com.oracle.truffle.tools.chromeinspector.resources"],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":TRUFFLE_PROFILER",
++        ":com.oracle.truffle.tools.utils.java_websocket",
++        "//sdk:COLLECTIONS",
++        "//sdk:POLYGLOT",
++        "//truffle:TRUFFLE_API",
++        "//truffle:TRUFFLE_JSON",
++    ],
++)
++
++mx_processed_java(
++    name = "com.oracle.truffle.tools.chromeinspector.test",
++    testonly = True,
++    srcs = ["//tools/src/com.oracle.truffle.tools.chromeinspector.test/src/com/oracle/truffle/tools/chromeinspector/test:com.oracle.truffle.tools.chromeinspector.test.srcs"],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++        "-Xep:JUnit4TestNotRun:WARN",
++        "-Xep:ComparingThisWithNull:WARN",
++    ],
++    plugins = [
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":com.oracle.truffle.tools.chromeinspector",
++        ":com.oracle.truffle.tools.utils.java_websocket",
++        "//sdk:POLYGLOT",
++        "//truffle:TRUFFLE_API",
++        "//truffle:TRUFFLE_JSON",
++        "//truffle:TRUFFLE_SL",
++        "//truffle:TRUFFLE_TEST",
++        "@contrib_rules_jvm_deps//:junit_junit",
++    ],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tools.chromeinspector.test.com.oracle.truffle.tools.chromeinspector.test.BuggyLanguageInspectDebugTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "-Dpolyglot.engine.AssertProbes=true",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++    ],
++    test_class = "com.oracle.truffle.tools.chromeinspector.test.BuggyLanguageInspectDebugTest",
++    runtime_deps = [":CHROMEINSPECTOR_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tools.chromeinspector.test.com.oracle.truffle.tools.chromeinspector.test.DisabledDomainTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "-Dpolyglot.engine.AssertProbes=true",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++    ],
++    test_class = "com.oracle.truffle.tools.chromeinspector.test.DisabledDomainTest",
++    runtime_deps = [":CHROMEINSPECTOR_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tools.chromeinspector.test.com.oracle.truffle.tools.chromeinspector.test.ITLInspectDebugTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "-Dpolyglot.engine.AssertProbes=true",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++    ],
++    test_class = "com.oracle.truffle.tools.chromeinspector.test.ITLInspectDebugTest",
++    runtime_deps = [":CHROMEINSPECTOR_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tools.chromeinspector.test.com.oracle.truffle.tools.chromeinspector.test.InspectHashMapTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "-Dpolyglot.engine.AssertProbes=true",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++    ],
++    test_class = "com.oracle.truffle.tools.chromeinspector.test.InspectHashMapTest",
++    runtime_deps = [":CHROMEINSPECTOR_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tools.chromeinspector.test.com.oracle.truffle.tools.chromeinspector.test.InspectIteratorTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "-Dpolyglot.engine.AssertProbes=true",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++    ],
++    test_class = "com.oracle.truffle.tools.chromeinspector.test.InspectIteratorTest",
++    runtime_deps = [":CHROMEINSPECTOR_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tools.chromeinspector.test.com.oracle.truffle.tools.chromeinspector.test.InspectStringTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "-Dpolyglot.engine.AssertProbes=true",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++    ],
++    test_class = "com.oracle.truffle.tools.chromeinspector.test.InspectStringTest",
++    runtime_deps = [":CHROMEINSPECTOR_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tools.chromeinspector.test.com.oracle.truffle.tools.chromeinspector.test.InspectorAddressTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "-Dpolyglot.engine.AssertProbes=true",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++    ],
++    test_class = "com.oracle.truffle.tools.chromeinspector.test.InspectorAddressTest",
++    runtime_deps = [":CHROMEINSPECTOR_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tools.chromeinspector.test.com.oracle.truffle.tools.chromeinspector.test.InspectorMessageTransportTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "-Dpolyglot.engine.AssertProbes=true",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++    ],
++    test_class = "com.oracle.truffle.tools.chromeinspector.test.InspectorMessageTransportTest",
++    runtime_deps = [":CHROMEINSPECTOR_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tools.chromeinspector.test.com.oracle.truffle.tools.chromeinspector.test.InspectorObjectTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "-Dpolyglot.engine.AssertProbes=true",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++    ],
++    test_class = "com.oracle.truffle.tools.chromeinspector.test.InspectorObjectTest",
++    runtime_deps = [":CHROMEINSPECTOR_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tools.chromeinspector.test.com.oracle.truffle.tools.chromeinspector.test.InspectorReceiverTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "-Dpolyglot.engine.AssertProbes=true",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++    ],
++    test_class = "com.oracle.truffle.tools.chromeinspector.test.InspectorReceiverTest",
++    runtime_deps = [":CHROMEINSPECTOR_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tools.chromeinspector.test.com.oracle.truffle.tools.chromeinspector.test.InteropTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "-Dpolyglot.engine.AssertProbes=true",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++    ],
++    test_class = "com.oracle.truffle.tools.chromeinspector.test.InteropTest",
++    runtime_deps = [":CHROMEINSPECTOR_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tools.chromeinspector.test.com.oracle.truffle.tools.chromeinspector.test.LazyAccessInspectDebugTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "-Dpolyglot.engine.AssertProbes=true",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++    ],
++    test_class = "com.oracle.truffle.tools.chromeinspector.test.LazyAccessInspectDebugTest",
++    runtime_deps = [":CHROMEINSPECTOR_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tools.chromeinspector.test.com.oracle.truffle.tools.chromeinspector.test.LineSearchTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "-Dpolyglot.engine.AssertProbes=true",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++    ],
++    test_class = "com.oracle.truffle.tools.chromeinspector.test.LineSearchTest",
++    runtime_deps = [":CHROMEINSPECTOR_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tools.chromeinspector.test.com.oracle.truffle.tools.chromeinspector.test.MultiEngineTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "-Dpolyglot.engine.AssertProbes=true",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++    ],
++    test_class = "com.oracle.truffle.tools.chromeinspector.test.MultiEngineTest",
++    runtime_deps = [":CHROMEINSPECTOR_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tools.chromeinspector.test.com.oracle.truffle.tools.chromeinspector.test.NotReadableValuesTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "-Dpolyglot.engine.AssertProbes=true",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++    ],
++    test_class = "com.oracle.truffle.tools.chromeinspector.test.NotReadableValuesTest",
++    runtime_deps = [":CHROMEINSPECTOR_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tools.chromeinspector.test.com.oracle.truffle.tools.chromeinspector.test.ProfilerTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "-Dpolyglot.engine.AssertProbes=true",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++    ],
++    test_class = "com.oracle.truffle.tools.chromeinspector.test.ProfilerTest",
++    runtime_deps = [":CHROMEINSPECTOR_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tools.chromeinspector.test.com.oracle.truffle.tools.chromeinspector.test.RelativeSourceInspectDebugTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "-Dpolyglot.engine.AssertProbes=true",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++    ],
++    test_class = "com.oracle.truffle.tools.chromeinspector.test.RelativeSourceInspectDebugTest",
++    runtime_deps = [":CHROMEINSPECTOR_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tools.chromeinspector.test.com.oracle.truffle.tools.chromeinspector.test.SLInspectDebugTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "-Dpolyglot.engine.AssertProbes=true",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++    ],
++    test_class = "com.oracle.truffle.tools.chromeinspector.test.SLInspectDebugTest",
++    runtime_deps = [":CHROMEINSPECTOR_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tools.chromeinspector.test.com.oracle.truffle.tools.chromeinspector.test.SLInspectProfileTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "-Dpolyglot.engine.AssertProbes=true",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++    ],
++    test_class = "com.oracle.truffle.tools.chromeinspector.test.SLInspectProfileTest",
++    runtime_deps = [":CHROMEINSPECTOR_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tools.chromeinspector.test.com.oracle.truffle.tools.chromeinspector.test.TestMemoryLeaks",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "-Dpolyglot.engine.AssertProbes=true",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++    ],
++    test_class = "com.oracle.truffle.tools.chromeinspector.test.TestMemoryLeaks",
++    runtime_deps = [":CHROMEINSPECTOR_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tools.chromeinspector.test.com.oracle.truffle.tools.chromeinspector.test.TimeoutTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "-Dpolyglot.engine.AssertProbes=true",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++    ],
++    test_class = "com.oracle.truffle.tools.chromeinspector.test.TimeoutTest",
++    runtime_deps = [":CHROMEINSPECTOR_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tools.chromeinspector.test.com.oracle.truffle.tools.chromeinspector.test.UnavailableSectionInspectDebugTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "-Dpolyglot.engine.AssertProbes=true",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++    ],
++    test_class = "com.oracle.truffle.tools.chromeinspector.test.UnavailableSectionInspectDebugTest",
++    runtime_deps = [":CHROMEINSPECTOR_TEST"],
++)
++
++mx_processed_java(
++    name = "com.oracle.truffle.tools.coverage",
++    srcs = [
++        "//tools/src/com.oracle.truffle.tools.coverage/src/com/oracle/truffle/tools/coverage:com.oracle.truffle.tools.coverage.srcs",
++        "//tools/src/com.oracle.truffle.tools.coverage/src/com/oracle/truffle/tools/coverage/impl:com.oracle.truffle.tools.coverage.srcs",
++    ],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++    ],
++    mx_resource_root = "src/com.oracle.truffle.tools.coverage/src",
++    plugins = [
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    resources = ["//tools/src/com.oracle.truffle.tools.coverage/src/META-INF/native-image/com.oracle.truffle.tools.profiler:com.oracle.truffle.tools.coverage.resources"],
++    visibility = ["//visibility:public"],
++    deps = [
++        "//sdk:POLYGLOT",
++        "//truffle:TRUFFLE_API",
++        "//truffle:TRUFFLE_JSON",
++    ],
++)
++
++mx_processed_java(
++    name = "com.oracle.truffle.tools.coverage.test",
++    testonly = True,
++    srcs = ["//tools/src/com.oracle.truffle.tools.coverage.test/src/com/oracle/truffle/tools/coverage/test:com.oracle.truffle.tools.coverage.test.srcs"],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++    ],
++    plugins = [
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":com.oracle.truffle.tools.coverage",
++        "//sdk:POLYGLOT",
++        "//truffle:TRUFFLE_API",
++        "//truffle:TRUFFLE_TEST",
++        "@contrib_rules_jvm_deps//:junit_junit",
++    ],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tools.coverage.test.com.oracle.truffle.tools.coverage.test.CoverageTest",
++    test_class = "com.oracle.truffle.tools.coverage.test.CoverageTest",
++    runtime_deps = [":TRUFFLE_COVERAGE_TEST"],
++)
++
++mx_processed_java(
++    name = "com.oracle.truffle.tools.dap",
++    srcs = [
++        "//tools/src/com.oracle.truffle.tools.dap/src/com/oracle/truffle/tools/dap/instrument:com.oracle.truffle.tools.dap.srcs",
++        "//tools/src/com.oracle.truffle.tools.dap/src/com/oracle/truffle/tools/dap/server:com.oracle.truffle.tools.dap.srcs",
++        "//tools/src/com.oracle.truffle.tools.dap/src/com/oracle/truffle/tools/dap/types:com.oracle.truffle.tools.dap.srcs",
++    ],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++        "--add-modules",
++        "java.logging",
++        "-Xep:ReturnValueIgnored:WARN",
++    ],
++    mx_resource_root = "src/com.oracle.truffle.tools.dap/src",
++    plugins = [
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    resources = ["//tools/src/com.oracle.truffle.tools.dap/src/META-INF/native-image/com.oracle.truffle.tools.dap:com.oracle.truffle.tools.dap.resources"],
++    visibility = ["//visibility:public"],
++    deps = [
++        "//sdk:COLLECTIONS",
++        "//sdk:POLYGLOT",
++        "//truffle:TRUFFLE_API",
++        "//truffle:TRUFFLE_JSON",
++    ],
++)
++
++mx_processed_java(
++    name = "com.oracle.truffle.tools.dap.test",
++    testonly = True,
++    srcs = ["//tools/src/com.oracle.truffle.tools.dap.test/src/com/oracle/truffle/tools/dap/test:com.oracle.truffle.tools.dap.test.srcs"],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++        "--add-modules",
++        "java.logging",
++    ],
++    plugins = [
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":com.oracle.truffle.tools.dap",
++        "//sdk:POLYGLOT",
++        "//truffle:TRUFFLE_API",
++        "//truffle:TRUFFLE_JSON",
++        "//truffle:TRUFFLE_TEST",
++        "@contrib_rules_jvm_deps//:junit_junit",
++    ],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tools.dap.test.com.oracle.truffle.tools.dap.test.DAPAddressTest",
++    test_class = "com.oracle.truffle.tools.dap.test.DAPAddressTest",
++    runtime_deps = [":DAP_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tools.dap.test.com.oracle.truffle.tools.dap.test.ITLDAPTest",
++    test_class = "com.oracle.truffle.tools.dap.test.ITLDAPTest",
++    runtime_deps = [":DAP_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tools.dap.test.com.oracle.truffle.tools.dap.test.PathMappingsDAPTest",
++    test_class = "com.oracle.truffle.tools.dap.test.PathMappingsDAPTest",
++    runtime_deps = [":DAP_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tools.dap.test.com.oracle.truffle.tools.dap.test.PathMappingsTest",
++    test_class = "com.oracle.truffle.tools.dap.test.PathMappingsTest",
++    runtime_deps = [":DAP_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tools.dap.test.com.oracle.truffle.tools.dap.test.RelativeSourceDAPTest",
++    test_class = "com.oracle.truffle.tools.dap.test.RelativeSourceDAPTest",
++    runtime_deps = [":DAP_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tools.dap.test.com.oracle.truffle.tools.dap.test.SimpleLanguageDAPTest",
++    test_class = "com.oracle.truffle.tools.dap.test.SimpleLanguageDAPTest",
++    runtime_deps = [":DAP_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tools.dap.test.com.oracle.truffle.tools.dap.test.StackFramesHandlerTest",
++    test_class = "com.oracle.truffle.tools.dap.test.StackFramesHandlerTest",
++    runtime_deps = [":DAP_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tools.dap.test.com.oracle.truffle.tools.dap.test.UnavailableSectionDAPTest",
++    test_class = "com.oracle.truffle.tools.dap.test.UnavailableSectionDAPTest",
++    runtime_deps = [":DAP_TEST"],
++)
++
++mx_processed_java(
++    name = "com.oracle.truffle.tools.profiler",
++    srcs = [
++        "//tools/src/com.oracle.truffle.tools.profiler/src/com/oracle/truffle/tools/profiler:com.oracle.truffle.tools.profiler.srcs",
++        "//tools/src/com.oracle.truffle.tools.profiler/src/com/oracle/truffle/tools/profiler/impl:com.oracle.truffle.tools.profiler.srcs",
++    ],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++        "--add-modules",
++        "java.logging",
++        "-Xep:BoxedPrimitiveEquality:WARN",
++    ],
++    mx_resource_root = "src/com.oracle.truffle.tools.profiler/src",
++    plugins = [
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    resources = [
++        "//tools/src/com.oracle.truffle.tools.profiler/src/META-INF/native-image/com.oracle.truffle.tools.profiler:com.oracle.truffle.tools.profiler.resources",
++        "//tools/src/com.oracle.truffle.tools.profiler/src/com/oracle/truffle/tools/profiler/impl/resources:com.oracle.truffle.tools.profiler.resources",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        "//sdk:POLYGLOT",
++        "//truffle:TRUFFLE_API",
++        "//truffle:TRUFFLE_JSON",
++    ],
++)
++
++mx_processed_java(
++    name = "com.oracle.truffle.tools.profiler.test",
++    testonly = True,
++    srcs = ["//tools/src/com.oracle.truffle.tools.profiler.test/src/com/oracle/truffle/tools/profiler/test:com.oracle.truffle.tools.profiler.test.srcs"],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++        "-Xep:SelfAssertion:WARN",
++    ],
++    plugins = [
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":com.oracle.truffle.tools.profiler",
++        "//sdk:POLYGLOT",
++        "//truffle:TRUFFLE_API",
++        "//truffle:TRUFFLE_JSON",
++        "//truffle:TRUFFLE_TEST",
++        "@contrib_rules_jvm_deps//:junit_junit",
++    ],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tools.profiler.test.com.oracle.truffle.tools.profiler.test.AsyncStackSamplingTest",
++    test_class = "com.oracle.truffle.tools.profiler.test.AsyncStackSamplingTest",
++    runtime_deps = [":TRUFFLE_PROFILER_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tools.profiler.test.com.oracle.truffle.tools.profiler.test.CPUSamplerMultiContextTest",
++    test_class = "com.oracle.truffle.tools.profiler.test.CPUSamplerMultiContextTest",
++    runtime_deps = [":TRUFFLE_PROFILER_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tools.profiler.test.com.oracle.truffle.tools.profiler.test.CPUSamplerTest",
++    test_class = "com.oracle.truffle.tools.profiler.test.CPUSamplerTest",
++    runtime_deps = [":TRUFFLE_PROFILER_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tools.profiler.test.com.oracle.truffle.tools.profiler.test.CPUTracerTest",
++    test_class = "com.oracle.truffle.tools.profiler.test.CPUTracerTest",
++    runtime_deps = [":TRUFFLE_PROFILER_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tools.profiler.test.com.oracle.truffle.tools.profiler.test.HeapMonitorTest",
++    test_class = "com.oracle.truffle.tools.profiler.test.HeapMonitorTest",
++    runtime_deps = [":TRUFFLE_PROFILER_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tools.profiler.test.com.oracle.truffle.tools.profiler.test.ManualSamplingTest",
++    test_class = "com.oracle.truffle.tools.profiler.test.ManualSamplingTest",
++    runtime_deps = [":TRUFFLE_PROFILER_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tools.profiler.test.com.oracle.truffle.tools.profiler.test.MemoryTracerTest",
++    test_class = "com.oracle.truffle.tools.profiler.test.MemoryTracerTest",
++    runtime_deps = [":TRUFFLE_PROFILER_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tools.profiler.test.com.oracle.truffle.tools.profiler.test.NoTagSamplingTest",
++    test_class = "com.oracle.truffle.tools.profiler.test.NoTagSamplingTest",
++    runtime_deps = [":TRUFFLE_PROFILER_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tools.profiler.test.com.oracle.truffle.tools.profiler.test.ProfilerCLITest",
++    test_class = "com.oracle.truffle.tools.profiler.test.ProfilerCLITest",
++    runtime_deps = [":TRUFFLE_PROFILER_TEST"],
++)
++
++mx_shaded_java(
++    name = "com.oracle.truffle.tools.utils.java_websocket",
++    javacopts = [
++        "--release",
++        "17",
++        "-parameters",
++        "--add-modules",
++        "java.logging",
++        "-Xlint:none",
++        "-Xep:BadShiftAmount:WARN",
++    ],
++    release = 17,
++    shade = "{\"packages\": {\"org.java_websocket\": \"com.oracle.truffle.tools.utils.java_websocket\"}, \"exclude\": [\"META-INF/MANIFEST.MF\", \"META-INF/maven/org.java-websocket/Java-WebSocket/pom.xml\", \"META-INF/maven/org.java-websocket/Java-WebSocket/pom.properties\"], \"patch\": {\"org/java_websocket/server/WebSocketServer.java\": {\"\\\"Uncaught exception in thread \\\\{\\\\}: \\\\{\\\\}\\\", (t\\\\.getName\\\\(\\\\)|getName\\\\(\\\\)), e\": \"\\\"Uncaught exception in thread {0}: {1}\\\", new Object[] { \\\\g<1>, e }\"}, \"org/java_websocket/WebSocketImpl.java\": {\"\\\"process\\\\(\\\\{\\\\}\\\\): \\\\(\\\\{\\\\}\\\\)\\\", socketBuffer\\\\.remaining\\\\(\\\\),\": \"\\\"process({0}): ({1})\\\", new Object[] { socketBuffer.remaining(),\", \"socketBuffer\\\\.remaining\\\\(\\\\)\\\\)\\\\)\\\\);\": \"socketBuffer.remaining()))});\", \"\\\"write\\\\(\\\\{\\\\}\\\\): \\\\{\\\\}\\\", buf\\\\.remaining\\\\(\\\\),\": \"\\\"write({0}): {1}\\\", new Object[] { buf.remaining(),\", \"new String\\\\(buf\\\\.array\\\\(\\\\)\\\\)\\\\);\": \"new String(buf.array())});\"}, \"org/java_websocket/drafts/Draft_6455.java\": {\"\\\"after(Enconding|Decoding)\\\\(\\\\{\\\\}\\\\): \\\\{\\\\}\\\", (framedata|frame)\\\\.getPayloadData\\\\(\\\\)\\\\.remaining\\\\(\\\\),\": \"\\\"after\\\\g<1>({0}): {1}\\\", new Object[] { \\\\g<2>.getPayloadData().remaining(),\", \"new String\\\\((framedata|frame)\\\\.getPayloadData\\\\(\\\\)\\\\.array\\\\(\\\\)\\\\)\\\\)\\\\);\": \"new String(\\\\g<1>.getPayloadData().array()))});\", \"\\\"Payload limit reached\\\\. Allowed: \\\\{\\\\} Current: \\\\{\\\\}\\\", maxFrameSize, (length|totalSize)\": \"\\\"Payload limit reached. Allowed: {0} Current: {1}\\\", new Object[] { maxFrameSize, \\\\g<1> }\"}, \"org/java_websocket/**/*.java\": {\"import org\\\\.slf4j\\\\.Logger;\": \"import java.util.logging.Level;\", \"import org\\\\.slf4j\\\\.LoggerFactory;\": \"import java.util.logging.Logger;\", \"LoggerFactory\\\\.getLogger\\\\(([A-Za-z_][A-Za-z0-9_]*)\\\\.class\\\\);\": \"Logger.getLogger(\\\\g<1>.class.getName());\", \"log\\\\.trace\\\\(\": \"log.log(Level.FINER, \", \"log\\\\.error\\\\(\": \"log.log(Level.SEVERE, \", \"log\\\\.isTraceEnabled\\\\(\\\\)\": \"log.isLoggable(Level.FINER)\"}}}",
++    shade_inputs = [
++        "@graal_shaded_inputs//:tools_JAVA_WEBSOCKET.jar",
++        "@graal_shaded_inputs//:tools_JAVA_WEBSOCKET-sources.jar",
++    ],
++    visibility = ["//visibility:public"],
++)
++
++mx_processed_java(
++    name = "com.oracle.truffle.tools.warmup",
++    srcs = ["//tools/src/com.oracle.truffle.tools.warmup/src/com/oracle/truffle/tools/warmup/impl:com.oracle.truffle.tools.warmup.srcs"],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++    ],
++    plugins = [
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        "//truffle:TRUFFLE_API",
++        "//truffle:TRUFFLE_JSON",
++    ],
++)
++
++mx_project(
++    name = "com.oracle.truffle.tools.warmup.test",
++    testonly = True,
++    packages = [],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":com.oracle.truffle.tools.warmup",
++        "//truffle:TRUFFLE_TEST",
++        "@contrib_rules_jvm_deps//:junit_junit",
++    ],
++)
++
++mx_processed_java(
++    name = "org.graalvm.tools.api.lsp",
++    srcs = ["//tools/src/org.graalvm.tools.api.lsp/src/org/graalvm/tools/api/lsp:org.graalvm.tools.api.lsp.srcs"],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++        "--add-modules",
++        "jdk.unsupported",
++    ],
++    plugins = [
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    visibility = ["//visibility:public"],
++    deps = ["//truffle:TRUFFLE_API"],
++)
++
++mx_processed_java(
++    name = "org.graalvm.tools.insight",
++    srcs = ["//tools/src/org.graalvm.tools.insight/src/org/graalvm/tools/insight:org.graalvm.tools.insight.srcs"],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++    ],
++    mx_resource_root = "src/org.graalvm.tools.insight/src",
++    plugins = [
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    resources = ["//tools/src/org.graalvm.tools.insight/src/META-INF/native-image/org.graalvm.tools.insight:org.graalvm.tools.insight.resources"],
++    visibility = ["//visibility:public"],
++    deps = [
++        "//sdk:POLYGLOT",
++        "//truffle:TRUFFLE_API",
++    ],
++)
++
++mx_processed_java(
++    name = "org.graalvm.tools.insight.heap",
++    srcs = [
++        "//tools/src/org.graalvm.tools.insight.heap/src/org/graalvm/tools/insight/heap:org.graalvm.tools.insight.heap.srcs",
++        "//tools/src/org.graalvm.tools.insight.heap/src/org/graalvm/tools/insight/heap/instrument:org.graalvm.tools.insight.heap.srcs",
++    ],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++    ],
++    mx_resource_root = "src/org.graalvm.tools.insight.heap/src",
++    plugins = [
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    resources = ["//tools/src/org.graalvm.tools.insight.heap/src/META-INF/native-image/org.graalvm.tools.insight.heap:org.graalvm.tools.insight.heap.resources"],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":org.graalvm.tools.insight",
++        "//sdk:COLLECTIONS",
++        "//sdk:POLYGLOT",
++        "//truffle:TRUFFLE_API",
++    ],
++)
++
++mx_processed_java(
++    name = "org.graalvm.tools.insight.test",
++    testonly = True,
++    srcs = [
++        "//tools/src/org.graalvm.tools.insight.test/src/org/graalvm/tools/insight/test:org.graalvm.tools.insight.test.srcs",
++        "//tools/src/org.graalvm.tools.insight.test/src/org/graalvm/tools/insight/test/heap:org.graalvm.tools.insight.test.srcs",
++    ],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++        "-Xep:InvalidPatternSyntax:WARN",
++    ],
++    plugins = [
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":com.oracle.truffle.tools.agentscript",
++        ":org.graalvm.tools.insight",
++        ":org.graalvm.tools.insight.heap",
++        "//sdk:POLYGLOT",
++        "//truffle:TRUFFLE_API",
++        "//truffle:TRUFFLE_TEST",
++        "@contrib_rules_jvm_deps//:junit_junit",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.tools.insight.test.org.graalvm.tools.insight.test.DoubleEnterTest",
++    test_class = "org.graalvm.tools.insight.test.DoubleEnterTest",
++    runtime_deps = [":INSIGHT_TEST"],
++)
++
++mx_test_class(
++    name = "org.graalvm.tools.insight.test.org.graalvm.tools.insight.test.EventContextObjectTest",
++    test_class = "org.graalvm.tools.insight.test.EventContextObjectTest",
++    runtime_deps = [":INSIGHT_TEST"],
++)
++
++mx_test_class(
++    name = "org.graalvm.tools.insight.test.org.graalvm.tools.insight.test.InsightContextTest",
++    test_class = "org.graalvm.tools.insight.test.InsightContextTest",
++    runtime_deps = [":INSIGHT_TEST"],
++)
++
++mx_test_class(
++    name = "org.graalvm.tools.insight.test.org.graalvm.tools.insight.test.InsightExceptionTest",
++    test_class = "org.graalvm.tools.insight.test.InsightExceptionTest",
++    runtime_deps = [":INSIGHT_TEST"],
++)
++
++mx_test_class(
++    name = "org.graalvm.tools.insight.test.org.graalvm.tools.insight.test.InsightObjectTest",
++    test_class = "org.graalvm.tools.insight.test.InsightObjectTest",
++    runtime_deps = [":INSIGHT_TEST"],
++)
++
++mx_test_class(
++    name = "org.graalvm.tools.insight.test.org.graalvm.tools.insight.test.NoSuchFileTest",
++    test_class = "org.graalvm.tools.insight.test.NoSuchFileTest",
++    runtime_deps = [":INSIGHT_TEST"],
++)
++
++mx_test_class(
++    name = "org.graalvm.tools.insight.test.org.graalvm.tools.insight.test.SourceEventObjectTest",
++    test_class = "org.graalvm.tools.insight.test.SourceEventObjectTest",
++    runtime_deps = [":INSIGHT_TEST"],
++)
++
++mx_test_class(
++    name = "org.graalvm.tools.insight.test.org.graalvm.tools.insight.test.heap.HeapDumpTest",
++    test_class = "org.graalvm.tools.insight.test.heap.HeapDumpTest",
++    runtime_deps = [":INSIGHT_TEST"],
++)
++
++mx_test_class(
++    name = "org.graalvm.tools.insight.test.org.graalvm.tools.insight.test.heap.HeapObjectStreamTest",
++    test_class = "org.graalvm.tools.insight.test.heap.HeapObjectStreamTest",
++    runtime_deps = [":INSIGHT_TEST"],
++)
++
++mx_test_class(
++    name = "org.graalvm.tools.insight.test.org.graalvm.tools.insight.test.heap.HeapObjectTest",
++    test_class = "org.graalvm.tools.insight.test.heap.HeapObjectTest",
++    runtime_deps = [":INSIGHT_TEST"],
++)
++
++mx_test_class(
++    name = "org.graalvm.tools.insight.test.org.graalvm.tools.insight.test.heap.WeakIdentityHashMapTest",
++    test_class = "org.graalvm.tools.insight.test.heap.WeakIdentityHashMapTest",
++    runtime_deps = [":INSIGHT_TEST"],
++)
++
++mx_processed_java(
++    name = "org.graalvm.tools.lsp",
++    srcs = [
++        "//tools/src/org.graalvm.tools.lsp/src/org/graalvm/tools/lsp/exceptions:org.graalvm.tools.lsp.srcs",
++        "//tools/src/org.graalvm.tools.lsp/src/org/graalvm/tools/lsp/instrument:org.graalvm.tools.lsp.srcs",
++        "//tools/src/org.graalvm.tools.lsp/src/org/graalvm/tools/lsp/server:org.graalvm.tools.lsp.srcs",
++        "//tools/src/org.graalvm.tools.lsp/src/org/graalvm/tools/lsp/server/request:org.graalvm.tools.lsp.srcs",
++        "//tools/src/org.graalvm.tools.lsp/src/org/graalvm/tools/lsp/server/types:org.graalvm.tools.lsp.srcs",
++        "//tools/src/org.graalvm.tools.lsp/src/org/graalvm/tools/lsp/server/utils:org.graalvm.tools.lsp.srcs",
++    ],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++        "--add-modules",
++        "java.logging",
++    ],
++    mx_resource_root = "src/org.graalvm.tools.lsp/src",
++    plugins = [
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    resources = ["//tools/src/org.graalvm.tools.lsp/src/META-INF/native-image/org.graalvm.tools.lsp:org.graalvm.tools.lsp.resources"],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":org.graalvm.tools.api.lsp",
++        "//sdk:COLLECTIONS",
++        "//sdk:POLYGLOT",
++        "//truffle:TRUFFLE_API",
++        "//truffle:TRUFFLE_JSON",
++    ],
++)
++
++mx_processed_java(
++    name = "org.graalvm.tools.lsp.test",
++    testonly = True,
++    srcs = ["//tools/src/org.graalvm.tools.lsp.test/src/org/graalvm/tools/lsp/test/server:org.graalvm.tools.lsp.test.srcs"],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++    ],
++    plugins = [
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":org.graalvm.tools.api.lsp",
++        ":org.graalvm.tools.lsp",
++        "//sdk:POLYGLOT",
++        "//truffle:TRUFFLE_API",
++        "//truffle:TRUFFLE_SL",
++        "//truffle:TRUFFLE_TEST",
++        "@contrib_rules_jvm_deps//:junit_junit",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.tools.lsp.test.org.graalvm.tools.lsp.test.server.CompletionTest",
++    test_class = "org.graalvm.tools.lsp.test.server.CompletionTest",
++    runtime_deps = [":LSP_TEST"],
++)
++
++mx_test_class(
++    name = "org.graalvm.tools.lsp.test.org.graalvm.tools.lsp.test.server.CoverageTest",
++    test_class = "org.graalvm.tools.lsp.test.server.CoverageTest",
++    runtime_deps = [":LSP_TEST"],
++)
++
++mx_test_class(
++    name = "org.graalvm.tools.lsp.test.org.graalvm.tools.lsp.test.server.DocumentHighlightTest",
++    test_class = "org.graalvm.tools.lsp.test.server.DocumentHighlightTest",
++    runtime_deps = [":LSP_TEST"],
++)
++
++mx_test_class(
++    name = "org.graalvm.tools.lsp.test.org.graalvm.tools.lsp.test.server.HoverTest",
++    test_class = "org.graalvm.tools.lsp.test.server.HoverTest",
++    runtime_deps = [":LSP_TEST"],
++)
++
++mx_test_class(
++    name = "org.graalvm.tools.lsp.test.org.graalvm.tools.lsp.test.server.LSPExtensionTest",
++    test_class = "org.graalvm.tools.lsp.test.server.LSPExtensionTest",
++    runtime_deps = [":LSP_TEST"],
++)
++
++mx_test_class(
++    name = "org.graalvm.tools.lsp.test.org.graalvm.tools.lsp.test.server.ParsingTest",
++    test_class = "org.graalvm.tools.lsp.test.server.ParsingTest",
++    runtime_deps = [":LSP_TEST"],
++)
++
++mx_test_class(
++    name = "org.graalvm.tools.lsp.test.org.graalvm.tools.lsp.test.server.SignatureHelpTest",
++    test_class = "org.graalvm.tools.lsp.test.server.SignatureHelpTest",
++    runtime_deps = [":LSP_TEST"],
++)
++
++mx_test_class(
++    name = "org.graalvm.tools.lsp.test.org.graalvm.tools.lsp.test.server.TestLSPLibrary",
++    test_class = "org.graalvm.tools.lsp.test.server.TestLSPLibrary",
++    runtime_deps = [":LSP_TEST"],
++)
++
++mx_test_class(
++    name = "org.graalvm.tools.lsp.test.org.graalvm.tools.lsp.test.server.TextDocumentContentChangeTest",
++    test_class = "org.graalvm.tools.lsp.test.server.TextDocumentContentChangeTest",
++    runtime_deps = [":LSP_TEST"],
++)
++
++mx_jar_dist(
++    name = "CHROMEINSPECTOR",
++    contents = [
++        ":com.oracle.truffle.tools.utils.java_websocket",
++        ":com.oracle.truffle.tools.chromeinspector",
++    ],
++    directives = [
++        "requires com.oracle.truffle.tools.profiler",
++        "requires java.logging",
++        "requires jdk.unsupported",
++        "requires org.graalvm.collections",
++        "requires org.graalvm.polyglot",
++        "requires org.graalvm.shadowed.org.json",
++        "requires org.graalvm.truffle",
++        "requires transitive org.graalvm.word",
++    ],
++    jni_services = True,
++    manifest = {
++        "Implementation-Vendor": "Oracle Corporation",
++        "Implementation-Version": "25.5.5-dev",
++        "Name": "chromeinspector-tool",
++        "Specification-Vendor": "Oracle Corporation",
++        "Specification-Version": "25.5.5-dev",
++    },
++    module_name = "com.oracle.truffle.tools.chromeinspector",
++    release = 21,
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":TRUFFLE_PROFILER",
++        "//truffle:TRUFFLE_API",
++        "//truffle:TRUFFLE_JSON",
++    ],
++)
++
++mx_jar_dist(
++    name = "CHROMEINSPECTOR_TEST",
++    testonly = True,
++    contents = [":com.oracle.truffle.tools.chromeinspector.test"],
++    jni_services = True,
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":CHROMEINSPECTOR",
++        "//truffle:TRUFFLE_API",
++        "//truffle:TRUFFLE_SL",
++        "//truffle:TRUFFLE_TEST",
++        "@contrib_rules_jvm_deps//:junit_junit",
++        "@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
++    ],
++)
++
++mx_pom_dist(
++    name = "COVERAGE_POM",
++    out = "coverage.pom",
++    content = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project xmlns=\"http://maven.apache.org/POM/4.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\">\n  <modelVersion>4.0.0</modelVersion>\n  <groupId>org.graalvm.polyglot</groupId>\n  <artifactId>coverage</artifactId>\n  <version>25.5.5-dev</version>\n  <packaging>pom</packaging>\n  <url>http://openjdk.java.net/projects/graal</url>\n  <name>Coverage Pom</name>\n  <description>The Truffle code coverage tool</description>\n  <developers>\n    <developer>\n      <name>GraalVM Development</name>\n      <email>graalvm-dev@oss.oracle.com</email>\n      <organization>Oracle Corporation</organization>\n      <organizationUrl>http://www.graalvm.org/</organizationUrl>\n    </developer>\n  </developers>\n  <licenses>\n    <license>\n      <name>GNU General Public License, version 2, with the Classpath Exception</name>\n      <url>http://openjdk.java.net/legal/gplv2+ce.html</url>\n    </license>\n  </licenses>\n  <dependencies>\n    <dependency>\n      <groupId>org.graalvm.tools</groupId>\n      <artifactId>coverage-tool</artifactId>\n      <version>25.5.5-dev</version>\n      <scope>runtime</scope>\n    </dependency>\n    <dependency>\n      <groupId>org.graalvm.truffle</groupId>\n      <artifactId>truffle-runtime</artifactId>\n      <version>25.5.5-dev</version>\n      <scope>runtime</scope>\n    </dependency>\n  </dependencies>\n</project>\n",
++    visibility = ["//visibility:public"],
++    deps = [
++        ":TRUFFLE_COVERAGE",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_jar_dist(
++    name = "DAP",
++    contents = [":com.oracle.truffle.tools.dap"],
++    directives = [
++        "requires java.logging",
++        "requires org.graalvm.collections",
++        "requires org.graalvm.polyglot",
++        "requires org.graalvm.shadowed.org.json",
++        "requires org.graalvm.truffle",
++        "requires transitive org.graalvm.word",
++    ],
++    jni_services = True,
++    manifest = {
++        "Implementation-Vendor": "Oracle Corporation",
++        "Implementation-Version": "25.5.5-dev",
++        "Name": "dap-tool",
++        "Specification-Vendor": "Oracle Corporation",
++        "Specification-Version": "25.5.5-dev",
++    },
++    module_name = "com.oracle.truffle.tools.dap",
++    release = 21,
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [
++        "//truffle:TRUFFLE_API",
++        "//truffle:TRUFFLE_JSON",
++    ],
++)
++
++mx_pom_dist(
++    name = "DAP_POM",
++    out = "dap.pom",
++    content = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project xmlns=\"http://maven.apache.org/POM/4.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\">\n  <modelVersion>4.0.0</modelVersion>\n  <groupId>org.graalvm.polyglot</groupId>\n  <artifactId>dap</artifactId>\n  <version>25.5.5-dev</version>\n  <packaging>pom</packaging>\n  <url>http://openjdk.java.net/projects/graal</url>\n  <name>Dap Pom</name>\n  <description>The polyglot debugging backend for the Debug Adapter Protocol</description>\n  <developers>\n    <developer>\n      <name>GraalVM Development</name>\n      <email>graalvm-dev@oss.oracle.com</email>\n      <organization>Oracle Corporation</organization>\n      <organizationUrl>http://www.graalvm.org/</organizationUrl>\n    </developer>\n  </developers>\n  <licenses>\n    <license>\n      <name>GNU General Public License, version 2, with the Classpath Exception</name>\n      <url>http://openjdk.java.net/legal/gplv2+ce.html</url>\n    </license>\n  </licenses>\n  <dependencies>\n    <dependency>\n      <groupId>org.graalvm.tools</groupId>\n      <artifactId>dap-tool</artifactId>\n      <version>25.5.5-dev</version>\n      <scope>runtime</scope>\n    </dependency>\n    <dependency>\n      <groupId>org.graalvm.truffle</groupId>\n      <artifactId>truffle-runtime</artifactId>\n      <version>25.5.5-dev</version>\n      <scope>runtime</scope>\n    </dependency>\n  </dependencies>\n</project>\n",
++    visibility = ["//visibility:public"],
++    deps = [
++        ":DAP",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_jar_dist(
++    name = "DAP_TEST",
++    testonly = True,
++    contents = [":com.oracle.truffle.tools.dap.test"],
++    jni_services = True,
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":DAP",
++        "//truffle:TRUFFLE_TEST",
++        "@contrib_rules_jvm_deps//:junit_junit",
++        "@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
++    ],
++)
++
++mx_pom_dist(
++    name = "HEAP_POM",
++    out = "heap.pom",
++    content = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project xmlns=\"http://maven.apache.org/POM/4.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\">\n  <modelVersion>4.0.0</modelVersion>\n  <groupId>org.graalvm.polyglot</groupId>\n  <artifactId>heap</artifactId>\n  <version>25.5.5-dev</version>\n  <packaging>pom</packaging>\n  <url>http://openjdk.java.net/projects/graal</url>\n  <name>Heap Pom</name>\n  <description>The Heap Dump for the Insights Gathering Platform</description>\n  <developers>\n    <developer>\n      <name>GraalVM Development</name>\n      <email>graalvm-dev@oss.oracle.com</email>\n      <organization>Oracle Corporation</organization>\n      <organizationUrl>http://www.graalvm.org/</organizationUrl>\n    </developer>\n  </developers>\n  <licenses>\n    <license>\n      <name>GNU General Public License, version 2, with the Classpath Exception</name>\n      <url>http://openjdk.java.net/legal/gplv2+ce.html</url>\n    </license>\n  </licenses>\n  <dependencies>\n    <dependency>\n      <groupId>org.graalvm.tools</groupId>\n      <artifactId>insight-heap-tool</artifactId>\n      <version>25.5.5-dev</version>\n      <scope>runtime</scope>\n    </dependency>\n    <dependency>\n      <groupId>org.graalvm.truffle</groupId>\n      <artifactId>truffle-runtime</artifactId>\n      <version>25.5.5-dev</version>\n      <scope>runtime</scope>\n    </dependency>\n  </dependencies>\n</project>\n",
++    visibility = ["//visibility:public"],
++    deps = [
++        ":INSIGHT_HEAP",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_jar_dist(
++    name = "INSIGHT",
++    contents = [
++        ":org.graalvm.tools.insight",
++        ":com.oracle.truffle.tools.agentscript",
++    ],
++    directives = [
++        "exports org.graalvm.tools.insight",
++        "requires jdk.unsupported",
++        "requires org.graalvm.collections",
++        "requires org.graalvm.polyglot",
++        "requires org.graalvm.truffle",
++        "requires transitive org.graalvm.word",
++    ],
++    jni_services = True,
++    manifest = {
++        "Implementation-Vendor": "Oracle Corporation",
++        "Implementation-Version": "25.5.5-dev",
++        "Name": "insight-tool",
++        "Specification-Vendor": "Oracle Corporation",
++        "Specification-Version": "25.5.5-dev",
++    },
++    module_name = "org.graalvm.tools.insight",
++    release = 21,
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = ["//truffle:TRUFFLE_API"],
++)
++
++mx_jar_dist(
++    name = "INSIGHT_HEAP",
++    contents = [":org.graalvm.tools.insight.heap"],
++    directives = [
++        "requires org.graalvm.collections",
++        "requires org.graalvm.polyglot",
++        "requires org.graalvm.tools.insight",
++        "requires org.graalvm.truffle",
++        "requires transitive org.graalvm.word",
++    ],
++    jni_services = True,
++    manifest = {
++        "Implementation-Vendor": "Oracle Corporation",
++        "Implementation-Version": "25.5.5-dev",
++        "Name": "insight-heap-tool",
++        "Specification-Vendor": "Oracle Corporation",
++        "Specification-Version": "25.5.5-dev",
++    },
++    module_name = "org.graalvm.tools.insight.heap",
++    release = 21,
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":INSIGHT",
++        "//truffle:TRUFFLE_API",
++    ],
++)
++
++mx_pom_dist(
++    name = "INSIGHT_POM",
++    out = "insight.pom",
++    content = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project xmlns=\"http://maven.apache.org/POM/4.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\">\n  <modelVersion>4.0.0</modelVersion>\n  <groupId>org.graalvm.polyglot</groupId>\n  <artifactId>insight</artifactId>\n  <version>25.5.5-dev</version>\n  <packaging>pom</packaging>\n  <url>http://openjdk.java.net/projects/graal</url>\n  <name>Insight Pom</name>\n  <description>The Ultimate Insights Gathering Platform</description>\n  <developers>\n    <developer>\n      <name>GraalVM Development</name>\n      <email>graalvm-dev@oss.oracle.com</email>\n      <organization>Oracle Corporation</organization>\n      <organizationUrl>http://www.graalvm.org/</organizationUrl>\n    </developer>\n  </developers>\n  <licenses>\n    <license>\n      <name>GNU General Public License, version 2, with the Classpath Exception</name>\n      <url>http://openjdk.java.net/legal/gplv2+ce.html</url>\n    </license>\n  </licenses>\n  <dependencies>\n    <dependency>\n      <groupId>org.graalvm.tools</groupId>\n      <artifactId>insight-tool</artifactId>\n      <version>25.5.5-dev</version>\n      <scope>runtime</scope>\n    </dependency>\n    <dependency>\n      <groupId>org.graalvm.truffle</groupId>\n      <artifactId>truffle-runtime</artifactId>\n      <version>25.5.5-dev</version>\n      <scope>runtime</scope>\n    </dependency>\n  </dependencies>\n</project>\n",
++    visibility = ["//visibility:public"],
++    deps = [
++        ":INSIGHT",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_jar_dist(
++    name = "INSIGHT_TEST",
++    testonly = True,
++    contents = [":org.graalvm.tools.insight.test"],
++    jni_services = True,
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":INSIGHT",
++        ":INSIGHT_HEAP",
++        "//truffle:TRUFFLE_TEST",
++        "@contrib_rules_jvm_deps//:junit_junit",
++        "@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
++    ],
++)
++
++mx_pom_dist(
++    name = "INSPECT_POM",
++    out = "inspect.pom",
++    content = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project xmlns=\"http://maven.apache.org/POM/4.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\">\n  <modelVersion>4.0.0</modelVersion>\n  <groupId>org.graalvm.polyglot</groupId>\n  <artifactId>inspect</artifactId>\n  <version>25.5.5-dev</version>\n  <packaging>pom</packaging>\n  <url>http://openjdk.java.net/projects/graal</url>\n  <name>Inspect Pom</name>\n  <description>The polyglot debugging backend for chrome inspector.</description>\n  <developers>\n    <developer>\n      <name>GraalVM Development</name>\n      <email>graalvm-dev@oss.oracle.com</email>\n      <organization>Oracle Corporation</organization>\n      <organizationUrl>http://www.graalvm.org/</organizationUrl>\n    </developer>\n  </developers>\n  <licenses>\n    <license>\n      <name>GNU General Public License, version 2, with the Classpath Exception</name>\n      <url>http://openjdk.java.net/legal/gplv2+ce.html</url>\n    </license>\n  </licenses>\n  <dependencies>\n    <dependency>\n      <groupId>org.graalvm.tools</groupId>\n      <artifactId>chromeinspector-tool</artifactId>\n      <version>25.5.5-dev</version>\n      <scope>runtime</scope>\n    </dependency>\n    <dependency>\n      <groupId>org.graalvm.truffle</groupId>\n      <artifactId>truffle-runtime</artifactId>\n      <version>25.5.5-dev</version>\n      <scope>runtime</scope>\n    </dependency>\n  </dependencies>\n</project>\n",
++    visibility = ["//visibility:public"],
++    deps = [
++        ":CHROMEINSPECTOR",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_jar_dist(
++    name = "LSP",
++    contents = [":org.graalvm.tools.lsp"],
++    directives = [
++        "requires java.logging",
++        "requires org.graalvm.collections",
++        "requires org.graalvm.polyglot",
++        "requires org.graalvm.shadowed.org.json",
++        "requires org.graalvm.tools.api.lsp",
++        "requires org.graalvm.truffle",
++        "requires transitive org.graalvm.word",
++    ],
++    jni_services = True,
++    manifest = {
++        "Implementation-Vendor": "Oracle Corporation",
++        "Implementation-Version": "25.5.5-dev",
++        "Name": "lsp-tool",
++        "Specification-Vendor": "Oracle Corporation",
++        "Specification-Version": "25.5.5-dev",
++    },
++    module_name = "org.graalvm.tools.lsp",
++    release = 21,
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":LSP_API",
++        "//truffle:TRUFFLE_JSON",
++    ],
++)
++
++mx_jar_dist(
++    name = "LSP_API",
++    contents = [":org.graalvm.tools.api.lsp"],
++    directives = [
++        "exports org.graalvm.tools.api.lsp",
++        "requires jdk.unsupported",
++        "requires org.graalvm.truffle",
++        "requires transitive org.graalvm.word",
++    ],
++    jni_services = True,
++    manifest = {
++        "Implementation-Vendor": "Oracle Corporation",
++        "Implementation-Version": "25.5.5-dev",
++        "Name": "lsp_api",
++        "Specification-Vendor": "Oracle Corporation",
++        "Specification-Version": "25.5.5-dev",
++    },
++    module_name = "org.graalvm.tools.api.lsp",
++    release = 21,
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = ["//truffle:TRUFFLE_API"],
++)
++
++mx_pom_dist(
++    name = "LSP_POM",
++    out = "lsp.pom",
++    content = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project xmlns=\"http://maven.apache.org/POM/4.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\">\n  <modelVersion>4.0.0</modelVersion>\n  <groupId>org.graalvm.polyglot</groupId>\n  <artifactId>lsp</artifactId>\n  <version>25.5.5-dev</version>\n  <packaging>pom</packaging>\n  <url>http://openjdk.java.net/projects/graal</url>\n  <name>Lsp Pom</name>\n  <description>The polyglot Language Server backend</description>\n  <developers>\n    <developer>\n      <name>GraalVM Development</name>\n      <email>graalvm-dev@oss.oracle.com</email>\n      <organization>Oracle Corporation</organization>\n      <organizationUrl>http://www.graalvm.org/</organizationUrl>\n    </developer>\n  </developers>\n  <licenses>\n    <license>\n      <name>GNU General Public License, version 2, with the Classpath Exception</name>\n      <url>http://openjdk.java.net/legal/gplv2+ce.html</url>\n    </license>\n  </licenses>\n  <dependencies>\n    <dependency>\n      <groupId>org.graalvm.tools</groupId>\n      <artifactId>lsp-tool</artifactId>\n      <version>25.5.5-dev</version>\n      <scope>runtime</scope>\n    </dependency>\n    <dependency>\n      <groupId>org.graalvm.truffle</groupId>\n      <artifactId>truffle-runtime</artifactId>\n      <version>25.5.5-dev</version>\n      <scope>runtime</scope>\n    </dependency>\n  </dependencies>\n</project>\n",
++    visibility = ["//visibility:public"],
++    deps = [
++        ":LSP",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_jar_dist(
++    name = "LSP_TEST",
++    testonly = True,
++    contents = [":org.graalvm.tools.lsp.test"],
++    jni_services = True,
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":LSP",
++        "//truffle:TRUFFLE_SL",
++        "//truffle:TRUFFLE_TEST",
++        "@contrib_rules_jvm_deps//:junit_junit",
++        "@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
++    ],
++)
++
++mx_pom_dist(
++    name = "PROFILER_POM",
++    out = "profiler.pom",
++    content = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project xmlns=\"http://maven.apache.org/POM/4.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\">\n  <modelVersion>4.0.0</modelVersion>\n  <groupId>org.graalvm.polyglot</groupId>\n  <artifactId>profiler</artifactId>\n  <version>25.5.5-dev</version>\n  <packaging>pom</packaging>\n  <url>http://openjdk.java.net/projects/graal</url>\n  <name>Profiler Pom</name>\n  <description>The truffle profiler, supporting CPU sampling and tracing. Memory tracing support is experimental</description>\n  <developers>\n    <developer>\n      <name>GraalVM Development</name>\n      <email>graalvm-dev@oss.oracle.com</email>\n      <organization>Oracle Corporation</organization>\n      <organizationUrl>http://www.graalvm.org/</organizationUrl>\n    </developer>\n  </developers>\n  <licenses>\n    <license>\n      <name>GNU General Public License, version 2, with the Classpath Exception</name>\n      <url>http://openjdk.java.net/legal/gplv2+ce.html</url>\n    </license>\n  </licenses>\n  <dependencies>\n    <dependency>\n      <groupId>org.graalvm.tools</groupId>\n      <artifactId>profiler-tool</artifactId>\n      <version>25.5.5-dev</version>\n      <scope>runtime</scope>\n    </dependency>\n    <dependency>\n      <groupId>org.graalvm.truffle</groupId>\n      <artifactId>truffle-runtime</artifactId>\n      <version>25.5.5-dev</version>\n      <scope>runtime</scope>\n    </dependency>\n  </dependencies>\n</project>\n",
++    visibility = ["//visibility:public"],
++    deps = [
++        ":TRUFFLE_PROFILER",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_jar_dist(
++    name = "TRUFFLE_COVERAGE",
++    contents = [":com.oracle.truffle.tools.coverage"],
++    directives = [
++        "requires org.graalvm.polyglot",
++        "requires org.graalvm.shadowed.org.json",
++        "requires org.graalvm.truffle",
++        "requires transitive org.graalvm.word",
++    ],
++    jni_services = True,
++    manifest = {
++        "Implementation-Vendor": "Oracle Corporation",
++        "Implementation-Version": "25.5.5-dev",
++        "Name": "coverage-tool",
++        "Specification-Vendor": "Oracle Corporation",
++        "Specification-Version": "25.5.5-dev",
++    },
++    module_name = "com.oracle.truffle.tools.coverage",
++    release = 21,
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [
++        "//truffle:TRUFFLE_API",
++        "//truffle:TRUFFLE_JSON",
++    ],
++)
++
++mx_jar_dist(
++    name = "TRUFFLE_COVERAGE_TEST",
++    testonly = True,
++    contents = [":com.oracle.truffle.tools.coverage.test"],
++    jni_services = True,
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":TRUFFLE_COVERAGE",
++        "//truffle:TRUFFLE_TEST",
++        "@contrib_rules_jvm_deps//:junit_junit",
++        "@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
++    ],
++)
++
++mx_jar_dist(
++    name = "TRUFFLE_PROFILER",
++    contents = [":com.oracle.truffle.tools.profiler"],
++    directives = [
++        "exports com.oracle.truffle.tools.profiler",
++        "requires java.logging",
++        "requires org.graalvm.polyglot",
++        "requires org.graalvm.shadowed.org.json",
++        "requires org.graalvm.truffle",
++        "requires transitive org.graalvm.word",
++    ],
++    jni_services = True,
++    manifest = {
++        "Implementation-Vendor": "Oracle Corporation",
++        "Implementation-Version": "25.5.5-dev",
++        "Name": "profiler-tool",
++        "Specification-Vendor": "Oracle Corporation",
++        "Specification-Version": "25.5.5-dev",
++    },
++    module_name = "com.oracle.truffle.tools.profiler",
++    release = 21,
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [
++        "//truffle:TRUFFLE_API",
++        "//truffle:TRUFFLE_JSON",
++    ],
++)
++
++mx_jar_dist(
++    name = "TRUFFLE_PROFILER_TEST",
++    testonly = True,
++    contents = [":com.oracle.truffle.tools.profiler.test"],
++    jni_services = True,
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":TRUFFLE_PROFILER",
++        "//truffle:TRUFFLE_TEST",
++        "@contrib_rules_jvm_deps//:junit_junit",
++        "@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
++    ],
++)
+diff --git a/tools/src/com.oracle.truffle.tools.agentscript/src/com/oracle/truffle/tools/agentscript/impl/BUILD.bazel b/tools/src/com.oracle.truffle.tools.agentscript/src/com/oracle/truffle/tools/agentscript/impl/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/com.oracle.truffle.tools.agentscript/src/com/oracle/truffle/tools/agentscript/impl/BUILD.bazel
+@@ -0,0 +1,30 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.tools.agentscript.srcs",
++    srcs = [
++        "AbstractContextObject.java",
++        "AgentObject.java",
++        "AgentScriptInstrument.java",
++        "AgentType.java",
++        "ArrayObject.java",
++        "EventContextObject.java",
++        "FilterExec.java",
++        "IgnoreSources.java",
++        "InsightException.java",
++        "InsightFilter.java",
++        "InsightHookNode.java",
++        "InsightInstrument.java",
++        "InsightPerContext.java",
++        "InsightPerSource.java",
++        "InsightSourceFilter.java",
++        "LocationObject.java",
++        "NullObject.java",
++        "RegexNameFilter.java",
++        "RegexSourceFilter.java",
++        "RootNameFilter.java",
++        "SourceEventObject.java",
++        "VariablesObject.java",
++    ],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/com.oracle.truffle.tools.chromeinspector/src/META-INF/native-image/com.oracle.truffle.tools.chromeinspector/BUILD.bazel b/tools/src/com.oracle.truffle.tools.chromeinspector/src/META-INF/native-image/com.oracle.truffle.tools.chromeinspector/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/com.oracle.truffle.tools.chromeinspector/src/META-INF/native-image/com.oracle.truffle.tools.chromeinspector/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.tools.chromeinspector.resources",
++    srcs = ["native-image.properties"],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/com.oracle.truffle.tools.chromeinspector/src/com/oracle/truffle/tools/chromeinspector/BUILD.bazel b/tools/src/com.oracle.truffle.tools.chromeinspector/src/com/oracle/truffle/tools/chromeinspector/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/com.oracle.truffle.tools.chromeinspector/src/com/oracle/truffle/tools/chromeinspector/BUILD.bazel
+@@ -0,0 +1,22 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.tools.chromeinspector.srcs",
++    srcs = [
++        "BreakpointsHandler.java",
++        "ConsoleUtilitiesAPI.java",
++        "DebuggerSuspendedInfo.java",
++        "InspectorDebugger.java",
++        "InspectorExecutionContext.java",
++        "InspectorProfiler.java",
++        "InspectorRuntime.java",
++        "LanguageChecks.java",
++        "OutputHandler.java",
++        "RemoteObjectsHandler.java",
++        "ScriptsHandler.java",
++        "SuspendThreadExecutable.java",
++        "SuspendableLocationFinder.java",
++        "TypeHandler.java",
++    ],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/com.oracle.truffle.tools.chromeinspector/src/com/oracle/truffle/tools/chromeinspector/client/BUILD.bazel b/tools/src/com.oracle.truffle.tools.chromeinspector/src/com/oracle/truffle/tools/chromeinspector/client/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/com.oracle.truffle.tools.chromeinspector/src/com/oracle/truffle/tools/chromeinspector/client/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.tools.chromeinspector.srcs",
++    srcs = ["InspectWSClient.java"],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/com.oracle.truffle.tools.chromeinspector/src/com/oracle/truffle/tools/chromeinspector/commands/BUILD.bazel b/tools/src/com.oracle.truffle.tools.chromeinspector/src/com/oracle/truffle/tools/chromeinspector/commands/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/com.oracle.truffle.tools.chromeinspector/src/com/oracle/truffle/tools/chromeinspector/commands/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.tools.chromeinspector.srcs",
++    srcs = [
++        "Command.java",
++        "ErrorResponse.java",
++        "Params.java",
++        "Result.java",
++    ],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/com.oracle.truffle.tools.chromeinspector/src/com/oracle/truffle/tools/chromeinspector/domains/BUILD.bazel b/tools/src/com.oracle.truffle.tools.chromeinspector/src/com/oracle/truffle/tools/chromeinspector/domains/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/com.oracle.truffle.tools.chromeinspector/src/com/oracle/truffle/tools/chromeinspector/domains/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.tools.chromeinspector.srcs",
++    srcs = [
++        "DebuggerDomain.java",
++        "Domain.java",
++        "ProfilerDomain.java",
++        "RuntimeDomain.java",
++    ],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/com.oracle.truffle.tools.chromeinspector/src/com/oracle/truffle/tools/chromeinspector/events/BUILD.bazel b/tools/src/com.oracle.truffle.tools.chromeinspector/src/com/oracle/truffle/tools/chromeinspector/events/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/com.oracle.truffle.tools.chromeinspector/src/com/oracle/truffle/tools/chromeinspector/events/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.tools.chromeinspector.srcs",
++    srcs = [
++        "Event.java",
++        "EventHandler.java",
++    ],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/com.oracle.truffle.tools.chromeinspector/src/com/oracle/truffle/tools/chromeinspector/instrument/BUILD.bazel b/tools/src/com.oracle.truffle.tools.chromeinspector/src/com/oracle/truffle/tools/chromeinspector/instrument/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/com.oracle.truffle.tools.chromeinspector/src/com/oracle/truffle/tools/chromeinspector/instrument/BUILD.bazel
+@@ -0,0 +1,16 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.tools.chromeinspector.srcs",
++    srcs = [
++        "Enabler.java",
++        "InspectorIOException.java",
++        "InspectorInstrument.java",
++        "InspectorWSConnection.java",
++        "OutputConsumerInstrument.java",
++        "SuppressFBWarnings.java",
++        "Token.java",
++        "TypeProfileInstrument.java",
++    ],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/com.oracle.truffle.tools.chromeinspector/src/com/oracle/truffle/tools/chromeinspector/objects/BUILD.bazel b/tools/src/com.oracle.truffle.tools.chromeinspector/src/com/oracle/truffle/tools/chromeinspector/objects/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/com.oracle.truffle.tools.chromeinspector/src/com/oracle/truffle/tools/chromeinspector/objects/BUILD.bazel
+@@ -0,0 +1,22 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.tools.chromeinspector.srcs",
++    srcs = [
++        "AbstractInspectorArray.java",
++        "AbstractInspectorObject.java",
++        "Console.java",
++        "Inspector.java",
++        "InspectorStateException.java",
++        "JSONTruffleArray.java",
++        "JSONTruffleObject.java",
++        "JavaTruffleArray.java",
++        "Keys.java",
++        "NullObject.java",
++        "Session.java",
++        "SessionClass.java",
++        "TruffleObject2JSON.java",
++        "UndefinedProvider.java",
++    ],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/com.oracle.truffle.tools.chromeinspector/src/com/oracle/truffle/tools/chromeinspector/server/BUILD.bazel b/tools/src/com.oracle.truffle.tools.chromeinspector/src/com/oracle/truffle/tools/chromeinspector/server/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/com.oracle.truffle.tools.chromeinspector/src/com/oracle/truffle/tools/chromeinspector/server/BUILD.bazel
+@@ -0,0 +1,15 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.tools.chromeinspector.srcs",
++    srcs = [
++        "CommandProcessException.java",
++        "ConnectionWatcher.java",
++        "InspectServerSession.java",
++        "InspectorServer.java",
++        "InspectorServerConnection.java",
++        "JSONMessageListener.java",
++        "WSInterceptorServer.java",
++    ],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/com.oracle.truffle.tools.chromeinspector/src/com/oracle/truffle/tools/chromeinspector/types/BUILD.bazel b/tools/src/com.oracle.truffle.tools.chromeinspector/src/com/oracle/truffle/tools/chromeinspector/types/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/com.oracle.truffle.tools.chromeinspector/src/com/oracle/truffle/tools/chromeinspector/types/BUILD.bazel
+@@ -0,0 +1,30 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.tools.chromeinspector.srcs",
++    srcs = [
++        "CallArgument.java",
++        "CallFrame.java",
++        "CoverageRange.java",
++        "CustomPreview.java",
++        "ExceptionDetails.java",
++        "FunctionCoverage.java",
++        "InternalPropertyDescriptor.java",
++        "Location.java",
++        "ObjectPreview.java",
++        "Profile.java",
++        "ProfileNode.java",
++        "PropertyDescriptor.java",
++        "RemoteObject.java",
++        "RuntimeCallFrame.java",
++        "Scope.java",
++        "Script.java",
++        "ScriptCoverage.java",
++        "ScriptTypeProfile.java",
++        "StackTrace.java",
++        "TypeInfo.java",
++        "TypeObject.java",
++        "TypeProfileEntry.java",
++    ],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/com.oracle.truffle.tools.chromeinspector/src/com/oracle/truffle/tools/chromeinspector/util/BUILD.bazel b/tools/src/com.oracle.truffle.tools.chromeinspector/src/com/oracle/truffle/tools/chromeinspector/util/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/com.oracle.truffle.tools.chromeinspector/src/com/oracle/truffle/tools/chromeinspector/util/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.tools.chromeinspector.srcs",
++    srcs = ["LineSearch.java"],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/com.oracle.truffle.tools.chromeinspector.test/src/com/oracle/truffle/tools/chromeinspector/test/BUILD.bazel b/tools/src/com.oracle.truffle.tools.chromeinspector.test/src/com/oracle/truffle/tools/chromeinspector/test/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/com.oracle.truffle.tools.chromeinspector.test/src/com/oracle/truffle/tools/chromeinspector/test/BUILD.bazel
+@@ -0,0 +1,35 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.tools.chromeinspector.test.srcs",
++    srcs = [
++        "AbstractFunctionValueTest.java",
++        "BuggyLanguageInspectDebugTest.java",
++        "DisabledDomainTest.java",
++        "EnginesGCedTest.java",
++        "ITLInspectDebugTest.java",
++        "InspectHashMapTest.java",
++        "InspectIteratorTest.java",
++        "InspectStringTest.java",
++        "InspectorAddressTest.java",
++        "InspectorMessageTransportTest.java",
++        "InspectorObjectTest.java",
++        "InspectorReceiverTest.java",
++        "InspectorTestInstrument.java",
++        "InspectorTester.java",
++        "InteropTest.java",
++        "LazyAccessInspectDebugTest.java",
++        "LineSearchTest.java",
++        "MultiEngineTest.java",
++        "NotReadableValuesTest.java",
++        "ProfilerTest.java",
++        "RelativeSourceInspectDebugTest.java",
++        "SLInspectDebugTest.java",
++        "SLInspectProfileTest.java",
++        "SecureInspectorPathGenerator.java",
++        "TestMemoryLeaks.java",
++        "TimeoutTest.java",
++        "UnavailableSectionInspectDebugTest.java",
++    ],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/com.oracle.truffle.tools.coverage/src/META-INF/native-image/com.oracle.truffle.tools.profiler/BUILD.bazel b/tools/src/com.oracle.truffle.tools.coverage/src/META-INF/native-image/com.oracle.truffle.tools.profiler/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/com.oracle.truffle.tools.coverage/src/META-INF/native-image/com.oracle.truffle.tools.profiler/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.tools.coverage.resources",
++    srcs = ["native-image.properties"],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/com.oracle.truffle.tools.coverage/src/com/oracle/truffle/tools/coverage/BUILD.bazel b/tools/src/com.oracle.truffle.tools.coverage/src/com/oracle/truffle/tools/coverage/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/com.oracle.truffle.tools.coverage/src/com/oracle/truffle/tools/coverage/BUILD.bazel
+@@ -0,0 +1,16 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.tools.coverage.srcs",
++    srcs = [
++        "AbstractCoverageNode.java",
++        "BooleanCoverageNode.java",
++        "CountingCoverageNode.java",
++        "CoverageTracker.java",
++        "RootCoverage.java",
++        "SectionCoverage.java",
++        "SourceCoverage.java",
++        "package-info.java",
++    ],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/com.oracle.truffle.tools.coverage/src/com/oracle/truffle/tools/coverage/impl/BUILD.bazel b/tools/src/com.oracle.truffle.tools.coverage/src/com/oracle/truffle/tools/coverage/impl/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/com.oracle.truffle.tools.coverage/src/com/oracle/truffle/tools/coverage/impl/BUILD.bazel
+@@ -0,0 +1,15 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.tools.coverage.srcs",
++    srcs = [
++        "CoverageCLI.java",
++        "CoverageException.java",
++        "CoverageInstrument.java",
++        "JSONPrinter.java",
++        "LCOVPrinter.java",
++        "LineCoverage.java",
++        "WildcardFilter.java",
++    ],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/com.oracle.truffle.tools.coverage.test/src/com/oracle/truffle/tools/coverage/test/BUILD.bazel b/tools/src/com.oracle.truffle.tools.coverage.test/src/com/oracle/truffle/tools/coverage/test/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/com.oracle.truffle.tools.coverage.test/src/com/oracle/truffle/tools/coverage/test/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.tools.coverage.test.srcs",
++    srcs = ["CoverageTest.java"],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/com.oracle.truffle.tools.dap/src/META-INF/native-image/com.oracle.truffle.tools.dap/BUILD.bazel b/tools/src/com.oracle.truffle.tools.dap/src/META-INF/native-image/com.oracle.truffle.tools.dap/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/com.oracle.truffle.tools.dap/src/META-INF/native-image/com.oracle.truffle.tools.dap/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.tools.dap.resources",
++    srcs = ["native-image.properties"],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/com.oracle.truffle.tools.dap/src/com/oracle/truffle/tools/dap/instrument/BUILD.bazel b/tools/src/com.oracle.truffle.tools.dap/src/com/oracle/truffle/tools/dap/instrument/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/com.oracle.truffle.tools.dap/src/com/oracle/truffle/tools/dap/instrument/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.tools.dap.srcs",
++    srcs = [
++        "DAPIOException.java",
++        "DAPInstrument.java",
++        "Enabler.java",
++        "OutputConsumerInstrument.java",
++    ],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/com.oracle.truffle.tools.dap/src/com/oracle/truffle/tools/dap/server/BUILD.bazel b/tools/src/com.oracle.truffle.tools.dap/src/com/oracle/truffle/tools/dap/server/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/com.oracle.truffle.tools.dap/src/com/oracle/truffle/tools/dap/server/BUILD.bazel
+@@ -0,0 +1,18 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.tools.dap.srcs",
++    srcs = [
++        "BreakpointsHandler.java",
++        "DebugProtocolServerImpl.java",
++        "Errors.java",
++        "ExecutionContext.java",
++        "LoadedSourcesHandler.java",
++        "OutputHandler.java",
++        "PathMappings.java",
++        "StackFramesHandler.java",
++        "ThreadsHandler.java",
++        "VariablesHandler.java",
++    ],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/com.oracle.truffle.tools.dap/src/com/oracle/truffle/tools/dap/types/BUILD.bazel b/tools/src/com.oracle.truffle.tools.dap/src/com/oracle/truffle/tools/dap/types/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/com.oracle.truffle.tools.dap/src/com/oracle/truffle/tools/dap/types/BUILD.bazel
+@@ -0,0 +1,139 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.tools.dap.srcs",
++    srcs = [
++        "AttachRequestArguments.java",
++        "AttachResponse.java",
++        "Breakpoint.java",
++        "BreakpointEvent.java",
++        "BreakpointLocation.java",
++        "BreakpointLocationsArguments.java",
++        "BreakpointLocationsResponse.java",
++        "CancelArguments.java",
++        "CancelResponse.java",
++        "Capabilities.java",
++        "CapabilitiesEvent.java",
++        "Checksum.java",
++        "ColumnDescriptor.java",
++        "CompletionItem.java",
++        "CompletionsArguments.java",
++        "CompletionsResponse.java",
++        "ConfigurationDoneArguments.java",
++        "ConfigurationDoneResponse.java",
++        "ContinueArguments.java",
++        "ContinueResponse.java",
++        "ContinuedEvent.java",
++        "DataBreakpoint.java",
++        "DataBreakpointInfoArguments.java",
++        "DataBreakpointInfoResponse.java",
++        "DebugProtocolClient.java",
++        "DebugProtocolServer.java",
++        "DisassembleArguments.java",
++        "DisassembleResponse.java",
++        "DisassembledInstruction.java",
++        "DisconnectArguments.java",
++        "DisconnectResponse.java",
++        "ErrorResponse.java",
++        "EvaluateArguments.java",
++        "EvaluateResponse.java",
++        "Event.java",
++        "ExceptionBreakpointsFilter.java",
++        "ExceptionDetails.java",
++        "ExceptionInfoArguments.java",
++        "ExceptionInfoResponse.java",
++        "ExceptionOptions.java",
++        "ExceptionPathSegment.java",
++        "ExitedEvent.java",
++        "FunctionBreakpoint.java",
++        "GotoArguments.java",
++        "GotoResponse.java",
++        "GotoTarget.java",
++        "GotoTargetsArguments.java",
++        "GotoTargetsResponse.java",
++        "InitializeRequestArguments.java",
++        "InitializeResponse.java",
++        "InitializedEvent.java",
++        "JSONBase.java",
++        "LaunchRequestArguments.java",
++        "LaunchResponse.java",
++        "LoadedSourceEvent.java",
++        "LoadedSourcesArguments.java",
++        "LoadedSourcesResponse.java",
++        "Message.java",
++        "Module.java",
++        "ModuleEvent.java",
++        "ModulesArguments.java",
++        "ModulesResponse.java",
++        "NextArguments.java",
++        "NextResponse.java",
++        "OutputEvent.java",
++        "PauseArguments.java",
++        "PauseResponse.java",
++        "ProcessEvent.java",
++        "ProgressEndEvent.java",
++        "ProgressStartEvent.java",
++        "ProgressUpdateEvent.java",
++        "ProtocolMessage.java",
++        "ReadMemoryArguments.java",
++        "ReadMemoryResponse.java",
++        "Request.java",
++        "Response.java",
++        "RestartArguments.java",
++        "RestartFrameArguments.java",
++        "RestartFrameResponse.java",
++        "RestartResponse.java",
++        "ReverseContinueArguments.java",
++        "ReverseContinueResponse.java",
++        "RunInTerminalRequestArguments.java",
++        "RunInTerminalResponse.java",
++        "Scope.java",
++        "ScopesArguments.java",
++        "ScopesResponse.java",
++        "SetBreakpointsArguments.java",
++        "SetBreakpointsResponse.java",
++        "SetDataBreakpointsArguments.java",
++        "SetDataBreakpointsResponse.java",
++        "SetExceptionBreakpointsArguments.java",
++        "SetExceptionBreakpointsResponse.java",
++        "SetExpressionArguments.java",
++        "SetExpressionResponse.java",
++        "SetFunctionBreakpointsArguments.java",
++        "SetFunctionBreakpointsResponse.java",
++        "SetVariableArguments.java",
++        "SetVariableResponse.java",
++        "Source.java",
++        "SourceArguments.java",
++        "SourceBreakpoint.java",
++        "SourceResponse.java",
++        "StackFrame.java",
++        "StackFrameFormat.java",
++        "StackTraceArguments.java",
++        "StackTraceResponse.java",
++        "StepBackArguments.java",
++        "StepBackResponse.java",
++        "StepInArguments.java",
++        "StepInResponse.java",
++        "StepInTarget.java",
++        "StepInTargetsArguments.java",
++        "StepInTargetsResponse.java",
++        "StepOutArguments.java",
++        "StepOutResponse.java",
++        "StoppedEvent.java",
++        "SuppressFBWarnings.java",
++        "TerminateArguments.java",
++        "TerminateResponse.java",
++        "TerminateThreadsArguments.java",
++        "TerminateThreadsResponse.java",
++        "TerminatedEvent.java",
++        "Thread.java",
++        "ThreadEvent.java",
++        "ThreadsResponse.java",
++        "ValueFormat.java",
++        "Variable.java",
++        "VariablePresentationHint.java",
++        "VariablesArguments.java",
++        "VariablesResponse.java",
++    ],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/com.oracle.truffle.tools.dap.test/src/com/oracle/truffle/tools/dap/test/BUILD.bazel b/tools/src/com.oracle.truffle.tools.dap.test/src/com/oracle/truffle/tools/dap/test/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/com.oracle.truffle.tools.dap.test/src/com/oracle/truffle/tools/dap/test/BUILD.bazel
+@@ -0,0 +1,18 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.tools.dap.test.srcs",
++    srcs = [
++        "DAPAddressTest.java",
++        "DAPTestInstrument.java",
++        "DAPTester.java",
++        "ITLDAPTest.java",
++        "PathMappingsDAPTest.java",
++        "PathMappingsTest.java",
++        "RelativeSourceDAPTest.java",
++        "SimpleLanguageDAPTest.java",
++        "StackFramesHandlerTest.java",
++        "UnavailableSectionDAPTest.java",
++    ],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/com.oracle.truffle.tools.profiler/src/META-INF/native-image/com.oracle.truffle.tools.profiler/BUILD.bazel b/tools/src/com.oracle.truffle.tools.profiler/src/META-INF/native-image/com.oracle.truffle.tools.profiler/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/com.oracle.truffle.tools.profiler/src/META-INF/native-image/com.oracle.truffle.tools.profiler/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.tools.profiler.resources",
++    srcs = [
++        "native-image.properties",
++        "resource-config.json",
++    ],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/com.oracle.truffle.tools.profiler/src/com/oracle/truffle/tools/profiler/BUILD.bazel b/tools/src/com.oracle.truffle.tools.profiler/src/com/oracle/truffle/tools/profiler/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/com.oracle.truffle.tools.profiler/src/com/oracle/truffle/tools/profiler/BUILD.bazel
+@@ -0,0 +1,21 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.tools.profiler.srcs",
++    srcs = [
++        "CPUSampler.java",
++        "CPUSamplerData.java",
++        "CPUTracer.java",
++        "HeapMonitor.java",
++        "HeapSummary.java",
++        "JoinableExecutors.java",
++        "MemoryTracer.java",
++        "ProfilerException.java",
++        "ProfilerNode.java",
++        "SafepointStackSampler.java",
++        "ShadowStack.java",
++        "StackTraceEntry.java",
++        "package-info.java",
++    ],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/com.oracle.truffle.tools.profiler/src/com/oracle/truffle/tools/profiler/impl/BUILD.bazel b/tools/src/com.oracle.truffle.tools.profiler/src/com/oracle/truffle/tools/profiler/impl/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/com.oracle.truffle.tools.profiler/src/com/oracle/truffle/tools/profiler/impl/BUILD.bazel
+@@ -0,0 +1,19 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.tools.profiler.srcs",
++    srcs = [
++        "CPUSamplerCLI.java",
++        "CPUSamplerInstrument.java",
++        "CPUTracerCLI.java",
++        "CPUTracerInstrument.java",
++        "HeapMonitorInstrument.java",
++        "MemoryTracerCLI.java",
++        "MemoryTracerInstrument.java",
++        "ProfilerCLI.java",
++        "ProfilerToolFactory.java",
++        "SVGSamplerOutput.java",
++        "WildcardFilter.java",
++    ],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/com.oracle.truffle.tools.profiler/src/com/oracle/truffle/tools/profiler/impl/resources/BUILD.bazel b/tools/src/com.oracle.truffle.tools.profiler/src/com/oracle/truffle/tools/profiler/impl/resources/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/com.oracle.truffle.tools.profiler/src/com/oracle/truffle/tools/profiler/impl/resources/BUILD.bazel
+@@ -0,0 +1,13 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.tools.profiler.resources",
++    srcs = [
++        "color_change.js",
++        "flamegraph.js",
++        "graphowner.js",
++        "histogram.js",
++        "search.js",
++    ],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/com.oracle.truffle.tools.profiler.test/src/com/oracle/truffle/tools/profiler/test/BUILD.bazel b/tools/src/com.oracle.truffle.tools.profiler.test/src/com/oracle/truffle/tools/profiler/test/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/com.oracle.truffle.tools.profiler.test/src/com/oracle/truffle/tools/profiler/test/BUILD.bazel
+@@ -0,0 +1,18 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.tools.profiler.test.srcs",
++    srcs = [
++        "AbstractProfilerTest.java",
++        "AsyncStackSamplingTest.java",
++        "CPUSamplerMultiContextTest.java",
++        "CPUSamplerTest.java",
++        "CPUTracerTest.java",
++        "HeapMonitorTest.java",
++        "ManualSamplingTest.java",
++        "MemoryTracerTest.java",
++        "NoTagSamplingTest.java",
++        "ProfilerCLITest.java",
++    ],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/com.oracle.truffle.tools.warmup/src/com/oracle/truffle/tools/warmup/impl/BUILD.bazel b/tools/src/com.oracle.truffle.tools.warmup/src/com/oracle/truffle/tools/warmup/impl/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/com.oracle.truffle.tools.warmup/src/com/oracle/truffle/tools/warmup/impl/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.tools.warmup.srcs",
++    srcs = [
++        "Results.java",
++        "ResultsPrinter.java",
++        "WarmupEstimatorNode.java",
++    ],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/org.graalvm.tools.api.lsp/src/org/graalvm/tools/api/lsp/BUILD.bazel b/tools/src/org.graalvm.tools.api.lsp/src/org/graalvm/tools/api/lsp/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/org.graalvm.tools.api.lsp/src/org/graalvm/tools/api/lsp/BUILD.bazel
+@@ -0,0 +1,13 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.tools.api.lsp.srcs",
++    srcs = [
++        "LSPCommand.java",
++        "LSPExtension.java",
++        "LSPLibrary.java",
++        "LSPServerAccessor.java",
++        "package-info.java",
++    ],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/org.graalvm.tools.insight/src/META-INF/native-image/org.graalvm.tools.insight/BUILD.bazel b/tools/src/org.graalvm.tools.insight/src/META-INF/native-image/org.graalvm.tools.insight/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/org.graalvm.tools.insight/src/META-INF/native-image/org.graalvm.tools.insight/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.tools.insight.resources",
++    srcs = ["native-image.properties"],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/org.graalvm.tools.insight/src/org/graalvm/tools/insight/BUILD.bazel b/tools/src/org.graalvm.tools.insight/src/org/graalvm/tools/insight/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/org.graalvm.tools.insight/src/org/graalvm/tools/insight/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.tools.insight.srcs",
++    srcs = [
++        "Insight.java",
++        "package-info.java",
++    ],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/org.graalvm.tools.insight.heap/src/META-INF/native-image/org.graalvm.tools.insight.heap/BUILD.bazel b/tools/src/org.graalvm.tools.insight.heap/src/META-INF/native-image/org.graalvm.tools.insight.heap/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/org.graalvm.tools.insight.heap/src/META-INF/native-image/org.graalvm.tools.insight.heap/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.tools.insight.heap.resources",
++    srcs = ["native-image.properties"],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/org.graalvm.tools.insight.heap/src/org/graalvm/tools/insight/heap/BUILD.bazel b/tools/src/org.graalvm.tools.insight.heap/src/org/graalvm/tools/insight/heap/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/org.graalvm.tools.insight.heap/src/org/graalvm/tools/insight/heap/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.tools.insight.heap.srcs",
++    srcs = [
++        "HeapDump.java",
++        "package-info.java",
++    ],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/org.graalvm.tools.insight.heap/src/org/graalvm/tools/insight/heap/instrument/BUILD.bazel b/tools/src/org.graalvm.tools.insight.heap/src/org/graalvm/tools/insight/heap/instrument/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/org.graalvm.tools.insight.heap/src/org/graalvm/tools/insight/heap/instrument/BUILD.bazel
+@@ -0,0 +1,16 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.tools.insight.heap.srcs",
++    srcs = [
++        "CacheReplacement.java",
++        "HeapDumpInstrument.java",
++        "HeapException.java",
++        "HeapGenerator.java",
++        "HeapObject.java",
++        "InteropUtils.java",
++        "MemoryDump.java",
++        "WeakIdentityHashMap.java",
++    ],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/org.graalvm.tools.insight.test/src/org/graalvm/tools/insight/test/BUILD.bazel b/tools/src/org.graalvm.tools.insight.test/src/org/graalvm/tools/insight/test/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/org.graalvm.tools.insight.test/src/org/graalvm/tools/insight/test/BUILD.bazel
+@@ -0,0 +1,20 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.tools.insight.test.srcs",
++    srcs = [
++        "DoubleEnterTest.java",
++        "Embedding.java",
++        "EventContextObjectTest.java",
++        "InsightAPI.java",
++        "InsightContextTest.java",
++        "InsightExceptionTest.java",
++        "InsightObjectFactory.java",
++        "InsightObjectTest.java",
++        "MeaningOfWorldInstrument.java",
++        "NoSuchFileTest.java",
++        "SourceEventObjectTest.java",
++        "TestinsightInstrument.java",
++    ],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/org.graalvm.tools.insight.test/src/org/graalvm/tools/insight/test/heap/BUILD.bazel b/tools/src/org.graalvm.tools.insight.test/src/org/graalvm/tools/insight/test/heap/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/org.graalvm.tools.insight.test/src/org/graalvm/tools/insight/test/heap/BUILD.bazel
+@@ -0,0 +1,14 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.tools.insight.test.srcs",
++    srcs = [
++        "HeapApi.java",
++        "HeapDumpTest.java",
++        "HeapObjectStreamTest.java",
++        "HeapObjectTest.java",
++        "HeapResourceRule.java",
++        "WeakIdentityHashMapTest.java",
++    ],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/org.graalvm.tools.lsp/src/META-INF/native-image/org.graalvm.tools.lsp/BUILD.bazel b/tools/src/org.graalvm.tools.lsp/src/META-INF/native-image/org.graalvm.tools.lsp/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/org.graalvm.tools.lsp/src/META-INF/native-image/org.graalvm.tools.lsp/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.tools.lsp.resources",
++    srcs = ["native-image.properties"],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/org.graalvm.tools.lsp/src/org/graalvm/tools/lsp/exceptions/BUILD.bazel b/tools/src/org.graalvm.tools.lsp/src/org/graalvm/tools/lsp/exceptions/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/org.graalvm.tools.lsp/src/org/graalvm/tools/lsp/exceptions/BUILD.bazel
+@@ -0,0 +1,13 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.tools.lsp.srcs",
++    srcs = [
++        "DiagnosticsNotification.java",
++        "EvaluationResultException.java",
++        "InvalidCoverageScriptURI.java",
++        "LSPIOException.java",
++        "UnknownLanguageException.java",
++    ],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/org.graalvm.tools.lsp/src/org/graalvm/tools/lsp/instrument/BUILD.bazel b/tools/src/org.graalvm.tools.lsp/src/org/graalvm/tools/lsp/instrument/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/org.graalvm.tools.lsp/src/org/graalvm/tools/lsp/instrument/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.tools.lsp.srcs",
++    srcs = [
++        "EnvironmentProvider.java",
++        "LSPInstrument.java",
++    ],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/org.graalvm.tools.lsp/src/org/graalvm/tools/lsp/server/BUILD.bazel b/tools/src/org.graalvm.tools.lsp/src/org/graalvm/tools/lsp/server/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/org.graalvm.tools.lsp/src/org/graalvm/tools/lsp/server/BUILD.bazel
+@@ -0,0 +1,15 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.tools.lsp.srcs",
++    srcs = [
++        "ContextAwareExecutor.java",
++        "DelegateServers.java",
++        "LSPFileSystem.java",
++        "LanguageServerImpl.java",
++        "LanguageTriggerCharacters.java",
++        "TruffleAdapter.java",
++        "VirtualLanguageServerFileProvider.java",
++    ],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/org.graalvm.tools.lsp/src/org/graalvm/tools/lsp/server/request/BUILD.bazel b/tools/src/org.graalvm.tools.lsp/src/org/graalvm/tools/lsp/server/request/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/org.graalvm.tools.lsp/src/org/graalvm/tools/lsp/server/request/BUILD.bazel
+@@ -0,0 +1,15 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.tools.lsp.srcs",
++    srcs = [
++        "AbstractRequestHandler.java",
++        "CompletionRequestHandler.java",
++        "CoverageRequestHandler.java",
++        "HighlightRequestHandler.java",
++        "HoverRequestHandler.java",
++        "SignatureHelpRequestHandler.java",
++        "SourceCodeEvaluator.java",
++    ],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/org.graalvm.tools.lsp/src/org/graalvm/tools/lsp/server/types/BUILD.bazel b/tools/src/org.graalvm.tools.lsp/src/org/graalvm/tools/lsp/server/types/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/org.graalvm.tools.lsp/src/org/graalvm/tools/lsp/server/types/BUILD.bazel
+@@ -0,0 +1,193 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.tools.lsp.srcs",
++    srcs = [
++        "ApplyWorkspaceEditParams.java",
++        "ApplyWorkspaceEditResponse.java",
++        "ClientCapabilities.java",
++        "CodeAction.java",
++        "CodeActionClientCapabilities.java",
++        "CodeActionContext.java",
++        "CodeActionKind.java",
++        "CodeActionOptions.java",
++        "CodeActionParams.java",
++        "CodeLens.java",
++        "CodeLensClientCapabilities.java",
++        "CodeLensOptions.java",
++        "CodeLensParams.java",
++        "Color.java",
++        "ColorInformation.java",
++        "ColorPresentation.java",
++        "ColorPresentationParams.java",
++        "Command.java",
++        "CompletionClientCapabilities.java",
++        "CompletionContext.java",
++        "CompletionItem.java",
++        "CompletionItemKind.java",
++        "CompletionItemTag.java",
++        "CompletionList.java",
++        "CompletionOptions.java",
++        "CompletionParams.java",
++        "CompletionTriggerKind.java",
++        "ConfigurationItem.java",
++        "ConfigurationParams.java",
++        "Coverage.java",
++        "DeclarationClientCapabilities.java",
++        "DeclarationOptions.java",
++        "DeclarationParams.java",
++        "DeclarationRegistrationOptions.java",
++        "DefinitionClientCapabilities.java",
++        "DefinitionOptions.java",
++        "DefinitionParams.java",
++        "Diagnostic.java",
++        "DiagnosticRelatedInformation.java",
++        "DiagnosticSeverity.java",
++        "DiagnosticTag.java",
++        "DidChangeConfigurationClientCapabilities.java",
++        "DidChangeConfigurationParams.java",
++        "DidChangeTextDocumentParams.java",
++        "DidChangeWatchedFilesClientCapabilities.java",
++        "DidChangeWatchedFilesParams.java",
++        "DidChangeWorkspaceFoldersParams.java",
++        "DidCloseTextDocumentParams.java",
++        "DidOpenTextDocumentParams.java",
++        "DidSaveTextDocumentParams.java",
++        "DocumentColorClientCapabilities.java",
++        "DocumentColorOptions.java",
++        "DocumentColorParams.java",
++        "DocumentColorRegistrationOptions.java",
++        "DocumentFilter.java",
++        "DocumentFormattingClientCapabilities.java",
++        "DocumentFormattingOptions.java",
++        "DocumentFormattingParams.java",
++        "DocumentHighlight.java",
++        "DocumentHighlightClientCapabilities.java",
++        "DocumentHighlightKind.java",
++        "DocumentHighlightOptions.java",
++        "DocumentHighlightParams.java",
++        "DocumentLink.java",
++        "DocumentLinkClientCapabilities.java",
++        "DocumentLinkOptions.java",
++        "DocumentLinkParams.java",
++        "DocumentOnTypeFormattingClientCapabilities.java",
++        "DocumentOnTypeFormattingOptions.java",
++        "DocumentOnTypeFormattingParams.java",
++        "DocumentRangeFormattingClientCapabilities.java",
++        "DocumentRangeFormattingOptions.java",
++        "DocumentRangeFormattingParams.java",
++        "DocumentSymbol.java",
++        "DocumentSymbolClientCapabilities.java",
++        "DocumentSymbolOptions.java",
++        "DocumentSymbolParams.java",
++        "ErrorCodes.java",
++        "ExecuteCommandClientCapabilities.java",
++        "ExecuteCommandOptions.java",
++        "ExecuteCommandParams.java",
++        "FailureHandlingKind.java",
++        "FileChangeType.java",
++        "FileEvent.java",
++        "FoldingRange.java",
++        "FoldingRangeClientCapabilities.java",
++        "FoldingRangeKind.java",
++        "FoldingRangeOptions.java",
++        "FoldingRangeParams.java",
++        "FoldingRangeRegistrationOptions.java",
++        "FormattingOptions.java",
++        "Hover.java",
++        "HoverClientCapabilities.java",
++        "HoverOptions.java",
++        "HoverParams.java",
++        "ImplementationClientCapabilities.java",
++        "ImplementationOptions.java",
++        "ImplementationParams.java",
++        "ImplementationRegistrationOptions.java",
++        "InitializeParams.java",
++        "InitializeResult.java",
++        "InitializedParams.java",
++        "InsertTextFormat.java",
++        "JSONBase.java",
++        "LanguageClient.java",
++        "LanguageServer.java",
++        "Location.java",
++        "LogMessageParams.java",
++        "MarkedString.java",
++        "MarkupContent.java",
++        "MarkupKind.java",
++        "Message.java",
++        "MessageActionItem.java",
++        "MessageType.java",
++        "NotificationMessage.java",
++        "ParameterInformation.java",
++        "PartialResultParams.java",
++        "Position.java",
++        "PrepareRenameParams.java",
++        "PublishDiagnosticsClientCapabilities.java",
++        "PublishDiagnosticsParams.java",
++        "Range.java",
++        "ReferenceClientCapabilities.java",
++        "ReferenceContext.java",
++        "ReferenceOptions.java",
++        "ReferenceParams.java",
++        "Registration.java",
++        "RegistrationParams.java",
++        "RenameClientCapabilities.java",
++        "RenameOptions.java",
++        "RenameParams.java",
++        "RequestMessage.java",
++        "ResourceOperationKind.java",
++        "ResponseErrorLiteral.java",
++        "ResponseMessage.java",
++        "SaveOptions.java",
++        "SelectionRange.java",
++        "SelectionRangeClientCapabilities.java",
++        "SelectionRangeOptions.java",
++        "SelectionRangeParams.java",
++        "SelectionRangeRegistrationOptions.java",
++        "ServerCapabilities.java",
++        "ShowMessageParams.java",
++        "ShowMessageRequestParams.java",
++        "SignatureHelp.java",
++        "SignatureHelpClientCapabilities.java",
++        "SignatureHelpContext.java",
++        "SignatureHelpOptions.java",
++        "SignatureHelpParams.java",
++        "SignatureHelpTriggerKind.java",
++        "SignatureInformation.java",
++        "SuppressFBWarnings.java",
++        "SymbolInformation.java",
++        "SymbolKind.java",
++        "TextDocumentClientCapabilities.java",
++        "TextDocumentContentChangeEvent.java",
++        "TextDocumentIdentifier.java",
++        "TextDocumentItem.java",
++        "TextDocumentPositionParams.java",
++        "TextDocumentRegistrationOptions.java",
++        "TextDocumentSaveReason.java",
++        "TextDocumentSyncClientCapabilities.java",
++        "TextDocumentSyncKind.java",
++        "TextDocumentSyncOptions.java",
++        "TextEdit.java",
++        "TypeDefinitionClientCapabilities.java",
++        "TypeDefinitionOptions.java",
++        "TypeDefinitionParams.java",
++        "TypeDefinitionRegistrationOptions.java",
++        "Unregistration.java",
++        "UnregistrationParams.java",
++        "VersionedTextDocumentIdentifier.java",
++        "WillSaveTextDocumentParams.java",
++        "WorkDoneProgressCancelParams.java",
++        "WorkDoneProgressCreateParams.java",
++        "WorkDoneProgressOptions.java",
++        "WorkDoneProgressParams.java",
++        "WorkspaceClientCapabilities.java",
++        "WorkspaceEdit.java",
++        "WorkspaceEditClientCapabilities.java",
++        "WorkspaceFolder.java",
++        "WorkspaceFoldersChangeEvent.java",
++        "WorkspaceSymbolClientCapabilities.java",
++        "WorkspaceSymbolOptions.java",
++        "WorkspaceSymbolParams.java",
++    ],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/org.graalvm.tools.lsp/src/org/graalvm/tools/lsp/server/utils/BUILD.bazel b/tools/src/org.graalvm.tools.lsp/src/org/graalvm/tools/lsp/server/utils/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/org.graalvm.tools.lsp/src/org/graalvm/tools/lsp/server/utils/BUILD.bazel
+@@ -0,0 +1,21 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.tools.lsp.srcs",
++    srcs = [
++        "CoverageData.java",
++        "CoverageEventNode.java",
++        "EvaluationResult.java",
++        "InteropUtils.java",
++        "NearestNode.java",
++        "NearestSectionsFinder.java",
++        "SourcePredicateBuilder.java",
++        "SourceSectionReference.java",
++        "SourceUtils.java",
++        "SourceWrapper.java",
++        "TextDocumentSurrogate.java",
++        "TextDocumentSurrogateMap.java",
++        "ThreadId.java",
++    ],
++    visibility = ["//tools:__pkg__"],
++)
+diff --git a/tools/src/org.graalvm.tools.lsp.test/src/org/graalvm/tools/lsp/test/server/BUILD.bazel b/tools/src/org.graalvm.tools.lsp.test/src/org/graalvm/tools/lsp/test/server/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/tools/src/org.graalvm.tools.lsp.test/src/org/graalvm/tools/lsp/test/server/BUILD.bazel
+@@ -0,0 +1,19 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.tools.lsp.test.srcs",
++    srcs = [
++        "CompletionTest.java",
++        "CoverageTest.java",
++        "DocumentHighlightTest.java",
++        "HoverTest.java",
++        "LSPExtensionTest.java",
++        "LSPExtensionTestInstance.java",
++        "ParsingTest.java",
++        "SignatureHelpTest.java",
++        "TestLSPLibrary.java",
++        "TextDocumentContentChangeTest.java",
++        "TruffleLSPTest.java",
++    ],
++    visibility = ["//tools:__pkg__"],
++)
