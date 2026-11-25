@@ -11,7 +11,8 @@ if __name__ == "__main__":
     java = str(root / {JAVA})
     compiler = {COMPILER}
     modules = os.pathsep.join(str(root / jar) for jar in {MODULES} if jar != compiler)
-    options = [
+    classpath_junit = {CLASSPATH_JUNIT}
+    options = [] if classpath_junit else [
         "--enable-native-access=org.graalvm.truffle",
         "-Dpolyglot.engine.WarnInterpreterOnly=" + ("true" if compiler else "false"),
         "-Dpolyglot.engine.AllowExperimentalOptions=true",
@@ -19,8 +20,9 @@ if __name__ == "__main__":
     if {JAVA_VERSION} >= 23:
         options.append("--sun-misc-unsafe-memory-access=allow")
     if tmp := os.environ.get("TEST_TMPDIR"):
-        options.extend(["-Dpolyglot.engine.userResourceCache=" + tmp,
-                        "-Dpolyglotimpl.AttachLibraryFailureAction=throw"])
+        if not classpath_junit:
+            options.extend(["-Dpolyglot.engine.userResourceCache=" + tmp,
+                            "-Dpolyglotimpl.AttachLibraryFailureAction=throw"])
     elif cwd := os.environ.get("BUILD_WORKING_DIRECTORY"):
         os.chdir(cwd)
     hsdis = {HSDIS}
@@ -37,7 +39,7 @@ if __name__ == "__main__":
                         "org.graalvm.sl/com.oracle.truffle.sl.runtime"):
             options.append("--add-exports=" + package + "=ALL-UNNAMED")
         entry = ["-cp", str(root / probe), "graal.CompiledGuest", str(root / compiler)]
-    elif hsdis or test_class or {NAMED_JUNIT}:
+    elif hsdis or test_class or classpath_junit or {NAMED_JUNIT}:
         options.extend(["-ea", "-esa"])
         if compiler:
             options.extend([
@@ -61,8 +63,9 @@ if __name__ == "__main__":
     if modules:
         options.extend(["--module-path", modules, "--add-modules", ",".join(roots)])
     command = [java, *options, *entry, *sys.argv[1:]]
-    if hsdis:
+    if hsdis or classpath_junit:
         # The released Elide Python runtime can start native processes with the
         # Bazel environment but does not expose all test variables in os.environ.
-        command = [java, "-cp", classpath, "com.oracle.mxtool.junit.CompilerJUnitLauncher", *command]
+        command = [java, "-cp", classpath, "com.oracle.mxtool.junit.MxJUnitLauncher",
+                   str(bool(hsdis)).lower(), *command]
     os.execv(java, command)

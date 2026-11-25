@@ -31,6 +31,7 @@ def _sl_main_impl(ctx):
             "{JAVA}": repr(_runfile(ctx, binaries[0])),
             "{MODULES}": repr([_runfile(ctx, jar) for jar in modules.to_list()]),
             "{JAVA_VERSION}": str(runtime.version),
+            "{CLASSPATH_JUNIT}": repr(ctx.attr.classpath_junit),
             "{COMPILER}": repr(_runfile(ctx, ctx.file.compiler)) if ctx.attr.compiler else "None",
             "{JVM_FLAGS}": repr(ctx.attr.jvm_flags),
             "{ROOT_MODULES}": repr(ctx.attr.root_modules),
@@ -46,6 +47,7 @@ def _sl_main_impl(ctx):
 _sl_main = rule(
     implementation = _sl_main_impl,
     attrs = {
+        "classpath_junit": attr.bool(),
         "compiletime": attr.label(allow_single_file = [".jar"]),
         "hsdis": attr.label(allow_single_file = True),
         "compiler": attr.label(allow_single_file = [".jar"], providers = [JavaInfo]),
@@ -106,6 +108,25 @@ def compiler_test_runner(name, jvm_flags):
         hsdis = ":hsdis_library_file",
         labs_runtime = Label("//tools:labs_runtime"),
         test_classpath = [":GRAAL_TEST", ":GRAAL_TEST_RUNTIME", Label("//graal:compiler_junit")],
+        jvm_flags = jvm_flags,
+        testonly = True,
+    )
+    py_binary(
+        name = name,
+        srcs = [":" + name + ".main"],
+        main = name + ".py",
+        data = [":" + name + ".main"],
+        testonly = True,
+    )
+
+def truffle_test_runner(name, jvm_flags):
+    """Run each test class with the Truffle mx subprocess command-file contract."""
+    _sl_main(
+        name = name + ".main",
+        out = name + ".py",
+        modules = [],
+        classpath_junit = True,
+        test_classpath = [":TRUFFLE_TEST", Label("//graal:compiler_junit")],
         jvm_flags = jvm_flags,
         testonly = True,
     )

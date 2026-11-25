@@ -2,15 +2,50 @@ diff --git a/compiler/BUILD.bazel b/compiler/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/compiler/BUILD.bazel
-@@ -0,0 +1,12970 @@
+@@ -0,0 +1,13424 @@
 +load("@rules_java//java:java_import.bzl", "java_import")
++load("@rules_java//java:java_plugin.bzl", "java_plugin")
 +load("@rules_mx//graal:simplelanguage.bzl", "compiler_test_runner", "simplelanguage")
-+load("@rules_mx//mx:graph.bzl", "mx_jar_dist", "mx_jvmci_library", "mx_processor", "mx_resource_layout", "mx_test_class", "mx_whole_java")
++load("@rules_mx//mx:graph.bzl", "mx_jar_dist", "mx_jvmci_library", "mx_processed_java", "mx_processor", "mx_resource_layout", "mx_test_class", "mx_whole_java")
 +
 +java_import(
 +    name = "JAVA_ALLOCATION_INSTRUMENTER",
 +    jars = ["@graal_shaded_inputs//:compiler_JAVA_ALLOCATION_INSTRUMENTER.jar"],
 +    visibility = ["//visibility:public"],
++)
++
++java_import(
++    name = "JMH_1_21",
++    jars = ["@graal_shaded_inputs//:mx_JMH_1_21.jar"],
++    deps = [
++        ":COMMONS_MATH3_3_2",
++        ":JMH_GENERATOR_ANNPROCESS_1_21",
++        ":JOPTSIMPLE_4_6",
++    ],
++)
++
++java_import(
++    name = "JOPTSIMPLE_4_6",
++    jars = ["@graal_shaded_inputs//:mx_JOPTSIMPLE_4_6.jar"],
++    deps = [],
++)
++
++java_import(
++    name = "JMH_GENERATOR_ANNPROCESS_1_21",
++    jars = ["@graal_shaded_inputs//:mx_JMH_GENERATOR_ANNPROCESS_1_21.jar"],
++    deps = [],
++)
++
++java_import(
++    name = "COMMONS_MATH3_3_2",
++    jars = ["@graal_shaded_inputs//:mx_COMMONS_MATH3_3_2.jar"],
++    deps = [],
++)
++
++java_plugin(
++    name = "jmh_processor",
++    processor_class = "org.openjdk.jmh.generators.BenchmarkProcessor",
++    deps = [":JMH_1_21"],
 +)
 +
 +compiler_test_runner(
@@ -51,6 +86,31 @@ new file mode 100644
 +        "@rules_mx//tools:exec_linux_arm64": "@hsdis_linux_aarch64//:library",
 +        "@rules_mx//tools:exec_macos_arm64": "@hsdis_darwin_aarch64//:library",
 +    }),
++    visibility = ["//visibility:public"],
++)
++
++filegroup(
++    name = "all_projects",
++    testonly = True,
++    srcs = [
++        ":jdk.graal.compiler",
++        ":jdk.graal.compiler.hostvmaccess",
++        ":jdk.graal.compiler.libgraal",
++        ":jdk.graal.compiler.libgraal.loader",
++        ":jdk.graal.compiler.management",
++        ":jdk.graal.compiler.microbenchmarks",
++        ":jdk.graal.compiler.options",
++        ":jdk.graal.compiler.processor",
++        ":jdk.graal.compiler.test",
++        ":jdk.graal.compiler.test.compiletime",
++        ":jdk.graal.compiler.test.runtime",
++        ":jdk.graal.compiler.vmaccess",
++        ":org.graalvm.igvutil",
++        ":org.graalvm.igvutil.test",
++        ":org.graalvm.micro.benchmarks",
++        ":org.graalvm.profdiff",
++        ":org.graalvm.profdiff.test",
++    ],
 +    visibility = ["//visibility:public"],
 +)
 +
@@ -331,7 +391,7 @@ new file mode 100644
 +        "-Xep:ReturnValueIgnored:WARN",
 +        "-Xep:SelfAssignment:WARN",
 +    ],
-+    mx_resource_root = "src/jdk.graal.compiler/src",
++    mx_resource_roots = ["src/jdk.graal.compiler/src"],
 +    plugins = [
 +        ":mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.replacements.processor.ReplacementsAnnotationProcessor",
 +        ":mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.nodeinfo.processor.GraphNodeProcessor",
@@ -355,6 +415,164 @@ new file mode 100644
 +        "//sdk:COLLECTIONS",
 +        "//sdk:WORD",
 +        "//truffle:TRUFFLE_COMPILER",
++    ],
++)
++
++mx_jvmci_library(
++    name = "jdk.graal.compiler.hostvmaccess",
++    srcs = ["//compiler/src/jdk.graal.compiler.hostvmaccess/src/jdk/graal/compiler/hostvmaccess:jdk.graal.compiler.hostvmaccess.srcs"],
++    add_exports = [
++        "java.base/jdk.internal.access",
++        "java.base/jdk.internal.loader",
++        "java.base/jdk.internal.module",
++        "java.base/jdk.internal.misc",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta.annotation",
++        "jdk.internal.vm.ci/jdk.vm.ci.runtime",
++        "jdk.internal.vm.ci/jdk.vm.ci.code",
++    ],
++    javacopts = [
++        "-source",
++        "21",
++        "-target",
++        "21",
++        "-parameters",
++        "--add-modules",
++        "jdk.internal.vm.ci",
++    ],
++    mx_resource_root = "src/jdk.graal.compiler.hostvmaccess/src",
++    resources = ["//compiler/src/jdk.graal.compiler.hostvmaccess/src/META-INF/services:jdk.graal.compiler.hostvmaccess.resources"],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":jdk.graal.compiler",
++        ":jdk.graal.compiler.vmaccess",
++        "//sdk:VMACCESS_GUEST",
++    ],
++)
++
++mx_jvmci_library(
++    name = "jdk.graal.compiler.libgraal",
++    srcs = [
++        "//compiler/src/jdk.graal.compiler.libgraal/src/jdk/graal/compiler/libgraal:jdk.graal.compiler.libgraal.srcs",
++        "//compiler/src/jdk.graal.compiler.libgraal/src/jdk/graal/compiler/libgraal/truffle:jdk.graal.compiler.libgraal.srcs",
++    ],
++    add_exports = [
++        "java.base/jdk.internal.module",
++        "java.base/jdk.internal.misc",
++        "jdk.internal.vm.ci/jdk.vm.ci.code",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta.annotation",
++        "jdk.internal.vm.ci/jdk.vm.ci.runtime",
++        "jdk.internal.vm.ci/jdk.vm.ci.services",
++        "jdk.internal.vm.ci/jdk.vm.ci.hotspot",
++    ],
++    javacopts = [
++        "-source",
++        "24",
++        "-target",
++        "24",
++        "-parameters",
++    ],
++    mx_resource_root = "src/jdk.graal.compiler.libgraal/src",
++    plugins = [
++        ":mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.replacements.processor.ReplacementsAnnotationProcessor",
++        ":mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.nodeinfo.processor.GraphNodeProcessor",
++        ":mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.IntrinsicStubProcessor",
++        ":mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.SyncPortProcessor",
++        ":mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.core.match.processor.MatchProcessor",
++        ":mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.options.processor.OptionProcessor",
++        ":mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.serviceprovider.processor.ServiceProviderProcessor",
++        ":mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.libgraal.truffle.TruffleFromLibGraalProcessor",
++    ],
++    resources = ["//compiler/src/jdk.graal.compiler.libgraal/src/META-INF/services:jdk.graal.compiler.libgraal.resources"],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":GRAAL",
++        ":GRAAL_MANAGEMENT",
++        ":GRAAL_OPTIONS",
++        "//sdk:COLLECTIONS",
++        "//sdk:JNIUTILS",
++        "//sdk:NATIVEIMAGE",
++        "//sdk:NATIVEIMAGE_LIBGRAAL",
++        "//sdk:WORD",
++        "//truffle:TRUFFLE_COMPILER",
++    ],
++)
++
++mx_jvmci_library(
++    name = "jdk.graal.compiler.libgraal.loader",
++    srcs = ["//compiler/src/jdk.graal.compiler.libgraal.loader/src/jdk/graal/compiler/libgraal/loader:jdk.graal.compiler.libgraal.loader.srcs"],
++    add_exports = [
++        "java.base/jdk.internal.module",
++        "java.base/jdk.internal.jimage",
++    ],
++    javacopts = [
++        "-source",
++        "24",
++        "-target",
++        "24",
++        "-parameters",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        "//sdk:NATIVEIMAGE",
++        "//sdk:NATIVEIMAGE_LIBGRAAL",
++    ],
++)
++
++mx_jvmci_library(
++    name = "jdk.graal.compiler.management",
++    srcs = ["//compiler/src/jdk.graal.compiler.management/src/jdk/graal/compiler/management:jdk.graal.compiler.management.srcs"],
++    javacopts = [
++        "-source",
++        "21",
++        "-target",
++        "21",
++        "-parameters",
++        "--add-modules",
++        "jdk.internal.vm.ci,jdk.management",
++    ],
++    plugins = [
++        ":mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.replacements.processor.ReplacementsAnnotationProcessor",
++        ":mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.nodeinfo.processor.GraphNodeProcessor",
++        ":mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.IntrinsicStubProcessor",
++        ":mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.SyncPortProcessor",
++        ":mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.core.match.processor.MatchProcessor",
++        ":mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.options.processor.OptionProcessor",
++        ":mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.serviceprovider.processor.ServiceProviderProcessor",
++        ":mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.libgraal.truffle.TruffleFromLibGraalProcessor",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [":jdk.graal.compiler"],
++)
++
++mx_jvmci_library(
++    name = "jdk.graal.compiler.microbenchmarks",
++    testonly = True,
++    srcs = [
++        "//compiler/src/jdk.graal.compiler.microbenchmarks/src/jdk/graal/compiler/microbenchmarks/graal:jdk.graal.compiler.microbenchmarks.srcs",
++        "//compiler/src/jdk.graal.compiler.microbenchmarks/src/jdk/graal/compiler/microbenchmarks/graal/util:jdk.graal.compiler.microbenchmarks.srcs",
++        "//compiler/src/jdk.graal.compiler.microbenchmarks/src/jdk/graal/compiler/microbenchmarks/lir:jdk.graal.compiler.microbenchmarks.srcs",
++    ],
++    add_exports = [
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta.annotation",
++        "jdk.internal.vm.ci/jdk.vm.ci.code",
++    ],
++    javacopts = [
++        "-source",
++        "24",
++        "-target",
++        "24",
++        "-parameters",
++    ],
++    plugins = [":jmh_processor"],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":GRAAL_OPTIONS",
++        ":JMH_1_21",
++        ":jdk.graal.compiler",
++        ":jdk.graal.compiler.test",
 +    ],
 +)
 +
@@ -537,6 +755,7 @@ new file mode 100644
 +        ":JAVA_ALLOCATION_INSTRUMENTER",
 +        ":jdk.graal.compiler",
 +        "//sdk:COLLECTIONS",
++        "//sdk:NATIVEIMAGE",
 +        "//sdk:WORD",
 +        "//truffle:TRUFFLE_API",
 +        "//truffle:TRUFFLE_COMPILER",
@@ -12318,6 +12537,29 @@ new file mode 100644
 +    visibility = ["//visibility:public"],
 +)
 +
++mx_jvmci_library(
++    name = "jdk.graal.compiler.vmaccess",
++    srcs = ["//compiler/src/jdk.graal.compiler.vmaccess/src/jdk/graal/compiler/vmaccess:jdk.graal.compiler.vmaccess.srcs"],
++    add_exports = [
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta.annotation",
++        "jdk.internal.vm.ci/jdk.vm.ci.code",
++        "java.base/jdk.internal.module",
++        "java.base/sun.reflect.annotation",
++    ],
++    javacopts = [
++        "-source",
++        "21",
++        "-target",
++        "21",
++        "-parameters",
++        "--add-modules",
++        "jdk.internal.vm.ci",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [":jdk.graal.compiler"],
++)
++
 +mx_whole_java(
 +    name = "org.graalvm.igvutil",
 +    srcs = ["//compiler/src/org.graalvm.igvutil/src/org/graalvm/igvutil:org.graalvm.igvutil.srcs"],
@@ -12368,6 +12610,21 @@ new file mode 100644
 +    name = "org.graalvm.igvutil.test.org.graalvm.igvutil.test.PrinterTest",
 +    project = ":org.graalvm.igvutil.test",
 +    test_class = "org.graalvm.igvutil.test.PrinterTest",
++)
++
++mx_processed_java(
++    name = "org.graalvm.micro.benchmarks",
++    testonly = True,
++    srcs = ["//compiler/src/org.graalvm.micro.benchmarks/src/micro/benchmarks:org.graalvm.micro.benchmarks.srcs"],
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++        "-Xep:IdentityBinaryExpression:WARN",
++    ],
++    plugins = [":jmh_processor"],
++    visibility = ["//visibility:public"],
++    deps = [":JMH_1_21"],
 +)
 +
 +mx_whole_java(
@@ -12829,6 +13086,83 @@ new file mode 100644
 +)
 +
 +mx_jar_dist(
++    name = "GRAAL_COMPILER_MICRO_BENCHMARKS",
++    testonly = True,
++    archived_libraries = [
++        ":JOPTSIMPLE_4_6",
++        ":JMH_GENERATOR_ANNPROCESS_1_21",
++        ":COMMONS_MATH3_3_2",
++        ":JMH_1_21",
++    ],
++    contents = [
++        ":JOPTSIMPLE_4_6",
++        ":JMH_GENERATOR_ANNPROCESS_1_21",
++        ":COMMONS_MATH3_3_2",
++        ":JMH_1_21",
++        ":org.graalvm.micro.benchmarks",
++    ],
++    graal_services = True,
++    jmh_metadata = True,
++    manifest = {
++        "Main-Class": "org.openjdk.jmh.Main",
++    },
++    snippets_pattern = ".*JavadocSnippets.*",
++    visibility = ["//visibility:public"],
++)
++
++mx_jar_dist(
++    name = "GRAAL_COMPILER_WHITEBOX_MICRO_BENCHMARKS",
++    testonly = True,
++    archived_libraries = [
++        ":JOPTSIMPLE_4_6",
++        ":JMH_GENERATOR_ANNPROCESS_1_21",
++        ":COMMONS_MATH3_3_2",
++        ":JMH_1_21",
++    ],
++    contents = [
++        ":JOPTSIMPLE_4_6",
++        ":JMH_GENERATOR_ANNPROCESS_1_21",
++        ":COMMONS_MATH3_3_2",
++        ":JMH_1_21",
++        ":jdk.graal.compiler.microbenchmarks",
++    ],
++    graal_services = True,
++    jmh_metadata = True,
++    jni_services = True,
++    manifest = {
++        "Main-Class": "org.openjdk.jmh.Main",
++    },
++    snippets_pattern = ".*JavadocSnippets.*",
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [":GRAAL_TEST"],
++)
++
++mx_jar_dist(
++    name = "GRAAL_MANAGEMENT",
++    contents = [":jdk.graal.compiler.management"],
++    directives = [
++        "requires jdk.graal.compiler",
++        "requires jdk.internal.vm.ci",
++        "requires jdk.management",
++        "requires transitive jdk.graal.compiler.options",
++    ],
++    graal_services = True,
++    manifest = {
++        "Implementation-Vendor": "Oracle Corporation",
++        "Implementation-Version": "25.5.5-dev",
++        "Name": "compiler-management",
++        "Specification-Vendor": "Oracle Corporation",
++        "Specification-Version": "25.5.5-dev",
++    },
++    module_name = "jdk.graal.compiler.management",
++    release = 21,
++    snippets_pattern = ".*JavadocSnippets.*",
++    visibility = ["//visibility:public"],
++    deps = [":GRAAL"],
++)
++
++mx_jar_dist(
 +    name = "GRAAL_OPTIONS",
 +    contents = [":jdk.graal.compiler.options"],
 +    directives = [
@@ -12900,6 +13234,126 @@ new file mode 100644
 +    graal_services = True,
 +    snippets_pattern = ".*JavadocSnippets.*",
 +    visibility = ["//visibility:public"],
++)
++
++mx_jar_dist(
++    name = "HOSTVMACCESS",
++    add_exports = [
++        "java.base/jdk.internal.access",
++        "java.base/jdk.internal.loader",
++        "java.base/jdk.internal.misc",
++        "java.base/jdk.internal.module",
++        "jdk.graal.compiler/jdk.graal.compiler.annotation",
++        "jdk.graal.compiler/jdk.graal.compiler.api.replacements",
++        "jdk.graal.compiler/jdk.graal.compiler.api.runtime",
++        "jdk.graal.compiler/jdk.graal.compiler.core.target",
++        "jdk.graal.compiler/jdk.graal.compiler.phases.util",
++        "jdk.graal.compiler/jdk.graal.compiler.runtime",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.runtime",
++    ],
++    contents = [":jdk.graal.compiler.hostvmaccess"],
++    directives = [
++        "exports jdk.graal.compiler.hostvmaccess",
++        "requires jdk.graal.compiler",
++        "requires jdk.graal.compiler.vmaccess",
++        "requires jdk.graal.compiler.vmaccess.guest",
++        "requires jdk.internal.vm.ci",
++        "requires transitive jdk.graal.compiler.options",
++    ],
++    graal_services = True,
++    manifest = {
++        "Implementation-Vendor": "Oracle Corporation",
++        "Implementation-Version": "25.5.5-dev",
++        "Name": "hostvmaccess",
++        "Specification-Vendor": "Oracle Corporation",
++        "Specification-Version": "25.5.5-dev",
++    },
++    module_name = "jdk.graal.compiler.hostvmaccess",
++    release = 21,
++    snippets_pattern = ".*JavadocSnippets.*",
++    visibility = ["//visibility:public"],
++    deps = [
++        ":VMACCESS",
++        "//sdk:VMACCESS_GUEST",
++    ],
++)
++
++mx_jar_dist(
++    name = "LIBGRAAL",
++    contents = [":jdk.graal.compiler.libgraal"],
++    directives = [
++        "requires jdk.graal.compiler",
++        "requires jdk.graal.compiler.management",
++        "requires org.graalvm.collections",
++        "requires org.graalvm.jniutils",
++        "requires org.graalvm.nativeimage.libgraal",
++        "requires org.graalvm.truffle.compiler",
++        "requires transitive jdk.graal.compiler.options",
++        "requires transitive org.graalvm.nativeimage",
++        "requires transitive org.graalvm.word",
++    ],
++    graal_services = True,
++    jni_services = True,
++    module_name = "jdk.graal.compiler.libgraal",
++    release = 21,
++    snippets_pattern = ".*JavadocSnippets.*",
++    visibility = ["//visibility:public"],
++    deps = [
++        ":GRAAL",
++        ":GRAAL_MANAGEMENT",
++        "//sdk:COLLECTIONS",
++        "//sdk:JNIUTILS",
++        "//sdk:NATIVEIMAGE",
++        "//sdk:NATIVEIMAGE_LIBGRAAL",
++        "//truffle:TRUFFLE_COMPILER",
++    ],
++)
++
++mx_jar_dist(
++    name = "LIBGRAAL_LOADER",
++    contents = [":jdk.graal.compiler.libgraal.loader"],
++    graal_services = True,
++    snippets_pattern = ".*JavadocSnippets.*",
++    visibility = ["//visibility:public"],
++    deps = [
++        ":GRAAL",
++        "//sdk:NATIVEIMAGE",
++        "//sdk:NATIVEIMAGE_LIBGRAAL",
++    ],
++)
++
++mx_jar_dist(
++    name = "VMACCESS",
++    add_exports = [
++        "java.base/sun.reflect.annotation",
++        "jdk.graal.compiler/jdk.graal.compiler.annotation",
++        "jdk.graal.compiler/jdk.graal.compiler.phases.util",
++        "jdk.internal.vm.ci/jdk.vm.ci.code",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta.annotation",
++    ],
++    contents = [":jdk.graal.compiler.vmaccess"],
++    directives = [
++        "exports jdk.graal.compiler.vmaccess",
++        "requires jdk.graal.compiler",
++        "requires jdk.internal.vm.ci",
++        "requires transitive jdk.graal.compiler.options",
++        "uses jdk.graal.compiler.vmaccess.VMAccess",
++    ],
++    graal_services = True,
++    manifest = {
++        "Implementation-Vendor": "Oracle Corporation",
++        "Implementation-Version": "25.5.5-dev",
++        "Name": "vmaccess",
++        "Specification-Vendor": "Oracle Corporation",
++        "Specification-Version": "25.5.5-dev",
++    },
++    module_name = "jdk.graal.compiler.vmaccess",
++    release = 21,
++    snippets_pattern = ".*JavadocSnippets.*",
++    visibility = ["//visibility:public"],
++    deps = [":GRAAL"],
 +)
 +
 +mx_resource_layout(
@@ -17718,6 +18172,186 @@ new file mode 100644
 +    ],
 +    visibility = ["//compiler:__pkg__"],
 +)
+diff --git a/compiler/src/jdk.graal.compiler.hostvmaccess/src/META-INF/services/BUILD.bazel b/compiler/src/jdk.graal.compiler.hostvmaccess/src/META-INF/services/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/compiler/src/jdk.graal.compiler.hostvmaccess/src/META-INF/services/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "jdk.graal.compiler.hostvmaccess.resources",
++    srcs = ["jdk.graal.compiler.vmaccess.VMAccess$Builder"],
++    visibility = ["//compiler:__pkg__"],
++)
+diff --git a/compiler/src/jdk.graal.compiler.hostvmaccess/src/jdk/graal/compiler/hostvmaccess/BUILD.bazel b/compiler/src/jdk.graal.compiler.hostvmaccess/src/jdk/graal/compiler/hostvmaccess/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/compiler/src/jdk.graal.compiler.hostvmaccess/src/jdk/graal/compiler/hostvmaccess/BUILD.bazel
+@@ -0,0 +1,16 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "jdk.graal.compiler.hostvmaccess.srcs",
++    srcs = [
++        "HostProxyExceptionImpl.java",
++        "HostProxyHandler.java",
++        "HostVMAccess.java",
++        "HostVMAccessBuilder.java",
++        "HostVMAccessClassLoader.java",
++        "HostVMResolvedJavaModuleImpl.java",
++        "HostVMResolvedJavaModuleLayerImpl.java",
++        "HostVMResolvedJavaPackageImpl.java",
++    ],
++    visibility = ["//compiler:__pkg__"],
++)
+diff --git a/compiler/src/jdk.graal.compiler.libgraal/src/META-INF/services/BUILD.bazel b/compiler/src/jdk.graal.compiler.libgraal/src/META-INF/services/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/compiler/src/jdk.graal.compiler.libgraal/src/META-INF/services/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "jdk.graal.compiler.libgraal.resources",
++    srcs = ["jdk.graal.compiler.options.LibGraalSupport"],
++    visibility = ["//compiler:__pkg__"],
++)
+diff --git a/compiler/src/jdk.graal.compiler.libgraal/src/jdk/graal/compiler/libgraal/BUILD.bazel b/compiler/src/jdk.graal.compiler.libgraal/src/jdk/graal/compiler/libgraal/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/compiler/src/jdk.graal.compiler.libgraal/src/jdk/graal/compiler/libgraal/BUILD.bazel
+@@ -0,0 +1,17 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "jdk.graal.compiler.libgraal.srcs",
++    srcs = [
++        "GetCompilerConfig.java",
++        "GetJNIConfig.java",
++        "LibGraalClassLoader.java",
++        "LibGraalEntryPoints.java",
++        "LibGraalFeature.java",
++        "LibGraalJNIMethodScope.java",
++        "LibGraalNativeBridgeSupport.java",
++        "LibGraalSubstitutions.java",
++        "LibGraalSupportImpl.java",
++    ],
++    visibility = ["//compiler:__pkg__"],
++)
+diff --git a/compiler/src/jdk.graal.compiler.libgraal/src/jdk/graal/compiler/libgraal/truffle/BUILD.bazel b/compiler/src/jdk.graal.compiler.libgraal/src/jdk/graal/compiler/libgraal/truffle/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/compiler/src/jdk.graal.compiler.libgraal/src/jdk/graal/compiler/libgraal/truffle/BUILD.bazel
+@@ -0,0 +1,24 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "jdk.graal.compiler.libgraal.srcs",
++    srcs = [
++        "BinaryInput.java",
++        "BinaryOutput.java",
++        "FromLibGraalCalls.java",
++        "HSConsumer.java",
++        "HSTruffleCompilable.java",
++        "HSTruffleCompilationTask.java",
++        "HSTruffleCompilerListener.java",
++        "HSTruffleCompilerRuntime.java",
++        "HSTruffleSourceLanguagePosition.java",
++        "LibGraalObjectHandleScope.java",
++        "LibGraalObjectHandles.java",
++        "LibGraalTruffleEntryPoints.java",
++        "LibGraalTruffleHostEnvironment.java",
++        "LibGraalTruffleHostEnvironmentLookup.java",
++        "LibGraalTruffleScopeEntryPoints.java",
++        "TruffleFromLibGraalCalls.java",
++    ],
++    visibility = ["//compiler:__pkg__"],
++)
+diff --git a/compiler/src/jdk.graal.compiler.libgraal.loader/src/jdk/graal/compiler/libgraal/loader/BUILD.bazel b/compiler/src/jdk.graal.compiler.libgraal.loader/src/jdk/graal/compiler/libgraal/loader/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/compiler/src/jdk.graal.compiler.libgraal.loader/src/jdk/graal/compiler/libgraal/loader/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "jdk.graal.compiler.libgraal.loader.srcs",
++    srcs = ["HostedLibGraalClassLoader.java"],
++    visibility = ["//compiler:__pkg__"],
++)
+diff --git a/compiler/src/jdk.graal.compiler.management/src/jdk/graal/compiler/management/BUILD.bazel b/compiler/src/jdk.graal.compiler.management/src/jdk/graal/compiler/management/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/compiler/src/jdk.graal.compiler.management/src/jdk/graal/compiler/management/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "jdk.graal.compiler.management.srcs",
++    srcs = ["JMXServiceProvider.java"],
++    visibility = ["//compiler:__pkg__"],
++)
+diff --git a/compiler/src/jdk.graal.compiler.microbenchmarks/src/jdk/graal/compiler/microbenchmarks/graal/BUILD.bazel b/compiler/src/jdk.graal.compiler.microbenchmarks/src/jdk/graal/compiler/microbenchmarks/graal/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/compiler/src/jdk.graal.compiler.microbenchmarks/src/jdk/graal/compiler/microbenchmarks/graal/BUILD.bazel
+@@ -0,0 +1,19 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "jdk.graal.compiler.microbenchmarks.srcs",
++    srcs = [
++        "BoxNodeOptimizationPhaseBenchmark.java",
++        "ConditionalEliminationBenchmark.java",
++        "FrameStateAssigmentPhaseBenchmark.java",
++        "GraalBenchmark.java",
++        "GraphCopyBenchmark.java",
++        "KillWithUnusedFloatingInputsBenchmark.java",
++        "NodeBenchmark.java",
++        "OptimizeDivPhaseBenchmark.java",
++        "PartialEscapeBench.java",
++        "SchedulePhaseBenchmark.java",
++        "TestJMHWhitebox.java",
++    ],
++    visibility = ["//compiler:__pkg__"],
++)
+diff --git a/compiler/src/jdk.graal.compiler.microbenchmarks/src/jdk/graal/compiler/microbenchmarks/graal/util/BUILD.bazel b/compiler/src/jdk.graal.compiler.microbenchmarks/src/jdk/graal/compiler/microbenchmarks/graal/util/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/compiler/src/jdk.graal.compiler.microbenchmarks/src/jdk/graal/compiler/microbenchmarks/graal/util/BUILD.bazel
+@@ -0,0 +1,15 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "jdk.graal.compiler.microbenchmarks.srcs",
++    srcs = [
++        "FrameStateAssignmentState.java",
++        "GraalState.java",
++        "GraalUtil.java",
++        "GraphState.java",
++        "MethodSpec.java",
++        "NodesState.java",
++        "ScheduleState.java",
++    ],
++    visibility = ["//compiler:__pkg__"],
++)
+diff --git a/compiler/src/jdk.graal.compiler.microbenchmarks/src/jdk/graal/compiler/microbenchmarks/lir/BUILD.bazel b/compiler/src/jdk.graal.compiler.microbenchmarks/src/jdk/graal/compiler/microbenchmarks/lir/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/compiler/src/jdk.graal.compiler.microbenchmarks/src/jdk/graal/compiler/microbenchmarks/lir/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "jdk.graal.compiler.microbenchmarks.srcs",
++    srcs = [
++        "CompileTimeBenchmark.java",
++        "GraalCompilerState.java",
++        "RegisterAllocationTimeBenchmark.java",
++    ],
++    visibility = ["//compiler:__pkg__"],
++)
 diff --git a/compiler/src/jdk.graal.compiler.options/src/jdk/graal/compiler/options/BUILD.bazel b/compiler/src/jdk.graal.compiler.options/src/jdk/graal/compiler/options/BUILD.bazel
 new file mode 100644
 --- /dev/null
@@ -20647,6 +21281,27 @@ new file mode 100644
 +    ],
 +    visibility = ["//compiler:__pkg__"],
 +)
+diff --git a/compiler/src/jdk.graal.compiler.vmaccess/src/jdk/graal/compiler/vmaccess/BUILD.bazel b/compiler/src/jdk.graal.compiler.vmaccess/src/jdk/graal/compiler/vmaccess/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/compiler/src/jdk.graal.compiler.vmaccess/src/jdk/graal/compiler/vmaccess/BUILD.bazel
+@@ -0,0 +1,16 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "jdk.graal.compiler.vmaccess.srcs",
++    srcs = [
++        "AnnotationValueValidation.java",
++        "HostAnnotationValueConverter.java",
++        "InvocationException.java",
++        "ModuleSupport.java",
++        "ResolvedJavaModule.java",
++        "ResolvedJavaModuleLayer.java",
++        "ResolvedJavaPackage.java",
++        "VMAccess.java",
++    ],
++    visibility = ["//compiler:__pkg__"],
++)
 diff --git a/compiler/src/org.graalvm.igvutil/src/org/graalvm/igvutil/BUILD.bazel b/compiler/src/org.graalvm.igvutil/src/org/graalvm/igvutil/BUILD.bazel
 new file mode 100644
 --- /dev/null
@@ -20677,6 +21332,55 @@ new file mode 100644
 +        "FlattenerTest.java",
 +        "JsonExporterTest.java",
 +        "PrinterTest.java",
++    ],
++    visibility = ["//compiler:__pkg__"],
++)
+diff --git a/compiler/src/org.graalvm.micro.benchmarks/src/micro/benchmarks/BUILD.bazel b/compiler/src/org.graalvm.micro.benchmarks/src/micro/benchmarks/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/compiler/src/org.graalvm.micro.benchmarks/src/micro/benchmarks/BUILD.bazel
+@@ -0,0 +1,44 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.micro.benchmarks.srcs",
++    srcs = [
++        "AESGCMBench.java",
++        "ArrayAllocationBenchmark.java",
++        "ArrayDuplicationBenchmark.java",
++        "ArrayFillBenchmark.java",
++        "ArrayHashCodeBenchmark.java",
++        "ArrayListBenchmark.java",
++        "BenchmarkBase.java",
++        "BigIntegerBenchmark.java",
++        "BigIntegerMontgomeryBenchmark.java",
++        "BoxingBenchmark.java",
++        "CharsetEncodeDecodeBenchmark.java",
++        "CipherBench.java",
++        "ConcurrentHashBenchmark.java",
++        "ConcurrentSkipListBenchmark.java",
++        "ConditionalConstantFoldingBenchmark.java",
++        "CryptoBase.java",
++        "DoubleClassCheckBenchmark.java",
++        "FPComparisonBenchmark.java",
++        "FloatClassCheckBenchmark.java",
++        "FloatingPointRemainderBenchmark.java",
++        "FpRoundingBenchmark.java",
++        "GroupAllocationBenchmark.java",
++        "GuardedIntrinsicBenchmark.java",
++        "HashBenchmark.java",
++        "MathFunctionBenchmark.java",
++        "MessageDigestBenchmark.java",
++        "ObjectCloneArrayLengthBenchmark.java",
++        "SignalCorrelationBenchmark.java",
++        "SimpleSyncBenchmark.java",
++        "StringBenchmark.java",
++        "StringCodingBenchmark.java",
++        "StringDecodeBenchmark.java",
++        "TestJMHBlackbox.java",
++        "TypecheckBenchmark.java",
++        "WriteSinkingBenchmark.java",
++        "package-info.java",
 +    ],
 +    visibility = ["//compiler:__pkg__"],
 +)

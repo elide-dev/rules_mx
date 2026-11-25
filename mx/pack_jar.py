@@ -152,7 +152,9 @@ def module_descriptor(args, tmp, entries, services, release):
         f"{args.module}={classes}",
     ]
     if args.module_jar:
-        command += ["--module-path", os.pathsep.join(args.module_jar)]
+        # Prefer the source-built modules over their counterparts in the Labs JDK.
+        option = "--upgrade-module-path" if args.system_modules else "--module-path"
+        command += [option, os.pathsep.join(args.module_jar)]
     subprocess.run(command + [str(source)], check=True)
     return (tmp / "module-info.class").read_bytes()
 

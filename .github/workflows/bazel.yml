@@ -20,17 +20,19 @@ jobs:
         run: |
           tools/check-graph
           tools/generate-graal --check
-          bazelisk build --config=elide-processors @graal//truffle:all_projects
+          bazelisk build --config=elide-processors @graal//truffle:all_projects @graal//truffle:all_distributions @graal//compiler:all_projects @graal//espresso-shared:ESPRESSO_SHARED @graal//espresso-shared:ESPRESSO_SVM
           bazelisk test --config=elide-processors //... @graal//sdk/... @graal//truffle/... @graal//compiler/...
-          bazelisk test --config=elide-python --config=elide-processors //mx:export_test //mx:pack_jar_test //graal/nativebridge:launcher_test //graal:launcher_modules_test @graal//truffle:sl.test.Fibonacci @graal//compiler:GR36613Test
+          bazelisk test --config=elide-processors --config=labsjdk @graal//substratevm/...
+          bazelisk test --config=elide-python --config=elide-processors //mx:export_test //mx:pack_jar_test //graal:truffle_layout_test //graal/nativebridge:launcher_test //graal:launcher_modules_test @graal//truffle:sl.test.Fibonacci @graal//compiler:GR36613Test
       - name: Test on BuildBuddy
         if: github.event_name != 'pull_request'
         env:
           BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
         run: |
           tools/check-graph --config=buildbuddy-rbe
-          tools/buildbuddy build --config=buildbuddy-rbe --config=elide-processors @graal//truffle:all_projects
+          tools/buildbuddy build --config=buildbuddy-rbe --config=elide-processors @graal//truffle:all_projects @graal//truffle:all_distributions @graal//compiler:all_projects @graal//espresso-shared:ESPRESSO_SHARED @graal//espresso-shared:ESPRESSO_SVM
           tools/buildbuddy test --config=buildbuddy-rbe --config=elide-processors //... @graal//sdk/... @graal//truffle/... @graal//compiler/...
+          tools/buildbuddy test --config=buildbuddy-rbe --config=elide-processors --config=labsjdk @graal//substratevm/...
           tools/buildbuddy test --config=buildbuddy-rbe --config=labsjdk //graal:panama_module_test //mx:export_test //graal:launcher_modules_test //graal:truffle_polyglot_test //graal:truffle_runtime_modules_test @graal//truffle:sl.test.Fibonacci
-          tools/buildbuddy test --config=buildbuddy-rbe --config=elide-python --config=elide-processors //mx:export_test //mx:pack_jar_test //graal/nativebridge:launcher_test //graal:launcher_modules_test @graal//truffle:sl.test.Fibonacci @graal//compiler:GR36613Test
+          tools/buildbuddy test --config=buildbuddy-rbe --config=elide-python --config=elide-processors //mx:export_test //mx:pack_jar_test //graal:truffle_layout_test //graal/nativebridge:launcher_test //graal:launcher_modules_test @graal//truffle:sl.test.Fibonacci @graal//compiler:GR36613Test
           tools/buildbuddy test --config=buildbuddy-rbe --config=native-image-linux //tests/native_image:checkcopy_test //graal/nativebridge:native_isolate_test
