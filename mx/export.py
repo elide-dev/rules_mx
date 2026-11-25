@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import re
 import textwrap
 from pathlib import Path
 
@@ -88,18 +89,106 @@ def _rule(kind, attrs, extra=""):
     )
 
 
-def _dependency_labels(deps, suite, mappings, pending):
+def _dependency_labels(deps, suite, mappings, pending, classpath_dists=False):
     labels = []
     for dep in deps:
         name = dep.qualifiedName()
         if name in mappings:
             labels.extend(mappings[name])
-        elif dep.isJavaProject() and dep.suite == suite:
+        elif dep.suite == suite and (
+            dep.isJavaProject()
+            or (
+                classpath_dists
+                and (
+                    dep.isJARDistribution()
+                    or type(dep).__name__ == "LayoutDirDistribution"
+                )
+            )
+        ):
             pending.append(dep)
             labels.append(":" + dep.name)
         else:
             mx.abort(f"{name}: supply --java-dep {name}=LABEL for this dependency")
     return list(dict.fromkeys(labels))
+
+
+def _classpath_distribution(dist, suite, mappings, pending):
+    if (
+        type(dist).__name__ != "JARDistribution"
+        or not dist.deps
+        or dist.archiveparticipants
+        or dist.is_stripped()
+        or dist.use_module_path()
+        or dist.excludedLibs
+        or dist.optionalDependencies
+        or dist.buildDependencies
+        or dist.overlaps
+        or dist.manifestEntries
+        or getattr(dist, "javaProperties", None)
+        or getattr(dist, "requiresConcealed", None)
+    ):
+        mx.abort(f"{dist.name}: distribution requires an explicit --java-dep mapping")
+    return {
+        "name": dist.name,
+        "deps": _dependency_labels(dist.deps, suite, mappings, pending, True),
+        "testonly": dist.is_test_distribution(),
+    }
+
+
+def _resource_path(path):
+    return path and all(
+        part not in (".", "..") and re.fullmatch(r"[a-zA-Z0-9._+-]+", part)
+        for part in path.split("/")
+    )
+
+
+def _resource_layout(dist, pending):
+    if (
+        dist.isPlatformDependent()
+        or dist.deps
+        or dist.excludedLibs
+        or dist.fileListEntry
+        or dist.hashEntry
+        or dist.fileListPurpose
+        or dist._removed_deps
+    ):
+        mx.abort(f"{dist.name}: unsupported resource layout")
+    literals = {}
+    copies = {}
+    inputs = set()
+    for dest, source in dist._walk_layout():
+        if not _resource_path(dest) or dest in copies or dest in literals:
+            mx.abort(f"{dist.name}: expected a unique resource file path: {dest!r}")
+        kind = source["source_type"]
+        keys = set(source) - {"_str_", "source_type"}
+        if kind == "string" and keys <= {"value", "ignore_value_subst"}:
+            literals[dest] = source["value"]
+        elif (
+            kind == "dependency"
+            and keys == {"dependency", "path", "optional"}
+            and not source["optional"]
+            and _resource_path(source["path"])
+        ):
+            dep = mx.dependency(source["dependency"], context=dist)
+            if type(dep).__name__ != "LayoutDirDistribution" or dep.suite != dist.suite:
+                mx.abort(
+                    f"{dist.name}: expected a file from a same-suite resource layout"
+                )
+            inputs.add(dep)
+            copies[dest] = f":{dep.name}.files/{source['path']}"
+        else:
+            mx.abort(
+                f"{dist.name}: unsupported resource layout source {source['_str_']}"
+            )
+    if not (literals or copies) or inputs != set(dist.buildDependencies):
+        mx.abort(f"{dist.name}: expected a nonempty file layout with explicit inputs")
+    pending.extend(inputs)
+    return {
+        "name": dist.name,
+        "literals": literals,
+        "copies": copies,
+        "testonly": dist.is_test_distribution(),
+    }
 
 
 def _mappings(parser, values, flag):
@@ -112,7 +201,7 @@ def _mappings(parser, values, flag):
     return result
 
 
-def _processor_plugins(project, mappings, java_deps, pending, plugins):
+def _processor_plugins(project, mappings, java_deps, pending, plugins, classpath_dists):
     labels = []
     for dist in project.annotation_processors():
         name = dist.qualifiedName()
@@ -131,7 +220,9 @@ def _processor_plugins(project, mappings, java_deps, pending, plugins):
             mx.abort(
                 f"{project.name}: supply --processor-plugin {name}=LABEL for this processor path"
             )
-        deps = _dependency_labels(dist.deps, project.suite, java_deps, pending)
+        deps = _dependency_labels(
+            dist.deps, project.suite, java_deps, pending, classpath_dists
+        )
         for processor in classes:
             target = f"mx_plugin.{dist.name}.{processor}"
             plugins[target] = {
@@ -176,32 +267,76 @@ def bazel_buildfile(args):
     parser.add_argument(
         "--java-dep", action="append", default=[], metavar="SUITE:NAME=LABEL"
     )
+    parser.add_argument(
+        "--javac-only-processor",
+        action="append",
+        default=[],
+        metavar="SUITE:DIST",
+        help="derive the ABI after javac for processors incompatible with Turbine",
+    )
+    parser.add_argument(
+        "--classpath-dists",
+        action="store_true",
+        help="expose same-suite source JAR distributions as Java classpaths in Gazelle",
+    )
     parser.add_argument("projects", nargs="+")
     options = parser.parse_args(args)
+    if options.javac_only_processor and not options.gazelle:
+        parser.error("--javac-only-processor requires --gazelle")
     if options.whole_project and not options.gazelle:
         parser.error("--whole-project requires --gazelle")
+    if options.classpath_dists and not options.gazelle:
+        parser.error("--classpath-dists requires --gazelle")
     mappings = _mappings(parser, options.processor_plugin, "--processor-plugin")
     java_deps = _mappings(parser, options.java_dep, "--java-dep")
-    roots = [mx.project(name) for name in options.projects]
+    lookup = mx.dependency if options.classpath_dists else mx.project
+    roots = [lookup(name) for name in options.projects]
     suite = roots[0].suite
     pending = list(roots)
     rules = {}
     plugins = {}
     graph = {}
+    distributions = {}
+    layouts = {}
+    javac_only_processors = set(options.javac_only_processor)
+    used_javac_only = set()
     processed = False
     has_resources = False
     while pending:
         project = pending.pop()
-        if project.name in rules:
+        if (
+            project.name in rules
+            or project.name in distributions
+            or project.name in layouts
+        ):
             continue
+        if options.classpath_dists and project.suite == suite:
+            if project.isJARDistribution():
+                distributions[project.name] = _classpath_distribution(
+                    project, suite, java_deps, pending
+                )
+                continue
+            if type(project).__name__ == "LayoutDirDistribution":
+                layouts[project.name] = _resource_layout(project, pending)
+                continue
         if type(project).__name__ != "JavaProject" or project.suite != suite:
             mx.abort(f"{project.name}: requires a separate Bazel dependency mapping")
-        unsupported = sorted(set(project._orig_attrs) - _PLAIN_JAVA)
+        allowed = _PLAIN_JAVA
+        # Preserve mx coverage exclusions as graph metadata.
+        excluded_from_jacoco = project._orig_attrs.get("jacoco") == "exclude"
+        if options.gazelle:
+            # SpotBugs is a separate mx analysis pass.
+            allowed = allowed | {"spotbugs"}
+        if options.gazelle and excluded_from_jacoco:
+            allowed = allowed | {"jacoco"}
+        unsupported = sorted(set(project._orig_attrs) - allowed)
         if unsupported:
             mx.abort(
                 f"{project.name}: unsupported mx attributes: {', '.join(unsupported)}"
             )
-        processors = _processor_plugins(project, mappings, java_deps, pending, plugins)
+        processors = _processor_plugins(
+            project, mappings, java_deps, pending, plugins, options.classpath_dists
+        )
         sources = []
         resources = []
         resource_roots = set()
@@ -218,7 +353,9 @@ def bazel_buildfile(args):
                         resource_roots.add(directory.relative_to(suite.dir).as_posix())
         if not sources:
             mx.abort(f"{project.name}: no Java sources")
-        deps = _dependency_labels(project.deps, suite, java_deps, pending)
+        deps = _dependency_labels(
+            project.deps, suite, java_deps, pending, options.classpath_dists
+        )
         release = (
             project.javaCompliance.value if options.release is None else options.release
         )
@@ -274,6 +411,10 @@ def bazel_buildfile(args):
                 "packages": sorted(project.defined_java_packages()),
                 "dirs": sorted({str(Path(src).parent) for src in sources}),
             }
+            if "spotbugs" in project._orig_attrs:
+                record["spotbugs"] = project._orig_attrs["spotbugs"]
+            if excluded_from_jacoco:
+                record["jacoco"] = "exclude"
             if coarse:
                 record["sources"] = sorted(sources)
                 if resources:
@@ -281,6 +422,12 @@ def bazel_buildfile(args):
                     record["resource_root"] = resource_root
                 if processors:
                     record["processors"] = processors
+                    matched = javac_only_processors.intersection(
+                        d.qualifiedName() for d in project.annotation_processors()
+                    )
+                    if matched:
+                        used_javac_only.update(matched)
+                        record["abi_after_javac"] = True
                 if test:
                     record["testonly"] = True
                     record["tests"] = sorted(
@@ -301,20 +448,24 @@ def bazel_buildfile(args):
     if rules.keys() & plugins.keys():
         mx.abort("A generated plugin target conflicts with a project name")
     if options.gazelle:
+        unmatched = javac_only_processors - used_javac_only
+        if unmatched:
+            mx.abort(
+                f"Unknown javac-only processor in selected closure: {sorted(unmatched)}"
+            )
         missing = set(options.whole_project) - graph.keys()
         if missing:
             mx.abort(f"Unknown whole project in selected closure: {sorted(missing)}")
-        print(
-            json.dumps(
-                {
-                    "version": 1,
-                    "projects": [graph[n] for n in sorted(graph)],
-                    "plugins": [plugins[n] for n in sorted(plugins)],
-                },
-                indent=2,
-                sort_keys=True,
-            )
-        )
+        result = {
+            "version": 1,
+            "projects": [graph[n] for n in sorted(graph)],
+            "plugins": [plugins[n] for n in sorted(plugins)],
+        }
+        if distributions:
+            result["distributions"] = [distributions[n] for n in sorted(distributions)]
+        if layouts:
+            result["layouts"] = [layouts[n] for n in sorted(layouts)]
+        print(json.dumps(result, indent=2, sort_keys=True))
         return
     rules.update({name: _rule("java_plugin", attrs) for name, attrs in plugins.items()})
     print('load("@rules_mx//mx:java.bzl", "elide_java_library")')

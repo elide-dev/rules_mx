@@ -69,6 +69,58 @@ class ExportTest(unittest.TestCase):
         self.assertEqual(len(graph["plugins"]), 2)
         self.assertTrue(all(plugin["deps"] == [":proc"] for plugin in graph["plugins"]))
 
+    def test_classpath_distribution_root(self):
+        args = ("bazel-buildfile", "--classpath-dists")
+        result = self.run_mx(
+            *args, "--gazelle", "PROCESSORS", suite=self.processor_suite
+        )
+        graph = json.loads(result.stdout)
+        self.assertEqual(
+            graph["distributions"],
+            [{"name": "PROCESSORS", "deps": [":proc"], "testonly": False}],
+        )
+        self.assertEqual([p["name"] for p in graph["projects"]], ["proc"])
+        invalid = self.run_mx(
+            *args, "PROCESSORS", suite=self.processor_suite, check=False
+        )
+        self.assertNotEqual(invalid.returncode, 0)
+        self.assertIn("--classpath-dists requires --gazelle", invalid.stderr)
+
+    def test_layout_with_undeclared_host_file_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            suite = Path(directory).resolve()
+            (suite / ".mx_vcs_root").touch()
+            metadata = suite / "mx.layout"
+            metadata.mkdir()
+            (metadata / "suite.py").write_text(
+                "suite = "
+                + repr(
+                    {
+                        "name": "layout",
+                        "mxversion": "7.89.0",
+                        "distributions": {
+                            "FILES": {
+                                "type": "dir",
+                                "platformDependent": False,
+                                "layout": {"value": "file:local-input.txt"},
+                            }
+                        },
+                    }
+                )
+            )
+            result = self.run_mx(
+                "bazel-buildfile",
+                "--gazelle",
+                "--classpath-dists",
+                "FILES",
+                suite=suite,
+                check=False,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "unsupported resource layout source", result.stdout + result.stderr
+            )
+
     def test_graph_preserves_compliance_range(self):
         result = self.run_mx("bazel-projects", "com.oracle.mxtool.webserver")
         self.assertTrue(result.stdout.startswith("{"), result.stdout)

@@ -1,0 +1,1011 @@
+diff --git a/truffle/BUILD.bazel b/truffle/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/BUILD.bazel
+@@ -0,0 +1,176 @@
++load("@rules_mx//mx:graph.bzl", "mx_processed_java", "mx_processor", "mx_project", "mx_whole_java")
++
++mx_whole_java(
++    name = "com.oracle.truffle.api",
++    srcs = [
++        "//truffle/src/com.oracle.truffle.api/src/com/oracle/truffle/api:com.oracle.truffle.api.srcs",
++        "//truffle/src/com.oracle.truffle.api/src/com/oracle/truffle/api/frame:com.oracle.truffle.api.srcs",
++        "//truffle/src/com.oracle.truffle.api/src/com/oracle/truffle/api/impl:com.oracle.truffle.api.srcs",
++        "//truffle/src/com.oracle.truffle.api/src/com/oracle/truffle/api/io:com.oracle.truffle.api.srcs",
++        "//truffle/src/com.oracle.truffle.api/src/com/oracle/truffle/api/memory:com.oracle.truffle.api.srcs",
++        "//truffle/src/com.oracle.truffle.api/src/com/oracle/truffle/api/nodes:com.oracle.truffle.api.srcs",
++        "//truffle/src/com.oracle.truffle.api/src/com/oracle/truffle/api/provider:com.oracle.truffle.api.srcs",
++        "//truffle/src/com.oracle.truffle.api/src/com/oracle/truffle/api/source:com.oracle.truffle.api.srcs",
++    ],
++    javac_opts = [
++        "--release",
++        "21",
++        "--add-modules",
++        "java.logging,jdk.management,jdk.unsupported",
++    ],
++    mx_resource_root = "src/com.oracle.truffle.api/src",
++    resources = ["//truffle/src/com.oracle.truffle.api/src/META-INF/native-image/org.graalvm.truffle/truffle-api:com.oracle.truffle.api.resources"],
++    unified_release = 21,
++    visibility = ["//visibility:public"],
++    deps = ["//sdk:POLYGLOT"],
++)
++
++mx_project(
++    name = "com.oracle.truffle.api.dsl",
++    packages = ["//truffle/src/com.oracle.truffle.api.dsl/src/com/oracle/truffle/api/dsl"],
++    visibility = ["//visibility:public"],
++    deps = [":com.oracle.truffle.api"],
++)
++
++mx_processed_java(
++    name = "com.oracle.truffle.api.library",
++    srcs = [
++        "//truffle/src/com.oracle.truffle.api.library/src/com/oracle/truffle/api/library:com.oracle.truffle.api.library.srcs",
++        "//truffle/src/com.oracle.truffle.api.library/src/com/oracle/truffle/api/library/provider:com.oracle.truffle.api.library.srcs",
++    ],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "--add-modules",
++        "jdk.unsupported",
++    ],
++    plugins = [
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":com.oracle.truffle.api.dsl",
++        ":com.oracle.truffle.api.utilities",
++    ],
++)
++
++mx_project(
++    name = "com.oracle.truffle.api.profiles",
++    packages = ["//truffle/src/com.oracle.truffle.api.profiles/src/com/oracle/truffle/api/profiles"],
++    visibility = ["//visibility:public"],
++    deps = [":com.oracle.truffle.api.dsl"],
++)
++
++mx_project(
++    name = "com.oracle.truffle.api.utilities",
++    packages = ["//truffle/src/com.oracle.truffle.api.utilities/src/com/oracle/truffle/api/utilities"],
++    visibility = ["//visibility:public"],
++    deps = [":com.oracle.truffle.api"],
++)
++
++mx_whole_java(
++    name = "com.oracle.truffle.dsl.processor",
++    srcs = [
++        "//truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor:com.oracle.truffle.dsl.processor.srcs",
++        "//truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/bytecode/generator:com.oracle.truffle.dsl.processor.srcs",
++        "//truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/bytecode/model:com.oracle.truffle.dsl.processor.srcs",
++        "//truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/bytecode/parser:com.oracle.truffle.dsl.processor.srcs",
++        "//truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/expression:com.oracle.truffle.dsl.processor.srcs",
++        "//truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/generator:com.oracle.truffle.dsl.processor.srcs",
++        "//truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/java:com.oracle.truffle.dsl.processor.srcs",
++        "//truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/java/compiler:com.oracle.truffle.dsl.processor.srcs",
++        "//truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/java/model:com.oracle.truffle.dsl.processor.srcs",
++        "//truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/java/transform:com.oracle.truffle.dsl.processor.srcs",
++        "//truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/library:com.oracle.truffle.dsl.processor.srcs",
++        "//truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/model:com.oracle.truffle.dsl.processor.srcs",
++        "//truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/parser:com.oracle.truffle.dsl.processor.srcs",
++        "//truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/util:com.oracle.truffle.dsl.processor.srcs",
++        "//truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/verify:com.oracle.truffle.dsl.processor.srcs",
++    ],
++    javac_opts = [
++        "--release",
++        "21",
++        "--add-modules",
++        "java.compiler,jdk.management",
++    ],
++    mx_resource_root = "src/com.oracle.truffle.dsl.processor/src",
++    resources = [
++        "//truffle/src/com.oracle.truffle.dsl.processor/src/META-INF/services:com.oracle.truffle.dsl.processor.resources",
++        "//truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/expression:com.oracle.truffle.dsl.processor.resources",
++    ],
++    unified_release = 21,
++    visibility = ["//visibility:public"],
++    deps = ["@contrib_rules_jvm_deps//:org_antlr_antlr4_runtime_4_13_2"],
++)
++
++mx_processor(
++    name = "mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++    generates_api = True,
++    processor_class = "com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++    visibility = ["//visibility:public"],
++    deps = [":com.oracle.truffle.dsl.processor"],
++)
++
++mx_processor(
++    name = "mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++    generates_api = True,
++    processor_class = "com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++    visibility = ["//visibility:public"],
++    deps = [":com.oracle.truffle.dsl.processor"],
++)
++
++mx_processor(
++    name = "mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++    generates_api = True,
++    processor_class = "com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++    visibility = ["//visibility:public"],
++    deps = [":com.oracle.truffle.dsl.processor"],
++)
++
++mx_processor(
++    name = "mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    generates_api = True,
++    processor_class = "com.oracle.truffle.dsl.processor.OptionProcessor",
++    visibility = ["//visibility:public"],
++    deps = [":com.oracle.truffle.dsl.processor"],
++)
++
++mx_processor(
++    name = "mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++    generates_api = True,
++    processor_class = "com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++    visibility = ["//visibility:public"],
++    deps = [":com.oracle.truffle.dsl.processor"],
++)
++
++mx_processor(
++    name = "mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++    generates_api = True,
++    processor_class = "com.oracle.truffle.dsl.processor.TruffleProcessor",
++    visibility = ["//visibility:public"],
++    deps = [":com.oracle.truffle.dsl.processor"],
++)
++
++mx_processor(
++    name = "mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++    generates_api = True,
++    processor_class = "com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++    visibility = ["//visibility:public"],
++    deps = [":com.oracle.truffle.dsl.processor"],
++)
++
++mx_processor(
++    name = "mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++    generates_api = True,
++    processor_class = "com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++    visibility = ["//visibility:public"],
++    deps = [":com.oracle.truffle.dsl.processor"],
++)
+diff --git a/truffle/src/com.oracle.truffle.api/src/META-INF/native-image/org.graalvm.truffle/truffle-api/BUILD.bazel b/truffle/src/com.oracle.truffle.api/src/META-INF/native-image/org.graalvm.truffle/truffle-api/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.api/src/META-INF/native-image/org.graalvm.truffle/truffle-api/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.api.resources",
++    srcs = ["native-image.properties"],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.api/src/com/oracle/truffle/api/BUILD.bazel b/truffle/src/com.oracle.truffle.api/src/com/oracle/truffle/api/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.api/src/com/oracle/truffle/api/BUILD.bazel
+@@ -0,0 +1,40 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.api.srcs",
++    srcs = [
++        "ArrayUtils.java",
++        "Assumption.java",
++        "CallTarget.java",
++        "CompilerAsserts.java",
++        "CompilerDirectives.java",
++        "ContextLocal.java",
++        "ContextThreadLocal.java",
++        "ExactMath.java",
++        "HostCompilerDirectives.java",
++        "InstrumentInfo.java",
++        "InternalResource.java",
++        "LanguageAccessor.java",
++        "OptimizationFailedException.java",
++        "Option.java",
++        "ReplaceObserver.java",
++        "RootCallTarget.java",
++        "SuppressFBWarnings.java",
++        "ThreadLocalAction.java",
++        "Truffle.java",
++        "TruffleContext.java",
++        "TruffleFile.java",
++        "TruffleLanguage.java",
++        "TruffleLogger.java",
++        "TruffleOptionDescriptors.java",
++        "TruffleOptions.java",
++        "TruffleRuntime.java",
++        "TruffleRuntimeAccess.java",
++        "TruffleSafepoint.java",
++        "TruffleStackTrace.java",
++        "TruffleStackTraceElement.java",
++        "TruffleThreadBuilder.java",
++        "package-info.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.api/src/com/oracle/truffle/api/frame/BUILD.bazel b/truffle/src/com.oracle.truffle.api/src/com/oracle/truffle/api/frame/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.api/src/com/oracle/truffle/api/frame/BUILD.bazel
+@@ -0,0 +1,20 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.api.srcs",
++    srcs = [
++        "Frame.java",
++        "FrameAccessor.java",
++        "FrameDescriptor.java",
++        "FrameExtensions.java",
++        "FrameInstance.java",
++        "FrameInstanceVisitor.java",
++        "FrameSlotKind.java",
++        "FrameSlotTypeException.java",
++        "MaterializedFrame.java",
++        "SuppressFBWarnings.java",
++        "VirtualFrame.java",
++        "package-info.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.api/src/com/oracle/truffle/api/impl/BUILD.bazel b/truffle/src/com.oracle.truffle.api/src/com/oracle/truffle/api/impl/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.api/src/com/oracle/truffle/api/impl/BUILD.bazel
+@@ -0,0 +1,38 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.api.srcs",
++    srcs = [
++        "AbstractAssumption.java",
++        "AbstractFastThreadLocal.java",
++        "Accessor.java",
++        "CheckMultiReleaseSupport.java",
++        "DefaultAssumption.java",
++        "DefaultBlockNode.java",
++        "DefaultCallTarget.java",
++        "DefaultContextThreadLocal.java",
++        "DefaultDirectCallNode.java",
++        "DefaultIndirectCallNode.java",
++        "DefaultLoopNode.java",
++        "DefaultRuntimeAccessor.java",
++        "DefaultTVMCI.java",
++        "DefaultThreadLocalHandshake.java",
++        "DefaultTruffleRuntime.java",
++        "DelegatingOutputStream.java",
++        "DispatchOutputStream.java",
++        "FrameExtensionsSafe.java",
++        "FrameExtensionsUnsafe.java",
++        "FrameWithoutBoxing.java",
++        "ImplAccessor.java",
++        "JDKAccessor.java",
++        "PolyglotIsolateLanguages.java",
++        "ReadOnlyArrayList.java",
++        "ReadOnlyFrame.java",
++        "TVMCI.java",
++        "ThreadLocalHandshake.java",
++        "TruffleAPIFeature.java",
++        "TruffleFileFileAdapter.java",
++        "TruffleVersions.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.api/src/com/oracle/truffle/api/io/BUILD.bazel b/truffle/src/com.oracle.truffle.api/src/com/oracle/truffle/api/io/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.api/src/com/oracle/truffle/api/io/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.api.srcs",
++    srcs = [
++        "IOAccessor.java",
++        "TruffleProcessBuilder.java",
++        "package-info.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.api/src/com/oracle/truffle/api/memory/BUILD.bazel b/truffle/src/com.oracle.truffle.api/src/com/oracle/truffle/api/memory/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.api/src/com/oracle/truffle/api/memory/BUILD.bazel
+@@ -0,0 +1,18 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.api.srcs",
++    srcs = [
++        "ByteArrayOutOfBoundsException.java",
++        "ByteArraySupport.java",
++        "ByteArraySupports.java",
++        "CheckedByteArraySupport.java",
++        "MemoryAccessor.java",
++        "ReversedByteArraySupport.java",
++        "SimpleByteArraySupport.java",
++        "SimpleByteArraySupportLock.java",
++        "UnsafeByteArraySupport.java",
++        "package-info.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.api/src/com/oracle/truffle/api/nodes/BUILD.bazel b/truffle/src/com.oracle.truffle.api/src/com/oracle/truffle/api/nodes/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.api/src/com/oracle/truffle/api/nodes/BUILD.bazel
+@@ -0,0 +1,39 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.api.srcs",
++    srcs = [
++        "BlockNode.java",
++        "BytecodeOSRNode.java",
++        "ControlFlowException.java",
++        "DenyReplace.java",
++        "DirectCallNode.java",
++        "EncapsulatingNodeReference.java",
++        "ExecutableNode.java",
++        "ExecutionSignature.java",
++        "ExplodeLoop.java",
++        "IndirectCallNode.java",
++        "InvalidAssumptionException.java",
++        "LanguageInfo.java",
++        "LoopNode.java",
++        "Node.java",
++        "NodeAccessor.java",
++        "NodeClass.java",
++        "NodeClassImpl.java",
++        "NodeCloneable.java",
++        "NodeCost.java",
++        "NodeInfo.java",
++        "NodeInterface.java",
++        "NodeIterator.java",
++        "NodeUtil.java",
++        "NodeVisitor.java",
++        "RepeatingNode.java",
++        "RootNode.java",
++        "SlowPathException.java",
++        "SuppressFBWarnings.java",
++        "UnadoptableNode.java",
++        "UnexpectedResultException.java",
++        "package-info.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.api/src/com/oracle/truffle/api/provider/BUILD.bazel b/truffle/src/com.oracle.truffle.api/src/com/oracle/truffle/api/provider/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.api/src/com/oracle/truffle/api/provider/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.api.srcs",
++    srcs = [
++        "InternalResourceProvider.java",
++        "LanguageProviderSupportImpl.java",
++        "TruffleLanguageProvider.java",
++        "package-info.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.api/src/com/oracle/truffle/api/source/BUILD.bazel b/truffle/src/com.oracle.truffle.api/src/com/oracle/truffle/api/source/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.api/src/com/oracle/truffle/api/source/BUILD.bazel
+@@ -0,0 +1,22 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.api.srcs",
++    srcs = [
++        "ByteSequenceWrapper.java",
++        "CharSequenceReader.java",
++        "CharSequenceWrapper.java",
++        "InternedSources.java",
++        "Source.java",
++        "SourceAccessor.java",
++        "SourceImpl.java",
++        "SourceSection.java",
++        "SourceSectionLoaded.java",
++        "SourceSectionUnavailable.java",
++        "SourceSectionUnloaded.java",
++        "SubSourceImpl.java",
++        "TextMap.java",
++        "package-info.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.api.dsl/src/com/oracle/truffle/api/dsl/BUILD.bazel b/truffle/src/com.oracle.truffle.api.dsl/src/com/oracle/truffle/api/dsl/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.api.dsl/src/com/oracle/truffle/api/dsl/BUILD.bazel
+@@ -0,0 +1,57 @@
++load("@rules_mx//mx:java.bzl", "elide_java_library")
++
++elide_java_library(
++    name = "dsl",
++    srcs = [
++        "AOTSupport.java",
++        "Bind.java",
++        "Cached.java",
++        "CreateCast.java",
++        "DSLAccessor.java",
++        "DSLSupport.java",
++        "ExecuteTracingSupport.java",
++        "Executed.java",
++        "Fallback.java",
++        "GenerateAOT.java",
++        "GenerateCached.java",
++        "GenerateInline.java",
++        "GenerateNodeFactory.java",
++        "GeneratePackagePrivate.java",
++        "GenerateUncached.java",
++        "GeneratedBy.java",
++        "Idempotent.java",
++        "ImplicitCast.java",
++        "ImportStatic.java",
++        "InlineSupport.java",
++        "Introspectable.java",
++        "Introspection.java",
++        "NeverDefault.java",
++        "NodeChild.java",
++        "NodeChildren.java",
++        "NodeFactory.java",
++        "NodeField.java",
++        "NodeFields.java",
++        "NonIdempotent.java",
++        "ReportPolymorphism.java",
++        "Specialization.java",
++        "SpecializationStatistics.java",
++        "SuppressFBWarnings.java",
++        "SuppressPackageWarnings.java",
++        "TypeCast.java",
++        "TypeCheck.java",
++        "TypeSystem.java",
++        "TypeSystemReference.java",
++        "UnsupportedSpecializationException.java",
++        "package-info.java",
++    ],
++    javac_opts = [
++        "--release",
++        "21",
++        "--add-modules",
++        "java.logging,jdk.unsupported",
++    ],
++    unified_release = 21,
++    visibility = ["//:__subpackages__"],
++    exports = ["//truffle:com.oracle.truffle.api"],
++    deps = ["//truffle:com.oracle.truffle.api"],
++)
+diff --git a/truffle/src/com.oracle.truffle.api.library/src/com/oracle/truffle/api/library/BUILD.bazel b/truffle/src/com.oracle.truffle.api.library/src/com/oracle/truffle/api/library/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.api.library/src/com/oracle/truffle/api/library/BUILD.bazel
+@@ -0,0 +1,20 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.api.library.srcs",
++    srcs = [
++        "CachedLibrary.java",
++        "DynamicDispatchLibrary.java",
++        "ExportLibrary.java",
++        "ExportMessage.java",
++        "GenerateLibrary.java",
++        "Library.java",
++        "LibraryAccessor.java",
++        "LibraryExport.java",
++        "LibraryFactory.java",
++        "Message.java",
++        "ReflectionLibrary.java",
++        "package-info.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.api.library/src/com/oracle/truffle/api/library/provider/BUILD.bazel b/truffle/src/com.oracle.truffle.api.library/src/com/oracle/truffle/api/library/provider/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.api.library/src/com/oracle/truffle/api/library/provider/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.api.library.srcs",
++    srcs = [
++        "DefaultExportProvider.java",
++        "EagerExportProvider.java",
++        "package-info.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.api.profiles/src/com/oracle/truffle/api/profiles/BUILD.bazel b/truffle/src/com.oracle.truffle.api.profiles/src/com/oracle/truffle/api/profiles/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.api.profiles/src/com/oracle/truffle/api/profiles/BUILD.bazel
+@@ -0,0 +1,42 @@
++load("@rules_mx//mx:java.bzl", "elide_java_library")
++
++elide_java_library(
++    name = "profiles",
++    srcs = [
++        "AbstractInlinedValueProfile.java",
++        "BranchProfile.java",
++        "ByteValueProfile.java",
++        "ConditionProfile.java",
++        "CountingConditionProfile.java",
++        "DoubleValueProfile.java",
++        "FloatValueProfile.java",
++        "InlinedBranchProfile.java",
++        "InlinedByteValueProfile.java",
++        "InlinedConditionProfile.java",
++        "InlinedCountingConditionProfile.java",
++        "InlinedDoubleValueProfile.java",
++        "InlinedExactClassProfile.java",
++        "InlinedFloatValueProfile.java",
++        "InlinedIntValueProfile.java",
++        "InlinedLongValueProfile.java",
++        "InlinedLoopConditionProfile.java",
++        "InlinedProfile.java",
++        "IntValueProfile.java",
++        "LongValueProfile.java",
++        "LoopConditionProfile.java",
++        "PrimitiveValueProfile.java",
++        "Profile.java",
++        "ValueProfile.java",
++        "package-info.java",
++    ],
++    javac_opts = [
++        "--release",
++        "21",
++    ],
++    unified_release = 21,
++    visibility = ["//:__subpackages__"],
++    deps = [
++        "//truffle:com.oracle.truffle.api",
++        "//truffle/src/com.oracle.truffle.api.dsl/src/com/oracle/truffle/api/dsl",
++    ],
++)
+diff --git a/truffle/src/com.oracle.truffle.api.utilities/src/com/oracle/truffle/api/utilities/BUILD.bazel b/truffle/src/com.oracle.truffle.api.utilities/src/com/oracle/truffle/api/utilities/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.api.utilities/src/com/oracle/truffle/api/utilities/BUILD.bazel
+@@ -0,0 +1,23 @@
++load("@rules_mx//mx:java.bzl", "elide_java_library")
++
++elide_java_library(
++    name = "utilities",
++    srcs = [
++        "AssumedValue.java",
++        "CyclicAssumption.java",
++        "FinalBitSet.java",
++        "JSONHelper.java",
++        "MathUtils.java",
++        "TriState.java",
++        "TruffleWeakReference.java",
++        "package-info.java",
++    ],
++    javac_opts = [
++        "--release",
++        "21",
++    ],
++    unified_release = 21,
++    visibility = ["//:__subpackages__"],
++    exports = ["//truffle:com.oracle.truffle.api"],
++    deps = ["//truffle:com.oracle.truffle.api"],
++)
+diff --git a/truffle/src/com.oracle.truffle.dsl.processor/src/META-INF/services/BUILD.bazel b/truffle/src/com.oracle.truffle.dsl.processor/src/META-INF/services/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.dsl.processor/src/META-INF/services/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.dsl.processor.resources",
++    srcs = ["javax.annotation.processing.Processor"],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/BUILD.bazel b/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/BUILD.bazel
+@@ -0,0 +1,26 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.dsl.processor.srcs",
++    srcs = [
++        "AbstractRegistrationProcessor.java",
++        "AnnotationProcessor.java",
++        "CodeWriter.java",
++        "CompileErrorException.java",
++        "ExpectError.java",
++        "InstrumentRegistrationProcessor.java",
++        "InstrumentableProcessor.java",
++        "LanguageRegistrationProcessor.java",
++        "Log.java",
++        "OptionProcessor.java",
++        "OptionalResourceRegistrationProcessor.java",
++        "ProcessorContext.java",
++        "SuppressFBWarnings.java",
++        "Timer.java",
++        "TruffleProcessor.java",
++        "TruffleProcessorOptions.java",
++        "TruffleSuppressedWarnings.java",
++        "TruffleTypes.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/bytecode/generator/BUILD.bazel b/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/bytecode/generator/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/bytecode/generator/BUILD.bazel
+@@ -0,0 +1,50 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.dsl.processor.srcs",
++    srcs = [
++        "AbstractBytecodeNodeElement.java",
++        "AbstractElement.java",
++        "BranchBackwardReturnExceptionElement.java",
++        "BranchBackwardThrowExceptionElement.java",
++        "BuilderElement.java",
++        "BytecodeConfigEncoderImplElement.java",
++        "BytecodeDSLCodeGenerator.java",
++        "BytecodeDSLNodeGeneratorPlugs.java",
++        "BytecodeDescriptorElement.java",
++        "BytecodeInstructionHandler.java",
++        "BytecodeNodeElement.java",
++        "BytecodeRootNodeElement.java",
++        "BytecodeRootNodeErrorElement.java",
++        "BytecodeRootNodesImplElement.java",
++        "BytecodeTransitionImplElement.java",
++        "ContinuationRootNodeImplElement.java",
++        "CounterStateElement.java",
++        "ElementHelpers.java",
++        "EqualityCodeTree.java",
++        "ExceptionHandlerImplElement.java",
++        "ExceptionHandlerListElement.java",
++        "FrameTagConstantsElement.java",
++        "InstructionDescriptorImplElement.java",
++        "InstructionDescriptorListElement.java",
++        "InstructionImplElement.java",
++        "InstructionRewriterElement.java",
++        "InstructionRewriterTestGenerator.java",
++        "InstructionTracerAccessImplElement.java",
++        "InstructionsElement.java",
++        "InterpreterTier.java",
++        "LocalVariableImplElement.java",
++        "LocalVariableListElement.java",
++        "LoopCounterElement.java",
++        "OldBytecodesBoxElement.java",
++        "OperationConstantsElement.java",
++        "SourceInformationImplElement.java",
++        "SourceInformationListElement.java",
++        "SourceInformationTreeImplElement.java",
++        "TagNodeElement.java",
++        "TagRootNodeElement.java",
++        "TagSourceLocationsElement.java",
++        "VirtualStateElement.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/bytecode/model/BUILD.bazel b/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/bytecode/model/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/bytecode/model/BUILD.bazel
+@@ -0,0 +1,28 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.dsl.processor.srcs",
++    srcs = [
++        "BytecodeConfigEncoding.java",
++        "BytecodeDSLBuiltins.java",
++        "BytecodeDSLModel.java",
++        "BytecodeDSLModels.java",
++        "ConstantOperandModel.java",
++        "CustomOperationModel.java",
++        "DFABuilder.java",
++        "DynamicOperandModel.java",
++        "GenerateInstructionRewriterTemplate.java",
++        "InstructionModel.java",
++        "InstructionName.java",
++        "InstructionPatternModel.java",
++        "InstructionRewriteRuleModel.java",
++        "InstructionRewriterModel.java",
++        "OperationModel.java",
++        "OptimizationDecisionsModel.java",
++        "PrettyPrintable.java",
++        "ShortCircuitInstructionModel.java",
++        "Signature.java",
++        "SourceSectionKind.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/bytecode/parser/BUILD.bazel b/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/bytecode/parser/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/bytecode/parser/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.dsl.processor.srcs",
++    srcs = [
++        "BytecodeDSLParser.java",
++        "CustomOperationParser.java",
++        "InstructionRewriterTestParser.java",
++        "SpecializationSignatureParser.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/expression/BUILD.bazel b/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/expression/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/expression/BUILD.bazel
+@@ -0,0 +1,19 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.dsl.processor.srcs",
++    srcs = [
++        "DSLExpression.java",
++        "DSLExpressionResolver.java",
++        "ExpressionLexer.java",
++        "ExpressionParser.java",
++        "InvalidExpressionException.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
++
++mx_files(
++    name = "com.oracle.truffle.dsl.processor.resources",
++    srcs = ["Expression.g4"],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/generator/BUILD.bazel b/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/generator/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/generator/BUILD.bazel
+@@ -0,0 +1,24 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.dsl.processor.srcs",
++    srcs = [
++        "BitSet.java",
++        "BitStateList.java",
++        "CodeTypeElementFactory.java",
++        "DSLExpressionGenerator.java",
++        "FlatNodeGenFactory.java",
++        "GeneratorUtils.java",
++        "MultiBitSet.java",
++        "MultiStateBitSet.java",
++        "NodeCodeGenerator.java",
++        "NodeConstants.java",
++        "NodeFactoryFactory.java",
++        "NodeGeneratorPlugs.java",
++        "NodeState.java",
++        "StateQuery.java",
++        "StaticConstants.java",
++        "TypeSystemCodeGenerator.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/java/BUILD.bazel b/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/java/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/java/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.dsl.processor.srcs",
++    srcs = ["ElementUtils.java"],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/java/compiler/BUILD.bazel b/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/java/compiler/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/java/compiler/BUILD.bazel
+@@ -0,0 +1,14 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.dsl.processor.srcs",
++    srcs = [
++        "AbstractCompiler.java",
++        "Compiler.java",
++        "CompilerFactory.java",
++        "GeneratedCompiler.java",
++        "JDTCompiler.java",
++        "JavaCCompiler.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/java/model/BUILD.bazel b/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/java/model/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/java/model/BUILD.bazel
+@@ -0,0 +1,27 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.dsl.processor.srcs",
++    srcs = [
++        "CodeAnnotationMirror.java",
++        "CodeAnnotationValue.java",
++        "CodeCompilationUnit.java",
++        "CodeElement.java",
++        "CodeElementScanner.java",
++        "CodeExecutableElement.java",
++        "CodeImport.java",
++        "CodeNames.java",
++        "CodeTree.java",
++        "CodeTreeBuilder.java",
++        "CodeTreeKind.java",
++        "CodeTypeElement.java",
++        "CodeTypeMirror.java",
++        "CodeTypeParameterElement.java",
++        "CodeVariableElement.java",
++        "GeneratedElement.java",
++        "GeneratedPackageElement.java",
++        "GeneratedTypeElement.java",
++        "GeneratedTypeMirror.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/java/transform/BUILD.bazel b/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/java/transform/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/java/transform/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.dsl.processor.srcs",
++    srcs = [
++        "AbstractCodeWriter.java",
++        "FixWarningsVisitor.java",
++        "GenerateOverrideVisitor.java",
++        "OrganizedImports.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/library/BUILD.bazel b/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/library/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/library/BUILD.bazel
+@@ -0,0 +1,18 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.dsl.processor.srcs",
++    srcs = [
++        "ExportMessageData.java",
++        "ExportsData.java",
++        "ExportsGenerator.java",
++        "ExportsLibrary.java",
++        "ExportsParser.java",
++        "LibraryData.java",
++        "LibraryDefaultExportData.java",
++        "LibraryGenerator.java",
++        "LibraryMessage.java",
++        "LibraryParser.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/model/BUILD.bazel b/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/model/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/model/BUILD.bazel
+@@ -0,0 +1,32 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.dsl.processor.srcs",
++    srcs = [
++        "AssumptionExpression.java",
++        "CacheExpression.java",
++        "CachedParameterSpec.java",
++        "CreateCastData.java",
++        "ExecutableTypeData.java",
++        "GuardExpression.java",
++        "ImplicitCastData.java",
++        "InlineFieldData.java",
++        "InlinedNodeData.java",
++        "MessageContainer.java",
++        "MethodSpec.java",
++        "NodeChildData.java",
++        "NodeData.java",
++        "NodeExecutionData.java",
++        "NodeFieldData.java",
++        "Parameter.java",
++        "ParameterSpec.java",
++        "SpecializationData.java",
++        "SpecializationThrowsData.java",
++        "Template.java",
++        "TemplateMethod.java",
++        "TypeCastData.java",
++        "TypeCheckData.java",
++        "TypeSystemData.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/parser/BUILD.bazel b/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/parser/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/parser/BUILD.bazel
+@@ -0,0 +1,22 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.dsl.processor.srcs",
++    srcs = [
++        "AbstractParser.java",
++        "CreateCastParser.java",
++        "FallbackParser.java",
++        "ImplicitCastParser.java",
++        "MethodSpecParser.java",
++        "NodeMethodParser.java",
++        "NodeParser.java",
++        "SpecializationGroup.java",
++        "SpecializationMethodParser.java",
++        "TemplateMethodParser.java",
++        "TypeCastParser.java",
++        "TypeCheckParser.java",
++        "TypeSystemMethodParser.java",
++        "TypeSystemParser.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/util/BUILD.bazel b/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/util/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/util/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.dsl.processor.srcs",
++    srcs = [
++        "Filterator.java",
++        "FilteredIterable.java",
++        "Predicate.java",
++        "TypeMirrorKey.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/verify/BUILD.bazel b/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/verify/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.dsl.processor/src/com/oracle/truffle/dsl/processor/verify/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.dsl.processor.srcs",
++    srcs = [
++        "VerifyCompilationFinalProcessor.java",
++        "VerifyTruffleProcessor.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)

@@ -1,0 +1,34 @@
+load("@rules_java//java:java_test.bzl", "java_test")
+
+exports_files([
+    "sdk.patch",
+    "truffle.patch",
+])
+
+test_suite(
+    name = "sdk_tests",
+    tests = ["@graal//sdk:tests"],
+)
+
+java_test(
+    name = "sdk_classpath_test",
+    size = "small",
+    srcs = ["SdkClasspathTest.java"],
+    test_class = "graal.SdkClasspathTest",
+    runtime_deps = [
+        "@graal//sdk:GRAAL_SDK",
+        "@graal//sdk:MAVEN_DOWNLOADER",
+    ],
+    deps = ["@contrib_rules_jvm_deps//:junit_junit"],
+)
+
+java_test(
+    name = "truffle_processor_test",
+    size = "small",
+    srcs = ["TruffleProcessorTest.java"],
+    test_class = "com.oracle.truffle.api.library.TruffleProcessorTest",
+    deps = [
+        "@contrib_rules_jvm_deps//:junit_junit",
+        "@graal//truffle:com.oracle.truffle.api.library",
+    ],
+)

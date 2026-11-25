@@ -1,0 +1,157 @@
+#!/usr/bin/env python3
+"""Generate Graal suite overlays in a temporary tree with mx and Gazelle."""
+
+import argparse
+import difflib
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import tempfile
+
+ROOT = Path(__file__).resolve().parents[1]
+SDK = [
+    "org.graalvm.collections.test",
+    "org.graalvm.word.test",
+    "org.graalvm.nativeimage.test",
+    "NATIVEIMAGE_LIBGRAAL",
+    "GRAAL_SDK",
+    "WEBIMAGE_PREVIEW",
+    "org.graalvm.polyglot.tck",
+    "RESOURCECOPY",
+    "org.graalvm.home.test",
+    "org.graalvm.jniutils",
+    "MAVEN_DOWNLOADER",
+    "jdk.graal.compiler.vmaccess.guest",
+]
+
+
+SUITES = {
+    "sdk": [
+        "--whole-project",
+        "org.graalvm.nativeimage.libgraal",
+        "--java-dep",
+        "mx:JUNIT=@contrib_rules_jvm_deps//:junit_junit",
+        *SDK,
+    ],
+    "truffle": [
+        "--java-dep",
+        "sdk:POLYGLOT=//sdk:POLYGLOT",
+        "--java-dep",
+        "truffle:ANTLR4=@contrib_rules_jvm_deps//:org_antlr_antlr4_runtime_4_13_2",
+        "--javac-only-processor",
+        "truffle:TRUFFLE_DSL_PROCESSOR",
+        "com.oracle.truffle.api.library",
+        "com.oracle.truffle.api.profiles",
+    ],
+}
+
+
+def generate(suite, stage):
+    directory = stage / suite
+    with (directory / "mx-graph.json").open("w") as graph:
+        subprocess.run(
+            [
+                "bazelisk",
+                "run",
+                "//:mx",
+                "--",
+                "-p",
+                str(directory),
+                "bazel-buildfile",
+                "--gazelle",
+                "--classpath-dists",
+                "--release",
+                "21",
+                *SUITES[suite],
+            ],
+            cwd=ROOT,
+            check=True,
+            stdout=graph,
+        )
+    # An implicit Bazel test_suite includes the generated JUnit targets in
+    # this package, so new test classes join the CI qualification on regeneration.
+    if suite == "sdk":
+        (directory / "BUILD.bazel").write_text(
+            'test_suite(name = "tests", visibility = ["//visibility:public"])\n'
+        )
+    subprocess.run(
+        [
+            "bazelisk",
+            "run",
+            "//:gazelle",
+            "--",
+            "-repo_root=" + str(stage),
+            f"-mx_graph={suite}/mx-graph.json",
+            str(directory),
+        ],
+        cwd=ROOT,
+        check=True,
+    )
+    patch = []
+    for build in sorted(directory.rglob("BUILD.bazel")):
+        path = build.relative_to(stage).as_posix()
+        patch.append(f"diff --git a/{path} b/{path}\nnew file mode 100644\n")
+        patch.extend(
+            difflib.unified_diff(
+                [],
+                build.read_text().splitlines(True),
+                fromfile="/dev/null",
+                tofile="b/" + path,
+            )
+        )
+    return "".join(patch)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "graal",
+        nargs="?",
+        type=Path,
+        help="Graal checkout (defaults to the pinned archive)",
+    )
+    parser.add_argument(
+        "--check", action="store_true", help="compare with the checked-in overlay"
+    )
+    args = parser.parse_args()
+    with tempfile.TemporaryDirectory() as temp:
+        stage = Path(temp).resolve()
+        source = args.graal
+        if source is None:
+            location = subprocess.check_output(
+                ["bazelisk", "query", "--output=location", "@graal//sdk:BUILD.bazel"],
+                cwd=ROOT,
+                text=True,
+            )
+            filename = location.split(": source file ", 1)[0].rsplit(":", 2)[0]
+            source = Path(filename).parents[1]
+        (stage / ".mx_vcs_root").touch()
+        (stage / "WORKSPACE").touch()
+        (stage / "BUILD.bazel").write_text(
+            "# gazelle:map_kind java_library elide_java_library @rules_mx//mx:java.bzl\n"
+        )
+        for suite in SUITES:
+            for directory in (f"mx.{suite}", "src"):
+                rel = Path(suite) / directory
+                shutil.copytree(
+                    source / rel,
+                    stage / rel,
+                    ignore=shutil.ignore_patterns(
+                        "BUILD", "BUILD.bazel", "__pycache__"
+                    ),
+                )
+        for suite in SUITES:
+            overlay = ROOT / f"graal/{suite}.patch"
+            patch = generate(suite, stage)
+            if args.check:
+                if overlay.read_text() != patch:
+                    sys.exit(
+                        f"{suite} overlay differs. Regenerate it with tools/generate-graal."
+                    )
+            else:
+                overlay.write_text(patch)
+
+
+if __name__ == "__main__":
+    main()

@@ -84,8 +84,26 @@ register_toolchains(
 
 bazel_dep(name = "rules_cc", version = "0.2.18")
 
-# Reuse Gazelle's locked JUnit dependency for the mx test suite fixture.
+# Reuse Gazelle's locked JUnit and ANTLR runtime artifacts.
 bazel_dep(name = "rules_jvm_external", version = "6.10", dev_dependency = True)
 
 maven = use_extension("@rules_jvm_external//:extensions.bzl", "maven", dev_dependency = True)
 use_repo(maven, "contrib_rules_jvm_deps")
+
+# Real upstream sources for the incremental GraalVM migration.
+graal_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+graal_archive(
+    name = "graal",
+    build_file_content = "",
+    dev_dependency = True,
+    patch_strip = 1,
+    patches = [
+        "//graal:sdk.patch",
+        "//graal:truffle.patch",
+    ],
+    sha256 = "a174bfe9204342b53d0e174c9d44a38a73eef2cdd799384cdb59caac95ab738b",
+    strip_prefix = "graal-7b7825ae92c83d91bb20d76bc64b68b344449cf3",
+    type = "tar.gz",
+    urls = ["https://codeload.github.com/oracle/graal/tar.gz/7b7825ae92c83d91bb20d76bc64b68b344449cf3"],
+)

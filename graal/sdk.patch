@@ -1,0 +1,1490 @@
+diff --git a/sdk/BUILD.bazel b/sdk/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/BUILD.bazel
+@@ -0,0 +1,497 @@
++load("@rules_mx//mx:graph.bzl", "mx_classpath_dist", "mx_processed_java", "mx_processor", "mx_project", "mx_resource_layout", "mx_test_class", "mx_whole_java")
++
++test_suite(
++    name = "tests",
++    visibility = ["//visibility:public"],
++)
++
++mx_project(
++    name = "com.oracle.svm.core.annotate",
++    packages = ["//sdk/src/com.oracle.svm.core.annotate/src/com/oracle/svm/core/annotate"],
++    visibility = ["//visibility:public"],
++    deps = [":org.graalvm.nativeimage"],
++)
++
++mx_project(
++    name = "jdk.graal.compiler.vmaccess.guest",
++    packages = ["//sdk/src/jdk.graal.compiler.vmaccess.guest/src/jdk/graal/compiler/vmaccess/guest"],
++    visibility = ["//visibility:public"],
++)
++
++mx_whole_java(
++    name = "org.graalvm.collections",
++    srcs = ["//sdk/src/org.graalvm.collections/src/org/graalvm/collections:org.graalvm.collections.srcs"],
++    javac_opts = [
++        "--release",
++        "21",
++    ],
++    mx_resource_root = "src/org.graalvm.collections/src",
++    resources = ["//sdk/src/org.graalvm.collections/src/META-INF/native-image/org.graalvm.sdk/collections:org.graalvm.collections.resources"],
++    unified_release = 21,
++    visibility = ["//visibility:public"],
++)
++
++mx_whole_java(
++    name = "org.graalvm.collections.test",
++    testonly = True,
++    srcs = ["//sdk/src/org.graalvm.collections.test/src/org/graalvm/collections/test:org.graalvm.collections.test.srcs"],
++    javac_opts = [
++        "--release",
++        "21",
++    ],
++    unified_release = 21,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":COLLECTIONS",
++        "@contrib_rules_jvm_deps//:junit_junit",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.collections.test.org.graalvm.collections.test.EconomicMapImplTest",
++    project = ":org.graalvm.collections.test",
++    test_class = "org.graalvm.collections.test.EconomicMapImplTest",
++)
++
++mx_test_class(
++    name = "org.graalvm.collections.test.org.graalvm.collections.test.EconomicMapLargeTest",
++    project = ":org.graalvm.collections.test",
++    test_class = "org.graalvm.collections.test.EconomicMapLargeTest",
++)
++
++mx_test_class(
++    name = "org.graalvm.collections.test.org.graalvm.collections.test.EconomicMapTest",
++    project = ":org.graalvm.collections.test",
++    test_class = "org.graalvm.collections.test.EconomicMapTest",
++)
++
++mx_test_class(
++    name = "org.graalvm.collections.test.org.graalvm.collections.test.EconomicMapUtilTest",
++    project = ":org.graalvm.collections.test",
++    test_class = "org.graalvm.collections.test.EconomicMapUtilTest",
++)
++
++mx_test_class(
++    name = "org.graalvm.collections.test.org.graalvm.collections.test.EconomicSetTest",
++    project = ":org.graalvm.collections.test",
++    test_class = "org.graalvm.collections.test.EconomicSetTest",
++)
++
++mx_test_class(
++    name = "org.graalvm.collections.test.org.graalvm.collections.test.EmptyEconomicMapTest",
++    project = ":org.graalvm.collections.test",
++    test_class = "org.graalvm.collections.test.EmptyEconomicMapTest",
++)
++
++mx_test_class(
++    name = "org.graalvm.collections.test.org.graalvm.collections.test.EmptyEconomicSetTest",
++    project = ":org.graalvm.collections.test",
++    test_class = "org.graalvm.collections.test.EmptyEconomicSetTest",
++)
++
++mx_test_class(
++    name = "org.graalvm.collections.test.org.graalvm.collections.test.EquivalenceTest",
++    project = ":org.graalvm.collections.test",
++    test_class = "org.graalvm.collections.test.EquivalenceTest",
++)
++
++mx_test_class(
++    name = "org.graalvm.collections.test.org.graalvm.collections.test.LockFreePoolTest",
++    project = ":org.graalvm.collections.test",
++    test_class = "org.graalvm.collections.test.LockFreePoolTest",
++)
++
++mx_test_class(
++    name = "org.graalvm.collections.test.org.graalvm.collections.test.LockFreePrefixTreeTest",
++    project = ":org.graalvm.collections.test",
++    test_class = "org.graalvm.collections.test.LockFreePrefixTreeTest",
++)
++
++mx_test_class(
++    name = "org.graalvm.collections.test.org.graalvm.collections.test.PairTest",
++    project = ":org.graalvm.collections.test",
++    test_class = "org.graalvm.collections.test.PairTest",
++)
++
++mx_test_class(
++    name = "org.graalvm.collections.test.org.graalvm.collections.test.SeqLockPrefixTreeTest",
++    project = ":org.graalvm.collections.test",
++    test_class = "org.graalvm.collections.test.SeqLockPrefixTreeTest",
++)
++
++mx_whole_java(
++    name = "org.graalvm.home",
++    srcs = [
++        "//sdk/src/org.graalvm.home/src/org/graalvm/home:org.graalvm.home.srcs",
++        "//sdk/src/org.graalvm.home/src/org/graalvm/home/impl:org.graalvm.home.srcs",
++    ],
++    javac_opts = [
++        "--release",
++        "21",
++    ],
++    mx_resource_root = "src/org.graalvm.home/src",
++    resources = ["//sdk/src/org.graalvm.home/src/META-INF/services:org.graalvm.home.resources"],
++    unified_release = 21,
++    visibility = ["//visibility:public"],
++    deps = [":NATIVEIMAGE"],
++)
++
++mx_whole_java(
++    name = "org.graalvm.home.test",
++    testonly = True,
++    srcs = ["//sdk/src/org.graalvm.home.test/src/org/graalvm/home/test:org.graalvm.home.test.srcs"],
++    javac_opts = [
++        "--release",
++        "21",
++    ],
++    unified_release = 21,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":POLYGLOT",
++        "@contrib_rules_jvm_deps//:junit_junit",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.home.test.org.graalvm.home.test.VersionTest",
++    project = ":org.graalvm.home.test",
++    test_class = "org.graalvm.home.test.VersionTest",
++)
++
++mx_processed_java(
++    name = "org.graalvm.jniutils",
++    srcs = ["//sdk/src/org.graalvm.jniutils/src/org/graalvm/jniutils:org.graalvm.jniutils.srcs"],
++    javacopts = [
++        "--release",
++        "21",
++    ],
++    mx_resource_root = "src/org.graalvm.jniutils/src",
++    plugins = [":mx_plugin.NATIVEBRIDGE_PROCESSOR.org.graalvm.nativebridge.processor.NativeBridgeProcessor"],
++    resources = ["//sdk/src/org.graalvm.jniutils/src/META-INF/native-image/org.graalvm.sdk/jniutils:org.graalvm.jniutils.resources"],
++    visibility = ["//visibility:public"],
++    deps = [":NATIVEIMAGE"],
++)
++
++mx_whole_java(
++    name = "org.graalvm.maven.downloader",
++    srcs = ["//sdk/src/org.graalvm.maven.downloader/src/org/graalvm/maven/downloader:org.graalvm.maven.downloader.srcs"],
++    javac_opts = [
++        "--release",
++        "21",
++        "--add-modules",
++        "java.logging,java.xml",
++    ],
++    mx_resource_root = "src/org.graalvm.maven.downloader/src",
++    resources = ["//sdk/src/org.graalvm.maven.downloader/src/META-INF/native-image/org.graalvm.sdk/maven-downloader:org.graalvm.maven.downloader.resources"],
++    unified_release = 21,
++    visibility = ["//visibility:public"],
++    deps = [":NATIVEIMAGE"],
++)
++
++mx_whole_java(
++    name = "org.graalvm.nativebridge.processor",
++    srcs = ["//sdk/src/org.graalvm.nativebridge.processor/src/org/graalvm/nativebridge/processor:org.graalvm.nativebridge.processor.srcs"],
++    javac_opts = [
++        "--release",
++        "21",
++        "--add-modules",
++        "java.compiler",
++    ],
++    mx_resource_root = "src/org.graalvm.nativebridge.processor/src",
++    resources = ["//sdk/src/org.graalvm.nativebridge.processor/src/META-INF/services:org.graalvm.nativebridge.processor.resources"],
++    unified_release = 21,
++    visibility = ["//visibility:public"],
++)
++
++mx_whole_java(
++    name = "org.graalvm.nativeimage",
++    srcs = [
++        "//sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage:org.graalvm.nativeimage.srcs",
++        "//sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/c:org.graalvm.nativeimage.srcs",
++        "//sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/c/constant:org.graalvm.nativeimage.srcs",
++        "//sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/c/function:org.graalvm.nativeimage.srcs",
++        "//sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/c/struct:org.graalvm.nativeimage.srcs",
++        "//sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/c/type:org.graalvm.nativeimage.srcs",
++        "//sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/dynamicaccess:org.graalvm.nativeimage.srcs",
++        "//sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/hosted:org.graalvm.nativeimage.srcs",
++        "//sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/impl:org.graalvm.nativeimage.srcs",
++        "//sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/impl/clinit:org.graalvm.nativeimage.srcs",
++    ],
++    javac_opts = [
++        "--release",
++        "21",
++    ],
++    mx_resource_root = "src/org.graalvm.nativeimage/src",
++    resources = [
++        "//sdk/src/org.graalvm.nativeimage/src/META-INF/native-image/org.graalvm.sdk/nativeimage:org.graalvm.nativeimage.resources",
++        "//sdk/src/org.graalvm.nativeimage/src/META-INF/services:org.graalvm.nativeimage.resources",
++        "//sdk/src/org.graalvm.nativeimage/src/META-INF/upgrade:org.graalvm.nativeimage.resources",
++    ],
++    unified_release = 21,
++    visibility = ["//visibility:public"],
++    deps = [":WORD"],
++)
++
++mx_whole_java(
++    name = "org.graalvm.nativeimage.libgraal",
++    srcs = [
++        "//sdk/src/org.graalvm.nativeimage.libgraal/src/org/graalvm/nativeimage/libgraal:org.graalvm.nativeimage.libgraal.srcs",
++        "//sdk/src/org.graalvm.nativeimage.libgraal/src/org/graalvm/nativeimage/libgraal/hosted:org.graalvm.nativeimage.libgraal.srcs",
++        "//sdk/src/org.graalvm.nativeimage.libgraal/src/org/graalvm/nativeimage/libgraal/impl:org.graalvm.nativeimage.libgraal.srcs",
++    ],
++    javac_opts = [
++        "--release",
++        "21",
++    ],
++    unified_release = 21,
++    visibility = ["//visibility:public"],
++    deps = [":NATIVEIMAGE"],
++)
++
++mx_whole_java(
++    name = "org.graalvm.nativeimage.test",
++    testonly = True,
++    srcs = ["//sdk/src/org.graalvm.nativeimage.test/src/org/graalvm/nativeimage/test:org.graalvm.nativeimage.test.srcs"],
++    javac_opts = [
++        "--release",
++        "21",
++    ],
++    unified_release = 21,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":org.graalvm.nativeimage",
++        "@contrib_rules_jvm_deps//:junit_junit",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.nativeimage.test.org.graalvm.nativeimage.test.ImageSingletonsTest",
++    project = ":org.graalvm.nativeimage.test",
++    test_class = "org.graalvm.nativeimage.test.ImageSingletonsTest",
++)
++
++mx_project(
++    name = "org.graalvm.options",
++    packages = ["//sdk/src/org.graalvm.options/src/org/graalvm/options"],
++    visibility = ["//visibility:public"],
++    deps = [":NATIVEIMAGE"],
++)
++
++mx_whole_java(
++    name = "org.graalvm.polyglot",
++    srcs = [
++        "//sdk/src/org.graalvm.polyglot/src/org/graalvm/polyglot:org.graalvm.polyglot.srcs",
++        "//sdk/src/org.graalvm.polyglot/src/org/graalvm/polyglot/impl:org.graalvm.polyglot.srcs",
++        "//sdk/src/org.graalvm.polyglot/src/org/graalvm/polyglot/io:org.graalvm.polyglot.srcs",
++        "//sdk/src/org.graalvm.polyglot/src/org/graalvm/polyglot/management:org.graalvm.polyglot.srcs",
++        "//sdk/src/org.graalvm.polyglot/src/org/graalvm/polyglot/proxy:org.graalvm.polyglot.srcs",
++    ],
++    javac_opts = [
++        "--release",
++        "21",
++        "--add-modules",
++        "java.logging",
++    ],
++    mx_resource_root = "src/org.graalvm.polyglot/src",
++    resources = ["//sdk/src/org.graalvm.polyglot/src/META-INF/native-image/org.graalvm.polyglot/polyglot:org.graalvm.polyglot.resources"],
++    unified_release = 21,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":NATIVEIMAGE",
++        ":org.graalvm.collections",
++        ":org.graalvm.home",
++        ":org.graalvm.options",
++    ],
++)
++
++mx_project(
++    name = "org.graalvm.polyglot.tck",
++    packages = ["//sdk/src/org.graalvm.polyglot.tck/src/org/graalvm/polyglot/tck"],
++    visibility = ["//visibility:public"],
++    deps = [":POLYGLOT"],
++)
++
++mx_project(
++    name = "org.graalvm.resourcecopy",
++    packages = ["//sdk/src/org.graalvm.resourcecopy/src/org/graalvm/resourcecopy"],
++    visibility = ["//visibility:public"],
++    deps = [":POLYGLOT"],
++)
++
++mx_whole_java(
++    name = "org.graalvm.sdk",
++    srcs = ["//sdk/src/org.graalvm.sdk/src/org/graalvm/sdk:org.graalvm.sdk.srcs"],
++    javac_opts = [
++        "--release",
++        "21",
++    ],
++    mx_resource_root = "src/org.graalvm.sdk/src",
++    resources = ["//sdk/src/org.graalvm.sdk/src/META-INF/native-image/org.graalvm.sdk/graal-sdk:org.graalvm.sdk.resources"],
++    unified_release = 21,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":COLLECTIONS",
++        ":NATIVEIMAGE",
++        ":POLYGLOT",
++        ":WORD",
++    ],
++)
++
++mx_project(
++    name = "org.graalvm.webimage.api",
++    packages = ["//sdk/src/org.graalvm.webimage.api/src/org/graalvm/webimage/api"],
++    visibility = ["//visibility:public"],
++)
++
++mx_whole_java(
++    name = "org.graalvm.word",
++    srcs = [
++        "//sdk/src/org.graalvm.word/src/org/graalvm/word:org.graalvm.word.srcs",
++        "//sdk/src/org.graalvm.word/src/org/graalvm/word/impl:org.graalvm.word.srcs",
++    ],
++    javac_opts = [
++        "--release",
++        "21",
++    ],
++    mx_resource_root = "src/org.graalvm.word/src",
++    resources = [
++        "//sdk/src/org.graalvm.word/src/META-INF/native-image/org.graalvm.sdk/word:org.graalvm.word.resources",
++        "//sdk/src/org.graalvm.word/src/org/graalvm/word/impl:org.graalvm.word.resources",
++    ],
++    unified_release = 21,
++    visibility = ["//visibility:public"],
++)
++
++mx_whole_java(
++    name = "org.graalvm.word.test",
++    testonly = True,
++    srcs = ["//sdk/src/org.graalvm.word.test/src/org/graalvm/word/test:org.graalvm.word.test.srcs"],
++    javac_opts = [
++        "--release",
++        "21",
++    ],
++    unified_release = 21,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":org.graalvm.word",
++        "@contrib_rules_jvm_deps//:junit_junit",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.word.test.org.graalvm.word.test.WordTests",
++    project = ":org.graalvm.word.test",
++    test_class = "org.graalvm.word.test.WordTests",
++)
++
++mx_classpath_dist(
++    name = "COLLECTIONS",
++    visibility = ["//visibility:public"],
++    deps = [":org.graalvm.collections"],
++)
++
++mx_classpath_dist(
++    name = "GRAAL_SDK",
++    visibility = ["//visibility:public"],
++    deps = [
++        ":COLLECTIONS",
++        ":NATIVEIMAGE",
++        ":POLYGLOT",
++        ":WORD",
++        ":org.graalvm.sdk",
++    ],
++)
++
++mx_classpath_dist(
++    name = "MAVEN_DOWNLOADER",
++    visibility = ["//visibility:public"],
++    deps = [
++        ":MAVEN_DOWNLOADER_VERSION",
++        ":NATIVEIMAGE",
++        ":org.graalvm.maven.downloader",
++    ],
++)
++
++mx_classpath_dist(
++    name = "NATIVEIMAGE",
++    visibility = ["//visibility:public"],
++    deps = [
++        ":WORD",
++        ":com.oracle.svm.core.annotate",
++        ":org.graalvm.nativeimage",
++    ],
++)
++
++mx_classpath_dist(
++    name = "NATIVEIMAGE_LIBGRAAL",
++    visibility = ["//visibility:public"],
++    deps = [
++        ":NATIVEIMAGE",
++        ":org.graalvm.nativeimage.libgraal",
++    ],
++)
++
++mx_classpath_dist(
++    name = "POLYGLOT",
++    visibility = ["//visibility:public"],
++    deps = [
++        ":COLLECTIONS",
++        ":NATIVEIMAGE",
++        ":POLYGLOT_VERSION",
++        ":org.graalvm.home",
++        ":org.graalvm.polyglot",
++    ],
++)
++
++mx_classpath_dist(
++    name = "RESOURCECOPY",
++    visibility = ["//visibility:public"],
++    deps = [
++        ":POLYGLOT",
++        ":org.graalvm.resourcecopy",
++    ],
++)
++
++mx_classpath_dist(
++    name = "WEBIMAGE_PREVIEW",
++    visibility = ["//visibility:public"],
++    deps = [":org.graalvm.webimage.api"],
++)
++
++mx_classpath_dist(
++    name = "WORD",
++    visibility = ["//visibility:public"],
++    deps = [":org.graalvm.word"],
++)
++
++mx_resource_layout(
++    name = "MAVEN_DOWNLOADER_VERSION",
++    copies = {
++        "META-INF/graalvm/org.graalvm.maven.downloader/version": ":VERSION.files/version",
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_resource_layout(
++    name = "POLYGLOT_VERSION",
++    copies = {
++        "META-INF/graalvm/org.graalvm.polyglot/version": ":VERSION.files/version",
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_resource_layout(
++    name = "VERSION",
++    literals = {
++        "version": "25.5.5",
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_processor(
++    name = "mx_plugin.NATIVEBRIDGE_PROCESSOR.org.graalvm.nativebridge.processor.NativeBridgeProcessor",
++    generates_api = True,
++    processor_class = "org.graalvm.nativebridge.processor.NativeBridgeProcessor",
++    visibility = ["//visibility:public"],
++    deps = [":org.graalvm.nativebridge.processor"],
++)
+diff --git a/sdk/src/com.oracle.svm.core.annotate/src/com/oracle/svm/core/annotate/BUILD.bazel b/sdk/src/com.oracle.svm.core.annotate/src/com/oracle/svm/core/annotate/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/com.oracle.svm.core.annotate/src/com/oracle/svm/core/annotate/BUILD.bazel
+@@ -0,0 +1,25 @@
++load("@rules_mx//mx:java.bzl", "elide_java_library")
++
++elide_java_library(
++    name = "annotate",
++    srcs = [
++        "Alias.java",
++        "AnnotateOriginal.java",
++        "Delete.java",
++        "Inject.java",
++        "InjectAccessors.java",
++        "KeepOriginal.java",
++        "RecomputeFieldValue.java",
++        "Substitute.java",
++        "TargetClass.java",
++        "TargetElement.java",
++        "package-info.java",
++    ],
++    javac_opts = [
++        "--release",
++        "21",
++    ],
++    unified_release = 21,
++    visibility = ["//:__subpackages__"],
++    deps = ["//sdk:org.graalvm.nativeimage"],
++)
+diff --git a/sdk/src/jdk.graal.compiler.vmaccess.guest/src/jdk/graal/compiler/vmaccess/guest/BUILD.bazel b/sdk/src/jdk.graal.compiler.vmaccess.guest/src/jdk/graal/compiler/vmaccess/guest/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/jdk.graal.compiler.vmaccess.guest/src/jdk/graal/compiler/vmaccess/guest/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:java.bzl", "elide_java_library")
++
++elide_java_library(
++    name = "guest",
++    srcs = ["HostProxyException.java"],
++    javac_opts = [
++        "--release",
++        "21",
++    ],
++    unified_release = 21,
++    visibility = ["//:__subpackages__"],
++)
+diff --git a/sdk/src/org.graalvm.collections/src/META-INF/native-image/org.graalvm.sdk/collections/BUILD.bazel b/sdk/src/org.graalvm.collections/src/META-INF/native-image/org.graalvm.sdk/collections/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.collections/src/META-INF/native-image/org.graalvm.sdk/collections/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.collections.resources",
++    srcs = ["native-image.properties"],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.collections/src/org/graalvm/collections/BUILD.bazel b/sdk/src/org.graalvm.collections/src/org/graalvm/collections/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.collections/src/org/graalvm/collections/BUILD.bazel
+@@ -0,0 +1,26 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.collections.srcs",
++    srcs = [
++        "EconomicMap.java",
++        "EconomicMapImpl.java",
++        "EconomicMapUtil.java",
++        "EconomicMapWrap.java",
++        "EconomicSet.java",
++        "EmptyMap.java",
++        "EmptySet.java",
++        "Equivalence.java",
++        "LockFreePool.java",
++        "LockFreePrefixTree.java",
++        "MapCursor.java",
++        "Pair.java",
++        "SeqLockPrefixTree.java",
++        "SuppressFBWarnings.java",
++        "UnmodifiableEconomicMap.java",
++        "UnmodifiableEconomicSet.java",
++        "UnmodifiableMapCursor.java",
++        "package-info.java",
++    ],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.collections.test/src/org/graalvm/collections/test/BUILD.bazel b/sdk/src/org.graalvm.collections.test/src/org/graalvm/collections/test/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.collections.test/src/org/graalvm/collections/test/BUILD.bazel
+@@ -0,0 +1,20 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.collections.test.srcs",
++    srcs = [
++        "EconomicMapImplTest.java",
++        "EconomicMapLargeTest.java",
++        "EconomicMapTest.java",
++        "EconomicMapUtilTest.java",
++        "EconomicSetTest.java",
++        "EmptyEconomicMapTest.java",
++        "EmptyEconomicSetTest.java",
++        "EquivalenceTest.java",
++        "LockFreePoolTest.java",
++        "LockFreePrefixTreeTest.java",
++        "PairTest.java",
++        "SeqLockPrefixTreeTest.java",
++    ],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.home/src/META-INF/services/BUILD.bazel b/sdk/src/org.graalvm.home/src/META-INF/services/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.home/src/META-INF/services/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.home.resources",
++    srcs = ["org.graalvm.home.HomeFinder"],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.home/src/org/graalvm/home/BUILD.bazel b/sdk/src/org.graalvm.home/src/org/graalvm/home/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.home/src/org/graalvm/home/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.home.srcs",
++    srcs = [
++        "HomeFinder.java",
++        "Version.java",
++        "package-info.java",
++    ],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.home/src/org/graalvm/home/impl/BUILD.bazel b/sdk/src/org.graalvm.home/src/org/graalvm/home/impl/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.home/src/org/graalvm/home/impl/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.home.srcs",
++    srcs = [
++        "DefaultHomeFinder.java",
++        "VmLocatorSymbol.java",
++    ],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.home.test/src/org/graalvm/home/test/BUILD.bazel b/sdk/src/org.graalvm.home.test/src/org/graalvm/home/test/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.home.test/src/org/graalvm/home/test/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.home.test.srcs",
++    srcs = ["VersionTest.java"],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.jniutils/src/META-INF/native-image/org.graalvm.sdk/jniutils/BUILD.bazel b/sdk/src/org.graalvm.jniutils/src/META-INF/native-image/org.graalvm.sdk/jniutils/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.jniutils/src/META-INF/native-image/org.graalvm.sdk/jniutils/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.jniutils.resources",
++    srcs = ["native-image.properties"],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.jniutils/src/org/graalvm/jniutils/BUILD.bazel b/sdk/src/org.graalvm.jniutils/src/org/graalvm/jniutils/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.jniutils/src/org/graalvm/jniutils/BUILD.bazel
+@@ -0,0 +1,18 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.jniutils.srcs",
++    srcs = [
++        "HSObject.java",
++        "JNI.java",
++        "JNICalls.java",
++        "JNIEntryPoint.java",
++        "JNIEntryPointProvider.java",
++        "JNIExceptionWrapper.java",
++        "JNIExceptionWrapperEntryPoints.java",
++        "JNIMethodScope.java",
++        "JNIUtil.java",
++        "NativeBridgeSupport.java",
++    ],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.maven.downloader/src/META-INF/native-image/org.graalvm.sdk/maven-downloader/BUILD.bazel b/sdk/src/org.graalvm.maven.downloader/src/META-INF/native-image/org.graalvm.sdk/maven-downloader/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.maven.downloader/src/META-INF/native-image/org.graalvm.sdk/maven-downloader/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.maven.downloader.resources",
++    srcs = [
++        "native-image.properties",
++        "reachability-metadata.json",
++    ],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.maven.downloader/src/org/graalvm/maven/downloader/BUILD.bazel b/sdk/src/org.graalvm.maven.downloader/src/org/graalvm/maven/downloader/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.maven.downloader/src/org/graalvm/maven/downloader/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.maven.downloader.srcs",
++    srcs = [
++        "MVNDownloader.java",
++        "Main.java",
++        "OptionProperties.java",
++    ],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.nativebridge.processor/src/META-INF/services/BUILD.bazel b/sdk/src/org.graalvm.nativebridge.processor/src/META-INF/services/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.nativebridge.processor/src/META-INF/services/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.nativebridge.processor.resources",
++    srcs = ["javax.annotation.processing.Processor"],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.nativebridge.processor/src/org/graalvm/nativebridge/processor/BUILD.bazel b/sdk/src/org.graalvm.nativebridge.processor/src/org/graalvm/nativebridge/processor/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.nativebridge.processor/src/org/graalvm/nativebridge/processor/BUILD.bazel
+@@ -0,0 +1,40 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.nativebridge.processor.srcs",
++    srcs = [
++        "AbstractBridgeGenerator.java",
++        "AbstractBridgeParser.java",
++        "AbstractFactoryParser.java",
++        "AbstractNativeServiceGenerator.java",
++        "AbstractNativeServiceParser.java",
++        "AbstractProcessor.java",
++        "AbstractServiceGenerator.java",
++        "AbstractServiceParser.java",
++        "CodeBuilder.java",
++        "ExpectError.java",
++        "HotSpotToNativeFactoryGenerator.java",
++        "HotSpotToNativeFactoryParser.java",
++        "HotSpotToNativeServiceGenerator.java",
++        "HotSpotToNativeServiceParser.java",
++        "HotSpotToNativeTypeCache.java",
++        "JNIEntryPointGenerator.java",
++        "JNIEntryPointParser.java",
++        "NativeBridgeProcessor.java",
++        "NativeBridgeTypeCache.java",
++        "NativeToHotSpotServiceGenerator.java",
++        "NativeToHotSpotServiceParser.java",
++        "NativeToNativeFactoryGenerator.java",
++        "NativeToNativeFactoryParser.java",
++        "NativeToNativeServiceGenerator.java",
++        "NativeToNativeServiceParser.java",
++        "ProcessToProcessFactoryGenerator.java",
++        "ProcessToProcessFactoryParser.java",
++        "ProcessToProcessServiceGenerator.java",
++        "ProcessToProcessServiceParser.java",
++        "ProcessToProcessTypeCache.java",
++        "SuppressFBWarnings.java",
++        "Utilities.java",
++    ],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.nativeimage/src/META-INF/native-image/org.graalvm.sdk/nativeimage/BUILD.bazel b/sdk/src/org.graalvm.nativeimage/src/META-INF/native-image/org.graalvm.sdk/nativeimage/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.nativeimage/src/META-INF/native-image/org.graalvm.sdk/nativeimage/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.nativeimage.resources",
++    srcs = ["native-image.properties"],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.nativeimage/src/META-INF/services/BUILD.bazel b/sdk/src/org.graalvm.nativeimage/src/META-INF/services/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.nativeimage/src/META-INF/services/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.nativeimage.resources",
++    srcs = ["org.graalvm.nativeimage.Platform"],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.nativeimage/src/META-INF/upgrade/BUILD.bazel b/sdk/src/org.graalvm.nativeimage/src/META-INF/upgrade/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.nativeimage/src/META-INF/upgrade/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.nativeimage.resources",
++    srcs = ["StackValueGetClass.hint"],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/BUILD.bazel b/sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/BUILD.bazel
+@@ -0,0 +1,33 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.nativeimage.srcs",
++    srcs = [
++        "AnnotationAccess.java",
++        "CurrentIsolate.java",
++        "ImageInfo.java",
++        "ImageSingletons.java",
++        "Isolate.java",
++        "IsolateThread.java",
++        "Isolates.java",
++        "LogHandler.java",
++        "MissingForeignRegistrationError.java",
++        "MissingJNIRegistrationError.java",
++        "MissingReflectionRegistrationError.java",
++        "ObjectHandle.java",
++        "ObjectHandles.java",
++        "PinnedObject.java",
++        "Platform.java",
++        "Platforms.java",
++        "ProcessProperties.java",
++        "RuntimeOptions.java",
++        "RuntimeStateTrimCallbackException.java",
++        "RuntimeStateTrimConfig.java",
++        "StackValue.java",
++        "Threading.java",
++        "UnmanagedMemory.java",
++        "VMRuntime.java",
++        "package-info.java",
++    ],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/c/BUILD.bazel b/sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/c/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/c/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.nativeimage.srcs",
++    srcs = [
++        "CContext.java",
++        "CHeader.java",
++        "package-info.java",
++    ],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/c/constant/BUILD.bazel b/sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/c/constant/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/c/constant/BUILD.bazel
+@@ -0,0 +1,14 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.nativeimage.srcs",
++    srcs = [
++        "CConstant.java",
++        "CEnum.java",
++        "CEnumConstant.java",
++        "CEnumLookup.java",
++        "CEnumValue.java",
++        "package-info.java",
++    ],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/c/function/BUILD.bazel b/sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/c/function/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/c/function/BUILD.bazel
+@@ -0,0 +1,18 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.nativeimage.srcs",
++    srcs = [
++        "CEntryPoint.java",
++        "CEntryPointLiteral.java",
++        "CFunction.java",
++        "CFunctionPointer.java",
++        "CLibrary.java",
++        "CMacroInfo.java",
++        "CodePointer.java",
++        "InvokeCFunctionPointer.java",
++        "RelocatedPointer.java",
++        "package-info.java",
++    ],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/c/struct/BUILD.bazel b/sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/c/struct/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/c/struct/BUILD.bazel
+@@ -0,0 +1,25 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.nativeimage.srcs",
++    srcs = [
++        "AllowNarrowingCast.java",
++        "AllowWideningCast.java",
++        "CBitfield.java",
++        "CField.java",
++        "CFieldAddress.java",
++        "CFieldOffset.java",
++        "CPointerTo.java",
++        "CStruct.java",
++        "CTypedefOfInfo.java",
++        "RawField.java",
++        "RawFieldAddress.java",
++        "RawFieldOffset.java",
++        "RawPointerTo.java",
++        "RawStructure.java",
++        "SizeOf.java",
++        "UniqueLocationIdentity.java",
++        "package-info.java",
++    ],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/c/type/BUILD.bazel b/sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/c/type/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/c/type/BUILD.bazel
+@@ -0,0 +1,23 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.nativeimage.srcs",
++    srcs = [
++        "CCharPointer.java",
++        "CCharPointerPointer.java",
++        "CConst.java",
++        "CDoublePointer.java",
++        "CFloatPointer.java",
++        "CIntPointer.java",
++        "CIntPointerPointer.java",
++        "CLongPointer.java",
++        "CShortPointer.java",
++        "CTypeConversion.java",
++        "CTypedef.java",
++        "CUnsigned.java",
++        "VoidPointer.java",
++        "WordPointer.java",
++        "package-info.java",
++    ],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/dynamicaccess/BUILD.bazel b/sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/dynamicaccess/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/dynamicaccess/BUILD.bazel
+@@ -0,0 +1,14 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.nativeimage.srcs",
++    srcs = [
++        "AccessCondition.java",
++        "ForeignAccess.java",
++        "JNIAccess.java",
++        "ReflectiveAccess.java",
++        "ResourceAccess.java",
++        "package-info.java",
++    ],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/hosted/BUILD.bazel b/sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/hosted/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/hosted/BUILD.bazel
+@@ -0,0 +1,19 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.nativeimage.srcs",
++    srcs = [
++        "Feature.java",
++        "FieldValueTransformer.java",
++        "RuntimeClassInitialization.java",
++        "RuntimeForeignAccess.java",
++        "RuntimeJNIAccess.java",
++        "RuntimeProxyCreation.java",
++        "RuntimeReflection.java",
++        "RuntimeResourceAccess.java",
++        "RuntimeSerialization.java",
++        "RuntimeSystemProperties.java",
++        "package-info.java",
++    ],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/impl/BUILD.bazel b/sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/impl/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/impl/BUILD.bazel
+@@ -0,0 +1,40 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.nativeimage.srcs",
++    srcs = [
++        "APIDeprecationSupport.java",
++        "AnnotationExtractor.java",
++        "CConstantValueSupport.java",
++        "CEntryPointLiteralCodePointer.java",
++        "CTypeConversionSupport.java",
++        "ClassLoading.java",
++        "ClassLoadingSupport.java",
++        "HeapDumpSupport.java",
++        "ImageSingletonsSupport.java",
++        "InternalPlatform.java",
++        "IsolateSupport.java",
++        "ObjectHandlesSupport.java",
++        "PinnedObjectSupport.java",
++        "ProcessPropertiesSupport.java",
++        "ReflectionIntrospector.java",
++        "ReflectionRegistry.java",
++        "RuntimeClassInitializationSupport.java",
++        "RuntimeForeignAccessSupport.java",
++        "RuntimeJNIAccessSupport.java",
++        "RuntimeOptionsSupport.java",
++        "RuntimeProxyCreationSupport.java",
++        "RuntimeProxyRegistrySupport.java",
++        "RuntimeReflectionSupport.java",
++        "RuntimeResourceSupport.java",
++        "RuntimeSerializationSupport.java",
++        "RuntimeSystemPropertiesSupport.java",
++        "SizeOfSupport.java",
++        "ThreadingSupport.java",
++        "TypeReachabilityCondition.java",
++        "UnmanagedMemorySupport.java",
++        "UnsafeMemorySupport.java",
++        "VMRuntimeSupport.java",
++    ],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/impl/clinit/BUILD.bazel b/sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/impl/clinit/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/impl/clinit/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.nativeimage.srcs",
++    srcs = ["ClassInitializationTracking.java"],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.nativeimage.libgraal/src/org/graalvm/nativeimage/libgraal/BUILD.bazel b/sdk/src/org.graalvm.nativeimage.libgraal/src/org/graalvm/nativeimage/libgraal/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.nativeimage.libgraal/src/org/graalvm/nativeimage/libgraal/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.nativeimage.libgraal.srcs",
++    srcs = [
++        "LibGraalRuntime.java",
++        "package-info.java",
++    ],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.nativeimage.libgraal/src/org/graalvm/nativeimage/libgraal/hosted/BUILD.bazel b/sdk/src/org.graalvm.nativeimage.libgraal/src/org/graalvm/nativeimage/libgraal/hosted/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.nativeimage.libgraal/src/org/graalvm/nativeimage/libgraal/hosted/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.nativeimage.libgraal.srcs",
++    srcs = [
++        "GlobalData.java",
++        "LibGraalLoader.java",
++        "package-info.java",
++    ],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.nativeimage.libgraal/src/org/graalvm/nativeimage/libgraal/impl/BUILD.bazel b/sdk/src/org.graalvm.nativeimage.libgraal/src/org/graalvm/nativeimage/libgraal/impl/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.nativeimage.libgraal/src/org/graalvm/nativeimage/libgraal/impl/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.nativeimage.libgraal.srcs",
++    srcs = [
++        "GlobalDataSupport.java",
++        "LibGraalRuntimeSupport.java",
++    ],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.nativeimage.test/src/org/graalvm/nativeimage/test/BUILD.bazel b/sdk/src/org.graalvm.nativeimage.test/src/org/graalvm/nativeimage/test/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.nativeimage.test/src/org/graalvm/nativeimage/test/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.nativeimage.test.srcs",
++    srcs = [
++        "FindPathsInBinary.java",
++        "ImageSingletonsTest.java",
++    ],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.options/src/org/graalvm/options/BUILD.bazel b/sdk/src/org.graalvm.options/src/org/graalvm/options/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.options/src/org/graalvm/options/BUILD.bazel
+@@ -0,0 +1,27 @@
++load("@rules_mx//mx:java.bzl", "elide_java_library")
++
++elide_java_library(
++    name = "options",
++    srcs = [
++        "ConstantOptionKey.java",
++        "OptionCategory.java",
++        "OptionDescriptor.java",
++        "OptionDescriptors.java",
++        "OptionKey.java",
++        "OptionMap.java",
++        "OptionStability.java",
++        "OptionType.java",
++        "OptionValues.java",
++        "package-info.java",
++    ],
++    javac_opts = [
++        "--release",
++        "21",
++    ],
++    unified_release = 21,
++    visibility = ["//:__subpackages__"],
++    deps = [
++        "//sdk:NATIVEIMAGE",
++        "//sdk:org.graalvm.nativeimage",
++    ],
++)
+diff --git a/sdk/src/org.graalvm.polyglot/src/META-INF/native-image/org.graalvm.polyglot/polyglot/BUILD.bazel b/sdk/src/org.graalvm.polyglot/src/META-INF/native-image/org.graalvm.polyglot/polyglot/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.polyglot/src/META-INF/native-image/org.graalvm.polyglot/polyglot/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.polyglot.resources",
++    srcs = ["native-image.properties"],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.polyglot/src/org/graalvm/polyglot/BUILD.bazel b/sdk/src/org.graalvm.polyglot/src/org/graalvm/polyglot/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.polyglot/src/org/graalvm/polyglot/BUILD.bazel
+@@ -0,0 +1,24 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.polyglot.srcs",
++    srcs = [
++        "Context.java",
++        "Engine.java",
++        "EnvironmentAccess.java",
++        "HostAccess.java",
++        "Instrument.java",
++        "Language.java",
++        "PolyglotAccess.java",
++        "PolyglotException.java",
++        "ResourceLimitEvent.java",
++        "ResourceLimits.java",
++        "SandboxPolicy.java",
++        "Source.java",
++        "SourceSection.java",
++        "TypeLiteral.java",
++        "Value.java",
++        "package-info.java",
++    ],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.polyglot/src/org/graalvm/polyglot/impl/BUILD.bazel b/sdk/src/org.graalvm.polyglot/src/org/graalvm/polyglot/impl/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.polyglot/src/org/graalvm/polyglot/impl/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.polyglot.srcs",
++    srcs = ["AbstractPolyglotImpl.java"],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.polyglot/src/org/graalvm/polyglot/io/BUILD.bazel b/sdk/src/org.graalvm.polyglot/src/org/graalvm/polyglot/io/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.polyglot/src/org/graalvm/polyglot/io/BUILD.bazel
+@@ -0,0 +1,19 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.polyglot.srcs",
++    srcs = [
++        "ByteArraySequence.java",
++        "ByteSequence.java",
++        "FileChannel.java",
++        "FileLock.java",
++        "FileSystem.java",
++        "IOAccess.java",
++        "IOHelper.java",
++        "MessageEndpoint.java",
++        "MessageTransport.java",
++        "ProcessHandler.java",
++        "package-info.java",
++    ],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.polyglot/src/org/graalvm/polyglot/management/BUILD.bazel b/sdk/src/org.graalvm.polyglot/src/org/graalvm/polyglot/management/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.polyglot/src/org/graalvm/polyglot/management/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.polyglot.srcs",
++    srcs = [
++        "ExecutionEvent.java",
++        "ExecutionListener.java",
++        "Management.java",
++        "package-info.java",
++    ],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.polyglot/src/org/graalvm/polyglot/proxy/BUILD.bazel b/sdk/src/org.graalvm.polyglot/src/org/graalvm/polyglot/proxy/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.polyglot/src/org/graalvm/polyglot/proxy/BUILD.bazel
+@@ -0,0 +1,23 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.polyglot.srcs",
++    srcs = [
++        "Proxy.java",
++        "ProxyArray.java",
++        "ProxyDate.java",
++        "ProxyDuration.java",
++        "ProxyExecutable.java",
++        "ProxyHashMap.java",
++        "ProxyInstant.java",
++        "ProxyInstantiable.java",
++        "ProxyIterable.java",
++        "ProxyIterator.java",
++        "ProxyNativeObject.java",
++        "ProxyObject.java",
++        "ProxyTime.java",
++        "ProxyTimeZone.java",
++        "package-info.java",
++    ],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.polyglot.tck/src/org/graalvm/polyglot/tck/BUILD.bazel b/sdk/src/org.graalvm.polyglot.tck/src/org/graalvm/polyglot/tck/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.polyglot.tck/src/org/graalvm/polyglot/tck/BUILD.bazel
+@@ -0,0 +1,26 @@
++load("@rules_mx//mx:java.bzl", "elide_java_library")
++
++elide_java_library(
++    name = "tck",
++    srcs = [
++        "DefaultResultVerifier.java",
++        "IdentityFunctionResultVerifier.java",
++        "InlineSnippet.java",
++        "LanguageProvider.java",
++        "ResultVerifier.java",
++        "Snippet.java",
++        "TypeDescriptor.java",
++        "package-info.java",
++    ],
++    javac_opts = [
++        "--release",
++        "21",
++    ],
++    unified_release = 21,
++    visibility = ["//:__subpackages__"],
++    exports = ["//sdk:org.graalvm.polyglot"],
++    deps = [
++        "//sdk:POLYGLOT",
++        "//sdk:org.graalvm.polyglot",
++    ],
++)
+diff --git a/sdk/src/org.graalvm.resourcecopy/src/org/graalvm/resourcecopy/BUILD.bazel b/sdk/src/org.graalvm.resourcecopy/src/org/graalvm/resourcecopy/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.resourcecopy/src/org/graalvm/resourcecopy/BUILD.bazel
+@@ -0,0 +1,24 @@
++load("@rules_java//java:defs.bzl", "java_binary")
++load("@rules_mx//mx:java.bzl", "elide_java_library")
++
++elide_java_library(
++    name = "resourcecopy",
++    srcs = ["CopyResources.java"],
++    javac_opts = [
++        "--release",
++        "21",
++    ],
++    unified_release = 21,
++    visibility = ["//:__subpackages__"],
++    deps = [
++        "//sdk:POLYGLOT",
++        "//sdk:org.graalvm.polyglot",
++    ],
++)
++
++java_binary(
++    name = "CopyResources",
++    main_class = "org.graalvm.resourcecopy.CopyResources",
++    visibility = ["//visibility:public"],
++    runtime_deps = [":resourcecopy"],
++)
+diff --git a/sdk/src/org.graalvm.sdk/src/META-INF/native-image/org.graalvm.sdk/graal-sdk/BUILD.bazel b/sdk/src/org.graalvm.sdk/src/META-INF/native-image/org.graalvm.sdk/graal-sdk/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.sdk/src/META-INF/native-image/org.graalvm.sdk/graal-sdk/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.sdk.resources",
++    srcs = ["native-image.properties"],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.sdk/src/org/graalvm/sdk/BUILD.bazel b/sdk/src/org.graalvm.sdk/src/org/graalvm/sdk/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.sdk/src/org/graalvm/sdk/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.sdk.srcs",
++    srcs = [
++        "Placeholder.java",
++        "package-info.java",
++    ],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.webimage.api/src/org/graalvm/webimage/api/BUILD.bazel b/sdk/src/org.graalvm.webimage.api/src/org/graalvm/webimage/api/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.webimage.api/src/org/graalvm/webimage/api/BUILD.bazel
+@@ -0,0 +1,25 @@
++load("@rules_mx//mx:java.bzl", "elide_java_library")
++
++elide_java_library(
++    name = "api",
++    srcs = [
++        "JS.java",
++        "JSBigInt.java",
++        "JSBoolean.java",
++        "JSNumber.java",
++        "JSObject.java",
++        "JSResource.java",
++        "JSString.java",
++        "JSSymbol.java",
++        "JSUndefined.java",
++        "JSValue.java",
++        "ThrownFromJavaScript.java",
++        "package-info.java",
++    ],
++    javac_opts = [
++        "--release",
++        "21",
++    ],
++    unified_release = 21,
++    visibility = ["//:__subpackages__"],
++)
+diff --git a/sdk/src/org.graalvm.word/src/META-INF/native-image/org.graalvm.sdk/word/BUILD.bazel b/sdk/src/org.graalvm.word/src/META-INF/native-image/org.graalvm.sdk/word/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.word/src/META-INF/native-image/org.graalvm.sdk/word/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.word.resources",
++    srcs = ["native-image.properties"],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.word/src/org/graalvm/word/BUILD.bazel b/sdk/src/org.graalvm.word/src/org/graalvm/word/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.word/src/org/graalvm/word/BUILD.bazel
+@@ -0,0 +1,17 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.word.srcs",
++    srcs = [
++        "ComparableWord.java",
++        "LocationIdentity.java",
++        "Pointer.java",
++        "PointerBase.java",
++        "SignedWord.java",
++        "UnsignedWord.java",
++        "WordBase.java",
++        "WordFactory.java",
++        "package-info.java",
++    ],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.word/src/org/graalvm/word/impl/BUILD.bazel b/sdk/src/org.graalvm.word/src/org/graalvm/word/impl/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.word/src/org/graalvm/word/impl/BUILD.bazel
+@@ -0,0 +1,19 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.word.srcs",
++    srcs = [
++        "BarrieredAccess.java",
++        "ObjectAccess.java",
++        "Word.java",
++        "WordFactoryOpcode.java",
++        "WordFactoryOperation.java",
++    ],
++    visibility = ["//sdk:__pkg__"],
++)
++
++mx_files(
++    name = "org.graalvm.word.resources",
++    srcs = ["package-info.md"],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.word.test/src/org/graalvm/word/test/BUILD.bazel b/sdk/src/org.graalvm.word.test/src/org/graalvm/word/test/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.word.test/src/org/graalvm/word/test/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.word.test.srcs",
++    srcs = [
++        "AddExports.java",
++        "WordTests.java",
++    ],
++    visibility = ["//sdk:__pkg__"],
++)

@@ -18,6 +18,17 @@ bazelisk test --config=elide-python //mx:export_test
 
 The default Python is managed CPython 3.13. The alternate configuration selects the matching Elide Python runtime for macOS arm64 or Linux x86_64/arm64. Both paths use the same rules_python binary. The checked-in rules_elide archive override provides the overlay support. Elide also compiles the Java targets and supplies JavaInfo and ABI jars. The launcher supplies the file-backed JDK selected by Bazel to mx as JAVA_HOME. Use a downloaded Java runtime in a consuming root, for example with --java_runtime_version=remotejdk_21.
 
+## Build upstream GraalVM
+
+The pinned Oracle source tree builds the SDK foundation and the first Truffle projects as native Bazel targets. Run the upstream SDK JUnit classes individually or build the selected closures and run their tests together.
+
+```sh
+bazelisk query 'tests(//graal:sdk_tests)'
+bazelisk test --config=elide-processors //graal/... @graal//sdk/... @graal//truffle/...
+```
+
+The migration notes track suite coverage, reproducible BUILD generation, BuildBuddy commands and the remaining milestones. [GraalVM migration](graal/README.md)
+
 ## Import a suite
 
 Run discovery against a trusted, prepared checkout. This is a developer operation. mx loads Python suite extensions and applies its normal environment, platform, JDK and suite-import selection. Invoke discovery separately for each relevant configuration when migrating conditional suites.

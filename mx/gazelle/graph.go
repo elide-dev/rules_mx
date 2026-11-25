@@ -28,6 +28,7 @@ type project struct {
 	Release                              int
 	Options, Dirs, Packages, Tests, Deps []string
 	Sources, Resources, Processors       []string
+	ABIAfterJavac                        bool   `json:"abi_after_javac"`
 	ResourceRoot                         string `json:"resource_root"`
 	Testonly                             bool
 }
@@ -66,9 +67,19 @@ func (g *importer) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
 		return err
 	}
 	var graph struct {
-		Version  int
-		Projects []*project
-		Plugins  []struct {
+		Version       int
+		Projects      []*project
+		Distributions []struct {
+			Name     string
+			Deps     []string
+			Testonly bool
+		}
+		Layouts []struct {
+			Name             string
+			Literals, Copies map[string]string
+			Testonly         bool
+		}
+		Plugins []struct {
 			Name           string
 			ProcessorClass string `json:"processor_class"`
 			GeneratesAPI   bool   `json:"generates_api"`
@@ -150,6 +161,9 @@ func (g *importer) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
 			r.SetAttr(opts, p.Options)
 			if len(p.Processors) != 0 {
 				r.SetAttr("plugins", p.Processors)
+				if p.ABIAfterJavac {
+					r.SetAttr("abi_after_javac", true)
+				}
 			} else {
 				r.SetAttr("unified_release", p.Release)
 			}
@@ -191,6 +205,33 @@ func (g *importer) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
 			}
 		}
 	}
+	for _, dist := range graph.Distributions {
+		r := rule.NewRule("mx_classpath_dist", dist.Name)
+		r.SetAttr("deps", dist.Deps)
+		r.SetAttr("visibility", []string{"//visibility:public"})
+		if dist.Testonly {
+			r.SetAttr("testonly", true)
+		}
+		if err := add(g.suite, r); err != nil {
+			return err
+		}
+	}
+	for _, layout := range graph.Layouts {
+		r := rule.NewRule("mx_resource_layout", layout.Name)
+		if len(layout.Literals) != 0 {
+			r.SetAttr("literals", layout.Literals)
+		}
+		if len(layout.Copies) != 0 {
+			r.SetAttr("copies", layout.Copies)
+		}
+		r.SetAttr("visibility", []string{"//visibility:public"})
+		if layout.Testonly {
+			r.SetAttr("testonly", true)
+		}
+		if err := add(g.suite, r); err != nil {
+			return err
+		}
+	}
 	for _, plugin := range graph.Plugins {
 		r := rule.NewRule("mx_processor", plugin.Name)
 		r.SetAttr("processor_class", plugin.ProcessorClass)
@@ -206,7 +247,7 @@ func (g *importer) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
 
 func graphKind(k string) bool {
 	switch k {
-	case "mx_files", "mx_project", "mx_whole_java", "mx_processed_java", "mx_processor", "mx_test_class":
+	case "mx_resource_layout", "mx_classpath_dist", "mx_files", "mx_project", "mx_whole_java", "mx_processed_java", "mx_processor", "mx_test_class":
 		return true
 	}
 	return false
@@ -215,12 +256,14 @@ func graphKind(k string) bool {
 func (g *importer) Kinds() map[string]rule.KindInfo {
 	kinds := g.javaLanguage.Kinds()
 	managed := map[string]bool{}
-	for _, a := range strings.Fields("srcs deps packages test_class project processor_class generates_api plugins resources mx_resource_root unified_release javac_opts javacopts testonly visibility") {
+	for _, a := range strings.Fields("abi_after_javac copies literals srcs deps packages test_class project processor_class generates_api plugins resources mx_resource_root unified_release javac_opts javacopts testonly visibility") {
 		managed[a] = true
 	}
 	for _, k := range strings.Fields("mx_files mx_project mx_whole_java mx_processed_java mx_processor mx_test_class") {
 		kinds[k] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"srcs": true, "packages": true, "project": true, "processor_class": true}, MergeableAttrs: managed}
 	}
+	kinds["mx_resource_layout"] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"literals": true, "copies": true}, MergeableAttrs: managed}
+	kinds["mx_classpath_dist"] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"deps": true}, MergeableAttrs: managed}
 	if g.filename == "" {
 		return kinds
 	}
@@ -233,7 +276,7 @@ func (g *importer) Kinds() map[string]rule.KindInfo {
 	return kinds
 }
 func (g *importer) Loads() []rule.LoadInfo {
-	return append(g.javaLanguage.Loads(), rule.LoadInfo{Name: "@rules_mx//mx:graph.bzl", Symbols: strings.Fields("mx_files mx_processed_java mx_processor mx_project mx_test_class mx_whole_java")})
+	return append(g.javaLanguage.Loads(), rule.LoadInfo{Name: "@rules_mx//mx:graph.bzl", Symbols: strings.Fields("mx_classpath_dist mx_resource_layout mx_files mx_processed_java mx_processor mx_project mx_test_class mx_whole_java")})
 }
 
 func (g *importer) GenerateRules(a language.GenerateArgs) language.GenerateResult {
