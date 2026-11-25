@@ -1,21 +1,29 @@
-"""Oracle Labs JDK for suites that require the JVMCI build required by the pinned Graal compiler."""
+"""Oracle Labs JDK for suites that require the JVMCI build required by the selected Graal compiler."""
 
 load("@rules_java//toolchains:remote_java_repository.bzl", "remote_java_repository")
 
+_PLATFORMS = {
+    "darwin-aarch64": ("aarch64", "macos"),
+    "linux-aarch64": ("aarch64", "linux"),
+    "linux-amd64": ("x86_64", "linux"),
+}
+
 def _labsjdk_impl(ctx):
-    # Matches labsjdk-ce-latest in the pinned Graal common.json.
-    for platform, cpu, os, digest in [
-        ("darwin-aarch64", "aarch64", "macos", "08d73b48434c033be7fb52f92c8a05f7579af575d2cfd4a26255c9f9cea5083a"),
-        ("linux-aarch64", "aarch64", "linux", "d82205166184bcd4687657942ea2919cec72328e4717b845b7a635efbacf04e6"),
-        ("linux-amd64", "x86_64", "linux", "871a0de0c24c35cbc17b364f9c3e322c709a85edd52d7ad5143bbb302c41232f"),
-    ]:
+    # tools/generate-graal keeps this pin equal to labsjdk-ce-latest in the selected Graal common.json.
+    pin = json.decode(ctx.read(Label("//mx:labsjdk.json")))
+    version = pin["version"]
+    jdk, jvmci = version.split("-jvmci-")
+    release = "jvmci-" + jvmci
+    home = "labsjdk-" + jdk.split("+")[0] + "-" + release
+    for platform, digest in pin["platforms"].items():
+        cpu, os = _PLATFORMS[platform]
         remote_java_repository(
             name = "labsjdk_" + platform.replace("-", "_"),
             version = "25",
             prefix = "labsjdk",
             sha256 = digest,
-            strip_prefix = "labsjdk-ce-25.0.4.1.1-jvmci-25.4-b23" + ("/Contents/Home" if os == "macos" else ""),
-            urls = ["https://github.com/graalvm/labs-openjdk/releases/download/jvmci-25.4-b23/labsjdk-ce-25.0.4.1.1%2B1-jvmci-25.4-b23-" + platform + ".tar.gz"],
+            strip_prefix = home + ("/Contents/Home" if os == "macos" else ""),
+            urls = ["https://github.com/graalvm/labs-openjdk/releases/download/%s/labsjdk-%s-%s.tar.gz" % (release, version.replace("+", "%2B"), platform)],
             target_compatible_with = ["@platforms//cpu:" + cpu, "@platforms//os:" + os],
         )
     return ctx.extension_metadata(reproducible = True)
