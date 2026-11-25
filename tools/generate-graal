@@ -2,6 +2,7 @@
 """Generate Graal suite overlays in a temporary tree with mx and Gazelle."""
 
 import argparse
+import base64
 import difflib
 import json
 import runpy
@@ -26,7 +27,11 @@ SDK = [
     "NATIVEBRIDGE_BENCHMARK",
     "NATIVEBRIDGE_PROCESSOR",
     "MAVEN_DOWNLOADER",
-    "jdk.graal.compiler.vmaccess.guest",
+    "org.graalvm.launcher.test",
+    "LAUNCHER_COMMON",
+    "VMACCESS_GUEST",
+    "SDK_TEST",
+    "POLYGLOT_TCK",
 ]
 
 
@@ -41,6 +46,9 @@ SUITES = {
         # These callbacks detach threads and release JNI handles for their side effects.
         "--javac-opt",
         "org.graalvm.nativebridge=-Xep:ReturnValueIgnored:OFF",
+        # JLine 3.28 uses explicit type arguments on Comparator.thenComparingInt.
+        "--javac-opt",
+        "org.graalvm.shadowed.org.jline=-Xep:UnnecessaryTypeArgument:OFF",
         *(
             arg
             for dist in (
@@ -52,6 +60,17 @@ SUITES = {
                 "NATIVEBRIDGE_PROCESSOR",
                 "NATIVEBRIDGE_PROCESSOR_TEST",
                 "NATIVEBRIDGE_BENCHMARK",
+                "JLINE3",
+                "POLYGLOT",
+                "LAUNCHER_COMMON",
+                "POLYGLOT_TCK",
+                "SDK_TEST",
+                "VMACCESS_GUEST",
+                "GRAAL_SDK",
+                "NATIVEIMAGE_LIBGRAAL",
+                "WEBIMAGE_PREVIEW",
+                "MAVEN_DOWNLOADER",
+                "RESOURCECOPY",
             )
             for arg in ("--archive-dist", dist)
         ),
@@ -70,7 +89,33 @@ SUITES = {
 }
 
 
-def sdk_launcher(sdk):
+def shading_inputs(sdk):
+    suite = runpy.run_path(str(sdk / "mx.sdk/suite.py"))["suite"]
+    inputs = {}
+    flags = []
+    for project in suite["projects"].values():
+        for qualified in project.get("shadedDependencies", []):
+            owner, name = qualified.split(":")
+            if owner != "sdk":
+                raise ValueError(f"Unmapped external shaded library {qualified}")
+            lib = suite["libraries"][name]
+            mvn = lib["maven"]
+            artifact, version = mvn["artifactId"], mvn["version"]
+            base = f"{mvn['groupId'].replace('.', '/')}/{artifact}/{version}/{artifact}-{version}"
+            for suffix, key in [("", "digest"), ("-sources", "sourceDigest")]:
+                filename = name + suffix + ".jar"
+                algo, digest = lib[key].split(":")
+                inputs[filename] = [
+                    base + suffix + ".jar",
+                    algo + "-" + base64.b64encode(bytes.fromhex(digest)).decode(),
+                ]
+                flags.extend(
+                    ["--shaded-input", f"{qualified}=@graal_shaded_inputs//:{filename}"]
+                )
+    return inputs, flags
+
+
+def sdk_native_projects(sdk):
     suite = runpy.run_path(str(sdk / "mx.sdk/suite.py"))["suite"]
     name = "org.graalvm.nativebridge.launcher"
     resource = "NATIVEBRIDGE_LAUNCHER_RESOURCES"
@@ -93,8 +138,19 @@ def sdk_launcher(sdk):
         resource=resource,
         platforms=layout["platforms"],
     )
+    probe = "org.graalvm.toolchain.test"
+    probe_project = suite["projects"][probe]
+    if probe_project["class"] != "ToolchainTestProject" or probe_project[
+        "buildDependencies"
+    ] != ["LLVM_TOOLCHAIN"]:
+        raise ValueError("SDK toolchain test contract changed")
+    probe_sources = [
+        f"{probe_project['subDir']}/{probe}/{src}" for src in ("hello.c", "hello.cc")
+    ]
     return (
-        'load("@rules_mx//graal:nativebridge.bzl", "nativebridge_launcher")\n\n'
+        'load("@rules_mx//graal:nativebridge.bzl", "nativebridge_launcher")\n'
+        'load("@rules_mx//graal:toolchain_test.bzl", "sdk_toolchain_test")\n\n'
+        + f'sdk_toolchain_test(name = "{probe}", sources = {json.dumps(probe_sources)})\n\n'
         + "nativebridge_launcher(\n"
         + "".join(f"    {key} = {json.dumps(value)},\n" for key, value in attrs.items())
         + ")\n\n"
@@ -108,6 +164,7 @@ def generate(suite, stage):
             [
                 "bazelisk",
                 "run",
+                "--config=labsjdk",
                 "//:mx",
                 "--",
                 "-p",
@@ -117,6 +174,7 @@ def generate(suite, stage):
                 "--classpath-dists",
                 "--release",
                 "21",
+                *(shading_inputs(directory)[1] if suite == "sdk" else []),
                 *SUITES[suite],
             ],
             cwd=ROOT,
@@ -127,7 +185,7 @@ def generate(suite, stage):
     # this package, so new test classes join the CI qualification on regeneration.
     if suite == "sdk":
         (directory / "BUILD.bazel").write_text(
-            sdk_launcher(directory)
+            sdk_native_projects(directory)
             + 'test_suite(name = "tests", visibility = ["//visibility:public"])\n'
         )
     subprocess.run(
@@ -196,6 +254,18 @@ def main():
                         "BUILD", "BUILD.bazel", "__pycache__"
                     ),
                 )
+        lock = ROOT / "graal/shaded_inputs.json"
+        lock_text = (
+            json.dumps(shading_inputs(stage / "sdk")[0], indent=2, sort_keys=True)
+            + "\n"
+        )
+        if args.check:
+            if lock.read_text() != lock_text:
+                sys.exit(
+                    "Shaded dependency pins differ. Regenerate with tools/generate-graal."
+                )
+        else:
+            lock.write_text(lock_text)
         for suite in SUITES:
             overlay = ROOT / f"graal/{suite}.patch"
             patch = generate(suite, stage)

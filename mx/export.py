@@ -152,16 +152,18 @@ def _module_directives(dist, members, external, archives):
             mx.abort(
                 f"{dist.name}: module path needs an explicit --archive-dist {dep.name}"
             )
-        requires.setdefault(dep.moduleInfo["name"], dep.moduleInfo["name"])
-        for req in dep.moduleInfo.get("requires", []):
-            if "transitive" in req.split()[:-1]:
-                requires[req.split()[-1]] = req
         for child in dep.deps:
             if child.isJARDistribution():
                 visit(child)
 
     for dep in external:
         visit(dep)
+        requires[dep.moduleInfo["name"]] = dep.moduleInfo["name"]
+    observable = {d.moduleInfo["name"] for d in seen}
+    for dep in seen:
+        for req in dep.moduleInfo.get("requires", []):
+            if req.split()[-1] in observable and "transitive" in req.split()[:-1]:
+                requires[req.split()[-1]] = req
     for project in members:
         for req in getattr(project, "requires", []):
             requires.setdefault(req, req)
@@ -192,16 +194,28 @@ def _jar_archive(dist, suite, mappings, pending, release, archives):
         or dist.manifestEntries
         or getattr(dist, "javaProperties", None)
         or dist.module_info_compilation_participants
-        or getattr(dist, "mainClass", None)
     ):
         mx.abort(f"{dist.name}: unsupported JAR archive configuration: {participants}")
     members = dist.archived_deps()
-    if any(not (d.isJavaProject() or d.isLibrary()) for d in members):
+    if any(
+        not (
+            d.isJavaProject()
+            or d.isLibrary()
+            or type(d).__name__ == "LayoutDirDistribution"
+        )
+        for d in members
+    ):
         mx.abort(f"{dist.name}: unsupported archive member")
     external = [d for d in dist.deps if d not in members] + dist.excludedLibs
+    base = [d for d in members if not getattr(d, "multiReleaseJarVersion", None)]
+    overlays = {
+        ":" + d.name: str(d.multiReleaseJarVersion) for d in members if d not in base
+    }
+    pending.extend(d for d in members if d not in base)
     result = {
         "name": dist.name,
-        "contents": _dependency_labels(members, suite, mappings, pending, True),
+        "overlays": overlays,
+        "contents": _dependency_labels(base, suite, mappings, pending, True),
         "deps": _dependency_labels(external, suite, mappings, pending, True),
         "testonly": dist.is_test_distribution(),
         "jni_services": bridge in participants,
@@ -225,6 +239,8 @@ def _jar_archive(dist, suite, mappings, pending, release, archives):
             if vendor:
                 manifest[prefix + "-Vendor"] = vendor
         result["manifest"] = manifest
+    if getattr(dist, "mainClass", None):
+        result.setdefault("manifest", {})["Main-Class"] = dist.mainClass
     return result
 
 
@@ -386,6 +402,13 @@ def bazel_buildfile(args):
         metavar="PROJECT=OPTION",
         help="append a javac option for one project in the selected closure",
     )
+    parser.add_argument(
+        "--shaded-input",
+        action="append",
+        default=[],
+        metavar="SUITE:LIB=LABEL",
+        help="bind a shaded library to its binary or source archive (repeat for both)",
+    )
     parser.add_argument("projects", nargs="+")
     options = parser.parse_args(args)
     project_options = {}
@@ -394,6 +417,7 @@ def bazel_buildfile(args):
         if not sep or not name or not value.startswith("-"):
             parser.error("expected --javac-opt PROJECT=OPTION")
         project_options.setdefault(name, []).append(value)
+    shaded_inputs = _mappings(parser, options.shaded_input, "--shaded-input")
     archives = set(options.archive_dist)
     if archives and not (options.classpath_dists and options.release):
         parser.error("--archive-dist requires --classpath-dists and --release")
@@ -440,7 +464,13 @@ def bazel_buildfile(args):
             if type(project).__name__ == "LayoutDirDistribution":
                 layouts[project.name] = _resource_layout(project, pending)
                 continue
-        if type(project).__name__ != "JavaProject" or project.suite != suite:
+        shaded = options.gazelle and (
+            type(project).__module__,
+            type(project).__name__,
+        ) == ("mx_sdk_shaded", "ShadedLibraryProject")
+        if (
+            not shaded and type(project).__name__ != "JavaProject"
+        ) or project.suite != suite:
             mx.abort(f"{project.name}: requires a separate Bazel dependency mapping")
         allowed = _PLAIN_JAVA
         # Preserve mx coverage exclusions as graph metadata.
@@ -450,6 +480,21 @@ def bazel_buildfile(args):
             allowed = allowed | {"spotbugs"}
         if options.gazelle and excluded_from_jacoco:
             allowed = allowed | {"jacoco"}
+        if options.gazelle:
+            allowed = allowed | {"requiresConcealed"}
+        if shaded:
+            allowed = allowed | {
+                "class",
+                "shadedDependencies",
+                "shade",
+                "description",
+                "allowsJavadocWarnings",
+                "noMavenJavadoc",
+                "javac.lint.overrides",
+                "overlayTarget",
+                "multiReleaseJarVersion",
+                "ignoreSrcGenForOverlayMap",
+            }
         unsupported = sorted(set(project._orig_attrs) - allowed)
         if unsupported:
             mx.abort(
@@ -461,7 +506,12 @@ def bazel_buildfile(args):
         sources = []
         resources = []
         resource_roots = set()
-        for directory in map(Path, project.source_dirs()):
+        source_dirs = [
+            s
+            for s in project.source_dirs()
+            if not shaded or s != project.source_gen_dir()
+        ]
+        for directory in map(Path, source_dirs):
             if not directory.is_dir():
                 mx.abort(f"{project.name}: missing source root {directory}")
             for source in sorted(directory.rglob("*")):
@@ -480,6 +530,8 @@ def bazel_buildfile(args):
         release = (
             project.javaCompliance.value if options.release is None else options.release
         )
+        if shaded:
+            release = project.javaCompliance.value
         if release not in project.javaCompliance:
             mx.abort(
                 f"{project.name}: release {release} is outside {project.javaCompliance!r}"
@@ -518,8 +570,14 @@ def bazel_buildfile(args):
             attrs["deps"] = deps
         if options.gazelle:
             test = project.is_test_project()
+            concealed = project._orig_attrs.get("requiresConcealed", {})
             coarse = bool(
-                processors or resources or test or project.name in options.whole_project
+                shaded
+                or concealed
+                or processors
+                or resources
+                or test
+                or project.name in options.whole_project
             )
             record = {
                 "name": project.name,
@@ -527,12 +585,33 @@ def bazel_buildfile(args):
                 "release": release,
                 "deps": deps,
                 "roots": sorted(
-                    Path(d).relative_to(suite.dir).as_posix()
-                    for d in project.source_dirs()
+                    Path(d).relative_to(suite.dir).as_posix() for d in source_dirs
                 ),
-                "packages": sorted(project.defined_java_packages()),
+                "packages": [] if shaded else sorted(project.defined_java_packages()),
                 "dirs": sorted({str(Path(src).parent) for src in sources}),
             }
+            if concealed:
+                record["add_exports"] = [
+                    f"{mod}/{pkg}" for mod, pkgs in concealed.items() for pkg in pkgs
+                ]
+                record["options"] = [
+                    "-source",
+                    str(release),
+                    "-target",
+                    str(release),
+                    *record["options"][2:],
+                ]
+            if shaded:
+                record["shade"] = json.dumps(project.shade)
+                inputs = []
+                for lib in project.shaded_deps():
+                    labels = shaded_inputs.get(lib.qualifiedName(), [])
+                    if len(labels) != 2:
+                        mx.abort(
+                            f"{project.name}: bind the binary and sources of {lib.qualifiedName()} with --shaded-input"
+                        )
+                    inputs.extend(labels)
+                record["shade_inputs"] = inputs
             if "spotbugs" in project._orig_attrs:
                 record["spotbugs"] = project._orig_attrs["spotbugs"]
             if excluded_from_jacoco:

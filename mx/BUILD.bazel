@@ -44,3 +44,13 @@ py_test(
     args = ["$(rootpath :pack_jar)"],
     data = [":pack_jar"],
 )
+
+py_binary(
+    name = "shade",
+    srcs = [
+        "pack_jar.py",
+        "shade.py",
+    ],
+    imports = ["."],
+    main = "shade.py",
+)

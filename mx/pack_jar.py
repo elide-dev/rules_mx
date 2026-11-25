@@ -61,7 +61,7 @@ def write_jar(path, entries):
             archive.writestr(info, content, compress_type=ZIP_DEFLATED)
 
 
-def module_descriptor(args, tmp, entries, services):
+def module_descriptor(args, tmp, entries, services, release):
     if any(version > 0 for version in services) or any(
         n.startswith("META-INF/versions/") for n in entries
     ):
@@ -91,7 +91,7 @@ def module_descriptor(args, tmp, entries, services):
         "-m",
         "jdk.compiler/com.sun.tools.javac.Main",
         "--release",
-        str(args.release),
+        str(release),
         "-proc:none",
         "-Xlint:-module",
         "-d",
@@ -108,6 +108,9 @@ def module_descriptor(args, tmp, entries, services):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", action="append", required=True)
+    parser.add_argument(
+        "--overlay", nargs=2, action="append", default=[], metavar=("VERSION", "JAR")
+    )
     parser.add_argument("--output", required=True)
     parser.add_argument("--jni-services", action="store_true")
     parser.add_argument("--manifest-entry", action="append", default=[])
@@ -118,11 +121,36 @@ def main():
     parser.add_argument("--java")
     args = parser.parse_args()
     entries, services = read_members(args.input, args.jni_services)
-    if args.module:
-        with tempfile.TemporaryDirectory() as tmp:
+    releases = defaultdict(list)
+    for version, jar in args.overlay:
+        if int(version) < 9:
+            raise ValueError(f"Invalid multi-release JAR version {version}")
+        releases[int(version)].append(jar)
+    visible = dict(entries)
+    with tempfile.TemporaryDirectory() as tmp:
+        if args.module:
             entries["module-info.class"] = module_descriptor(
-                args, Path(tmp), entries, services
+                args, Path(tmp), visible, services, args.release
             )
+        for version, jars in sorted(releases.items()):
+            layer, layer_services = read_members(jars, args.jni_services)
+            if layer_services or any(n.startswith("META-INF/") for n in layer):
+                raise ValueError(
+                    "Overlay META-INF resources need an explicit versioned layout"
+                )
+            visible.update(layer)
+            if args.module:
+                layer["module-info.class"] = module_descriptor(
+                    args, Path(tmp), visible, services, version
+                )
+            entries.update(
+                {
+                    f"META-INF/versions/{version}/{name}": data
+                    for name, data in layer.items()
+                }
+            )
+    if releases:
+        args.manifest_entry.append("Multi-Release=true")
     if args.manifest_entry:
         lines = ["Manifest-Version: 1.0"]
         for entry in args.manifest_entry:

@@ -8,6 +8,9 @@ load("@rules_java//java/common:java_common.bzl", "java_common")
 load("@rules_java//java/common:java_info.bzl", "JavaInfo")
 load(":jar.bzl", _mx_jar_dist = "mx_jar_dist")
 load(":java.bzl", "elide_java_library", "mx_resource_prefix")
+load(":shade.bzl", _mx_shaded_java = "mx_shaded_java")
+
+mx_shaded_java = _mx_shaded_java
 
 mx_jar_dist = _mx_jar_dist
 

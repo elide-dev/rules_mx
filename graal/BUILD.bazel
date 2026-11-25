@@ -3,7 +3,9 @@ load("@rules_java//java:java_test.bzl", "java_test")
 exports_files([
     "benchmark_timer.patch",
     "sdk.patch",
+    "shaded_inputs.json",
     "truffle.patch",
+    "toolchain_test.py",
 ])
 
 test_suite(
@@ -32,4 +34,24 @@ java_test(
         "@contrib_rules_jvm_deps//:junit_junit",
         "@graal//truffle:com.oracle.truffle.api.library",
     ],
+)
+
+_LAUNCHER_MODULES = [
+    "WORD",
+    "COLLECTIONS",
+    "NATIVEIMAGE",
+    "POLYGLOT",
+    "JLINE3",
+    "LAUNCHER_COMMON",
+]
+
+java_test(
+    name = "launcher_modules_test",
+    size = "small",
+    srcs = ["LauncherModulesTest.java"],
+    data = ["@graal//sdk:" + name for name in _LAUNCHER_MODULES],
+    env = {name: "$(rootpath @graal//sdk:" + name + ")" for name in _LAUNCHER_MODULES},
+    jvm_flags = ["--enable-native-access=ALL-UNNAMED"],
+    test_class = "graal.LauncherModulesTest",
+    deps = ["@contrib_rules_jvm_deps//:junit_junit"],
 )

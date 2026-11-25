@@ -108,3 +108,11 @@ graal_archive(
     type = "tar.gz",
     urls = ["https://codeload.github.com/oracle/graal/tar.gz/7b7825ae92c83d91bb20d76bc64b68b344449cf3"],
 )
+
+shaded_inputs = use_repo_rule("//graal:shaded_inputs.bzl", "shaded_inputs")
+
+shaded_inputs(
+    name = "graal_shaded_inputs",
+    dev_dependency = True,
+    lock = "//graal:shaded_inputs.json",
+)

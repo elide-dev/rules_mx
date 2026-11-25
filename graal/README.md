@@ -14,14 +14,25 @@ tools/buildbuddy test --config=buildbuddy-rbe --config=elide-processors //graal/
 
 | Suite | Native Bazel build | Test coverage |
 | --- | --- | --- |
-| SDK | 24 of 29 declared projects, including Collections, Word, Home, Polyglot, its TCK SPI, Native Image Java APIs, JNI utilities and the Native Bridge runtime, processor, test project, benchmark and C++ launcher. Eight distributions produce JARs and six expose their constituent classpaths. | All 16 discovered upstream JUnit classes across Collections, Word, Home, the Native Image API and Native Bridge. An integration test reads the exact upstream version resources through the Polyglot and Maven Downloader classpaths. |
+| SDK | All 29 declared projects. All 19 Java distributions produce JARs, including Polyglot, Native Bridge, JLine and Launcher Common. Three additional targets expose the version and launcher resource layouts. | All 17 discovered upstream JUnit classes and the C and C++ toolchain probes. Runtime tests verify packaged version resources, JPMS module loading and JLine provider selection on JDK 21 and Labs JDK 25. |
 | Truffle | Six of 69 declared projects. The core API depends on the SDK Polyglot classpath. DSL, profiles, utilities, the DSL processor and the processed library API build from source. | A separate consumer compiles against two generated library factories and loads them from the runtime jar. The upstream Truffle test projects are pending. |
 
 The SDK and Truffle slice targets Java 21. Some SDK projects declare an older minimum while using newer APIs, including `java.io.Serial`. The libgraal API compiles as one unit because its packages depend on each other. Gazelle keeps project resources, processors and tests with their owning compilations and splits eligible source-only projects by package.
 
-`--classpath-dists` follows same-suite distribution dependencies during Gazelle export. `mx_classpath_dist` exposes their constituent jars and combined JavaInfo. Platform-independent file layouts support literal contents and exact file references to another layout. The SDK version layouts exercise both operations. Select individual distributions for JAR assembly and JPMS descriptors with `--archive-dist DIST`. The Native Bridge closure uses this path. Signing, publication and multi-release module assembly remain separate migration work.
+`--classpath-dists` follows same-suite distribution dependencies during Gazelle export. `mx_classpath_dist` exposes their constituent jars and combined JavaInfo. Platform-independent file layouts support literal contents and exact file references to another layout. The SDK version layouts exercise both operations. Select individual distributions for JAR assembly and JPMS descriptors with `--archive-dist DIST`. The Native Bridge closure uses this path. JAR assembly supports release-specific class overlays and compiles their JPMS descriptors against the classes visible at each release. Signing and publication remain separate migration work.
 
 Truffle's eight declared processors run on the execution platform. Its DSL processor inspects javac internals that Turbine does not implement. The generator selects `--javac-only-processor truffle:TRUFFLE_DSL_PROCESSOR` for that distribution. Bazel runs javac once on affected projects, then extracts an interface jar containing the generated types for downstream compilation. Eligible Elide compilations keep their worker and ABI settings.
+
+## SDK launchers and toolchain tests
+
+```sh
+bazelisk build --config=elide-processors @graal//sdk:JLINE3 @graal//sdk:LAUNCHER_COMMON
+bazelisk test --config=elide-processors @graal//sdk:org.graalvm.launcher.test.org.graalvm.launcher.test.LauncherTest @graal//sdk:org.graalvm.toolchain.test
+bazelisk test //graal:launcher_modules_test
+bazelisk test --config=labsjdk //graal:launcher_modules_test
+```
+
+The SDK graph binds the published JLine binary and source archives by the SHA-512 digests in the pinned suite. Separate actions relocate the sources and resources, apply Graal's patches, compile the base and JDK 22 projects, and assemble the multi-release JAR. The launcher module test loads the exec provider on JDK 21 and additionally loads the foreign-function provider on Labs JDK 25. The C and C++ probes compile the upstream sources with the registered Elide LLVM toolchain and run both binaries, checking their output.
 
 ## Native Bridge
 
@@ -44,7 +55,7 @@ Run `tools/generate-graal --check` to reproduce the checked-in patches from the 
 
 | Next checkpoint | Acceptance under Bazel |
 | --- | --- |
-| Complete the SDK | Reproduce the shaded JLine sources and JDK 22 multi-release overlay. Build the SDK command-line launcher and run its tests and the SDK toolchain tests. |
+| SDK toolchain distributions | Assemble the five LLVM, Ninja, CMake and musl redistribution layouts with their upstream contents and platform filters. Their packaged payloads are separate from the Elide LLVM toolchain used for Bazel compilation. |
 | Complete Truffle | Model generated dependencies, concealed JDK exports, multi-release classes and modular distributions. Build the runtime and SimpleLanguage, execute a guest program, and run the upstream TCK and Truffle tests. |
 | Compiler and SubstrateVM | Use the pinned Labs JDK for JVMCI. Build the compiler and relevant Espresso Shared dependencies, run compiler tests, then build SubstrateVM and produce and execute an image with the newly built toolchain. |
 | Languages and tools | Migrate Regex, Sulong, Wasm, Espresso, Espresso Compiler Stub, Tools, Visualizer, Web Image and Sandbox Toolchains with their Java, native and external inputs. Run each suite's upstream tests. |

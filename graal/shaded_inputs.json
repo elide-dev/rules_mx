@@ -1,0 +1,34 @@
+{
+  "JLINE_BUILTINS-sources.jar": [
+    "org/jline/jline-builtins/3.28.0/jline-builtins-3.28.0-sources.jar",
+    "sha512-M/BtfiuyMs5BPYz3I0vbQWw6Z3Dc8YpcF+OImIeyhzeP9fxTF1gUM4PD9QtWYT5b+AK1xJoqCbdIyARWjgVluA=="
+  ],
+  "JLINE_BUILTINS.jar": [
+    "org/jline/jline-builtins/3.28.0/jline-builtins-3.28.0.jar",
+    "sha512-GJ2JNAUXCj7cYkprgiqKOUovi2I8I67Z4BXUsBiyMjB0CLYDgyJxkVX8fafpwEqbsKdshSH0ndhqX4TqOICstg=="
+  ],
+  "JLINE_READER-sources.jar": [
+    "org/jline/jline-reader/3.28.0/jline-reader-3.28.0-sources.jar",
+    "sha512-+OxiUI8+gyeBVre9FNXa3tcpdrENpjraxTvi97HF5saTQPrFsvEP/n6S2GsnQlvu5z5dWzx3XnJZW0cVi/vtGw=="
+  ],
+  "JLINE_READER.jar": [
+    "org/jline/jline-reader/3.28.0/jline-reader-3.28.0.jar",
+    "sha512-2v1Fr3mph017QdFG03OG2mBeGewr+ciYnxIflAOQLOYMqXCPsBav7XhRhpNdLd3UtbMwSsojTJJrDkNoYHsR7Q=="
+  ],
+  "JLINE_TERMINAL-sources.jar": [
+    "org/jline/jline-terminal/3.28.0/jline-terminal-3.28.0-sources.jar",
+    "sha512-y3CtK+4vdxP6U1jBb8fFOXTIYuM5V9PsgJRoq8vAsg3oVG7LQZVdzCAD5wLlRpBp/YVqHOUbEy4p0Chr7sT+fg=="
+  ],
+  "JLINE_TERMINAL.jar": [
+    "org/jline/jline-terminal/3.28.0/jline-terminal-3.28.0.jar",
+    "sha512-q+CtAwPl64G1STAd/c80qs4USVJAgW8UMC0ZMpbHqL4xSI5GjRiiFZdrjk6Pop9y2DDkku7X1Kb58EyBpuNsPA=="
+  ],
+  "JLINE_TERMINAL_FFM-sources.jar": [
+    "org/jline/jline-terminal-ffm/3.28.0/jline-terminal-ffm-3.28.0-sources.jar",
+    "sha512-xlGumf4fRT2bPSKRPi+wA8Ef+cQ2Ib7ddQj6MitJ8Vw9k88UbADy4fndk588qQCaUu5Ae2P6Pz1PXJl6HvuhOQ=="
+  ],
+  "JLINE_TERMINAL_FFM.jar": [
+    "org/jline/jline-terminal-ffm/3.28.0/jline-terminal-ffm-3.28.0.jar",
+    "sha512-5YObBKL9YRmhHGvBbgUgOviFEgOdhVUbGdbofDWKMl7V63BRAioiXiZBNXyZ2cQSGBekeVxQz3mhO2udU3zulg=="
+  ]
+}

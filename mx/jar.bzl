@@ -13,6 +13,13 @@ def _jar_impl(ctx):
     args = ctx.actions.args()
     args.add("--output", jar)
     args.add_all(inputs, before_each = "--input")
+    overlay_inputs = []
+    for dep, version in ctx.attr.overlays.items():
+        for member in dep.files.to_list():
+            args.add("--overlay")
+            args.add(version)
+            args.add(member)
+            overlay_inputs.append(member)
     for key, value in ctx.attr.manifest.items():
         args.add("--manifest-entry", key + "=" + value)
     if ctx.attr.jni_services:
@@ -31,7 +38,7 @@ def _jar_impl(ctx):
     ctx.actions.run(
         executable = ctx.executable._packer,
         arguments = [args],
-        inputs = depset(transitive = [inputs] + tools),
+        inputs = depset(overlay_inputs, transitive = [inputs] + tools),
         outputs = [jar],
         mnemonic = "MxJar",
         toolchain = _TOOLCHAIN,
@@ -46,6 +53,7 @@ def _jar_impl(ctx):
 mx_jar_dist = rule(
     implementation = _jar_impl,
     attrs = {
+        "overlays": attr.label_keyed_string_dict(providers = [JavaInfo]),
         "contents": attr.label_list(providers = [JavaInfo], mandatory = True),
         "deps": attr.label_list(providers = [JavaInfo]),
         "manifest": attr.string_dict(),
