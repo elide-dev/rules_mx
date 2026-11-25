@@ -146,3 +146,8 @@ cc_toolchain(
     strip_files = ":bin",
     toolchain_config = ":config",
 )
+
+filegroup(
+    name = "llvm_nm",
+    srcs = ["bin/llvm-nm"],
+)

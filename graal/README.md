@@ -16,9 +16,12 @@ tools/buildbuddy test --config=buildbuddy-rbe --config=elide-processors //graal/
 | --- | --- | --- |
 | SDK | All 29 declared projects. All 19 Java distributions produce JARs, including Polyglot, Native Bridge, JLine and Launcher Common. Three additional targets expose the version and launcher resource layouts. | All 17 discovered upstream JUnit classes and the C and C++ toolchain probes. Runtime tests verify packaged version resources, JPMS module loading and JLine provider selection on JDK 21 and Labs JDK 25. |
 | Truffle | All 69 declared projects and all 47 distribution labels, including JNI attach, both NFI backends, the shaded libraries, PolyBench and the JMH benchmarks. Bazel packages the multi-release Truffle API, SL language, SL launcher, Truffle compiler interface and HotSpot runtime as named modules. | 57 guest fixtures run independently. All 30 concrete SL JUnit classes run on the default runtime, including the four interpreter configurations of the upstream fixture runner. Nine TCK classes run on both runtimes. All 570 discovered JUnit classes in `TRUFFLE_TEST` have individual Bazel targets and are included in `harness_tests`. All 31 discovered NFI JUnit classes run on both libffi and Panama. The host-access tests run inside their JPMS test module. |
-| Compiler | All 17 projects, including VM access, management, libgraal and its loader, and both JMH suites. | 21 compiler-tool JUnit classes, 19 shared-harness classes, four previously qualified compiler regressions and the last-tier compiled guest probe run by default. |
+| Compiler | All 17 projects and all 20 distributions, including VM access, management, libgraal and its loader, and both JMH suites. | 21 compiler-tool JUnit classes, 19 shared-harness classes, four previously qualified compiler regressions and the last-tier compiled guest probe run by default. |
+| Regex | All three projects and all five distributions, including Native Image metadata archives. | All 20 discovered upstream JUnit classes. |
 | Espresso Shared | Both named modules, including the source-relocated `ESPRESSO_SVM` used by SubstrateVM. | The SubstrateVM compile exercises the relocated source API. |
-| SubstrateVM | 30 of 70 projects and 11 distributions, including the `SVM` builder JAR, its processors, staged modules, ObjectFile, Pointsto and Configure. | 11 upstream configuration test classes on Labs JDK 25. |
+| SubstrateVM | 41 of 70 projects and 16 of 44 distributions, including the `SVM` builder JAR, its processors, staged modules, ObjectFile, Pointsto, Configure and the Native Image driver. | 11 upstream configuration test classes and a smoke test that builds and runs a Java executable on Labs JDK 25. |
+
+Run `tools/graal-coverage --missing` for the full project and distribution inventory, or add `--suite substratevm` to narrow it. The audit compares upstream declarations with Bazel labels. CI builds and tests the migrated targets.
 
 The SDK and Truffle slice generally targets Java 21. Shaded libraries compile at their declared releases, including the JDK 22 JLine overlay. Some SDK projects declare an older minimum while using newer APIs, including `java.io.Serial`. The libgraal API compiles as one unit because its packages depend on each other. Gazelle keeps project resources, processors and tests with their owning compilations and splits eligible source-only projects by package.
 
@@ -134,10 +137,11 @@ Bazel lowers the native TARs and benchmark JARs from the pinned suite layout. Th
 
 ```sh
 bazelisk build --config=elide-processors --config=labsjdk @graal//substratevm:SVM
-bazelisk test --config=elide-processors --config=labsjdk @graal//substratevm/...
+bazelisk test --config=elide-processors --config=labsjdk @graal//substratevm/... //graal:source_native_image_test
+bazelisk build --config=elide-processors --config=labsjdk --output_groups=distribution @graal//substratevm:native-image.root
 ```
 
-The builder uses the source-built Graal compiler and the relocated Espresso module. Bazel supplies option help files to javac's annotation processors through a declared source tree.
+The builder uses the source-built Graal compiler and the relocated Espresso module. Bazel supplies option help files to javac's annotation processors through a declared source tree. The Native Image launcher uses the source-built driver, its generated JVM flags, the pinned Labs JDK and the Bazel C/C++ toolchain.
 
 ## Extending the graph
 
@@ -148,8 +152,8 @@ Run `tools/generate-graal --check` to reproduce the checked-in patches from the 
 | SDK toolchain distributions | Assemble the five LLVM, Ninja, CMake and musl redistribution layouts with their upstream contents and platform filters. Their packaged payloads are separate from the Elide LLVM toolchain used for Bazel compilation. |
 | Truffle upstream gates | Qualify the remaining gate configurations, including broader optimized-runtime and platform coverage. |
 | Compiler test gates | Qualify more classes from the compiler distribution, including architecture-specific backends and VM-specific test configurations. |
-| Native Image from source | Package the driver’s generated JVM flags, target-specific native helpers and support files. Link and run an image using the source-built builder and the hermetic native toolchain. |
-| Languages and tools | Migrate Regex, Sulong, Wasm, Espresso, Espresso Compiler Stub, Tools, Visualizer, Web Image and Sandbox Toolchains with their Java, native and external inputs. Run each suite's upstream tests. |
+| SubstrateVM distributions and gates | Package the remaining support layouts and platform variants, and qualify more upstream Native Image tests. |
+| Languages and tools | Migrate Sulong, Wasm, Espresso, Espresso Compiler Stub, Tools, Visualizer, Web Image and Sandbox Toolchains with their Java, native and external inputs. Run each suite's upstream tests. |
 | VM assembly | Pin the external components required by each selected VM configuration. Assemble the distribution and run its launchers, component tests and corresponding mx gate equivalents from a clean Linux RBE build. |
 
-The migration is complete when the selected GraalVM distributions can be built from source, their upstream test gates run, and their packaging and runtime behavior match the reference mx builds. Building the Java Native Image API or using an existing Native Image executable covers only part of that work.
+The migration is complete when all GraalVM distributions can be built from source, their upstream test gates run, and their packaging and runtime behavior match the reference mx builds.

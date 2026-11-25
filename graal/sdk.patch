@@ -2,7 +2,7 @@ diff --git a/sdk/BUILD.bazel b/sdk/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/sdk/BUILD.bazel
-@@ -0,0 +1,1103 @@
+@@ -0,0 +1,1104 @@
 +load("@rules_mx//graal:nativebridge.bzl", "nativebridge_launcher")
 +load("@rules_mx//graal:toolchain_test.bzl", "sdk_toolchain_test")
 +load("@rules_mx//mx:graph.bzl", "mx_jar_dist", "mx_processed_java", "mx_processor", "mx_project", "mx_resource_layout", "mx_shaded_java", "mx_test_class", "mx_whole_java")
@@ -760,6 +760,7 @@ new file mode 100644
 +        "Specification-Vendor": "Oracle Corporation",
 +        "Specification-Version": "25.5.5-dev",
 +    },
++    module_exports = ["java.base/jdk.internal.module"],
 +    module_name = "org.graalvm.launcher",
 +    release = 21,
 +    snippets_pattern = ".*(Snippets|doc-files).*",

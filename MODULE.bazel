@@ -108,6 +108,7 @@ graal_archive(
         "//graal:espresso-shared.patch",
         "//graal:truffle.patch",
         "//graal:substratevm.patch",
+        "//graal:regex.patch",
     ],
     sha256 = "a174bfe9204342b53d0e174c9d44a38a73eef2cdd799384cdb59caac95ab738b",
     strip_prefix = "graal-7b7825ae92c83d91bb20d76bc64b68b344449cf3",

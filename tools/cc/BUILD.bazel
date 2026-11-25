@@ -24,3 +24,13 @@ exports_files([
         "@platforms//cpu:aarch64",
     ],
 }.items()]
+
+alias(
+    name = "llvm_nm",
+    actual = select({
+        "//tools:exec_linux_amd64": "@elide_toolchain_linux_amd64//:llvm_nm",
+        "//tools:exec_linux_arm64": "@elide_toolchain_linux_arm64//:llvm_nm",
+        "//tools:exec_macos_arm64": "@elide_toolchain_darwin_arm64//:llvm_nm",
+    }),
+    visibility = ["//visibility:public"],
+)

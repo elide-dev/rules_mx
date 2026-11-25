@@ -185,6 +185,49 @@ def _source_dependencies(graph, suite, mappings, distributions):
         record["deps"] += sorted(direct.difference(record["deps"]))
 
 
+def _module_reads_from_projects(graph, suite, mappings, distributions):
+    """Promote direct module reads from the compiled project dependencies."""
+    module_by_label = {}
+    for qualified, labels in mappings.items():
+        dep = mx.dependency(qualified)
+        if dep.isJARDistribution() and getattr(dep, "moduleInfo", None):
+            for label in labels:
+                module_by_label[label] = dep.moduleInfo["name"]
+    for name, record in distributions.items():
+        if "module" in record:
+            module_by_label[":" + name] = record["module"]
+
+    for name, record in distributions.items():
+        if "module" not in record:
+            continue
+        dist = mx.distribution(f"{suite.name}:{name}")
+        available = set()
+        pending = list(dist.deps)
+        while pending:
+            dep = pending.pop()
+            if not dep.isJARDistribution() or not getattr(dep, "moduleInfo", None):
+                continue
+            module = dep.moduleInfo["name"]
+            if module not in available:
+                available.add(module)
+                pending.extend(dep.deps)
+        reads = {
+            module_by_label[label]
+            for member in dist.archived_deps()
+            for label in graph.get(member.name, {}).get("deps", [])
+            if label in module_by_label
+        }
+        declared = {
+            directive.split()[-1]
+            for directive in record["directives"]
+            if directive.startswith("requires ")
+        }
+        extra = (available & reads) - declared - {record["module"]}
+        record["directives"] = sorted(
+            record["directives"] + ["requires " + module for module in extra]
+        )
+
+
 def _classpath_distribution(dist, suite, mappings, pending):
     if (
         type(dist).__name__ != "JARDistribution"
@@ -255,6 +298,10 @@ def _module_directives(dist, members, external, archives, mappings, library_modu
     for project in members:
         for req in getattr(project, "requires", []):
             requires.setdefault(req, req)
+        if project.isJavaProject():
+            for module in project._orig_attrs.get("requiresConcealed", {}):
+                if module != "java.base" and module.startswith(("java.", "jdk.")):
+                    requires.setdefault(module, module)
     for req in info.get("requires", []):
         requires[req.split()[-1]] = req
 
@@ -325,6 +372,7 @@ def _jar_archive(dist, suite, mappings, pending, release, archives, library_modu
             d.isJavaProject()
             or d.isLibrary()
             or type(d).__name__ == "LayoutDirDistribution"
+            or d.qualifiedName() in mappings
         )
         for d in members
     ):
@@ -374,6 +422,17 @@ def _jar_archive(dist, suite, mappings, pending, release, archives, library_modu
             f"{mod}/{pkg}" for mod, packages in concealed.items() for pkg in packages
         )
     if getattr(dist, "moduleInfo", None):
+        project_exports = {
+            f"{module}/{package}"
+            for project in members
+            if project.isJavaProject()
+            for module, packages in project._orig_attrs.get(
+                "requiresConcealed", {}
+            ).items()
+            for package in packages
+        }
+        if project_exports:
+            result["module_exports"] = sorted(project_exports)
         result["module"] = dist.moduleInfo["name"]
         result["directives"] = _module_directives(
             dist, members, external, archives, mappings, library_modules
@@ -1084,6 +1143,7 @@ def bazel_buildfile(args):
             mx.abort(f"Unknown whole project in selected closure: {sorted(missing)}")
         if options.infer_source_deps:
             _source_dependencies(graph, suite, java_deps, distributions)
+            _module_reads_from_projects(graph, suite, java_deps, distributions)
         result = {
             "version": 1,
             "projects": [graph[n] for n in sorted(graph)],

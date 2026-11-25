@@ -2,9 +2,10 @@ diff --git a/compiler/BUILD.bazel b/compiler/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/compiler/BUILD.bazel
-@@ -0,0 +1,13424 @@
+@@ -0,0 +1,13555 @@
 +load("@rules_java//java:java_import.bzl", "java_import")
 +load("@rules_java//java:java_plugin.bzl", "java_plugin")
++load("@rules_mx//graal:layout.bzl", "mx_archive_layout")
 +load("@rules_mx//graal:simplelanguage.bzl", "compiler_test_runner", "simplelanguage")
 +load("@rules_mx//mx:graph.bzl", "mx_jar_dist", "mx_jvmci_library", "mx_processed_java", "mx_processor", "mx_resource_layout", "mx_test_class", "mx_whole_java")
 +
@@ -110,6 +111,41 @@ new file mode 100644
 +        ":org.graalvm.micro.benchmarks",
 +        ":org.graalvm.profdiff",
 +        ":org.graalvm.profdiff.test",
++    ],
++    visibility = ["//visibility:public"],
++)
++
++mx_archive_layout(
++    name = "HSDIS_GRAALVM_SUPPORT",
++    format = "tar",
++    members = {":hsdis_library_file": "{basename}"},
++    visibility = ["//visibility:public"],
++)
++
++filegroup(
++    name = "all_distributions",
++    testonly = True,
++    srcs = [
++        ":GRAAL",
++        ":GRAAL_COMPILER_MICRO_BENCHMARKS",
++        ":GRAAL_COMPILER_WHITEBOX_MICRO_BENCHMARKS",
++        ":GRAAL_IGVUTIL",
++        ":GRAAL_IGVUTIL_TEST",
++        ":GRAAL_MANAGEMENT",
++        ":GRAAL_OPTIONS",
++        ":GRAAL_PROCESSOR",
++        ":GRAAL_PROFDIFF",
++        ":GRAAL_PROFDIFF_TEST",
++        ":GRAAL_TEST",
++        ":GRAAL_TEST_COMPILETIME",
++        ":GRAAL_TEST_RUNTIME",
++        ":GRAAL_VERSION",
++        ":HOSTVMACCESS",
++        ":HSDIS_GRAALVM_SUPPORT",
++        ":HSDIS_LIBRARY",
++        ":LIBGRAAL",
++        ":LIBGRAAL_LOADER",
++        ":VMACCESS",
 +    ],
 +    visibility = ["//visibility:public"],
 +)
@@ -13073,6 +13109,24 @@ new file mode 100644
 +        "Specification-Vendor": "Oracle Corporation",
 +        "Specification-Version": "25.5.5-dev",
 +    },
++    module_exports = [
++        "java.base/jdk.internal.misc",
++        "jdk.internal.vm.ci/jdk.vm.ci.aarch64",
++        "jdk.internal.vm.ci/jdk.vm.ci.amd64",
++        "jdk.internal.vm.ci/jdk.vm.ci.code",
++        "jdk.internal.vm.ci/jdk.vm.ci.code.site",
++        "jdk.internal.vm.ci/jdk.vm.ci.code.stack",
++        "jdk.internal.vm.ci/jdk.vm.ci.common",
++        "jdk.internal.vm.ci/jdk.vm.ci.hotspot",
++        "jdk.internal.vm.ci/jdk.vm.ci.hotspot.aarch64",
++        "jdk.internal.vm.ci/jdk.vm.ci.hotspot.amd64",
++        "jdk.internal.vm.ci/jdk.vm.ci.hotspot.riscv64",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta.annotation",
++        "jdk.internal.vm.ci/jdk.vm.ci.riscv64",
++        "jdk.internal.vm.ci/jdk.vm.ci.runtime",
++        "jdk.internal.vm.ci/jdk.vm.ci.services",
++    ],
 +    module_name = "jdk.graal.compiler",
 +    release = 21,
 +    snippets_pattern = ".*JavadocSnippets.*",
@@ -13139,6 +13193,29 @@ new file mode 100644
 +)
 +
 +mx_jar_dist(
++    name = "GRAAL_IGVUTIL",
++    contents = [":org.graalvm.igvutil"],
++    graal_services = True,
++    snippets_pattern = ".*JavadocSnippets.*",
++    visibility = ["//visibility:public"],
++    deps = [":GRAAL"],
++)
++
++mx_jar_dist(
++    name = "GRAAL_IGVUTIL_TEST",
++    testonly = True,
++    contents = [":org.graalvm.igvutil.test"],
++    graal_services = True,
++    graal_test_services = True,
++    snippets_pattern = ".*JavadocSnippets.*",
++    visibility = ["//visibility:public"],
++    deps = [
++        ":GRAAL_IGVUTIL",
++        "@contrib_rules_jvm_deps//:junit_junit",
++    ],
++)
++
++mx_jar_dist(
 +    name = "GRAAL_MANAGEMENT",
 +    contents = [":jdk.graal.compiler.management"],
 +    directives = [
@@ -13192,6 +13269,32 @@ new file mode 100644
 +    graal_services = True,
 +    snippets_pattern = ".*JavadocSnippets.*",
 +    visibility = ["//visibility:public"],
++)
++
++mx_jar_dist(
++    name = "GRAAL_PROFDIFF",
++    contents = [":org.graalvm.profdiff"],
++    graal_services = True,
++    snippets_pattern = ".*JavadocSnippets.*",
++    visibility = ["//visibility:public"],
++    deps = [
++        ":GRAAL",
++        "//sdk:COLLECTIONS",
++    ],
++)
++
++mx_jar_dist(
++    name = "GRAAL_PROFDIFF_TEST",
++    testonly = True,
++    contents = [":org.graalvm.profdiff.test"],
++    graal_services = True,
++    graal_test_services = True,
++    snippets_pattern = ".*JavadocSnippets.*",
++    visibility = ["//visibility:public"],
++    deps = [
++        ":GRAAL_PROFDIFF",
++        "@contrib_rules_jvm_deps//:junit_junit",
++    ],
 +)
 +
 +mx_jar_dist(
@@ -13269,6 +13372,16 @@ new file mode 100644
 +        "Specification-Vendor": "Oracle Corporation",
 +        "Specification-Version": "25.5.5-dev",
 +    },
++    module_exports = [
++        "java.base/jdk.internal.access",
++        "java.base/jdk.internal.loader",
++        "java.base/jdk.internal.misc",
++        "java.base/jdk.internal.module",
++        "jdk.internal.vm.ci/jdk.vm.ci.code",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta.annotation",
++        "jdk.internal.vm.ci/jdk.vm.ci.runtime",
++    ],
 +    module_name = "jdk.graal.compiler.hostvmaccess",
 +    release = 21,
 +    snippets_pattern = ".*JavadocSnippets.*",
@@ -13285,6 +13398,7 @@ new file mode 100644
 +    directives = [
 +        "requires jdk.graal.compiler",
 +        "requires jdk.graal.compiler.management",
++        "requires jdk.internal.vm.ci",
 +        "requires org.graalvm.collections",
 +        "requires org.graalvm.jniutils",
 +        "requires org.graalvm.nativeimage.libgraal",
@@ -13295,6 +13409,16 @@ new file mode 100644
 +    ],
 +    graal_services = True,
 +    jni_services = True,
++    module_exports = [
++        "java.base/jdk.internal.misc",
++        "java.base/jdk.internal.module",
++        "jdk.internal.vm.ci/jdk.vm.ci.code",
++        "jdk.internal.vm.ci/jdk.vm.ci.hotspot",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta.annotation",
++        "jdk.internal.vm.ci/jdk.vm.ci.runtime",
++        "jdk.internal.vm.ci/jdk.vm.ci.services",
++    ],
 +    module_name = "jdk.graal.compiler.libgraal",
 +    release = 21,
 +    snippets_pattern = ".*JavadocSnippets.*",
@@ -13349,6 +13473,13 @@ new file mode 100644
 +        "Specification-Vendor": "Oracle Corporation",
 +        "Specification-Version": "25.5.5-dev",
 +    },
++    module_exports = [
++        "java.base/jdk.internal.module",
++        "java.base/sun.reflect.annotation",
++        "jdk.internal.vm.ci/jdk.vm.ci.code",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta.annotation",
++    ],
 +    module_name = "jdk.graal.compiler.vmaccess",
 +    release = 21,
 +    snippets_pattern = ".*JavadocSnippets.*",

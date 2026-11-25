@@ -1,0 +1,69 @@
+#!/usr/bin/env python3
+"""Compare the pinned mx suite declarations with the generated Bazel rule labels."""
+
+import argparse
+from collections import defaultdict
+from pathlib import Path
+import runpy
+import subprocess
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--missing", action="store_true", help="list each missing rule")
+    parser.add_argument(
+        "--require-complete",
+        action="store_true",
+        help="fail if a declaration has no target",
+    )
+    parser.add_argument(
+        "suites", nargs="*", help="limit the report to these suite names"
+    )
+    options = parser.parse_args()
+    generator = runpy.run_path(str(ROOT / "tools/generate-graal"))
+    source = generator["bazel_source"]("@graal//sdk:BUILD.bazel").parents[1]
+    labels = subprocess.check_output(
+        ["bazelisk", "query", 'kind("rule", @graal//...)'], cwd=ROOT, text=True
+    )
+    rules = defaultdict(set)
+    for line in labels.splitlines():
+        package, name = line.split("//", 1)[1].split(":", 1)
+        rules[package].add(name)
+    counts = defaultdict(lambda: [0, 0])
+    missing = []
+    available = set()
+    print(f"{'Suite':24} {'Projects':>11} {'Distributions':>14}")
+    for path in sorted(source.glob("*/mx.*/suite.py")):
+        suite = runpy.run_path(str(path))["suite"]
+        name = suite["name"]
+        available.add(name)
+        if options.suites and name not in options.suites:
+            continue
+        coverage = []
+        for category in ("projects", "distributions"):
+            declared = set(suite.get(category, {}))
+            present = len(declared & rules[name])
+            coverage.append(f"{present}/{len(declared)}")
+            counts[category][0] += present
+            counts[category][1] += len(declared)
+            missing.extend(
+                f"{name} {category} {target}"
+                for target in sorted(declared - rules[name])
+            )
+        print(f"{name:24} {coverage[0]:>11} {coverage[1]:>14}")
+    if unknown := set(options.suites) - available:
+        parser.error(f"Unknown suite: {', '.join(sorted(unknown))}")
+    print(
+        f"{'Total':24} {'/'.join(map(str, counts['projects'])):>11} {'/'.join(map(str, counts['distributions'])):>14}"
+    )
+    if options.missing:
+        for target in missing:
+            print(target)
+    return int(options.require_complete and bool(missing))
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -20,10 +20,10 @@ The default Python is managed CPython 3.13. The alternate configuration selects 
 
 ## Build upstream GraalVM
 
-The pinned Oracle source tree builds all 29 SDK projects, all 69 Truffle projects and the Graal optimizing compiler as native Bazel targets. Run individual upstream SDK, SimpleLanguage, TCK and compiler regression tests by Bazel label.
+The pinned Oracle source tree has native Bazel targets for all projects and distributions in the Truffle, compiler, Regex and Espresso Shared suites, and for all SDK projects. Run individual upstream tests by Bazel label. Use `tools/graal-coverage --missing` to list the pinned projects and distributions that still need Bazel targets.
 
 ```sh
-bazelisk build --config=elide-processors @graal//truffle:all_projects
+bazelisk build --config=elide-processors @graal//truffle:all_projects @graal//compiler:all_distributions @graal//regex:all_distributions
 bazelisk test --config=elide-processors @graal//truffle:harness_tests @graal//compiler:harness_tests
 bazelisk query 'tests(//graal:sdk_tests)'
 bazelisk test @graal//truffle:sl.test.Fibonacci
@@ -31,7 +31,11 @@ bazelisk test --config=elide-processors @graal//compiler:sl_compilation_test
 bazelisk test --config=elide-processors @graal//truffle:sl_jit.tck.IdentityFunctionTest @graal//compiler:GR42688Test
 bazelisk test --config=elide-processors //graal/... @graal//sdk/... @graal//truffle/... @graal//compiler/...
 bazelisk test --config=elide-processors //graal/nativebridge:native_isolate_test
+bazelisk test --config=labsjdk --config=elide-processors //graal:source_native_image_test
+bazelisk run --config=labsjdk --config=elide-processors @graal//substratevm:native-image -- --version
 ```
+
+The source-built Native Image launcher assembles the selected Labs JDK with the Bazel-built compiler, SubstrateVM jars and native helper libraries. The smoke test compiles and runs a Java executable on Linux x86_64 and macOS arm64.
 
 The Native Bridge test builds a shared library and exercises the generated JNI bindings in the JVM process and through the C++ launcher. The migration notes cover the standalone benchmark, BuildBuddy commands and remaining suites. [GraalVM migration](graal/README.md)
 

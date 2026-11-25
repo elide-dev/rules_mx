@@ -2,7 +2,7 @@ diff --git a/truffle/BUILD.bazel b/truffle/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/truffle/BUILD.bazel
-@@ -0,0 +1,9079 @@
+@@ -0,0 +1,9099 @@
 +load("@rules_mx//mx:graph.bzl", "mx_jar_dist", "mx_jvmci_library", "mx_processed_java", "mx_processor", "mx_project", "mx_resource_layout", "mx_shaded_java", "mx_test_class", "mx_whole_java")
 +
 +# gazelle:resolve java com.oracle.truffle.api.impl //truffle:com.oracle.truffle.api
@@ -8361,6 +8361,12 @@ new file mode 100644
 +        "Specification-Vendor": "Oracle Corporation",
 +        "Specification-Version": "25.5.5-dev",
 +    },
++    module_exports = [
++        "java.base/jdk.internal.access",
++        "java.base/jdk.internal.loader",
++        "java.base/jdk.internal.misc",
++        "java.base/jdk.internal.module",
++    ],
 +    module_name = "org.graalvm.truffle",
 +    overlays = {
 +        ":com.oracle.truffle.api.jdk21": "21",
@@ -8402,6 +8408,10 @@ new file mode 100644
 +        "Specification-Vendor": "Oracle Corporation",
 +        "Specification-Version": "25.5.5-dev",
 +    },
++    module_exports = [
++        "jdk.internal.vm.ci/jdk.vm.ci.code",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++    ],
 +    module_name = "org.graalvm.truffle.compiler",
 +    release = 21,
 +    snippets_pattern = ".*(Snippets|doc-files).*",
@@ -8733,6 +8743,16 @@ new file mode 100644
 +        "Specification-Vendor": "Oracle Corporation",
 +        "Specification-Version": "25.5.5-dev",
 +    },
++    module_exports = [
++        "java.base/jdk.internal.access",
++        "jdk.internal.vm.ci/jdk.vm.ci.code",
++        "jdk.internal.vm.ci/jdk.vm.ci.code.stack",
++        "jdk.internal.vm.ci/jdk.vm.ci.common",
++        "jdk.internal.vm.ci/jdk.vm.ci.hotspot",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.runtime",
++        "jdk.internal.vm.ci/jdk.vm.ci.services",
++    ],
 +    module_name = "org.graalvm.truffle.runtime",
 +    release = 21,
 +    snippets_pattern = ".*(Snippets|doc-files).*",
