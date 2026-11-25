@@ -2,7 +2,7 @@ diff --git a/truffle/BUILD.bazel b/truffle/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/truffle/BUILD.bazel
-@@ -0,0 +1,9320 @@
+@@ -0,0 +1,9321 @@
 +load("@rules_mx//mx:graph.bzl", "mx_jar_dist", "mx_jvmci_library", "mx_processed_java", "mx_processor", "mx_project", "mx_resource_layout", "mx_shaded_java", "mx_test_class", "mx_whole_java")
 +
 +# gazelle:resolve java com.oracle.truffle.api.impl //truffle:com.oracle.truffle.api
@@ -4315,6 +4315,7 @@ new file mode 100644
 +        "-parameters",
 +        "--add-modules",
 +        "jdk.unsupported",
++        "-Xep:ReturnValueIgnored:WARN",
 +    ],
 +    visibility = ["//visibility:public"],
 +    deps = [
