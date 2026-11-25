@@ -36,4 +36,5 @@ jobs:
           tools/buildbuddy test --test_output=errors --config=buildbuddy-rbe --config=elide-processors --config=labsjdk @graal//substratevm/... //graal:source_native_image_test
           tools/buildbuddy test --test_output=errors --config=buildbuddy-rbe --config=labsjdk //graal:panama_module_test //mx:export_test //graal:launcher_modules_test //graal:truffle_polyglot_test //graal:truffle_runtime_modules_test @graal//truffle:sl.test.Fibonacci
           tools/buildbuddy test --test_output=errors --config=buildbuddy-rbe --config=elide-python --config=elide-processors //mx:export_test //mx:pack_jar_test //graal:truffle_layout_test //graal/nativebridge:launcher_test //graal:launcher_modules_test @graal//truffle:sl.test.Fibonacci @graal//compiler:GR36613Test
+          tools/buildbuddy test --test_output=errors --config=buildbuddy-rbe --config=source-native-image //graal:source_native_image_action_test
           tools/buildbuddy test --test_output=errors --config=buildbuddy-rbe --config=native-image-linux //tests/native_image:checkcopy_test //graal/nativebridge:native_isolate_test

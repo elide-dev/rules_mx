@@ -3,6 +3,8 @@
 load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain", "use_cc_toolchain")
+load("@rules_cc//cc/common:cc_common.bzl", "cc_common")
+load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
 load("@rules_java//java/common:java_common.bzl", "java_common")
 load("@rules_java//java/common:java_info.bzl", "JavaInfo")
 load("@rules_mx//mx:jar.bzl", "MxJarInfo")
@@ -93,6 +95,26 @@ svm_jvm_fallbacks = rule(
 def _source_root(name):
     return "src/com.oracle.svm.native." + name
 
+def _labs_jni_impl(ctx):
+    runtime = ctx.attr._jdk[java_common.JavaRuntimeInfo]
+    include = runtime.java_home + "/include"
+    paths = [include + "/jni.h", include + "/" + ctx.attr.os + "/jni_md.h"]
+    headers = [file for file in runtime.files.to_list() if file.path in paths]
+    if len(headers) != len(paths):
+        fail("Missing JNI headers in the selected Labs JDK")
+    return [CcInfo(compilation_context = cc_common.create_compilation_context(
+        headers = depset(headers),
+        system_includes = depset([header.dirname for header in headers]),
+    ))]
+
+_labs_jni = rule(
+    implementation = _labs_jni_impl,
+    attrs = {
+        "os": attr.string(mandatory = True),
+        "_jdk": attr.label(default = Label("//tools:labs_runtime")),
+    },
+)
+
 def svm_native_projects(projects):
     """Lower the native builder helpers to target C/C++ libraries and mx archive paths."""
     linux = "@platforms//os:linux"
@@ -114,6 +136,7 @@ def svm_native_projects(projects):
         platform = select(platform),
     )
 
+    _labs_jni(name = "svm-labs-jni", os = select({linux: "linux", macos: "darwin"}))
     archive_paths = {}
     for short, options in projects.items():
         name = "com.oracle.svm.native." + short
@@ -132,7 +155,7 @@ def svm_native_projects(projects):
         if short == "darwin":
             # The pinned Mach-O linker cannot synthesize Clang's Objective-C call stubs.
             copts += ["-fno-objc-msgsend-class-selector-stubs", "-fno-objc-msgsend-selector-stubs"]
-        deps = ["@rules_java//toolchains:jni"] if options["jni"] else []
+        deps = [":svm-labs-jni"] if options["jni"] else []
         if short == "reporterchelper":
             for os, suffix in [(linux, ".so"), (macos, ".dylib")]:
                 cc_binary(
@@ -295,6 +318,7 @@ def svm_launcher(name):
         },
         reporter = ":com.oracle.svm.native.reporterchelper",
         native_archive = ":SVM_HOSTED_NATIVE",
+        visibility = ["//visibility:public"],
     )
     py_binary(
         name = name,

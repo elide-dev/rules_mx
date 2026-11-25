@@ -43,3 +43,8 @@ build:buildbuddy-rbe --remote_executor=grpcs://elide-dev.buildbuddy.io
 build:elide-unified --@rules_elide//elide:unified_jvm_compile
 build:labsjdk --java_runtime_version=labsjdk_25
 build:native-image-linux --extra_toolchains=//tools/cc:elide_cc_linux_amd64
+
+build:source-native-image --config=labsjdk
+build:source-native-image --tool_java_runtime_version=labsjdk_25
+build:source-native-image --config=elide-processors
+build:source-native-image --extra_toolchains=//graal:source_native_image_toolchain
