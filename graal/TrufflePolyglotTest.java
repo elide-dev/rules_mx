@@ -21,6 +21,6 @@ public class TrufflePolyglotTest {
     public void discoversTruffleImplementationAndReadsPackagedVersion() {
         var provider = ServiceLoader.load(AbstractPolyglotImpl.class).findFirst().orElseThrow();
         assertEquals("com.oracle.truffle.polyglot.PolyglotImpl", provider.getClass().getName());
-        assertEquals("25.5.5", provider.getTruffleVersion());
+        assertEquals("25.6.0", provider.getTruffleVersion());
     }
 }

@@ -1,8 +1,8 @@
 {
   "platforms": {
-    "darwin-aarch64": "08d73b48434c033be7fb52f92c8a05f7579af575d2cfd4a26255c9f9cea5083a",
-    "linux-aarch64": "d82205166184bcd4687657942ea2919cec72328e4717b845b7a635efbacf04e6",
-    "linux-amd64": "871a0de0c24c35cbc17b364f9c3e322c709a85edd52d7ad5143bbb302c41232f"
+    "darwin-aarch64": "d131ec63639352cb1d516d98efdfe8fd5f0ebe1f76fd7b97a9d46115043090bc",
+    "linux-aarch64": "dd6eaf6f4e72cfda9c00840a0a77a68f989ae8ef435859a5b08b228ab1eeaf50",
+    "linux-amd64": "f31cd1b52a9c43f5b1a13e2b45ce0ade74f9488326cdc19af84cd1f5039cf5c8"
   },
-  "version": "ce-25.0.4.1.1+1-jvmci-25.4-b23"
+  "version": "ce-25.0.5.1+0-jvmci-25.6-b27"
 }

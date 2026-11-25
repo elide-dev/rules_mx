@@ -68,9 +68,12 @@ SUITES = {
         # These callbacks detach threads and release JNI handles for their side effects.
         "--javac-opt",
         "org.graalvm.nativebridge=-Xep:ReturnValueIgnored:OFF",
-        # JLine 3.28 uses explicit type arguments on Comparator.thenComparingInt.
+        # JLine uses explicit type arguments on Comparator.comparingInt and thenComparingInt.
         "--javac-opt",
         "org.graalvm.shadowed.org.jline=-Xep:UnnecessaryTypeArgument:OFF",
+        # JLine 4's KeyParser compares a char with 0.
+        "--javac-opt",
+        "org.graalvm.shadowed.org.jline=-Xep:ComparisonOutOfRange:WARN",
         "--all",
         "--declared-only",
         *[
@@ -483,6 +486,12 @@ SUITES = {
         "substratevm:com.oracle.svm.with.space.test=@rules_mx//graal:svm_native_resource_guest",
         "--manual-test-project",
         "com.oracle.svm.with.space.test",
+        # elide-dev/graal elide-25.6.x: ShenandoahOptions.<clinit> resolves
+        # SubstrateGuestOptions.UnlockDiagnosticVMOptions by getName() while option descriptors
+        # are still loading, so the lookup fails when ServiceLoader visits the Shenandoah
+        # descriptors first, as it does on this test's classpath.
+        "--manual-test-class",
+        "com.oracle.svm.driver.BundlePathMapTest",
         # These tests run inside a Native Image (mx svmjunit), not on the JVM.
         "--manual-test-project",
         "com.oracle.svm.test",
@@ -492,6 +501,11 @@ SUITES = {
         # member that it uses. The rest of SVM_TESTS is not migrated yet.
         "--java-dep",
         "substratevm:SVM_TESTS=:com.oracle.svm.test",
+        # The image test corpus deliberately exercises unusual and invalid API use.
+        "--javac-opt",
+        "com.oracle.svm.test=-XepDisableAllChecks",
+        "--generated-dep",
+        "substratevm:com.oracle.svm.test=@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
         "--java-dep",
         "substratevm:TRUFFLE_RUNTIME_SVM_VERSION=:TRUFFLE_RUNTIME_SVM_VERSION",
         "--java-dep",
@@ -528,7 +542,14 @@ SUITES = {
         ],
         *[
             arg
-            for name in ("NATIVEIMAGE", "NATIVEIMAGE_LIBGRAAL", "COLLECTIONS", "WORD")
+            for name in (
+                "NATIVEIMAGE",
+                "NATIVEIMAGE_LIBGRAAL",
+                "COLLECTIONS",
+                "WORD",
+                # The builder reads guest host-proxy exceptions through HOSTVMACCESS.
+                "VMACCESS_GUEST",
+            )
             for arg in ("--java-dep", f"sdk:{name}=//sdk:{name}")
         ],
         "--java-dep",
@@ -1371,6 +1392,8 @@ def truffle_native_projects(directory):
         + 'truffle_test_runner(name = "truffle_junit", jvm_flags = ['
         + '"--enable-native-access=ALL-UNNAMED", "--add-exports=java.base/jdk.internal.module=ALL-UNNAMED", '
         + '"-Dpolyglot.engine.WarnInterpreterOnly=false", '
+        # mx's Truffle unittest configuration keeps the expensive assertions enabled.
+        + '"-Dtruffle.DetailedAssertions=true", '
         + '"-Dpolyglot.ConstantOptionsLanguage.ConstantOption1=configuredValue"])\n'
         + 'modular_test_runner(name = "modular_junit")\n'
         + "".join(

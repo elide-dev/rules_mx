@@ -30,6 +30,10 @@ public class LauncherModulesTest {
         Class<?> provider = Class.forName(jline, prefix + "terminal.spi.TerminalProvider");
         var load = provider.getMethod("load", String.class);
         assertEquals(prefix + "terminal.impl.exec.ExecTerminalProvider", load.invoke(null, "exec").getClass().getName());
+        // Graal's suite patches drop the JNI provider from the reduced bundle and from the default probe order.
+        var builder = Class.forName(jline, prefix + "terminal.TerminalBuilder");
+        assertEquals("ffm,exec", builder.getField("PROP_PROVIDERS_DEFAULT").get(null));
+        assertThrows(InvocationTargetException.class, () -> load.invoke(null, "jni"));
         if (Runtime.version().feature() >= 22) {
             // The JDK 22 API grants native access to a module in a child layer.
             ModuleLayer.Controller.class.getMethod("enableNativeAccess", Module.class).invoke(controller, jline);

@@ -92,6 +92,70 @@ svm_jvm_fallbacks = rule(
     },
 )
 
+def _svm_jvm_symbols_impl(ctx):
+    output = ctx.actions.declare_file(ctx.label.name)
+    args = ctx.actions.args()
+    args.add("--nm", ctx.file._nm)
+    if ctx.attr.darwin:
+        args.add("--darwin")
+    args.add_all("--svm-jvm", [ctx.file.archive, output])
+    ctx.actions.run(
+        executable = ctx.executable._generator,
+        arguments = [args],
+        inputs = [ctx.file.archive],
+        tools = [ctx.file._nm],
+        outputs = [output],
+        mnemonic = "SvmStaticSymbols",
+    )
+    return [DefaultInfo(files = depset([output]))]
+
+svm_jvm_symbols = rule(
+    implementation = _svm_jvm_symbols_impl,
+    doc = "The static library symbol manifest of the SubstrateVM libjvm replacement.",
+    attrs = {
+        "archive": attr.label(mandatory = True, allow_single_file = [".a"]),
+        "darwin": attr.bool(),
+        "_nm": attr.label(default = Label("//tools/cc:llvm_nm"), cfg = "exec", allow_single_file = True),
+        "_generator": attr.label(default = Label("//graal:static_symbols"), cfg = "exec", executable = True),
+    },
+)
+
+def _jdk_static_symbols(ctx, runtime, platform):
+    """Declares symbol manifests next to the Labs JDK's static archives, keyed by java.home path."""
+    root = "lib/static/" + platform + "/"
+    if platform.startswith("linux-"):
+        root += "glibc/"
+    home = runtime.java_home + "/"
+    archives = [f for f in runtime.files.to_list() if f.path.startswith(home + root) and f.extension == "a"]
+    jvm = [f for f in archives if f.basename == "libjvm.a"]
+    archives = [f for f in archives if f.basename != "libjvm.a"]
+    if not archives:
+        fail("The Labs JDK must provide static archives at " + root)
+    args = ctx.actions.args()
+    args.add("--nm", ctx.file._nm)
+    args.add("--objdump", ctx.file._objdump)
+    args.add("--java-home", runtime.java_home)
+    if platform.startswith("darwin-"):
+        args.add("--darwin")
+    if jvm:
+        args.add("--jdk-jvm", jvm[0])
+    manifests = {}
+    for archive in archives:
+        relative = archive.path.removeprefix(home)
+        output = ctx.actions.declare_file(ctx.label.name + ".jdk_symbols/" + relative + ".symbols")
+        args.add_all("--jdk", [archive, output])
+        manifests[relative + ".symbols"] = output
+    dynamic = [f for f in runtime.files.to_list() if f.extension in ("so", "dylib")]
+    ctx.actions.run(
+        executable = ctx.executable._static_symbols,
+        arguments = [args],
+        inputs = archives + dynamic,
+        tools = [ctx.file._nm, ctx.file._objdump],
+        outputs = manifests.values(),
+        mnemonic = "SvmJdkStaticSymbols",
+    )
+    return manifests
+
 def _source_root(name):
     return "src/com.oracle.svm.native." + name
 
@@ -198,6 +262,12 @@ def svm_native_projects(projects):
         ])
     }
     common_headers["//substratevm/src/com.oracle.svm.core/src/com/oracle/svm/core/gc/shared/include:com.oracle.svm.core.resources"] = "include/sharedGCStructs.h"
+    # Native Image reads a symbol manifest next to the libjvm replacement.
+    svm_jvm_symbols(
+        name = "libjvm.a.symbols",
+        archive = archive_paths["jvm.posix"][0],
+        darwin = select({macos: True, "//conditions:default": False}),
+    )
     members = {}
     for setting, target in platform.items():
         glibc = target.startswith("linux-")
@@ -208,7 +278,7 @@ def svm_native_projects(projects):
         members[setting] = common_headers | {
             archive_paths[short][0]: prefix + archive_paths[short][1]
             for short in selected
-        }
+        } | {":libjvm.a.symbols": prefix + archive_paths["jvm.posix"][1] + ".symbols"}
     mx_archive_layout(
         name = "SVM_HOSTED_NATIVE",
         format = "tar",
@@ -246,6 +316,7 @@ def _native_image_root_impl(ctx):
             entries.setdefault(jdk_file.path.removeprefix(java_home), jdk_file)
     if "lib/modules" not in entries:
         fail("The Labs JDK must provide lib/modules")
+    entries.update(_jdk_static_symbols(ctx, runtime, ctx.attr.platform))
     for target, name in ctx.attr.guest.items():
         [jar] = target.files.to_list()
         entries["lib/svm/" + name + ".jar"] = jar
@@ -298,7 +369,11 @@ _native_image_root = rule(
         "reporter": attr.label(allow_single_file = True, mandatory = True),
         "builder_libs": attr.label_keyed_string_dict(providers = [JavaInfo]),
         "native_archive": attr.label(allow_single_file = [".tar"], mandatory = True),
+        "platform": attr.string(mandatory = True),
         "_jdk": attr.label(default = Label("//tools:labs_runtime")),
+        "_nm": attr.label(default = Label("//tools/cc:llvm_nm"), cfg = "exec", allow_single_file = True),
+        "_objdump": attr.label(default = Label("//tools/cc:llvm_objdump"), cfg = "exec", allow_single_file = True),
+        "_static_symbols": attr.label(default = Label("//graal:static_symbols"), cfg = "exec", executable = True),
         "_assemble": attr.label(default = Label("//graal:assemble_svm"), executable = True, cfg = "exec"),
         "_template": attr.label(default = Label("//graal:source_native_image.py.tpl"), allow_single_file = True),
     },
@@ -331,6 +406,7 @@ def svm_launcher(name, builder_libs = {}):
         reporter = ":com.oracle.svm.native.reporterchelper",
         builder_libs = builder_libs,
         native_archive = ":SVM_HOSTED_NATIVE",
+        platform = select({":" + setting: setting.removeprefix("svm.") for setting in ["svm.darwin-aarch64", "svm.linux-aarch64", "svm.linux-amd64"]}),
         visibility = ["//visibility:public"],
     )
     py_binary(

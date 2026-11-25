@@ -18,9 +18,9 @@ bazelisk test --config=elide-python //mx:export_test
 
 The default Python is managed CPython 3.13. The alternate configuration selects the matching Elide Python runtime for macOS arm64 or Linux x86_64/arm64. Both paths use the same rules_python binary. The checked-in rules_elide archive override provides the overlay support. Elide also compiles the Java targets and supplies JavaInfo and ABI jars. The launcher supplies the file-backed JDK selected by Bazel to mx as JAVA_HOME. Use a downloaded Java runtime in a consuming root, for example with --java_runtime_version=remotejdk_21.
 
-## Build upstream GraalVM
+## Build GraalVM
 
-The pinned Oracle source tree has native Bazel targets for all projects and distributions in the Truffle, compiler, Regex, Tools and Espresso Shared suites, and for all SDK projects and distributions. Run individual upstream tests by Bazel label. Use `tools/graal-coverage --missing` to list the pinned projects and distributions that still need Bazel targets.
+The pinned Graal source tree, the Elide fork `elide-dev/graal` at an `elide-25.6.x` commit, has native Bazel targets for all projects and distributions in the Truffle, compiler, Regex, Tools and Espresso Shared suites, and for all SDK projects and distributions. Run individual upstream tests by Bazel label. Use `tools/graal-coverage --missing` to list the pinned projects and distributions that still need Bazel targets.
 
 ```sh
 bazelisk build --config=elide-processors @graal//truffle:all_projects @graal//compiler:all_distributions @graal//regex:all_distributions
