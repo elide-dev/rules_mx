@@ -1,0 +1,1234 @@
+diff --git a/regex/BUILD.bazel b/regex/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/BUILD.bazel
+@@ -0,0 +1,403 @@
++load("@rules_java//java:java_import.bzl", "java_import")
++load("@rules_java//java:java_plugin.bzl", "java_plugin")
++load("@rules_mx//graal:layout.bzl", "mx_archive_layout")
++load("@rules_mx//mx:graph.bzl", "mx_jar_dist", "mx_processed_java", "mx_test_class")
++
++java_import(
++    name = "JMH_1_21",
++    jars = ["@graal_shaded_inputs//:mx_JMH_1_21.jar"],
++    deps = [
++        ":COMMONS_MATH3_3_2",
++        ":JMH_GENERATOR_ANNPROCESS_1_21",
++        ":JOPTSIMPLE_4_6",
++    ],
++)
++
++java_import(
++    name = "JOPTSIMPLE_4_6",
++    jars = ["@graal_shaded_inputs//:mx_JOPTSIMPLE_4_6.jar"],
++    deps = [],
++)
++
++java_import(
++    name = "JMH_GENERATOR_ANNPROCESS_1_21",
++    jars = ["@graal_shaded_inputs//:mx_JMH_GENERATOR_ANNPROCESS_1_21.jar"],
++    deps = [],
++)
++
++java_import(
++    name = "COMMONS_MATH3_3_2",
++    jars = ["@graal_shaded_inputs//:mx_COMMONS_MATH3_3_2.jar"],
++    deps = [],
++)
++
++java_plugin(
++    name = "jmh_processor",
++    processor_class = "org.openjdk.jmh.generators.BenchmarkProcessor",
++    deps = [":JMH_1_21"],
++)
++
++mx_archive_layout(
++    name = "TREGEX_GRAALVM_SUPPORT",
++    format = "tar",
++    members = {"mx.regex/native-image.properties": "native-image.properties"},
++    visibility = ["//visibility:public"],
++)
++
++mx_archive_layout(
++    name = "TREGEX_TEST_DUMMY_LANG_GRAALVM_SUPPORT",
++    format = "tar",
++    members = {"mx.regex/dummylang-native-image.properties": "native-image.properties"},
++    visibility = ["//visibility:public"],
++)
++
++filegroup(
++    name = "all_projects",
++    testonly = True,
++    srcs = [
++        ":com.oracle.truffle.regex",
++        ":com.oracle.truffle.regex.test",
++        ":com.oracle.truffle.regex.test.dummylang",
++    ],
++    visibility = ["//visibility:public"],
++)
++
++filegroup(
++    name = "all_distributions",
++    testonly = True,
++    srcs = [
++        ":TREGEX",
++        ":TREGEX_GRAALVM_SUPPORT",
++        ":TREGEX_TEST_DUMMY_LANG",
++        ":TREGEX_TEST_DUMMY_LANG_GRAALVM_SUPPORT",
++        ":TREGEX_UNIT_TESTS",
++    ],
++    visibility = ["//visibility:public"],
++)
++
++mx_processed_java(
++    name = "com.oracle.truffle.regex",
++    srcs = [
++        "//regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex:com.oracle.truffle.regex.srcs",
++        "//regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/analysis:com.oracle.truffle.regex.srcs",
++        "//regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/chardata:com.oracle.truffle.regex.srcs",
++        "//regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/charset:com.oracle.truffle.regex.srcs",
++        "//regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/dead:com.oracle.truffle.regex.srcs",
++        "//regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/errors:com.oracle.truffle.regex.srcs",
++        "//regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/flavor:com.oracle.truffle.regex.srcs",
++        "//regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/flavor/java:com.oracle.truffle.regex.srcs",
++        "//regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/flavor/js:com.oracle.truffle.regex.srcs",
++        "//regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/flavor/oracledb:com.oracle.truffle.regex.srcs",
++        "//regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/flavor/python:com.oracle.truffle.regex.srcs",
++        "//regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/flavor/ruby:com.oracle.truffle.regex.srcs",
++        "//regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/literal:com.oracle.truffle.regex.srcs",
++        "//regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/result:com.oracle.truffle.regex.srcs",
++        "//regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/runtime/nodes:com.oracle.truffle.regex.srcs",
++        "//regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex:com.oracle.truffle.regex.srcs",
++        "//regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/automaton:com.oracle.truffle.regex.srcs",
++        "//regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/buffer:com.oracle.truffle.regex.srcs",
++        "//regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/dfa:com.oracle.truffle.regex.srcs",
++        "//regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/nfa:com.oracle.truffle.regex.srcs",
++        "//regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/nodes:com.oracle.truffle.regex.srcs",
++        "//regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/nodes/dfa:com.oracle.truffle.regex.srcs",
++        "//regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/nodes/input:com.oracle.truffle.regex.srcs",
++        "//regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/nodes/nfa:com.oracle.truffle.regex.srcs",
++        "//regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/parser:com.oracle.truffle.regex.srcs",
++        "//regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/parser/ast:com.oracle.truffle.regex.srcs",
++        "//regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/parser/ast/visitors:com.oracle.truffle.regex.srcs",
++        "//regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/string:com.oracle.truffle.regex.srcs",
++        "//regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/util:com.oracle.truffle.regex.srcs",
++        "//regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/util/json:com.oracle.truffle.regex.srcs",
++        "//regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/util:com.oracle.truffle.regex.srcs",
++    ],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++        "--add-modules",
++        "java.logging,jdk.unsupported",
++    ],
++    mx_resource_root = "src/com.oracle.truffle.regex/src",
++    plugins = [
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    resources = ["//regex/src/com.oracle.truffle.regex/src/META-INF/native-image/org.graalvm.regex/regex:com.oracle.truffle.regex.resources"],
++    visibility = ["//visibility:public"],
++    deps = [
++        "//sdk:COLLECTIONS",
++        "//sdk:POLYGLOT",
++        "//truffle:TRUFFLE_API",
++        "//truffle:TRUFFLE_ICU4J",
++    ],
++)
++
++mx_processed_java(
++    name = "com.oracle.truffle.regex.test",
++    testonly = True,
++    srcs = [
++        "//regex/src/com.oracle.truffle.regex.test/src/com/oracle/truffle/regex/flavor/js:com.oracle.truffle.regex.test.srcs",
++        "//regex/src/com.oracle.truffle.regex.test/src/com/oracle/truffle/regex/flavor/python:com.oracle.truffle.regex.test.srcs",
++        "//regex/src/com.oracle.truffle.regex.test/src/com/oracle/truffle/regex/jmh:com.oracle.truffle.regex.test.srcs",
++        "//regex/src/com.oracle.truffle.regex.test/src/com/oracle/truffle/regex/tregex:com.oracle.truffle.regex.test.srcs",
++        "//regex/src/com.oracle.truffle.regex.test/src/com/oracle/truffle/regex/tregex/matchers:com.oracle.truffle.regex.test.srcs",
++        "//regex/src/com.oracle.truffle.regex.test/src/com/oracle/truffle/regex/tregex/nodes/dfa:com.oracle.truffle.regex.test.srcs",
++        "//regex/src/com.oracle.truffle.regex.test/src/com/oracle/truffle/regex/tregex/test:com.oracle.truffle.regex.test.srcs",
++        "//regex/src/com.oracle.truffle.regex.test/src/com/oracle/truffle/regex/tregex/test/generated:com.oracle.truffle.regex.test.srcs",
++    ],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++    ],
++    plugins = [
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++        ":jmh_processor",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":JMH_1_21",
++        ":TREGEX",
++        ":TREGEX_TEST_DUMMY_LANG",
++        "//sdk:COLLECTIONS",
++        "//sdk:POLYGLOT",
++        "//truffle:TRUFFLE_API",
++        "@contrib_rules_jvm_deps//:junit_junit",
++    ],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.regex.test.com.oracle.truffle.regex.flavor.js.JsFlagsTest",
++    test_class = "com.oracle.truffle.regex.flavor.js.JsFlagsTest",
++    runtime_deps = [":TREGEX_UNIT_TESTS"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.regex.test.com.oracle.truffle.regex.flavor.python.PythonFlagsTest",
++    test_class = "com.oracle.truffle.regex.flavor.python.PythonFlagsTest",
++    runtime_deps = [":TREGEX_UNIT_TESTS"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.regex.test.com.oracle.truffle.regex.tregex.StateSetTest",
++    test_class = "com.oracle.truffle.regex.tregex.StateSetTest",
++    runtime_deps = [":TREGEX_UNIT_TESTS"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.regex.test.com.oracle.truffle.regex.tregex.StringTest",
++    test_class = "com.oracle.truffle.regex.tregex.StringTest",
++    runtime_deps = [":TREGEX_UNIT_TESTS"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.regex.test.com.oracle.truffle.regex.tregex.TBitSetTest",
++    test_class = "com.oracle.truffle.regex.tregex.TBitSetTest",
++    runtime_deps = [":TREGEX_UNIT_TESTS"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.regex.test.com.oracle.truffle.regex.tregex.matchers.MatcherBuilderTest",
++    test_class = "com.oracle.truffle.regex.tregex.matchers.MatcherBuilderTest",
++    runtime_deps = [":TREGEX_UNIT_TESTS"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.regex.test.com.oracle.truffle.regex.tregex.matchers.RangesBufferTest",
++    test_class = "com.oracle.truffle.regex.tregex.matchers.RangesBufferTest",
++    runtime_deps = [":TREGEX_UNIT_TESTS"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.regex.test.com.oracle.truffle.regex.tregex.nodes.dfa.CounterTrackerBitSetWithOffsetTest",
++    test_class = "com.oracle.truffle.regex.tregex.nodes.dfa.CounterTrackerBitSetWithOffsetTest",
++    runtime_deps = [":TREGEX_UNIT_TESTS"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.regex.test.com.oracle.truffle.regex.tregex.test.InputStringGeneratorTests",
++    test_class = "com.oracle.truffle.regex.tregex.test.InputStringGeneratorTests",
++    runtime_deps = [":TREGEX_UNIT_TESTS"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.regex.test.com.oracle.truffle.regex.tregex.test.JavaUtilPatternTests",
++    test_class = "com.oracle.truffle.regex.tregex.test.JavaUtilPatternTests",
++    runtime_deps = [":TREGEX_UNIT_TESTS"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.regex.test.com.oracle.truffle.regex.tregex.test.JsTests",
++    test_class = "com.oracle.truffle.regex.tregex.test.JsTests",
++    runtime_deps = [":TREGEX_UNIT_TESTS"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.regex.test.com.oracle.truffle.regex.tregex.test.OracleDBTests",
++    test_class = "com.oracle.truffle.regex.tregex.test.OracleDBTests",
++    runtime_deps = [":TREGEX_UNIT_TESTS"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.regex.test.com.oracle.truffle.regex.tregex.test.PythonByteTests",
++    test_class = "com.oracle.truffle.regex.tregex.test.PythonByteTests",
++    runtime_deps = [":TREGEX_UNIT_TESTS"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.regex.test.com.oracle.truffle.regex.tregex.test.PythonTests",
++    test_class = "com.oracle.truffle.regex.tregex.test.PythonTests",
++    runtime_deps = [":TREGEX_UNIT_TESTS"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.regex.test.com.oracle.truffle.regex.tregex.test.RegexOptionsTest",
++    test_class = "com.oracle.truffle.regex.tregex.test.RegexOptionsTest",
++    runtime_deps = [":TREGEX_UNIT_TESTS"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.regex.test.com.oracle.truffle.regex.tregex.test.RegressionTests",
++    test_class = "com.oracle.truffle.regex.tregex.test.RegressionTests",
++    runtime_deps = [":TREGEX_UNIT_TESTS"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.regex.test.com.oracle.truffle.regex.tregex.test.RubyBytesTests",
++    test_class = "com.oracle.truffle.regex.tregex.test.RubyBytesTests",
++    runtime_deps = [":TREGEX_UNIT_TESTS"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.regex.test.com.oracle.truffle.regex.tregex.test.RubyTests",
++    test_class = "com.oracle.truffle.regex.tregex.test.RubyTests",
++    runtime_deps = [":TREGEX_UNIT_TESTS"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.regex.test.com.oracle.truffle.regex.tregex.test.RubyUTF8Tests",
++    test_class = "com.oracle.truffle.regex.tregex.test.RubyUTF8Tests",
++    runtime_deps = [":TREGEX_UNIT_TESTS"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.regex.test.com.oracle.truffle.regex.tregex.test.TransitionConstraintTest",
++    test_class = "com.oracle.truffle.regex.tregex.test.TransitionConstraintTest",
++    runtime_deps = [":TREGEX_UNIT_TESTS"],
++)
++
++mx_processed_java(
++    name = "com.oracle.truffle.regex.test.dummylang",
++    testonly = True,
++    srcs = ["//regex/src/com.oracle.truffle.regex.test.dummylang/src/com/oracle/truffle/regex/test/dummylang:com.oracle.truffle.regex.test.dummylang.srcs"],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++    ],
++    plugins = [
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":com.oracle.truffle.regex",
++        "//sdk:POLYGLOT",
++        "//truffle:TRUFFLE_API",
++    ],
++)
++
++mx_jar_dist(
++    name = "TREGEX",
++    contents = [":com.oracle.truffle.regex"],
++    directives = [
++        "exports com.oracle.truffle.regex.chardata",
++        "requires java.logging",
++        "requires jdk.unsupported",
++        "requires org.graalvm.collections",
++        "requires org.graalvm.polyglot",
++        "requires org.graalvm.shadowed.icu4j",
++        "requires org.graalvm.truffle",
++        "requires transitive org.graalvm.word",
++    ],
++    jni_services = True,
++    manifest = {
++        "Implementation-Vendor": "Oracle Corporation",
++        "Implementation-Version": "25.5.5-dev",
++        "Name": "regex",
++        "Specification-Vendor": "Oracle Corporation",
++        "Specification-Version": "25.5.5-dev",
++    },
++    module_name = "com.oracle.truffle.regex",
++    release = 21,
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [
++        "//truffle:TRUFFLE_API",
++        "//truffle:TRUFFLE_ICU4J",
++    ],
++)
++
++mx_jar_dist(
++    name = "TREGEX_TEST_DUMMY_LANG",
++    testonly = True,
++    contents = [":com.oracle.truffle.regex.test.dummylang"],
++    directives = [
++        "requires com.oracle.truffle.regex",
++        "requires org.graalvm.polyglot",
++        "requires org.graalvm.truffle",
++        "requires transitive org.graalvm.word",
++    ],
++    jni_services = True,
++    module_name = "com.oracle.truffle.regex.test.dummylang",
++    release = 21,
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [":TREGEX"],
++)
++
++mx_jar_dist(
++    name = "TREGEX_UNIT_TESTS",
++    testonly = True,
++    contents = [
++        ":JOPTSIMPLE_4_6",
++        ":JMH_GENERATOR_ANNPROCESS_1_21",
++        ":COMMONS_MATH3_3_2",
++        ":JMH_1_21",
++        ":com.oracle.truffle.regex.test",
++    ],
++    jmh_metadata = True,
++    jni_services = True,
++    manifest = {
++        "Main-Class": "org.openjdk.jmh.Main",
++    },
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":TREGEX",
++        ":TREGEX_TEST_DUMMY_LANG",
++        "@contrib_rules_jvm_deps//:junit_junit",
++    ],
++)
+diff --git a/regex/src/com.oracle.truffle.regex/src/META-INF/native-image/org.graalvm.regex/regex/BUILD.bazel b/regex/src/com.oracle.truffle.regex/src/META-INF/native-image/org.graalvm.regex/regex/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex/src/META-INF/native-image/org.graalvm.regex/regex/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.resources",
++    srcs = ["native-image.properties"],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/BUILD.bazel b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/BUILD.bazel
+@@ -0,0 +1,22 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.srcs",
++    srcs = [
++        "AbstractConstantKeysObject.java",
++        "AbstractRegexObject.java",
++        "RegexBodyNode.java",
++        "RegexExecNode.java",
++        "RegexFlags.java",
++        "RegexInterruptedException.java",
++        "RegexLanguage.java",
++        "RegexObject.java",
++        "RegexOptions.java",
++        "RegexProfile.java",
++        "RegexRootNode.java",
++        "RegexSource.java",
++        "RegexSyntaxException.java",
++        "UnsupportedRegexException.java",
++    ],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/analysis/BUILD.bazel b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/analysis/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/analysis/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.srcs",
++    srcs = [
++        "InputStringGenerator.java",
++        "RegexUnifier.java",
++    ],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/chardata/BUILD.bazel b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/chardata/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/chardata/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.srcs",
++    srcs = ["UnicodeCharacterAliases.java"],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/charset/BUILD.bazel b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/charset/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/charset/BUILD.bazel
+@@ -0,0 +1,24 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.srcs",
++    srcs = [
++        "CharMatchers.java",
++        "ClassSetContents.java",
++        "ClassSetContentsAccumulator.java",
++        "CodePointSet.java",
++        "CodePointSetAccumulator.java",
++        "CompressedCodePointSet.java",
++        "Constants.java",
++        "ImmutableSortedListOfIntRanges.java",
++        "ImmutableSortedListOfRanges.java",
++        "Range.java",
++        "RangesBuffer.java",
++        "SortedListOfRanges.java",
++        "UnicodeProperties.java",
++        "UnicodePropertyData.java",
++        "UnicodePropertyDataDiff.java",
++        "UnicodePropertyDataVersion.java",
++    ],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/dead/BUILD.bazel b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/dead/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/dead/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.srcs",
++    srcs = ["DeadRegexExecNode.java"],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/errors/BUILD.bazel b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/errors/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/errors/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.srcs",
++    srcs = ["JsErrorMessages.java"],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/flavor/BUILD.bazel b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/flavor/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/flavor/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.srcs",
++    srcs = ["RegexFlavorProvider.java"],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/flavor/java/BUILD.bazel b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/flavor/java/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/flavor/java/BUILD.bazel
+@@ -0,0 +1,17 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.srcs",
++    srcs = [
++        "JavaASCII.java",
++        "JavaErrorMessages.java",
++        "JavaFlags.java",
++        "JavaFlavor.java",
++        "JavaFlavorProvider.java",
++        "JavaRegexLexer.java",
++        "JavaRegexParser.java",
++        "JavaRegexValidator.java",
++        "JavaUnicodeProperties.java",
++    ],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/flavor/js/BUILD.bazel b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/flavor/js/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/flavor/js/BUILD.bazel
+@@ -0,0 +1,13 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.srcs",
++    srcs = [
++        "ECMAScriptFlavor.java",
++        "JSFlavorProvider.java",
++        "JSRegexLexer.java",
++        "JSRegexParser.java",
++        "JSRegexValidator.java",
++    ],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/flavor/oracledb/BUILD.bazel b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/flavor/oracledb/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/flavor/oracledb/BUILD.bazel
+@@ -0,0 +1,15 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.srcs",
++    srcs = [
++        "OracleDBConstants.java",
++        "OracleDBErrorMessages.java",
++        "OracleDBFlags.java",
++        "OracleDBFlavor.java",
++        "OracleDBFlavorProvider.java",
++        "OracleDBRegexLexer.java",
++        "OracleDBRegexParser.java",
++    ],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/flavor/python/BUILD.bazel b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/flavor/python/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/flavor/python/BUILD.bazel
+@@ -0,0 +1,16 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.srcs",
++    srcs = [
++        "PyErrorMessages.java",
++        "PythonFlags.java",
++        "PythonFlavor.java",
++        "PythonFlavorProvider.java",
++        "PythonLocaleData.java",
++        "PythonREMode.java",
++        "PythonRegexLexer.java",
++        "PythonRegexParser.java",
++    ],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/flavor/ruby/BUILD.bazel b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/flavor/ruby/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/flavor/ruby/BUILD.bazel
+@@ -0,0 +1,14 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.srcs",
++    srcs = [
++        "RbErrorMessages.java",
++        "RubyFlags.java",
++        "RubyFlavor.java",
++        "RubyFlavorProvider.java",
++        "RubyRegexParser.java",
++        "RubySubexpressionCalls.java",
++    ],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/literal/BUILD.bazel b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/literal/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/literal/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.srcs",
++    srcs = [
++        "LiteralRegexEngine.java",
++        "LiteralRegexExecNode.java",
++    ],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/result/BUILD.bazel b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/result/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/result/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.srcs",
++    srcs = [
++        "PreCalculatedResultFactory.java",
++        "RegexResult.java",
++    ],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/runtime/nodes/BUILD.bazel b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/runtime/nodes/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/runtime/nodes/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.srcs",
++    srcs = [
++        "DispatchNode.java",
++        "ExpectStringNode.java",
++        "ToIntNode.java",
++        "ToLongNode.java",
++    ],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/BUILD.bazel b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.srcs",
++    srcs = [
++        "TRegexCompilationRequest.java",
++        "TRegexCompiler.java",
++        "TRegexOptions.java",
++    ],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/automaton/BUILD.bazel b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/automaton/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/automaton/BUILD.bazel
+@@ -0,0 +1,21 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.srcs",
++    srcs = [
++        "AbstractState.java",
++        "AbstractTransition.java",
++        "BasicState.java",
++        "SimpleStateIndex.java",
++        "StateIndex.java",
++        "StateSet.java",
++        "StateSetImpl.java",
++        "StateSetToIntMap.java",
++        "StateTransitionCanonicalizer.java",
++        "TransitionBuilder.java",
++        "TransitionConstraint.java",
++        "TransitionOp.java",
++        "TransitionSet.java",
++    ],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/buffer/BUILD.bazel b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/buffer/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/buffer/BUILD.bazel
+@@ -0,0 +1,18 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.srcs",
++    srcs = [
++        "AbstractArrayBuffer.java",
++        "ByteArrayBuffer.java",
++        "CharArrayBuffer.java",
++        "CompilationBuffer.java",
++        "IntArrayBuffer.java",
++        "IntRangesBuffer.java",
++        "IntRingBuffer.java",
++        "LongArrayBuffer.java",
++        "ObjectArrayBuffer.java",
++        "ShortArrayBuffer.java",
++    ],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/dfa/BUILD.bazel b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/dfa/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/dfa/BUILD.bazel
+@@ -0,0 +1,14 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.srcs",
++    srcs = [
++        "DFACaptureGroupLazyTransitionBuilder.java",
++        "DFACaptureGroupTransitionBuilder.java",
++        "DFAGenerator.java",
++        "DFAStateNodeBuilder.java",
++        "DFAStateTransitionBuilder.java",
++        "DFATransitionCanonicalizer.java",
++    ],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/nfa/BUILD.bazel b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/nfa/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/nfa/BUILD.bazel
+@@ -0,0 +1,24 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.srcs",
++    srcs = [
++        "ASTStep.java",
++        "ASTStepVisitor.java",
++        "ASTSuccessor.java",
++        "ASTTransition.java",
++        "ASTTransitionCanonicalizer.java",
++        "NFA.java",
++        "NFAGenerator.java",
++        "NFAState.java",
++        "NFAStateTransition.java",
++        "NFATraceFinderGenerator.java",
++        "PureNFA.java",
++        "PureNFAGenerator.java",
++        "PureNFAState.java",
++        "PureNFATransition.java",
++        "PureNFATransitionGenerator.java",
++        "TransitionGuard.java",
++    ],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/nodes/BUILD.bazel b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/nodes/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/nodes/BUILD.bazel
+@@ -0,0 +1,13 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.srcs",
++    srcs = [
++        "TRegexExecNode.java",
++        "TRegexExecutorBaseNode.java",
++        "TRegexExecutorEntryNode.java",
++        "TRegexExecutorLocals.java",
++        "TRegexExecutorNode.java",
++    ],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/nodes/dfa/BUILD.bazel b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/nodes/dfa/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/nodes/dfa/BUILD.bazel
+@@ -0,0 +1,47 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.srcs",
++    srcs = [
++        "AllTransitionsInOneTreeMatcher.java",
++        "CGTrackingAbstractTransitionNode.java",
++        "CGTrackingAnchoredFinalTransitionNode.java",
++        "CGTrackingDFAStateNode.java",
++        "CGTrackingPreFinalTransitionNode.java",
++        "CGTrackingTransitionNode.java",
++        "CounterTracker.java",
++        "CounterTrackerBitSetWithOffset.java",
++        "CounterTrackerData.java",
++        "CounterTrackerList.java",
++        "CounterTrackerLong.java",
++        "CounterTrackerLong2.java",
++        "CounterTrackerTrivialAlwaysReEnter.java",
++        "CounterTrackerTrivialNeverReEnter.java",
++        "DFAAbstractNode.java",
++        "DFAAbstractStateNode.java",
++        "DFAAbstractTransitionNode.java",
++        "DFABQTrackingStateNode.java",
++        "DFABQTrackingTransitionConstraintsNode.java",
++        "DFABQTrackingTransitionOpsNode.java",
++        "DFACaptureGroupLazyTransition.java",
++        "DFACaptureGroupPartialTransition.java",
++        "DFACaptureGroupTrackingData.java",
++        "DFAFindInnerLiteralStateNode.java",
++        "DFAInitialStateNode.java",
++        "DFASimpleCGTrackingStateNode.java",
++        "DFASimpleCGTransition.java",
++        "DFAStateNode.java",
++        "RegressionModeCounterTracker.java",
++        "SequentialMatchers.java",
++        "TRegexDFAExecutorDebugRecorder.java",
++        "TRegexDFAExecutorLocals.java",
++        "TRegexDFAExecutorNode.java",
++        "TRegexDFAExecutorProperties.java",
++        "TRegexLazyBackwardSimpleCGRootNode.java",
++        "TRegexLazyCaptureGroupsRootNode.java",
++        "TRegexLazyFindStartRootNode.java",
++        "TRegexTraceFinderRootNode.java",
++        "TraceFinderDFAStateNode.java",
++    ],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/nodes/input/BUILD.bazel b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/nodes/input/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/nodes/input/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.srcs",
++    srcs = [
++        "InputOps.java",
++        "InputReadNode.java",
++    ],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/nodes/nfa/BUILD.bazel b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/nodes/nfa/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/nodes/nfa/BUILD.bazel
+@@ -0,0 +1,15 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.srcs",
++    srcs = [
++        "EncodedGroupBoundaries.java",
++        "TRegexBacktrackerSubExecutorNode.java",
++        "TRegexBacktrackingNFAExecutorLocals.java",
++        "TRegexBacktrackingNFAExecutorNode.java",
++        "TRegexLiteralLookAroundExecutorNode.java",
++        "TRegexNFAExecutorLocals.java",
++        "TRegexNFAExecutorNode.java",
++    ],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/parser/BUILD.bazel b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/parser/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/parser/BUILD.bazel
+@@ -0,0 +1,22 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.srcs",
++    srcs = [
++        "CaseFoldData.java",
++        "CaseUnfoldingTrie.java",
++        "Counter.java",
++        "MatchingMode.java",
++        "MultiCharacterCaseFolding.java",
++        "OracleDBCharClassTrieNode.java",
++        "RegexASTBuilder.java",
++        "RegexASTPostProcessor.java",
++        "RegexFlavor.java",
++        "RegexLexer.java",
++        "RegexParser.java",
++        "RegexProperties.java",
++        "RegexValidator.java",
++        "Token.java",
++    ],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/parser/ast/BUILD.bazel b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/parser/ast/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/parser/ast/BUILD.bazel
+@@ -0,0 +1,33 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.srcs",
++    srcs = [
++        "AtomicGroup.java",
++        "BackReference.java",
++        "CalcASTFlagsVisitor.java",
++        "CalcASTPropsVisitor.java",
++        "CharacterClass.java",
++        "ConditionalBackReferenceGroup.java",
++        "GlobalSubTreeIndex.java",
++        "Group.java",
++        "GroupBoundaries.java",
++        "GroupsWithGuardsIndex.java",
++        "InnerLiteral.java",
++        "LookAheadAssertion.java",
++        "LookAroundAssertion.java",
++        "LookBehindAssertion.java",
++        "MatchFound.java",
++        "PositionAssertion.java",
++        "QuantifiableTerm.java",
++        "RegexAST.java",
++        "RegexASTNode.java",
++        "RegexASTRootNode.java",
++        "RegexASTSubtreeRootNode.java",
++        "Sequence.java",
++        "SubTreeIndex.java",
++        "SubexpressionCall.java",
++        "Term.java",
++    ],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/parser/ast/visitors/BUILD.bazel b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/parser/ast/visitors/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/parser/ast/visitors/BUILD.bazel
+@@ -0,0 +1,25 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.srcs",
++    srcs = [
++        "ASTDebugDumpVisitor.java",
++        "ASTDotExportVisitor.java",
++        "ASTLaTexExportVisitor.java",
++        "AddToSetVisitor.java",
++        "CopyVisitor.java",
++        "DepthFirstTraversalRegexASTVisitor.java",
++        "InitIDVisitor.java",
++        "MarkAsAliveVisitor.java",
++        "MarkAsDeadVisitor.java",
++        "MarkLookBehindEntriesVisitor.java",
++        "NFATraversalRegexASTVisitor.java",
++        "NodeCountVisitor.java",
++        "PreCalcResultVisitor.java",
++        "PropagateDeadFlagVisitor.java",
++        "RegexASTVisitor.java",
++        "RegexASTVisitorIterable.java",
++        "SetSourceSectionVisitor.java",
++    ],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/string/BUILD.bazel b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/string/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/string/BUILD.bazel
+@@ -0,0 +1,14 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.srcs",
++    srcs = [
++        "AbstractStringBuffer.java",
++        "Encoding.java",
++        "StringBufferBytes.java",
++        "StringBufferUTF16.java",
++        "StringBufferUTF32.java",
++        "StringBufferUTF8.java",
++    ],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/util/BUILD.bazel b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/util/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/util/BUILD.bazel
+@@ -0,0 +1,16 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.srcs",
++    srcs = [
++        "DFAExport.java",
++        "DebugUtil.java",
++        "DotExport.java",
++        "LaTexExport.java",
++        "Loggers.java",
++        "MathUtil.java",
++        "NFAExport.java",
++        "TruffleReadOnlyIntArray.java",
++    ],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/util/json/BUILD.bazel b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/util/json/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/util/json/BUILD.bazel
+@@ -0,0 +1,17 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.srcs",
++    srcs = [
++        "Json.java",
++        "JsonArray.java",
++        "JsonBool.java",
++        "JsonConvertible.java",
++        "JsonInt.java",
++        "JsonNull.java",
++        "JsonObject.java",
++        "JsonString.java",
++        "JsonValue.java",
++    ],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/util/BUILD.bazel b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/util/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/util/BUILD.bazel
+@@ -0,0 +1,23 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.srcs",
++    srcs = [
++        "Abstract128BitSet.java",
++        "Abstract64BitSet.java",
++        "Assertions.java",
++        "BitSets.java",
++        "Boundaries.java",
++        "EmptyArrays.java",
++        "Immutable128BitSet.java",
++        "JavaStringUtil.java",
++        "Mutable128BitSet.java",
++        "TBitSet.java",
++        "TruffleNull.java",
++        "TruffleOrderedReadOnlyKeysArray.java",
++        "TruffleReadOnlyKeysArray.java",
++        "TruffleReadOnlyMap.java",
++        "TruffleSmallReadOnlyStringToIntMap.java",
++    ],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex.test/src/com/oracle/truffle/regex/flavor/js/BUILD.bazel b/regex/src/com.oracle.truffle.regex.test/src/com/oracle/truffle/regex/flavor/js/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex.test/src/com/oracle/truffle/regex/flavor/js/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.test.srcs",
++    srcs = ["JsFlagsTest.java"],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex.test/src/com/oracle/truffle/regex/flavor/python/BUILD.bazel b/regex/src/com.oracle.truffle.regex.test/src/com/oracle/truffle/regex/flavor/python/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex.test/src/com/oracle/truffle/regex/flavor/python/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.test.srcs",
++    srcs = ["PythonFlagsTest.java"],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex.test/src/com/oracle/truffle/regex/jmh/BUILD.bazel b/regex/src/com.oracle.truffle.regex.test/src/com/oracle/truffle/regex/jmh/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex.test/src/com/oracle/truffle/regex/jmh/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.test.srcs",
++    srcs = [
++        "BenchmarkBase.java",
++        "MultiLiteralBenchmark.java",
++        "TRegexVSJavaBenchmarks.java",
++    ],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex.test/src/com/oracle/truffle/regex/tregex/BUILD.bazel b/regex/src/com.oracle.truffle.regex.test/src/com/oracle/truffle/regex/tregex/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex.test/src/com/oracle/truffle/regex/tregex/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.test.srcs",
++    srcs = [
++        "BitSetOracle.java",
++        "StateSetTest.java",
++        "StringTest.java",
++        "TBitSetTest.java",
++    ],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex.test/src/com/oracle/truffle/regex/tregex/matchers/BUILD.bazel b/regex/src/com.oracle.truffle.regex.test/src/com/oracle/truffle/regex/tregex/matchers/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex.test/src/com/oracle/truffle/regex/tregex/matchers/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.test.srcs",
++    srcs = [
++        "MatcherBuilderTest.java",
++        "RangesBufferTest.java",
++    ],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex.test/src/com/oracle/truffle/regex/tregex/nodes/dfa/BUILD.bazel b/regex/src/com.oracle.truffle.regex.test/src/com/oracle/truffle/regex/tregex/nodes/dfa/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex.test/src/com/oracle/truffle/regex/tregex/nodes/dfa/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.test.srcs",
++    srcs = ["CounterTrackerBitSetWithOffsetTest.java"],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex.test/src/com/oracle/truffle/regex/tregex/test/BUILD.bazel b/regex/src/com.oracle.truffle.regex.test/src/com/oracle/truffle/regex/tregex/test/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex.test/src/com/oracle/truffle/regex/tregex/test/BUILD.bazel
+@@ -0,0 +1,21 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.test.srcs",
++    srcs = [
++        "InputStringGeneratorTests.java",
++        "JavaUtilPatternTests.java",
++        "JsTests.java",
++        "OracleDBTests.java",
++        "PythonByteTests.java",
++        "PythonTests.java",
++        "RegexOptionsTest.java",
++        "RegexTestBase.java",
++        "RegressionTests.java",
++        "RubyBytesTests.java",
++        "RubyTests.java",
++        "RubyUTF8Tests.java",
++        "TransitionConstraintTest.java",
++    ],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex.test/src/com/oracle/truffle/regex/tregex/test/generated/BUILD.bazel b/regex/src/com.oracle.truffle.regex.test/src/com/oracle/truffle/regex/tregex/test/generated/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex.test/src/com/oracle/truffle/regex/tregex/test/generated/BUILD.bazel
+@@ -0,0 +1,14 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.test.srcs",
++    srcs = [
++        "JavaGeneratedTests.java",
++        "JsGeneratedTests.java",
++        "OracleDBGeneratedTests.java",
++        "PythonGeneratedTests.java",
++        "RubyGeneratedTests.java",
++        "TestCase.java",
++    ],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex.test.dummylang/src/com/oracle/truffle/regex/test/dummylang/BUILD.bazel b/regex/src/com.oracle.truffle.regex.test.dummylang/src/com/oracle/truffle/regex/test/dummylang/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex.test.dummylang/src/com/oracle/truffle/regex/test/dummylang/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.test.dummylang.srcs",
++    srcs = [
++        "TRegexTestDummyLangOptionDescriptors.java",
++        "TRegexTestDummyLanguage.java",
++        "TRegexTestDummyLanguageOptions.java",
++    ],
++    visibility = ["//regex:__pkg__"],
++)

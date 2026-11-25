@@ -123,6 +123,16 @@ SUITES = {
             )
             for arg in ("--archive-dist", dist)
         ],
+        *[
+            arg
+            for dist in (
+                "GRAAL_IGVUTIL",
+                "GRAAL_PROFDIFF",
+                "GRAAL_IGVUTIL_TEST",
+                "GRAAL_PROFDIFF_TEST",
+            )
+            for arg in ("--archive-dist", dist)
+        ],
         # This benchmark intentionally measures self-normalization.
         "--javac-opt",
         "org.graalvm.micro.benchmarks=-Xep:IdentityBinaryExpression:WARN",
@@ -206,6 +216,8 @@ SUITES = {
         "GRAAL_COMPILER_WHITEBOX_MICRO_BENCHMARKS",
         "GRAAL_COMPILER_MICRO_BENCHMARKS",
         "GRAAL",
+        "GRAAL_IGVUTIL_TEST",
+        "GRAAL_PROFDIFF_TEST",
         "org.graalvm.igvutil.test",
         "org.graalvm.profdiff.test",
         "GRAAL_TEST_RUNTIME",
@@ -446,7 +458,53 @@ SUITES = {
         "TRUFFLE_SL_TCK",
         "TRUFFLE_TEST",
     ],
+    "regex": [
+        "--infer-source-deps",
+        "--java-dep",
+        "sdk:POLYGLOT=//sdk:POLYGLOT",
+        "--java-dep",
+        "sdk:COLLECTIONS=//sdk:COLLECTIONS",
+        "--generated-dep",
+        "regex:com.oracle.truffle.regex.test.dummylang=//truffle:TRUFFLE_API",
+        "--generated-dep",
+        "regex:com.oracle.truffle.regex.test.dummylang=//sdk:POLYGLOT",
+        *[
+            arg
+            for name in ("TRUFFLE_API", "TRUFFLE_ICU4J")
+            for arg in ("--java-dep", f"truffle:{name}=//truffle:{name}")
+        ],
+        "--java-dep",
+        "mx:JUNIT=@contrib_rules_jvm_deps//:junit_junit",
+        "--java-dep",
+        "mx:HAMCREST=@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
+        *[
+            arg
+            for name in (
+                "JMH_1_21",
+                "JOPTSIMPLE_4_6",
+                "COMMONS_MATH3_3_2",
+                "JMH_GENERATOR_ANNPROCESS_1_21",
+            )
+            for arg in ("--java-dep", f"mx:{name}=:{name}")
+        ],
+        "--processor-plugin",
+        "mx:JMH_1_21=:jmh_processor",
+        "--javac-only-processor",
+        "truffle:TRUFFLE_DSL_PROCESSOR",
+        "--test-runtime",
+        "regex:com.oracle.truffle.regex.test=:TREGEX_UNIT_TESTS",
+        *[
+            arg
+            for name in ("TREGEX", "TREGEX_TEST_DUMMY_LANG", "TREGEX_UNIT_TESTS")
+            for arg in ("--archive-dist", name)
+        ],
+        "TREGEX",
+        "TREGEX_TEST_DUMMY_LANG",
+        "TREGEX_UNIT_TESTS",
+    ],
     "substratevm": [
+        "--java-dep",
+        "substratevm:svm-compiler-flags-builder=:svm-compiler-flags-builder",
         "--java-dep",
         "espresso-shared:ESPRESSO_SVM=//espresso-shared:ESPRESSO_SVM",
         "--java-dep",
@@ -524,6 +582,10 @@ SUITES = {
         *[
             arg
             for dist in (
+                "SVM_GUEST",
+                "SVM_JVMCI_GUEST",
+                "LIBRARY_SUPPORT",
+                "SVM_DRIVER",
                 "SVM",
                 "SVM_CAPNPROTO_RUNTIME",
                 "SVM_GUEST_STAGING",
@@ -538,6 +600,10 @@ SUITES = {
             )
             for arg in ("--archive-dist", dist)
         ],
+        "SVM_GUEST",
+        "SVM_JVMCI_GUEST",
+        "LIBRARY_SUPPORT",
+        "SVM_DRIVER",
         "SVM",
         "SVM_PROCESSOR",
         "SVM_CONFIGURE",
@@ -620,11 +686,22 @@ def harness_options(directory):
                 p,
             )
         ]
-    if suite == "compiler":
+    if suite in ("compiler", "regex"):
         service = (
             directory.parent
             / "truffle/src/com.oracle.truffle.dsl.processor/src/META-INF/services/javax.annotation.processing.Processor"
         )
+        processors = [
+            arg
+            for proc in service.read_text().splitlines()
+            if proc.strip() and not proc.startswith("#")
+            for arg in (
+                "--processor-plugin",
+                f"truffle:TRUFFLE_DSL_PROCESSOR=//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.{proc}",
+            )
+        ]
+        if suite == "regex":
+            return processors
         return [
             "--test-launcher",
             "compiler:jdk.graal.compiler.test=:compiler_junit",
@@ -632,15 +709,7 @@ def harness_options(directory):
             "compiler:jdk.graal.compiler.test=@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
             "--manual-test-project",
             "jdk.graal.compiler.test",
-            *[
-                arg
-                for proc in service.read_text().splitlines()
-                if proc.strip() and not proc.startswith("#")
-                for arg in (
-                    "--processor-plugin",
-                    f"truffle:TRUFFLE_DSL_PROCESSOR=//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.{proc}",
-                )
-            ],
+            *processors,
         ]
     if suite == "substratevm":
         source = (
@@ -648,7 +717,13 @@ def harness_options(directory):
             / "compiler/src/jdk.graal.compiler.processor/src"
             / "META-INF/services/javax.annotation.processing.Processor"
         )
-        pending = ["SVM"]
+        pending = [
+            "SVM",
+            "SVM_DRIVER",
+            "LIBRARY_SUPPORT",
+            "SVM_GUEST",
+            "SVM_JVMCI_GUEST",
+        ]
         seen = set()
         releases = []
         while pending:
@@ -808,6 +883,14 @@ def compiler_harness(directory):
     inventory = sorted(":" + name for name in metadata["projects"])
     rules.append(
         f'filegroup(name = "all_projects", srcs = {json.dumps(inventory)}, testonly = True, visibility = ["//visibility:public"])'
+    )
+    distributions = sorted(":" + name for name in metadata["distributions"])
+    rules.extend(
+        [
+            'load("@rules_mx//graal:layout.bzl", "mx_archive_layout")',
+            'mx_archive_layout(name = "HSDIS_GRAALVM_SUPPORT", format = "tar", members = {":hsdis_library_file": "{basename}"}, visibility = ["//visibility:public"])',
+            f'filegroup(name = "all_distributions", srcs = {json.dumps(distributions)}, testonly = True, visibility = ["//visibility:public"])',
+        ]
     )
     # Preserve the individually qualified regression labels from the earlier SL migration.
     for name in (
@@ -1155,6 +1238,50 @@ def espresso_shared_rules(directory):
     )
 
 
+def svm_native_rules(directory):
+    suite = runpy.run_path(str(directory / "mx.substratevm/suite.py"))["suite"]
+    projects = {}
+    for name in (
+        "libchelper",
+        "jvm.posix",
+        "libcontainer",
+        "darwin",
+        "reporterchelper",
+    ):
+        key = "com.oracle.svm.native." + name
+        project = suite["projects"][key]
+        options = project.get("os") or {
+            os: arches["<others>"] for os, arches in project["os_arch"].items()
+        }
+        flags = {}
+        includes = set()
+        for system in ("linux", "darwin"):
+            target = options.get(system, options.get("<others>", {}))
+            if "cflags" in target:
+                flags[system] = []
+                prefix = "-I<path:" + key + ">/"
+                for flag in target["cflags"]:
+                    if flag.startswith(prefix):
+                        includes.add("src/" + key + "/" + flag.removeprefix(prefix))
+                    elif "<path:" in flag:
+                        raise ValueError(
+                            f"Unsupported path substitution in {key}: {flag}"
+                        )
+                    else:
+                        flags[system].append(flag)
+        projects[name] = {
+            "deliverable": project.get("deliverable", name.split(".")[-1]),
+            "cflags": flags,
+            "includes": sorted(includes),
+            "jni": project.get("use_jdk_headers", False),
+        }
+    return (
+        'load("@rules_mx//graal:svm.bzl", "svm_launcher", "svm_native_projects")\n'
+        f"svm_native_projects(projects = {repr(projects)})\n"
+        'svm_launcher(name = "native-image")\n'
+    )
+
+
 def generate(suite, stage):
     directory = stage / suite
     with (directory / "mx-graph.json").open("w") as graph:
@@ -1224,8 +1351,35 @@ def generate(suite, stage):
         )
     elif suite == "espresso-shared":
         (directory / "BUILD.bazel").write_text(espresso_shared_rules(directory))
+    elif suite == "regex":
+        metadata = runpy.run_path(str(directory / "mx.regex/suite.py"))["suite"]
+        layouts = ['load("@rules_mx//graal:layout.bzl", "mx_archive_layout")']
+        for name, dist in metadata["distributions"].items():
+            if "layout" in dist:
+                [(destination, source)] = dist["layout"].items()
+                if not source.startswith("file:"):
+                    raise ValueError(f"Unsupported Regex layout {name}")
+                members = {source.removeprefix("file:"): destination}
+                layouts.append(
+                    f'mx_archive_layout(name = "{name}", format = "tar", members = {json.dumps(members)}, visibility = ["//visibility:public"])'
+                )
+        inventories = [
+            f'filegroup(name = "all_{kind}", srcs = {json.dumps(sorted(":" + name for name in metadata[kind]))}, testonly = True, visibility = ["//visibility:public"])'
+            for kind in ("projects", "distributions")
+        ]
+        (directory / "BUILD.bazel").write_text(
+            'load("@rules_java//java:java_import.bzl", "java_import")\n'
+            + jmh_rules(directory)[1]
+            + "\n".join(layouts + inventories)
+            + "\n"
+        )
     elif suite == "substratevm":
-        (directory / "BUILD.bazel").write_text("")
+        (directory / "BUILD.bazel").write_text(
+            'load("@rules_mx//graal:svm.bzl", "svm_compiler_flags")\n'
+            'svm_compiler_flags(name = "svm-compiler-flags-builder", builder = ":SVM", '
+            'linux = select({"@platforms//os:linux": True, "//conditions:default": False}))\n'
+            + svm_native_rules(directory)
+        )
     subprocess.run(
         [
             "bazelisk",
@@ -1272,6 +1426,12 @@ def main():
     parser.add_argument(
         "--check", action="store_true", help="compare with the checked-in overlay"
     )
+    parser.add_argument(
+        "--suite",
+        action="append",
+        choices=SUITES,
+        help="only regenerate the named BUILD overlays",
+    )
     args = parser.parse_args()
     with tempfile.TemporaryDirectory() as temp:
         stage = Path(temp).resolve()
@@ -1300,6 +1460,9 @@ def main():
             source / "truffle/benchmarks",
             stage / "truffle/benchmarks",
             ignore=shutil.ignore_patterns("BUILD", "BUILD.bazel"),
+        )
+        shutil.copytree(
+            source / "substratevm/debug/include", stage / "substratevm/debug/include"
         )
         lib = runpy.run_path(str(stage / "truffle/mx.truffle/suite.py"))["suite"][
             "libraries"
@@ -1354,7 +1517,7 @@ def main():
                 )
         else:
             lock.write_text(lock_text)
-        for suite in SUITES:
+        for suite in dict.fromkeys(args.suite or SUITES):
             overlay = ROOT / f"graal/{suite}.patch"
             patch = generate(suite, stage)
             if args.check:

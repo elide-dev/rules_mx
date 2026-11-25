@@ -2,8 +2,141 @@ diff --git a/substratevm/BUILD.bazel b/substratevm/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/substratevm/BUILD.bazel
-@@ -0,0 +1,2665 @@
+@@ -0,0 +1,3196 @@
++load("@rules_mx//graal:svm.bzl", "svm_compiler_flags", "svm_launcher", "svm_native_projects")
 +load("@rules_mx//mx:graph.bzl", "mx_jar_dist", "mx_jvmci_library", "mx_processed_java", "mx_processor", "mx_shaded_java", "mx_test_class", "mx_whole_java")
++
++svm_compiler_flags(
++    name = "svm-compiler-flags-builder",
++    builder = ":SVM",
++    linux = select({
++        "@platforms//os:linux": True,
++        "//conditions:default": False,
++    }),
++)
++
++svm_native_projects(projects = {
++    "libchelper": {
++        "deliverable": "libchelper",
++        "cflags": {
++            "linux": [
++                "-g",
++                "-gdwarf-5",
++                "-fPIC",
++                "-O2",
++                "-D_LITTLE_ENDIAN",
++                "-ffunction-sections",
++                "-fdata-sections",
++                "-fvisibility=hidden",
++                "-D_FORTIFY_SOURCE=0",
++            ],
++            "darwin": [
++                "-g",
++                "-gdwarf-5",
++                "-fPIC",
++                "-O2",
++                "-D_LITTLE_ENDIAN",
++                "-ffunction-sections",
++                "-fdata-sections",
++                "-fvisibility=hidden",
++                "-D_FORTIFY_SOURCE=0",
++            ],
++        },
++        "includes": [],
++        "jni": False,
++    },
++    "jvm.posix": {
++        "deliverable": "jvm",
++        "cflags": {
++            "linux": [
++                "-g",
++                "-gdwarf-5",
++                "-fPIC",
++                "-O2",
++                "-ffunction-sections",
++                "-fdata-sections",
++                "-fvisibility=hidden",
++                "-D_FORTIFY_SOURCE=0",
++                "-D_GNU_SOURCE",
++            ],
++            "darwin": [
++                "-g",
++                "-fPIC",
++                "-O2",
++                "-ffunction-sections",
++                "-fdata-sections",
++                "-fvisibility=hidden",
++            ],
++        },
++        "includes": [],
++        "jni": True,
++    },
++    "libcontainer": {
++        "deliverable": "svm_container",
++        "cflags": {"linux": [
++            "-O2",
++            "-fno-rtti",
++            "-fno-exceptions",
++            "-fvisibility=hidden",
++            "-fPIC",
++            "-DNATIVE_IMAGE",
++            "-DLINUX",
++            "-DINCLUDE_SUFFIX_COMPILER=_gcc",
++            "-std=c++14",
++            "-D__STDC_FORMAT_MACROS",
++            "-D__STDC_LIMIT_MACROS",
++            "-D__STDC_CONSTANT_MACROS",
++        ]},
++        "includes": [
++            "src/com.oracle.svm.native.libcontainer/src/hotspot",
++            "src/com.oracle.svm.native.libcontainer/src/hotspot/os/linux",
++            "src/com.oracle.svm.native.libcontainer/src/hotspot/os/posix",
++            "src/com.oracle.svm.native.libcontainer/src/hotspot/os/posix/include",
++            "src/com.oracle.svm.native.libcontainer/src/hotspot/share",
++            "src/com.oracle.svm.native.libcontainer/src/java.base/share/native/include",
++            "src/com.oracle.svm.native.libcontainer/src/java.base/unix/native/include",
++            "src/com.oracle.svm.native.libcontainer/src/svm",
++            "src/com.oracle.svm.native.libcontainer/src/svm/share",
++        ],
++        "jni": False,
++    },
++    "darwin": {
++        "deliverable": "darwin",
++        "cflags": {"darwin": [
++            "-ObjC",
++            "-fPIC",
++            "-O1",
++            "-D_LITTLE_ENDIAN",
++            "-ffunction-sections",
++            "-fdata-sections",
++            "-fvisibility=hidden",
++            "-D_FORTIFY_SOURCE=0",
++        ]},
++        "includes": [],
++        "jni": False,
++    },
++    "reporterchelper": {
++        "deliverable": "reporterchelper",
++        "cflags": {
++            "linux": [
++                "-g",
++                "-O2",
++                "-Wall",
++                "-Werror",
++            ],
++            "darwin": [
++                "-g",
++                "-O2",
++                "-Wall",
++                "-Werror",
++            ],
++        },
++        "includes": [],
++        "jni": True,
++    },
++})
++
++svm_launcher(name = "native-image")
 +
 +mx_jvmci_library(
 +    name = "com.oracle.graal.pointsto",
@@ -1121,6 +1254,94 @@ new file mode 100644
 +    ],
 +)
 +
++mx_processed_java(
++    name = "com.oracle.svm.driver",
++    srcs = [
++        "//substratevm/src/com.oracle.svm.driver/src/com/oracle/svm/driver:com.oracle.svm.driver.srcs",
++        "//substratevm/src/com.oracle.svm.driver/src/com/oracle/svm/driver/metainf:com.oracle.svm.driver.srcs",
++    ],
++    add_exports = [
++        "java.base/jdk.internal.jimage",
++        "jdk.jfr/jdk.jfr.internal",
++    ],
++    javacopts = [
++        "-source",
++        "24",
++        "-target",
++        "24",
++        "-parameters",
++        "--add-modules",
++        "jdk.management",
++    ],
++    mx_resource_root = "src/com.oracle.svm.driver/resources",
++    plugins = [
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.replacements.processor.ReplacementsAnnotationProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.nodeinfo.processor.GraphNodeProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.IntrinsicStubProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.SyncPortProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.core.match.processor.MatchProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.options.processor.OptionProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.serviceprovider.processor.ServiceProviderProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.libgraal.truffle.TruffleFromLibGraalProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredFeatureProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredImageSingletonProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.BasedOnJDKFileProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.LayeredAnnotationProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.GenerateAnnotationWrapperProcessor",
++    ],
++    resources = [
++        "//substratevm/src/com.oracle.svm.driver/resources:com.oracle.svm.driver.resources",
++        "//substratevm/src/com.oracle.svm.driver/resources/container-default:com.oracle.svm.driver.resources",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":NATIVE_IMAGE_BASE",
++        ":SVM_CONFIGURE",
++        ":SVM_SHARED",
++        ":com.oracle.graal.pointsto",
++        ":com.oracle.svm.core",
++        ":com.oracle.svm.driver.launcher",
++        ":com.oracle.svm.hosted",
++        ":com.oracle.svm.util",
++        "//compiler:GRAAL",
++        "//compiler:GRAAL_OPTIONS",
++        "//sdk:COLLECTIONS",
++        "//sdk:NATIVEIMAGE",
++    ],
++)
++
++mx_processed_java(
++    name = "com.oracle.svm.driver.launcher",
++    srcs = [
++        "//substratevm/src/com.oracle.svm.driver.launcher/src/com/oracle/svm/driver/launcher:com.oracle.svm.driver.launcher.srcs",
++        "//substratevm/src/com.oracle.svm.driver.launcher/src/com/oracle/svm/driver/launcher/configuration:com.oracle.svm.driver.launcher.srcs",
++        "//substratevm/src/com.oracle.svm.driver.launcher/src/com/oracle/svm/driver/launcher/json:com.oracle.svm.driver.launcher.srcs",
++    ],
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++    ],
++    mx_resource_root = "src/com.oracle.svm.driver.launcher/resources",
++    plugins = [
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.replacements.processor.ReplacementsAnnotationProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.nodeinfo.processor.GraphNodeProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.IntrinsicStubProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.SyncPortProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.core.match.processor.MatchProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.options.processor.OptionProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.serviceprovider.processor.ServiceProviderProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.libgraal.truffle.TruffleFromLibGraalProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredFeatureProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredImageSingletonProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.BasedOnJDKFileProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.LayeredAnnotationProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.GenerateAnnotationWrapperProcessor",
++    ],
++    resources = ["//substratevm/src/com.oracle.svm.driver.launcher/resources/com/oracle/svm/driver/launcher:com.oracle.svm.driver.launcher.resources"],
++    visibility = ["//visibility:public"],
++)
++
 +mx_jvmci_library(
 +    name = "com.oracle.svm.graal",
 +    srcs = [
@@ -1195,6 +1416,38 @@ new file mode 100644
 +        "//sdk:COLLECTIONS",
 +        "//sdk:NATIVEIMAGE",
 +        "//sdk:WORD",
++    ],
++)
++
++mx_processed_java(
++    name = "com.oracle.svm.guest",
++    srcs = [
++        "//substratevm/src/com.oracle.svm.guest/src/com/oracle/svm/guest:com.oracle.svm.guest.srcs",
++        "//substratevm/src/com.oracle.svm.guest/src/com/oracle/svm/guest/features/jdk/hosted:com.oracle.svm.guest.srcs",
++        "//substratevm/src/com.oracle.svm.guest/src/com/oracle/svm/guest/hosted:com.oracle.svm.guest.srcs",
++    ],
++    add_exports = ["java.base/jdk.internal.misc"],
++    javacopts = [
++        "-source",
++        "21",
++        "-target",
++        "21",
++        "-parameters",
++    ],
++    mx_resource_root = "src/com.oracle.svm.guest/src",
++    plugins = [
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredFeatureProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredImageSingletonProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.BasedOnJDKFileProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.LayeredAnnotationProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.GenerateAnnotationWrapperProcessor",
++    ],
++    resources = ["//substratevm/src/com.oracle.svm.guest/src/META-INF/native-image/org.graalvm.nativeimage.guest:com.oracle.svm.guest.resources"],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":SVM_GUEST_STAGING",
++        ":SVM_SHARED",
++        "//sdk:NATIVEIMAGE",
 +    ],
 +)
 +
@@ -1739,6 +1992,24 @@ new file mode 100644
 +)
 +
 +mx_processed_java(
++    name = "com.oracle.svm.jvmci.guest",
++    srcs = ["//substratevm/src/com.oracle.svm.jvmci.guest/src/com/oracle/svm/jvmci/guest:com.oracle.svm.jvmci.guest.srcs"],
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++    ],
++    plugins = [
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredFeatureProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredImageSingletonProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.BasedOnJDKFileProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.LayeredAnnotationProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.GenerateAnnotationWrapperProcessor",
++    ],
++    visibility = ["//visibility:public"],
++)
++
++mx_processed_java(
 +    name = "com.oracle.svm.jvmci.guest.staging",
 +    srcs = ["//substratevm/src/com.oracle.svm.jvmci.guest.staging/src/com/oracle/svm/jvmci/guest/staging:com.oracle.svm.jvmci.guest.staging.srcs"],
 +    javacopts = [
@@ -1794,6 +2065,41 @@ new file mode 100644
 +        "//sdk:NATIVEIMAGE",
 +        "//sdk:WORD",
 +    ],
++)
++
++mx_jvmci_library(
++    name = "com.oracle.svm.polyglot",
++    srcs = ["//substratevm/src/com.oracle.svm.polyglot/src/com/oracle/svm/polyglot/groovy:com.oracle.svm.polyglot.srcs"],
++    add_exports = [
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta.annotation",
++    ],
++    javacopts = [
++        "-source",
++        "24",
++        "-target",
++        "24",
++        "-parameters",
++    ],
++    mx_resource_root = "src/com.oracle.svm.polyglot/src",
++    plugins = [
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.replacements.processor.ReplacementsAnnotationProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.nodeinfo.processor.GraphNodeProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.IntrinsicStubProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.SyncPortProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.core.match.processor.MatchProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.options.processor.OptionProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.serviceprovider.processor.ServiceProviderProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.libgraal.truffle.TruffleFromLibGraalProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredFeatureProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredImageSingletonProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.BasedOnJDKFileProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.LayeredAnnotationProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.GenerateAnnotationWrapperProcessor",
++    ],
++    resources = ["//substratevm/src/com.oracle.svm.polyglot/src/META-INF/native-image/com.oracle.svm/polyglot:com.oracle.svm.polyglot.resources"],
++    visibility = ["//visibility:public"],
++    deps = ["//sdk:NATIVEIMAGE"],
 +)
 +
 +mx_whole_java(
@@ -1948,6 +2254,27 @@ new file mode 100644
 +)
 +
 +mx_jar_dist(
++    name = "LIBRARY_SUPPORT",
++    contents = [":com.oracle.svm.polyglot"],
++    directives = [
++        "exports com.oracle.svm.polyglot.groovy to org.graalvm.nativeimage.builder",
++        "requires jdk.graal.compiler",
++        "requires jdk.internal.vm.ci",
++        "requires org.graalvm.nativeimage",
++        "requires transitive org.graalvm.word",
++    ],
++    graal_services = True,
++    module_exports = [
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta.annotation",
++    ],
++    module_name = "org.graalvm.nativeimage.librarysupport",
++    release = 21,
++    visibility = ["//visibility:public"],
++    deps = ["//sdk:NATIVEIMAGE"],
++)
++
++mx_jar_dist(
 +    name = "NATIVE_IMAGE_BASE",
 +    contents = [
 +        ":com.oracle.svm.common",
@@ -1965,6 +2292,7 @@ new file mode 100644
 +        "requires jdk.graal.compiler",
 +        "requires jdk.graal.compiler.hostvmaccess",
 +        "requires jdk.graal.compiler.vmaccess",
++        "requires jdk.internal.vm.ci",
 +        "requires org.graalvm.collections",
 +        "requires org.graalvm.nativeimage.libgraal",
 +        "requires org.graalvm.nativeimage.shared",
@@ -1974,6 +2302,14 @@ new file mode 100644
 +        "uses jdk.graal.compiler.vmaccess.VMAccess.Builder",
 +    ],
 +    graal_services = True,
++    module_exports = [
++        "java.base/jdk.internal.loader",
++        "java.base/jdk.internal.module",
++        "jdk.internal.vm.ci/jdk.vm.ci.code",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta.annotation",
++        "jdk.internal.vm.ci/jdk.vm.ci.runtime",
++    ],
 +    module_name = "org.graalvm.nativeimage.base",
 +    release = 21,
 +    visibility = ["//visibility:public"],
@@ -2003,12 +2339,23 @@ new file mode 100644
 +        "exports com.oracle.objectfile.io",
 +        "exports com.oracle.objectfile.macho",
 +        "requires jdk.graal.compiler",
++        "requires jdk.internal.vm.ci",
 +        "requires org.graalvm.collections",
 +        "requires org.graalvm.nativeimage",
 +        "requires transitive jdk.graal.compiler.options",
 +        "requires transitive org.graalvm.word",
 +    ],
 +    graal_services = True,
++    module_exports = [
++        "java.base/jdk.internal.misc",
++        "java.base/jdk.internal.ref",
++        "java.base/sun.nio.ch",
++        "jdk.internal.vm.ci/jdk.vm.ci.aarch64",
++        "jdk.internal.vm.ci/jdk.vm.ci.amd64",
++        "jdk.internal.vm.ci/jdk.vm.ci.code",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta.annotation",
++    ],
 +    module_name = "org.graalvm.nativeimage.objectfile",
 +    release = 21,
 +    visibility = ["//visibility:public"],
@@ -2060,6 +2407,14 @@ new file mode 100644
 +        "requires transitive org.graalvm.word",
 +    ],
 +    graal_services = True,
++    module_exports = [
++        "java.base/jdk.internal.misc",
++        "jdk.internal.vm.ci/jdk.vm.ci.code",
++        "jdk.internal.vm.ci/jdk.vm.ci.common",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta.annotation",
++        "jdk.internal.vm.ci/jdk.vm.ci.runtime",
++    ],
 +    module_name = "org.graalvm.nativeimage.pointsto",
 +    release = 21,
 +    visibility = ["//visibility:public"],
@@ -2412,6 +2767,7 @@ new file mode 100644
 +        "requires jdk.graal.compiler",
 +        "requires jdk.graal.compiler.hostvmaccess",
 +        "requires jdk.graal.compiler.vmaccess",
++        "requires jdk.internal.vm.ci",
 +        "requires jdk.jfr",
 +        "requires jdk.management",
 +        "requires jdk.zipfs",
@@ -2440,6 +2796,76 @@ new file mode 100644
 +        "uses org.graalvm.nativeimage.Platform",
 +    ],
 +    graal_services = True,
++    module_exports = [
++        "java.base/com.sun.crypto.provider",
++        "java.base/jdk.internal",
++        "java.base/jdk.internal.access",
++        "java.base/jdk.internal.event",
++        "java.base/jdk.internal.foreign",
++        "java.base/jdk.internal.loader",
++        "java.base/jdk.internal.logger",
++        "java.base/jdk.internal.misc",
++        "java.base/jdk.internal.module",
++        "java.base/jdk.internal.perf",
++        "java.base/jdk.internal.platform",
++        "java.base/jdk.internal.ref",
++        "java.base/jdk.internal.reflect",
++        "java.base/jdk.internal.util",
++        "java.base/jdk.internal.vm",
++        "java.base/jdk.internal.vm.annotation",
++        "java.base/sun.invoke.util",
++        "java.base/sun.net",
++        "java.base/sun.net.www",
++        "java.base/sun.net.www.protocol.file",
++        "java.base/sun.net.www.protocol.ftp",
++        "java.base/sun.net.www.protocol.http",
++        "java.base/sun.net.www.protocol.https",
++        "java.base/sun.net.www.protocol.jar",
++        "java.base/sun.net.www.protocol.jmod",
++        "java.base/sun.net.www.protocol.jrt",
++        "java.base/sun.net.www.protocol.mailto",
++        "java.base/sun.nio.ch",
++        "java.base/sun.reflect.annotation",
++        "java.base/sun.reflect.generics.factory",
++        "java.base/sun.reflect.generics.reflectiveObjects",
++        "java.base/sun.reflect.generics.repository",
++        "java.base/sun.reflect.generics.tree",
++        "java.base/sun.security.jca",
++        "java.base/sun.security.provider",
++        "java.base/sun.security.rsa",
++        "java.base/sun.security.ssl",
++        "java.base/sun.security.util",
++        "java.base/sun.security.x509",
++        "java.base/sun.text.spi",
++        "java.base/sun.util",
++        "java.base/sun.util.calendar",
++        "java.base/sun.util.cldr",
++        "java.base/sun.util.locale",
++        "java.base/sun.util.locale.provider",
++        "java.base/sun.util.resources",
++        "java.base/sun.util.spi",
++        "java.management/com.sun.jmx.mbeanserver",
++        "java.management/sun.management",
++        "jdk.internal.vm.ci/jdk.vm.ci.aarch64",
++        "jdk.internal.vm.ci/jdk.vm.ci.amd64",
++        "jdk.internal.vm.ci/jdk.vm.ci.code",
++        "jdk.internal.vm.ci/jdk.vm.ci.code.site",
++        "jdk.internal.vm.ci/jdk.vm.ci.code.stack",
++        "jdk.internal.vm.ci/jdk.vm.ci.common",
++        "jdk.internal.vm.ci/jdk.vm.ci.hotspot",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta.annotation",
++        "jdk.internal.vm.ci/jdk.vm.ci.riscv64",
++        "jdk.internal.vm.ci/jdk.vm.ci.runtime",
++        "jdk.internal.vm.ci/jdk.vm.ci.services",
++        "jdk.jfr/jdk.jfr.events",
++        "jdk.jfr/jdk.jfr.internal",
++        "jdk.jfr/jdk.jfr.internal.event",
++        "jdk.jfr/jdk.jfr.internal.jfc",
++        "jdk.jfr/jdk.jfr.internal.settings",
++        "jdk.jfr/jdk.jfr.internal.tracing",
++        "jdk.management/com.sun.management.internal",
++    ],
 +    module_name = "org.graalvm.nativeimage.builder",
 +    release = 21,
 +    visibility = ["//visibility:public"],
@@ -2482,6 +2908,7 @@ new file mode 100644
 +        "exports com.oracle.svm.configure.filters to org.graalvm.nativeimage.agent.tracing",
 +        "exports com.oracle.svm.configure.trace to org.graalvm.nativeimage.agent.tracing",
 +        "requires jdk.graal.compiler",
++        "requires jdk.internal.vm.ci",
 +        "requires org.graalvm.collections",
 +        "requires org.graalvm.nativeimage.base",
 +        "requires org.graalvm.nativeimage.shared",
@@ -2493,12 +2920,80 @@ new file mode 100644
 +    manifest = {
 +        "Main-Class": "com.oracle.svm.configure.ConfigurationTool",
 +    },
++    module_exports = [
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta.annotation",
++    ],
 +    module_name = "org.graalvm.nativeimage.configure",
 +    release = 21,
 +    visibility = ["//visibility:public"],
 +    deps = [
 +        ":NATIVE_IMAGE_BASE",
 +        ":SVM_SHARED",
++    ],
++)
++
++mx_jar_dist(
++    name = "SVM_DRIVER",
++    contents = [
++        ":com.oracle.svm.driver.launcher",
++        ":com.oracle.svm.driver",
++        ":svm-compiler-flags-builder",
++    ],
++    directives = [
++        "exports com.oracle.svm.driver",
++        "exports com.oracle.svm.driver.metainf",
++        "requires java.management",
++        "requires jdk.graal.compiler",
++        "requires jdk.jfr",
++        "requires jdk.management",
++        "requires org.graalvm.collections",
++        "requires org.graalvm.nativeimage.builder",
++        "requires org.graalvm.nativeimage.configure",
++        "requires transitive jdk.graal.compiler.options",
++        "requires transitive org.graalvm.nativeimage",
++        "requires transitive org.graalvm.nativeimage.base",
++        "requires transitive org.graalvm.nativeimage.guest.staging",
++        "requires transitive org.graalvm.nativeimage.jvmci.shared",
++        "requires transitive org.graalvm.nativeimage.objectfile",
++        "requires transitive org.graalvm.nativeimage.pointsto",
++        "requires transitive org.graalvm.nativeimage.shared",
++        "requires transitive org.graalvm.word",
++        "uses jdk.graal.compiler.options.OptionDescriptors",
++    ],
++    graal_services = True,
++    manifest = {
++        "Main-Class": "com.oracle.svm.driver.NativeImage",
++    },
++    module_exports = [
++        "java.base/jdk.internal.jimage",
++        "jdk.jfr/jdk.jfr.internal",
++    ],
++    module_name = "org.graalvm.nativeimage.driver",
++    release = 21,
++    visibility = ["//visibility:public"],
++    deps = [":SVM"],
++)
++
++mx_jar_dist(
++    name = "SVM_GUEST",
++    contents = [":com.oracle.svm.guest"],
++    directives = [
++        "requires org.graalvm.nativeimage.shared",
++        "requires transitive org.graalvm.nativeimage",
++        "requires transitive org.graalvm.nativeimage.guest.staging",
++        "requires transitive org.graalvm.word",
++        "uses org.graalvm.nativeimage.Platform",
++    ],
++    graal_services = True,
++    module_exports = ["java.base/jdk.internal.misc"],
++    module_name = "org.graalvm.nativeimage.guest",
++    release = 21,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":SVM_GUEST_STAGING",
++        ":SVM_SHARED",
++        "//sdk:NATIVEIMAGE",
 +    ],
 +)
 +
@@ -2530,18 +3025,49 @@ new file mode 100644
 +        "exports com.oracle.svm.guest.staging.snippets to org.graalvm.nativeimage.builder, org.graalvm.nativeimage.llvm, org.graalvm.extraimage.builder, org.graalvm.nativeimage.guest, org.graalvm.nativeimage.foreign, org.graalvm.truffle.runtime.svm, org.graalvm.nativeimage.agent.jvmtibase, org.graalvm.nativeimage.enterprise.testrunner, com.oracle.truffle.enterprise.svm, com.oracle.svm.svm_enterprise",
 +        "exports com.oracle.svm.guest.staging.util to org.graalvm.nativeimage.builder, org.graalvm.nativeimage.llvm, org.graalvm.extraimage.builder, org.graalvm.nativeimage.guest, org.graalvm.nativeimage.foreign, org.graalvm.truffle.runtime.svm, org.graalvm.nativeimage.agent.jvmtibase, org.graalvm.nativeimage.enterprise.testrunner, com.oracle.truffle.enterprise.svm, com.oracle.svm.svm_enterprise",
 +        "requires jdk.graal.compiler.options",
++        "requires jdk.internal.vm.ci",
++        "requires org.graalvm.collections",
 +        "requires org.graalvm.nativeimage.shared",
 +        "requires transitive org.graalvm.nativeimage",
 +        "requires transitive org.graalvm.word",
 +        "uses org.graalvm.nativeimage.Platform",
 +    ],
 +    graal_services = True,
++    module_exports = [
++        "java.base/jdk.internal.misc",
++        "java.base/jdk.internal.reflect",
++        "java.base/sun.security.util",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta.annotation",
++    ],
 +    module_name = "org.graalvm.nativeimage.guest.staging",
 +    release = 21,
 +    visibility = ["//visibility:public"],
 +    deps = [
 +        ":SVM_SHARED",
 +        "//sdk:NATIVEIMAGE",
++    ],
++)
++
++mx_jar_dist(
++    name = "SVM_JVMCI_GUEST",
++    contents = [":com.oracle.svm.jvmci.guest"],
++    directives = [
++        "requires transitive org.graalvm.nativeimage",
++        "requires transitive org.graalvm.nativeimage.guest",
++        "requires transitive org.graalvm.nativeimage.guest.staging",
++        "requires transitive org.graalvm.nativeimage.jvmci.guest.staging",
++        "requires transitive org.graalvm.nativeimage.jvmci.shared",
++        "requires transitive org.graalvm.nativeimage.shared",
++        "requires transitive org.graalvm.word",
++    ],
++    graal_services = True,
++    module_name = "org.graalvm.nativeimage.jvmci.guest",
++    release = 21,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":SVM_GUEST",
++        ":SVM_JVMCI_GUEST_STAGING",
 +    ],
 +)
 +
@@ -2581,6 +3107,10 @@ new file mode 100644
 +        "requires transitive org.graalvm.word",
 +    ],
 +    graal_services = True,
++    module_exports = [
++        "jdk.internal.vm.ci/jdk.vm.ci.code",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++    ],
 +    module_name = "org.graalvm.nativeimage.jvmci.shared",
 +    release = 21,
 +    visibility = ["//visibility:public"],
@@ -2619,6 +3149,7 @@ new file mode 100644
 +        "uses org.graalvm.nativeimage.Platform",
 +    ],
 +    graal_services = True,
++    module_exports = ["java.base/jdk.internal.module"],
 +    module_name = "org.graalvm.nativeimage.shared",
 +    release = 21,
 +    visibility = ["//visibility:public"],
@@ -7943,6 +8474,139 @@ new file mode 100644
 +    srcs = ["WindowsJfrEmergencyDumpSupport.java"],
 +    visibility = ["//substratevm:__pkg__"],
 +)
+diff --git a/substratevm/src/com.oracle.svm.driver/resources/BUILD.bazel b/substratevm/src/com.oracle.svm.driver/resources/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.driver/resources/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.driver.resources",
++    srcs = [
++        "Help.txt",
++        "HelpExtra.txt",
++        "Usage.txt",
++        "bash_completion.native-image",
++    ],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.driver/resources/container-default/BUILD.bazel b/substratevm/src/com.oracle.svm.driver/resources/container-default/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.driver/resources/container-default/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.driver.resources",
++    srcs = ["Dockerfile"],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.driver/src/com/oracle/svm/driver/BUILD.bazel b/substratevm/src/com.oracle.svm.driver/src/com/oracle/svm/driver/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.driver/src/com/oracle/svm/driver/BUILD.bazel
+@@ -0,0 +1,23 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.driver.srcs",
++    srcs = [
++        "APIOptionHandler.java",
++        "ArgFilesOptionPreprocessor.java",
++        "BundleOptions.java",
++        "BundlePathMap.java",
++        "BundleSupport.java",
++        "BundleSupportArgumentRewriter.java",
++        "CmdLineOptionHandler.java",
++        "ComprehensiveOptions.java",
++        "DefaultOptionHandler.java",
++        "DriverPathOptions.java",
++        "MacroOption.java",
++        "MacroOptionHandler.java",
++        "MemoryUtil.java",
++        "NativeImage.java",
++        "WindowsBuildEnvironmentUtil.java",
++    ],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.driver/src/com/oracle/svm/driver/metainf/BUILD.bazel b/substratevm/src/com.oracle.svm.driver/src/com/oracle/svm/driver/metainf/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.driver/src/com/oracle/svm/driver/metainf/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.driver.srcs",
++    srcs = [
++        "MetaInfFileType.java",
++        "NativeImageMetaInfResourceProcessor.java",
++        "NativeImageMetaInfWalker.java",
++    ],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.driver.launcher/resources/com/oracle/svm/driver/launcher/BUILD.bazel b/substratevm/src/com.oracle.svm.driver.launcher/resources/com/oracle/svm/driver/launcher/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.driver.launcher/resources/com/oracle/svm/driver/launcher/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.driver.launcher.resources",
++    srcs = ["BundleLauncherHelp.txt"],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.driver.launcher/src/com/oracle/svm/driver/launcher/BUILD.bazel b/substratevm/src/com.oracle.svm.driver.launcher/src/com/oracle/svm/driver/launcher/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.driver.launcher/src/com/oracle/svm/driver/launcher/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.driver.launcher.srcs",
++    srcs = [
++        "BundleLauncher.java",
++        "BundleLauncherUtil.java",
++        "ContainerSupport.java",
++    ],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.driver.launcher/src/com/oracle/svm/driver/launcher/configuration/BUILD.bazel b/substratevm/src/com.oracle.svm.driver.launcher/src/com/oracle/svm/driver/launcher/configuration/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.driver.launcher/src/com/oracle/svm/driver/launcher/configuration/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.driver.launcher.srcs",
++    srcs = [
++        "BundleArgsParser.java",
++        "BundleConfigurationParser.java",
++        "BundleContainerSettingsParser.java",
++        "BundleEnvironmentParser.java",
++    ],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.driver.launcher/src/com/oracle/svm/driver/launcher/json/BUILD.bazel b/substratevm/src/com.oracle.svm.driver.launcher/src/com/oracle/svm/driver/launcher/json/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.driver.launcher/src/com/oracle/svm/driver/launcher/json/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.driver.launcher.srcs",
++    srcs = [
++        "BundleJSONParser.java",
++        "BundleJSONParserException.java",
++    ],
++    visibility = ["//substratevm:__pkg__"],
++)
 diff --git a/substratevm/src/com.oracle.svm.graal/src/com/oracle/svm/graal/BUILD.bazel b/substratevm/src/com.oracle.svm.graal/src/com/oracle/svm/graal/BUILD.bazel
 new file mode 100644
 --- /dev/null
@@ -8193,6 +8857,58 @@ new file mode 100644
 +mx_files(
 +    name = "com.oracle.svm.graal.srcs",
 +    srcs = ["GraalSubstitutions.java"],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.guest/src/META-INF/native-image/org.graalvm.nativeimage.guest/BUILD.bazel b/substratevm/src/com.oracle.svm.guest/src/META-INF/native-image/org.graalvm.nativeimage.guest/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.guest/src/META-INF/native-image/org.graalvm.nativeimage.guest/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.guest.resources",
++    srcs = ["native-image.properties"],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.guest/src/com/oracle/svm/guest/BUILD.bazel b/substratevm/src/com.oracle.svm.guest/src/com/oracle/svm/guest/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.guest/src/com/oracle/svm/guest/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.guest.srcs",
++    srcs = ["GuestModuleLayerMarker.java"],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.guest/src/com/oracle/svm/guest/features/jdk/hosted/BUILD.bazel b/substratevm/src/com.oracle.svm.guest/src/com/oracle/svm/guest/features/jdk/hosted/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.guest/src/com/oracle/svm/guest/features/jdk/hosted/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.guest.srcs",
++    srcs = ["JavaNetHttpFeature.java"],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.guest/src/com/oracle/svm/guest/hosted/BUILD.bazel b/substratevm/src/com.oracle.svm.guest/src/com/oracle/svm/guest/hosted/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.guest/src/com/oracle/svm/guest/hosted/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.guest.srcs",
++    srcs = [
++        "BuildTimeSupport.java",
++        "GuestFeatureHandler.java",
++        "GuestFeatureImpl.java",
++    ],
 +    visibility = ["//substratevm:__pkg__"],
 +)
 diff --git a/substratevm/src/com.oracle.svm.guest.staging/src/META-INF/native-image/org.graalvm.nativeimage.guest/BUILD.bazel b/substratevm/src/com.oracle.svm.guest.staging/src/META-INF/native-image/org.graalvm.nativeimage.guest/BUILD.bazel
@@ -10947,6 +11663,18 @@ new file mode 100644
 +    ],
 +    visibility = ["//substratevm:__pkg__"],
 +)
+diff --git a/substratevm/src/com.oracle.svm.jvmci.guest/src/com/oracle/svm/jvmci/guest/BUILD.bazel b/substratevm/src/com.oracle.svm.jvmci.guest/src/com/oracle/svm/jvmci/guest/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.jvmci.guest/src/com/oracle/svm/jvmci/guest/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.jvmci.guest.srcs",
++    srcs = ["JVMCIGuestModuleLayerMarker.java"],
++    visibility = ["//substratevm:__pkg__"],
++)
 diff --git a/substratevm/src/com.oracle.svm.jvmci.guest.staging/src/com/oracle/svm/jvmci/guest/staging/BUILD.bazel b/substratevm/src/com.oracle.svm.jvmci.guest.staging/src/com/oracle/svm/jvmci/guest/staging/BUILD.bazel
 new file mode 100644
 --- /dev/null
@@ -10991,6 +11719,30 @@ new file mode 100644
 +        "SharedMethod.java",
 +        "SharedType.java",
 +    ],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.polyglot/src/META-INF/native-image/com.oracle.svm/polyglot/BUILD.bazel b/substratevm/src/com.oracle.svm.polyglot/src/META-INF/native-image/com.oracle.svm/polyglot/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.polyglot/src/META-INF/native-image/com.oracle.svm/polyglot/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.polyglot.resources",
++    srcs = ["native-image.properties"],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.polyglot/src/com/oracle/svm/polyglot/groovy/BUILD.bazel b/substratevm/src/com.oracle.svm.polyglot/src/com/oracle/svm/polyglot/groovy/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.polyglot/src/com/oracle/svm/polyglot/groovy/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.polyglot.srcs",
++    srcs = ["GroovySubstitutions.java"],
 +    visibility = ["//substratevm:__pkg__"],
 +)
 diff --git a/substratevm/src/com.oracle.svm.processor/src/META-INF/services/BUILD.bazel b/substratevm/src/com.oracle.svm.processor/src/META-INF/services/BUILD.bazel

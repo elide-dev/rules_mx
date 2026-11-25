@@ -3,7 +3,7 @@
 load("@rules_java//java/common:java_common.bzl", "java_common")
 load("@rules_java//java/common:java_info.bzl", "JavaInfo")
 
-_MxJarInfo = provider(fields = ["uses_jvmci"])
+MxJarInfo = provider(fields = ["uses_jvmci", "required_exports"])
 
 _TOOLCHAIN = "@bazel_tools//tools/jdk:toolchain_type"
 
@@ -37,9 +37,9 @@ def _jar_impl(ctx):
     if ctx.attr.jni_services:
         args.add("--jni-services")
     uses_jvmci = ctx.attr.requires_jvmci or any([
-        dep[_MxJarInfo].uses_jvmci
+        dep[MxJarInfo].uses_jvmci
         for dep in ctx.attr.deps
-        if _MxJarInfo in dep
+        if MxJarInfo in dep
     ])
     tools = []
     if ctx.attr.module_name:
@@ -66,7 +66,13 @@ def _jar_impl(ctx):
     abi = java_common.run_ijar(ctx.actions, jar, target_label = ctx.label, java_toolchain = toolchain)
     return [
         DefaultInfo(files = depset([jar])),
-        _MxJarInfo(uses_jvmci = uses_jvmci),
+        MxJarInfo(
+            uses_jvmci = uses_jvmci,
+            required_exports = depset(
+                ["--add-exports=" + package + "=" + ctx.attr.module_name for package in sorted({p: True for p in ctx.attr.add_exports + ctx.attr.module_exports})] if ctx.attr.module_name else [],
+                transitive = [dep[MxJarInfo].required_exports for dep in ctx.attr.deps if MxJarInfo in dep],
+            ),
+        ),
         JavaInfo(output_jar = jar, compile_jar = abi, exports = dependencies, add_exports = ctx.attr.add_exports),
         coverage_common.instrumented_files_info(ctx, dependency_attributes = ["contents", "deps"]),
     ]
@@ -91,6 +97,7 @@ _jar_dist = rule(
         "snippets_pattern": attr.string(),
         "archived_libraries": attr.label_list(providers = [JavaInfo]),
         "add_exports": attr.string_list(),
+        "module_exports": attr.string_list(),
         "_packer": attr.label(default = Label("//mx:pack_jar"), executable = True, cfg = "exec"),
     },
     toolchains = [_TOOLCHAIN],
@@ -99,7 +106,7 @@ _jar_dist = rule(
 
 def mx_jar_dist(name, directives = [], **kwargs):
     """Use the Labs system image for descriptors that read JVMCI."""
-    jvmci = any([d.split(" ")[-1] == "jdk.internal.vm.ci" for d in directives if d.startswith("requires ")])
+    jvmci = any([d.split(" ")[-1] in ["jdk.internal.vm.ci", "jdk.graal.compiler"] for d in directives if d.startswith("requires ")])
     _jar_dist(
         name = name,
         directives = directives,
