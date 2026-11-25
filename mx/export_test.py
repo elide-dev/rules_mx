@@ -120,7 +120,14 @@ class ExportTest(unittest.TestCase):
                             for name in ("first", "second")
                         },
                         "distributions": {
-                            "APP": {"dependencies": ["first"]},
+                            "APP": {
+                                "dependencies": ["first"],
+                                "moduleInfo": {
+                                    "name": "demo.inventory",
+                                    "exports": ["first"],
+                                    "requires": ["java.net.http"],
+                                },
+                            },
                             "BASE": {
                                 "native": True,
                                 "layout": {"docs/info": "file:info"},
@@ -169,6 +176,7 @@ class ExportTest(unittest.TestCase):
                 [p["name"] for p in graph["projects"]], ["first", "second"]
             )
             self.assertEqual(graph["distributions"][0]["contents"], [":first"])
+            self.assertEqual(graph["distributions"][0]["release"], 17)
             base, layer = graph["tar_layouts"]
             self.assertEqual(base["members"], {"info": "docs/info"})
             self.assertEqual(layer["members"], {":BASE": "archives/original.tar"})

@@ -475,6 +475,9 @@ def _jar_archive(dist, suite, mappings, pending, release, archives, library_modu
         ":" + d.name: str(d.multiReleaseJarVersion) for d in members if d not in base
     }
     pending.extend(d for d in members if d not in base)
+    if release is None:
+        compliance = dist.maxJavaCompliance()
+        release = max(9, compliance.value) if compliance else 9
     result = {
         "name": dist.name,
         "overlays": overlays,
@@ -1103,7 +1106,7 @@ def bazel_buildfile(args):
                         suite,
                         java_deps,
                         pending,
-                        options.release or 9,
+                        options.release,
                         archives,
                         library_modules,
                     )
