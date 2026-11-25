@@ -79,11 +79,16 @@ SUITES = {
     ],
     "truffle": [
         "--infer-source-deps",
+        "--generated-dep",
+        "truffle:com.oracle.truffle.sandbox=:com.oracle.truffle.api.dsl",
+        "--generated-dep",
+        "truffle:com.oracle.truffle.api.object=:com.oracle.truffle.api.utilities",
         # Preserve diagnostics for the pinned upstream sources on stock JavaBuilder.
         *(
             arg
             for project, checks in {
                 "com.oracle.truffle.api.strings": ["ReturnValueIgnored"],
+                "com.oracle.truffle.sl": ["ReturnValueIgnored"],
                 "com.oracle.truffle.api.instrumentation": [
                     "BoxedPrimitiveEquality",
                     "InfiniteRecursion",
@@ -116,9 +121,18 @@ SUITES = {
         "sdk:NATIVEBRIDGE=//sdk:NATIVEBRIDGE",
         "--processor-plugin",
         "sdk:NATIVEBRIDGE_PROCESSOR=//sdk:mx_plugin.NATIVEBRIDGE_PROCESSOR.org.graalvm.nativebridge.processor.NativeBridgeProcessor",
-        "com.oracle.truffle.api.library",
-        "com.oracle.truffle.polyglot",
-        "TRUFFLE_API_VERSION",
+        "--java-dep",
+        "sdk:JNIUTILS=//sdk:JNIUTILS",
+        "--java-dep",
+        "truffle:TRUFFLE_ATTACH_RESOURCES=:TRUFFLE_ATTACH_RESOURCES",
+        "--archive-dist",
+        "TRUFFLE_API",
+        "--archive-dist",
+        "TRUFFLE_SL",
+        "--archive-dist",
+        "TRUFFLE_SL_LAUNCHER",
+        "TRUFFLE_SL",
+        "TRUFFLE_SL_LAUNCHER",
     ],
 }
 
@@ -197,6 +211,46 @@ def sdk_native_projects(sdk):
     )
 
 
+def truffle_native_projects(directory):
+    suite = runpy.run_path(str(directory / "mx.truffle/suite.py"))["suite"]
+    name = "com.oracle.truffle.attach"
+    resource = "TRUFFLE_ATTACH_RESOURCES"
+    project = suite["projects"][name]
+    dist = suite["distributions"][resource]
+    [(destination, source)] = dist["layout"].items()
+    if (
+        source != "dependency:" + name
+        or project["native"] != "shared_lib"
+        or not project["use_jdk_headers"]
+        or project["buildDependencies"]
+    ):
+        raise ValueError("Unsupported Truffle attach project or resource layout")
+    src = directory / project["subDir"] / name / "src"
+    attrs = dict(
+        name=name,
+        resource=resource,
+        deliverable=project["deliverable"],
+        srcs=sorted(p.relative_to(directory).as_posix() for p in src.rglob("*.c")),
+        cflags={os: a["<others>"]["cflags"] for os, a in project["os_arch"].items()},
+        ldlibs={
+            os: a["<others>"].get("ldlibs", []) for os, a in project["os_arch"].items()
+        },
+        platforms=dist["platforms"],
+        destination=destination,
+        file_list=dist["fileListEntry"],
+        hash_entry=dist["hashEntry"],
+    )
+    return (
+        'load("@rules_mx//graal:attach.bzl", "truffle_attach")\n\n'
+        + 'load("@rules_mx//graal:simplelanguage.bzl", "simplelanguage", "sl_fixture_tests")\n\n'
+        + 'simplelanguage(name = "sl")\n\n'
+        + 'sl_fixture_tests("src/com.oracle.truffle.sl.test/src/tests")\n\n'
+        + "truffle_attach(\n"
+        + "".join(f"    {key} = {json.dumps(value)},\n" for key, value in attrs.items())
+        + ")\n"
+    )
+
+
 def generate(suite, stage):
     directory = stage / suite
     with (directory / "mx-graph.json").open("w") as graph:
@@ -234,6 +288,21 @@ def generate(suite, stage):
         (directory / "BUILD.bazel").write_text(
             sdk_native_projects(directory)
             + 'test_suite(name = "tests", visibility = ["//visibility:public"])\n'
+        )
+    elif suite == "truffle":
+        (directory / "BUILD.bazel").write_text(
+            "".join(
+                f"# gazelle:resolve java {pkg} {label}\n"
+                for pkg, label in {
+                    "com.oracle.truffle.api.impl": "//truffle:com.oracle.truffle.api",
+                    "com.oracle.truffle.api.impl.asm": "//truffle:com.oracle.truffle.api.impl.asm",
+                    "org.graalvm.collections": "//sdk:COLLECTIONS",
+                    "org.graalvm.nativeimage": "//sdk:NATIVEIMAGE",
+                    "org.graalvm.polyglot": "//sdk:POLYGLOT",
+                }.items()
+            )
+            + "\n"
+            + truffle_native_projects(directory)
         )
     subprocess.run(
         [

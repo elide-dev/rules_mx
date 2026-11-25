@@ -22,6 +22,12 @@ def _jar_impl(ctx):
             overlay_inputs.append(member)
     for key, value in ctx.attr.manifest.items():
         args.add("--manifest-entry", key + "=" + value)
+    if ctx.attr.snippets_pattern:
+        args.add("--snippets-pattern", ctx.attr.snippets_pattern)
+        for lib in ctx.attr.archived_libraries:
+            args.add_all(lib.files, before_each = "--archived-library")
+    if ctx.attr.truffle_services:
+        args.add("--truffle-services")
     if ctx.attr.jni_services:
         args.add("--jni-services")
     tools = []
@@ -61,6 +67,9 @@ mx_jar_dist = rule(
         "release": attr.int(),
         "directives": attr.string_list(),
         "jni_services": attr.bool(),
+        "truffle_services": attr.bool(),
+        "snippets_pattern": attr.string(),
+        "archived_libraries": attr.label_list(providers = [JavaInfo]),
         "add_exports": attr.string_list(),
         "_packer": attr.label(default = Label("//mx:pack_jar"), executable = True, cfg = "exec"),
     },

@@ -20,10 +20,11 @@ The default Python is managed CPython 3.13. The alternate configuration selects 
 
 ## Build upstream GraalVM
 
-The pinned Oracle source tree builds every SDK project and the Truffle Polyglot implementation as native Bazel targets. Run the upstream SDK JUnit classes individually or build the selected closures and run their tests together.
+The pinned Oracle source tree builds every SDK project, the modular Truffle API and the SimpleLanguage interpreter as native Bazel targets. Run the upstream SDK JUnit classes individually or build the selected closures and run their tests together.
 
 ```sh
 bazelisk query 'tests(//graal:sdk_tests)'
+bazelisk test @graal//truffle:sl.test.Fibonacci
 bazelisk test --config=elide-processors //graal/... @graal//sdk/... @graal//truffle/...
 bazelisk test --config=elide-processors //graal/nativebridge:native_isolate_test
 ```

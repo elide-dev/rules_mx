@@ -26,6 +26,26 @@ class ExportTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
         return result
 
+    def test_mx_can_render_the_same_descriptor_for_two_releases(self):
+        sys.path.insert(0, str(self.mx.parent / "src"))
+        try:
+            from mx._impl.mx_javamodules import JavaModuleDescriptor
+
+            descriptor = JavaModuleDescriptor(
+                "m",
+                {"p": {"client"}},
+                {},
+                [],
+                {"p.Service": {"p.Impl"}},
+                jarpath="m.jar",
+            )
+            for _ in range(2):
+                source = descriptor.as_module_info(False)
+                self.assertIn("exports p to client;", source)
+                self.assertIn("provides p.Service with p.Impl;", source)
+        finally:
+            sys.path.pop(0)
+
     def test_project_snapshot(self):
         names = [
             "com.oracle.mxtool.webserver",

@@ -298,7 +298,7 @@
   "moduleExtensions": {
     "//mx:extensions.bzl%mx_sources": {
       "general": {
-        "bzlTransitiveDigest": "NtD6BdJ8EDHY6pKYVizKqHXP2NM7gheYDsZ6Dh3VrZo=",
+        "bzlTransitiveDigest": "SqPCxyR+FXtZgdxTDKAZTXtRf3GWZucLe7RTyTjAwig=",
         "usagesDigest": "dxCJDfVKOZaNXO+n+nKHCOz1xnXb/8TY9y22raU6kQc=",
         "recordedInputs": [
           "REPO_MAPPING:,bazel_tools bazel_tools"
@@ -318,7 +318,8 @@
                 "mx.mx/mx_bazel_export.py": "@@//mx:export.py"
               },
               "patches": [
-                "@@//mx:register.patch"
+                "@@//mx:register.patch",
+                "@@//mx:module_descriptor.patch"
               ],
               "patch_args": [
                 "-p1"

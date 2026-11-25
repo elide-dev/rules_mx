@@ -5,6 +5,7 @@ exports_files([
     "elide_javabuilder.patch",
     "export.py",
     "launcher.py.tpl",
+    "module_descriptor.patch",
     "register.patch",
     "upstream.BUILD",
 ])
@@ -55,4 +56,15 @@ py_binary(
     ],
     imports = ["."],
     main = "shade.py",
+)
+
+py_binary(
+    name = "pack_native_resource",
+    srcs = [
+        "pack_jar.py",
+        "pack_native_resource.py",
+    ],
+    imports = ["."],
+    main = "pack_native_resource.py",
+    visibility = ["//graal:__pkg__"],
 )

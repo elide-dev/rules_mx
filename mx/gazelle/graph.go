@@ -77,6 +77,9 @@ func (g *importer) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
 			Name, Module               string
 			Deps, Contents, Directives []string
 			AddExports                 []string `json:"add_exports"`
+			SnippetsPattern            string   `json:"snippets_pattern"`
+			ArchivedLibraries          []string `json:"archived_libraries"`
+			TruffleServices            bool     `json:"truffle_services"`
 			JNIServices                bool     `json:"jni_services"`
 			Release                    int
 			Testonly                   bool
@@ -237,6 +240,15 @@ func (g *importer) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
 				r.SetAttr("directives", dist.Directives)
 				r.SetAttr("release", dist.Release)
 			}
+			if dist.SnippetsPattern != "" {
+				r.SetAttr("snippets_pattern", dist.SnippetsPattern)
+			}
+			if len(dist.ArchivedLibraries) != 0 {
+				r.SetAttr("archived_libraries", dist.ArchivedLibraries)
+			}
+			if dist.TruffleServices {
+				r.SetAttr("truffle_services", true)
+			}
 			if dist.JNIServices {
 				r.SetAttr("jni_services", true)
 			}
@@ -295,7 +307,7 @@ func graphKind(k string) bool {
 func (g *importer) Kinds() map[string]rule.KindInfo {
 	kinds := g.javaLanguage.Kinds()
 	managed := map[string]bool{}
-	for _, a := range strings.Fields("overlays shade shade_inputs manifest contents directives release jni_services module_name add_exports abi_after_javac copies literals srcs deps packages test_class project processor_class generates_api plugins resources mx_resource_root unified_release javac_opts javacopts testonly visibility") {
+	for _, a := range strings.Fields("overlays shade shade_inputs manifest contents directives release snippets_pattern archived_libraries jni_services truffle_services module_name add_exports abi_after_javac copies literals srcs deps packages test_class project processor_class generates_api plugins resources mx_resource_root unified_release javac_opts javacopts testonly visibility") {
 		managed[a] = true
 	}
 	for _, k := range strings.Fields("mx_shaded_java mx_files mx_project mx_whole_java mx_processed_java mx_processor mx_test_class") {

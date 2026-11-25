@@ -3,6 +3,8 @@ load("@rules_java//java:java_test.bzl", "java_test")
 exports_files([
     "benchmark_timer.patch",
     "sdk.patch",
+    "sl.py.tpl",
+    "sl_fixture_test.py",
     "shaded_inputs.json",
     "truffle.patch",
     "toolchain_test.py",
@@ -67,4 +69,14 @@ java_test(
         "@graal//sdk:POLYGLOT",
         "@graal//truffle:com.oracle.truffle.polyglot",
     ],
+)
+
+java_test(
+    name = "truffle_archive_test",
+    size = "small",
+    srcs = ["TruffleArchiveTest.java"],
+    data = ["@graal//truffle:TRUFFLE_API"],
+    env = {"TRUFFLE_API": "$(rootpath @graal//truffle:TRUFFLE_API)"},
+    test_class = "graal.TruffleArchiveTest",
+    deps = ["@contrib_rules_jvm_deps//:junit_junit"],
 )

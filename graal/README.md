@@ -15,13 +15,26 @@ tools/buildbuddy test --config=buildbuddy-rbe --config=elide-processors //graal/
 | Suite | Native Bazel build | Test coverage |
 | --- | --- | --- |
 | SDK | All 29 declared projects. All 19 Java distributions produce JARs, including Polyglot, Native Bridge, JLine and Launcher Common. Three additional targets expose the version and launcher resource layouts. | All 17 discovered upstream JUnit classes and the C and C++ toolchain probes. Runtime tests verify packaged version resources, JPMS module loading and JLine provider selection on JDK 21 and Labs JDK 25. |
-| Truffle | 13 of 69 declared projects. The Polyglot implementation now compiles against the SDK, the Truffle bytecode, instrumentation, interop, exception, string and library APIs, and shaded ASM. | Integration tests load the Polyglot service provider, check its version, use its generated isolate service registry and consume the generated Truffle library factories. The upstream Truffle test projects remain pending. |
+| Truffle | 24 of 69 declared projects, including the JNI attach library, host interop and SimpleLanguage. Bazel packages the multi-release Truffle API, SL language and SL launcher as named modules. | 57 upstream guest fixtures each run on the AST and bytecode interpreters. Additional tests check both JPMS descriptors, the native resource layout, Polyglot services and generated factories. |
 
 The SDK and Truffle slice generally targets Java 21. Shaded libraries compile at their declared releases, including the JDK 22 JLine overlay. Some SDK projects declare an older minimum while using newer APIs, including `java.io.Serial`. The libgraal API compiles as one unit because its packages depend on each other. Gazelle keeps project resources, processors and tests with their owning compilations and splits eligible source-only projects by package.
 
 `--classpath-dists` follows same-suite distribution dependencies during Gazelle export. `mx_classpath_dist` exposes their constituent jars and combined JavaInfo. Platform-independent file layouts support literal contents and exact file references to another layout. The SDK version layouts exercise both operations. Select individual distributions for JAR assembly and JPMS descriptors with `--archive-dist DIST`. The Native Bridge closure uses this path. JAR assembly supports release-specific class overlays and compiles their JPMS descriptors against the classes visible at each release. Signing and publication remain separate migration work.
 
-Truffle's eight declared processors run on the execution platform. Its DSL processor inspects javac internals that Turbine does not implement. The generator selects `--javac-only-processor truffle:TRUFFLE_DSL_PROCESSOR` for that distribution. Bazel runs javac once on affected projects, then extracts an interface jar containing the generated types for downstream compilation. Eligible Elide compilations keep their worker and ABI settings. For three pinned Truffle projects the generator sets individual Error Prone checks to warning severity. Stock JavaBuilder reports the upstream diagnostics, including an unconditional recursive call in instrumentation’s `NearestNodesCollector`.
+Truffle's eight declared processors run on the execution platform. Its DSL processor inspects javac internals that Turbine does not implement. The generator selects `--javac-only-processor truffle:TRUFFLE_DSL_PROCESSOR` for that distribution. Bazel runs javac once on affected projects, then extracts an interface jar containing the generated types for downstream compilation. Eligible Elide compilations keep their worker and ABI settings. For four pinned Truffle projects the generator sets individual Error Prone checks to warning severity. Stock JavaBuilder reports the upstream diagnostics, including an unconditional recursive call in instrumentation’s `NearestNodesCollector`.
+
+## Run SimpleLanguage
+
+```sh
+printf 'function main() { println(6 * 7); }\n' | bazelisk run @graal//truffle:sl -- --disable-launcher-output
+bazelisk run --config=labsjdk @graal//truffle:sl -- path/to/program.sl
+bazelisk query 'filter("sl[.]test[.]", tests(@graal//truffle/...))'
+bazelisk test --config=elide-processors @graal//truffle:sl.test.Fibonacci @graal//truffle:sl.test.error.InvalidBreak
+```
+
+The launcher resolves its module path from the Bazel-built distributions and runs on the selected JDK. Each guest test checks upstream output or diagnostics with both values of `sl.UseBytecode`. Tests extract the JNI attach library into Bazel's test temporary directory and fail if loading it fails. The language currently uses Truffle's interpreter runtime. The optimizing runtime and JVMCI compiler are separate migration targets.
+
+The archive action consumes Truffle registration markers, filters documentation snippets using the suite pattern, and assembles the Java 9 and 21 overlays. The pinned mx includes a fix for repeated module descriptor rendering so both releases retain singleton qualified exports and service providers.
 
 ## SDK launchers and toolchain tests
 
@@ -56,7 +69,7 @@ Run `tools/generate-graal --check` to reproduce the checked-in patches from the 
 | Next checkpoint | Acceptance under Bazel |
 | --- | --- |
 | SDK toolchain distributions | Assemble the five LLVM, Ninja, CMake and musl redistribution layouts with their upstream contents and platform filters. Their packaged payloads are separate from the Elide LLVM toolchain used for Bazel compilation. |
-| Complete Truffle | Assemble the modular Truffle API with its native attach resources, build the runtime and SimpleLanguage, execute a guest program and run the upstream TCK and Truffle tests. |
+| Complete Truffle | Build the optimizing Truffle runtime and compiler interface. Migrate the upstream Java test projects, run the TCK, and qualify compiled guest execution. |
 | Compiler and SubstrateVM | Use the pinned Labs JDK for JVMCI. Build the compiler and relevant Espresso Shared dependencies, run compiler tests, then build SubstrateVM and produce and execute an image with the newly built toolchain. |
 | Languages and tools | Migrate Regex, Sulong, Wasm, Espresso, Espresso Compiler Stub, Tools, Visualizer, Web Image and Sandbox Toolchains with their Java, native and external inputs. Run each suite's upstream tests. |
 | VM assembly | Pin the external components required by each selected VM configuration. Assemble the distribution and run its launchers, component tests and corresponding mx gate equivalents from a clean Linux RBE build. |

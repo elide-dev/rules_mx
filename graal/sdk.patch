@@ -2,7 +2,7 @@ diff --git a/sdk/BUILD.bazel b/sdk/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/sdk/BUILD.bazel
-@@ -0,0 +1,1055 @@
+@@ -0,0 +1,1082 @@
 +load("@rules_mx//graal:nativebridge.bzl", "nativebridge_launcher")
 +load("@rules_mx//graal:toolchain_test.bzl", "sdk_toolchain_test")
 +load("@rules_mx//mx:graph.bzl", "mx_jar_dist", "mx_processed_java", "mx_processor", "mx_project", "mx_resource_layout", "mx_shaded_java", "mx_test_class", "mx_whole_java")
@@ -619,6 +619,7 @@ new file mode 100644
 +    },
 +    module_name = "org.graalvm.collections",
 +    release = 21,
++    snippets_pattern = ".*(Snippets|doc-files).*",
 +    visibility = ["//visibility:public"],
 +)
 +
@@ -642,6 +643,7 @@ new file mode 100644
 +    },
 +    module_name = "org.graalvm.sdk",
 +    release = 21,
++    snippets_pattern = ".*(Snippets|doc-files).*",
 +    visibility = ["//visibility:public"],
 +    deps = [
 +        ":COLLECTIONS",
@@ -683,6 +685,7 @@ new file mode 100644
 +        ":org.graalvm.shadowed.org.jline.jdk22": "22",
 +    },
 +    release = 21,
++    snippets_pattern = ".*(Snippets|doc-files).*",
 +    visibility = ["//visibility:public"],
 +    deps = [
 +        ":NATIVEIMAGE",
@@ -709,6 +712,7 @@ new file mode 100644
 +    },
 +    module_name = "org.graalvm.jniutils",
 +    release = 21,
++    snippets_pattern = ".*(Snippets|doc-files).*",
 +    visibility = ["//visibility:public"],
 +    deps = [
 +        ":COLLECTIONS",
@@ -737,6 +741,7 @@ new file mode 100644
 +    },
 +    module_name = "org.graalvm.launcher",
 +    release = 21,
++    snippets_pattern = ".*(Snippets|doc-files).*",
 +    visibility = ["//visibility:public"],
 +    deps = [
 +        ":COLLECTIONS",
@@ -769,6 +774,7 @@ new file mode 100644
 +    },
 +    module_name = "org.graalvm.maven.downloader",
 +    release = 21,
++    snippets_pattern = ".*(Snippets|doc-files).*",
 +    visibility = ["//visibility:public"],
 +    deps = [":NATIVEIMAGE"],
 +)
@@ -793,6 +799,7 @@ new file mode 100644
 +    },
 +    module_name = "org.graalvm.nativebridge",
 +    release = 21,
++    snippets_pattern = ".*(Snippets|doc-files).*",
 +    visibility = ["//visibility:public"],
 +    deps = [":JNIUTILS"],
 +)
@@ -802,6 +809,7 @@ new file mode 100644
 +    testonly = True,
 +    contents = [":org.graalvm.nativebridge.benchmark"],
 +    jni_services = True,
++    snippets_pattern = ".*(Snippets|doc-files).*",
 +    visibility = ["//visibility:public"],
 +    deps = [":NATIVEBRIDGE"],
 +)
@@ -809,6 +817,7 @@ new file mode 100644
 +mx_jar_dist(
 +    name = "NATIVEBRIDGE_PROCESSOR",
 +    contents = [":org.graalvm.nativebridge.processor"],
++    snippets_pattern = ".*(Snippets|doc-files).*",
 +    visibility = ["//visibility:public"],
 +)
 +
@@ -816,12 +825,17 @@ new file mode 100644
 +    name = "NATIVEBRIDGE_PROCESSOR_TEST",
 +    testonly = True,
 +    add_exports = ["jdk.internal.vm.ci/jdk.vm.ci.services"],
++    archived_libraries = [
++        "@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
++        "@contrib_rules_jvm_deps//:junit_junit",
++    ],
 +    contents = [
 +        "@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
 +        "@contrib_rules_jvm_deps//:junit_junit",
 +        ":org.graalvm.nativebridge.processor.test",
 +    ],
 +    jni_services = True,
++    snippets_pattern = ".*(Snippets|doc-files).*",
 +    visibility = ["//visibility:public"],
 +    deps = [":NATIVEBRIDGE"],
 +)
@@ -855,6 +869,7 @@ new file mode 100644
 +    },
 +    module_name = "org.graalvm.nativeimage",
 +    release = 21,
++    snippets_pattern = ".*(Snippets|doc-files).*",
 +    visibility = ["//visibility:public"],
 +    deps = [":WORD"],
 +)
@@ -878,6 +893,7 @@ new file mode 100644
 +    },
 +    module_name = "org.graalvm.nativeimage.libgraal",
 +    release = 21,
++    snippets_pattern = ".*(Snippets|doc-files).*",
 +    visibility = ["//visibility:public"],
 +    deps = [":NATIVEIMAGE"],
 +)
@@ -915,6 +931,7 @@ new file mode 100644
 +    },
 +    module_name = "org.graalvm.polyglot",
 +    release = 21,
++    snippets_pattern = ".*(Snippets|doc-files).*",
 +    visibility = ["//visibility:public"],
 +    deps = [
 +        ":COLLECTIONS",
@@ -940,6 +957,7 @@ new file mode 100644
 +    },
 +    module_name = "org.graalvm.polyglot_tck",
 +    release = 21,
++    snippets_pattern = ".*(Snippets|doc-files).*",
 +    visibility = ["//visibility:public"],
 +    deps = [
 +        ":COLLECTIONS",
@@ -950,6 +968,7 @@ new file mode 100644
 +mx_jar_dist(
 +    name = "RESOURCECOPY",
 +    contents = [":org.graalvm.resourcecopy"],
++    snippets_pattern = ".*(Snippets|doc-files).*",
 +    visibility = ["//visibility:public"],
 +    deps = [":POLYGLOT"],
 +)
@@ -957,6 +976,10 @@ new file mode 100644
 +mx_jar_dist(
 +    name = "SDK_TEST",
 +    testonly = True,
++    archived_libraries = [
++        "@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
++        "@contrib_rules_jvm_deps//:junit_junit",
++    ],
 +    contents = [
 +        "@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
 +        "@contrib_rules_jvm_deps//:junit_junit",
@@ -966,6 +989,7 @@ new file mode 100644
 +        ":org.graalvm.launcher.test",
 +        ":org.graalvm.home.test",
 +    ],
++    snippets_pattern = ".*(Snippets|doc-files).*",
 +    visibility = ["//visibility:public"],
 +    deps = [
 +        ":COLLECTIONS",
@@ -989,6 +1013,7 @@ new file mode 100644
 +    },
 +    module_name = "jdk.graal.compiler.vmaccess.guest",
 +    release = 21,
++    snippets_pattern = ".*(Snippets|doc-files).*",
 +    visibility = ["//visibility:public"],
 +)
 +
@@ -1005,6 +1030,7 @@ new file mode 100644
 +    },
 +    module_name = "org.graalvm.webimage.api",
 +    release = 21,
++    snippets_pattern = ".*(Snippets|doc-files).*",
 +    visibility = ["//visibility:public"],
 +)
 +
@@ -1024,6 +1050,7 @@ new file mode 100644
 +    },
 +    module_name = "org.graalvm.word",
 +    release = 21,
++    snippets_pattern = ".*(Snippets|doc-files).*",
 +    visibility = ["//visibility:public"],
 +)
 +

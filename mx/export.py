@@ -201,7 +201,7 @@ def _classpath_distribution(dist, suite, mappings, pending):
     }
 
 
-def _module_directives(dist, members, external, archives):
+def _module_directives(dist, members, external, archives, mappings):
     info = dist.moduleInfo
     if set(info) - {"name", "requires", "exports", "opens", "uses"}:
         mx.abort(f"{dist.name}: unsupported moduleInfo fields")
@@ -214,7 +214,9 @@ def _module_directives(dist, members, external, archives):
         if dep in seen:
             return
         seen.add(dep)
-        if dep.name not in archives or not getattr(dep, "moduleInfo", None):
+        if (dep.suite == dist.suite and dep.name not in archives) or not getattr(
+            dep, "moduleInfo", None
+        ):
             mx.abort(
                 f"{dist.name}: module path needs an explicit --archive-dist {dep.name}"
             )
@@ -223,8 +225,15 @@ def _module_directives(dist, members, external, archives):
                 visit(child)
 
     for dep in external:
-        visit(dep)
-        requires[dep.moduleInfo["name"]] = dep.moduleInfo["name"]
+        if (
+            dep.isLibrary()
+            and getattr(dep, "moduleName", None)
+            and dep.qualifiedName() in mappings
+        ):
+            requires[dep.moduleName] = dep.moduleName
+        else:
+            visit(dep)
+            requires[dep.moduleInfo["name"]] = dep.moduleInfo["name"]
     observable = {d.moduleInfo["name"] for d in seen}
     for dep in seen:
         for req in dep.moduleInfo.get("requires", []):
@@ -235,10 +244,17 @@ def _module_directives(dist, members, external, archives):
             requires.setdefault(req, req)
     for req in info.get("requires", []):
         requires[req.split()[-1]] = req
+
+    def directive(kind, entry):
+        subject, to, targets = " ".join(entry.split()).partition(" to ")
+        if to:
+            targets = ", ".join(dict.fromkeys(t.strip() for t in targets.split(",")))
+        return kind + " " + subject + to + targets
+
     return sorted(
         ["requires " + req for req in requires.values()]
         + [
-            kind + " " + " ".join(entry.split())
+            directive(kind, entry)
             for kind in ("exports", "uses", "opens")
             for entry in info.get(kind, [])
         ]
@@ -250,13 +266,19 @@ def _jar_archive(dist, suite, mappings, pending, release, archives):
         (type(p).__module__, type(p).__name__) for p in dist.archiveparticipants
     }
     bridge = ("mx_sdk", "NativeBridgeArchiveParticipant")
+    truffle = ("mx_truffle", "TruffleArchiveParticipant")
     if (
-        participants - {bridge}
+        participants - {bridge, truffle}
         or type(dist).__name__ != "JARDistribution"
         or dist.overlaps
         or dist.is_stripped()
         or dist.buildDependencies
-        or dist.optionalDependencies
+        or any(
+            d not in dist.deps
+            or ("static " + getattr(d, "moduleInfo", {}).get("name", ""))
+            not in getattr(dist, "moduleInfo", {}).get("requires", [])
+            for d in dist.optionalDependencies
+        )
         or dist.manifestEntries
         or getattr(dist, "javaProperties", None)
         or dist.module_info_compilation_participants
@@ -285,8 +307,14 @@ def _jar_archive(dist, suite, mappings, pending, release, archives):
         "deps": _dependency_labels(external, suite, mappings, pending, True),
         "testonly": dist.is_test_distribution(),
         "jni_services": bridge in participants,
+        "truffle_services": truffle in participants,
         "release": release,
     }
+    if pattern := getattr(suite, "snippetsPattern", None):
+        result["snippets_pattern"] = pattern
+        result["archived_libraries"] = _dependency_labels(
+            [d for d in base if d.isLibrary()], suite, mappings, pending, True
+        )
     concealed = getattr(dist, "requiresConcealed", {})
     if concealed:
         result["add_exports"] = sorted(
@@ -294,7 +322,9 @@ def _jar_archive(dist, suite, mappings, pending, release, archives):
         )
     if getattr(dist, "moduleInfo", None):
         result["module"] = dist.moduleInfo["name"]
-        result["directives"] = _module_directives(dist, members, external, archives)
+        result["directives"] = _module_directives(
+            dist, members, external, archives, mappings
+        )
     if dist.maven:
         manifest = {"Name": dist.maven_artifact_id()}
         version = suite.release_version_from_suite()
@@ -565,7 +595,9 @@ def bazel_buildfile(args):
         excluded_from_jacoco = project._orig_attrs.get("jacoco") == "exclude"
         if options.gazelle:
             # SpotBugs is a separate mx analysis pass.
-            allowed = allowed | {"spotbugs"}
+            allowed = allowed | {"spotbugs", "spotbugsIgnoresGenerated", "javadocType"}
+            if getattr(project, "multiReleaseJarVersion", None):
+                allowed = allowed | {"multiReleaseJarVersion", "overlayTarget"}
         if options.gazelle and excluded_from_jacoco:
             allowed = allowed | {"jacoco"}
         if options.gazelle:
@@ -625,7 +657,7 @@ def bazel_buildfile(args):
         release = (
             project.javaCompliance.value if options.release is None else options.release
         )
-        if shaded:
+        if shaded or getattr(project, "multiReleaseJarVersion", None):
             release = project.javaCompliance.value
         if release not in project.javaCompliance:
             mx.abort(

@@ -10,7 +10,8 @@ import tempfile
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 
-def read_members(inputs, jni_services):
+def read_members(inputs, args):
+    snippets = re.compile(args.snippets_pattern) if args.snippets_pattern else None
     entries = {}
     services = defaultdict(lambda: defaultdict(set))
     for jar in inputs:
@@ -18,13 +19,23 @@ def read_members(inputs, jni_services):
             for name in src.namelist():
                 if name.endswith("/") or name.upper() == "META-INF/MANIFEST.MF":
                     continue
+                if (
+                    snippets
+                    and jar not in args.archived_library
+                    and not name.startswith("META-INF/services/")
+                    and snippets.match(name)
+                ):
+                    continue
                 data = src.read(name)
                 marker = re.fullmatch(
-                    r"(?:META-INF/versions/([1-9][0-9]*)/)?META-INF/jni-entry-points/([^/]+)",
+                    r"(?:META-INF/versions/([1-9][0-9]*)/)?META-INF/(jni-entry-points|truffle-registrations)/([^/]+)",
                     name,
                 )
-                if jni_services and marker:
-                    version, provider = marker.groups()
+                if marker and (
+                    (args.jni_services and marker[2] == "jni-entry-points")
+                    or (args.truffle_services and marker[2] == "truffle-registrations")
+                ):
+                    version, _, provider = marker.groups()
                     for service in data.decode().strip().splitlines():
                         if not service.strip():
                             raise ValueError(f"Empty service in {name}")
@@ -112,6 +123,9 @@ def main():
         "--overlay", nargs=2, action="append", default=[], metavar=("VERSION", "JAR")
     )
     parser.add_argument("--output", required=True)
+    parser.add_argument("--snippets-pattern")
+    parser.add_argument("--archived-library", action="append", default=[])
+    parser.add_argument("--truffle-services", action="store_true")
     parser.add_argument("--jni-services", action="store_true")
     parser.add_argument("--manifest-entry", action="append", default=[])
     parser.add_argument("--module")
@@ -120,7 +134,7 @@ def main():
     parser.add_argument("--release", type=int)
     parser.add_argument("--java")
     args = parser.parse_args()
-    entries, services = read_members(args.input, args.jni_services)
+    entries, services = read_members(args.input, args)
     releases = defaultdict(list)
     for version, jar in args.overlay:
         if int(version) < 9:
@@ -128,12 +142,12 @@ def main():
         releases[int(version)].append(jar)
     visible = dict(entries)
     with tempfile.TemporaryDirectory() as tmp:
-        if args.module:
+        if args.module and 9 not in releases:
             entries["module-info.class"] = module_descriptor(
                 args, Path(tmp), visible, services, args.release
             )
         for version, jars in sorted(releases.items()):
-            layer, layer_services = read_members(jars, args.jni_services)
+            layer, layer_services = read_members(jars, args)
             if layer_services or any(n.startswith("META-INF/") for n in layer):
                 raise ValueError(
                     "Overlay META-INF resources need an explicit versioned layout"

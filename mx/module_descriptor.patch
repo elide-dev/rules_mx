@@ -1,0 +1,20 @@
+--- a/src/mx/_impl/mx_javamodules.py
++++ b/src/mx/_impl/mx_javamodules.py
+@@ -254,7 +254,7 @@
+             if len(targets) == 0:
+                 targets_string = ""
+             elif len(targets) == 1:
+-                targets_string = f" to {targets.pop()}"
++                targets_string = f" to {next(iter(targets))}"
+             else:
+                 sep = f"{os.linesep}        "
+                 targets_string = f" to{sep}" + ("," + sep).join(sorted(targets))
+@@ -265,7 +265,7 @@
+             print('    opens ' + opens + ';', file=out)
+         for service, providers in sorted(self.provides.items()):
+             if len(providers) == 1:
+-                providers_string = f" with {providers.pop()}"
++                providers_string = f" with {next(iter(providers))}"
+             else:
+                 sep = f"{os.linesep}        "
+                 providers_string = f" with{sep}" + ("," + sep).join(sorted(providers))
