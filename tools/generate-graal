@@ -156,6 +156,56 @@ SUITES = {
     ],
     "truffle": [
         "--java-dep",
+        "sdk:LAUNCHER_COMMON=//sdk:LAUNCHER_COMMON",
+        "--generated-dep",
+        "truffle:com.oracle.truffle.st.test=:TRUFFLE_API",
+        # The API test corpus deliberately invokes invalid operations and checks their diagnostics.
+        "--javac-opt",
+        "com.oracle.truffle.api.test=-XepDisableAllChecks",
+        "--java-dep",
+        "mx:JMH_1_21=:JMH_1_21",
+        *[
+            arg
+            for name in (
+                "JOPTSIMPLE_4_6",
+                "COMMONS_MATH3_3_2",
+                "JMH_GENERATOR_ANNPROCESS_1_21",
+            )
+            for arg in ("--java-dep", f"mx:{name}=:{name}")
+        ],
+        "--library-module",
+        "mx:JUNIT=junit",
+        "--test-launcher",
+        "truffle:com.oracle.truffle.api.modularized.test=:modular_junit",
+        "--processor-plugin",
+        "mx:JMH_1_21=:jmh_processor",
+        "--whole-project",
+        "org.graalvm.polybench",
+        "--test-runtime",
+        "truffle:com.oracle.truffle.st.test=:TRUFFLE_ST_TEST",
+        "--test-runtime",
+        "truffle:com.oracle.truffle.st.test=:TRUFFLE_SL",
+        *[
+            arg
+            for dist in (
+                "TRUFFLE_NFI_PANAMA",
+                "TRUFFLE_MODULARIZED_TEST",
+                "TRUFFLE_MODULARIZED_TEST_SEPARATE_MODULE_TEST",
+                "TRUFFLE_TCK_TESTS_LANGUAGE",
+                "TRUFFLE_ST",
+                "TRUFFLE_ST_TEST",
+                "TRUFFLE_MICRO_BENCHMARKS",
+                "POLYBENCH",
+                "POLYBENCH_INSTRUMENTS",
+                "PMH",
+                "TRUFFLE_JSON",
+                "TRUFFLE_ICU4J",
+                "TRUFFLE_XZ",
+                "TRUFFLE_ANTLR4",
+            )
+            for arg in ("--archive-dist", dist)
+        ],
+        "--java-dep",
         "truffle:TRUFFLE_NFI_RESOURCES=:TRUFFLE_NFI_RESOURCES",
         "--generated-dep",
         "truffle:com.oracle.truffle.nfi.api=:com.oracle.truffle.api.utilities",
@@ -243,6 +293,38 @@ SUITES = {
             arg
             for project, checks in {
                 "com.oracle.truffle.api.strings": ["ReturnValueIgnored"],
+                "com.oracle.truffle.sl.test": ["JUnit4TestNotRun"],
+                "com.oracle.truffle.api.staticobject.test": ["ReturnValueIgnored"],
+                "com.oracle.truffle.api.instrumentation.test": ["ReturnValueIgnored"],
+                "com.oracle.truffle.api.bytecode.test": [
+                    "JUnit4TestNotRun",
+                    "SelfAssertion",
+                    "ImpossibleNullComparison",
+                    "ArrayToString",
+                ],
+                "com.oracle.truffle.api.dsl.test": [
+                    "JUnitAssertSameCheck",
+                    "SelfAssertion",
+                    "SuppressWarningsDeprecated",
+                    "TryFailThrowable",
+                    "SelfEquals",
+                ],
+                "com.oracle.truffle.api.strings.test": ["ReturnValueIgnored"],
+                "com.oracle.truffle.tck": ["JUnit4ClassAnnotationNonStatic"],
+                "com.oracle.truffle.tck.instrumentation": ["BoxedPrimitiveEquality"],
+                "org.graalvm.shadowed.com.ibm.icu": [
+                    "ComparableType",
+                    "ComparisonOutOfRange",
+                ],
+                "org.graalvm.shadowed.org.antlr.v4.runtime": [
+                    "DoubleBraceInitialization"
+                ],
+                "org.graalvm.shadowed.org.jcodings": [
+                    "ArrayToString",
+                    "ComparisonOutOfRange",
+                    "EqualsHashCode",
+                ],
+                "org.graalvm.shadowed.org.json": ["EqualsNull"],
                 "com.oracle.truffle.compiler": ["FormatString"],
                 "com.oracle.truffle.runtime": ["ReturnValueIgnored"],
                 "com.oracle.truffle.sl": ["ReturnValueIgnored"],
@@ -288,6 +370,16 @@ SUITES = {
         "TRUFFLE_SL",
         "--archive-dist",
         "TRUFFLE_SL_LAUNCHER",
+        "TRUFFLE_MODULARIZED_TEST",
+        "TRUFFLE_TCK_TESTS_LANGUAGE",
+        "TRUFFLE_ST_TEST",
+        "TRUFFLE_MICRO_BENCHMARKS",
+        "POLYBENCH",
+        "POLYBENCH_INSTRUMENTS",
+        "PMH",
+        "TRUFFLE_ICU4J",
+        "TRUFFLE_JSON",
+        "TRUFFLE_ANTLR4",
         "TRUFFLE_NFI_LIBFFI",
         "TRUFFLE_NFI_TEST",
         "TRUFFLE_SL",
@@ -302,7 +394,14 @@ SUITES = {
 
 SHADED_PROJECTS = {
     "sdk": ("org.graalvm.shadowed.org.jline", "org.graalvm.shadowed.org.jline.jdk22"),
-    "truffle": ("com.oracle.truffle.api.impl.asm", "org.graalvm.shadowed.org.jcodings"),
+    "truffle": (
+        "com.oracle.truffle.api.impl.asm",
+        "org.graalvm.shadowed.org.jcodings",
+        "org.graalvm.shadowed.com.ibm.icu",
+        "org.graalvm.shadowed.org.tukaani.xz",
+        "org.graalvm.shadowed.org.json",
+        "org.graalvm.shadowed.org.antlr.v4.runtime",
+    ),
 }
 
 
@@ -310,6 +409,34 @@ JAVA_LIBRARIES = {
     "truffle": ["GUAVA", "JIMFS", "VISUALVM-LIB-JFLUID-HEAP"],
     "compiler": ["JAVA_ALLOCATION_INSTRUMENTER"],
 }
+
+
+def maven_pin(lib, suffix="", key="digest"):
+    mvn = lib["maven"]
+    artifact, version = mvn["artifactId"], mvn["version"]
+    path = f"{mvn['groupId'].replace('.', '/')}/{artifact}/{version}/{artifact}-{version}{suffix}.jar"
+    algorithm, digest = lib[key].split(":")
+    return [path, algorithm + "-" + base64.b64encode(bytes.fromhex(digest)).decode()]
+
+
+def jmh_rules(directory):
+    suite = runpy.run_path(str(directory.parent / "mx-suite.py"))["suite"]
+    libraries = suite["libraries"]
+    names = ["JMH_1_21", *libraries["JMH_1_21"]["dependencies"]]
+    pins = {}
+    rules = ['load("@rules_java//java:java_plugin.bzl", "java_plugin")']
+    for name in names:
+        lib = libraries[name]
+        filename = f"mx_{name}.jar"
+        pins[filename] = maven_pin(lib)
+        deps = [":" + dep for dep in lib.get("dependencies", [])]
+        rules.append(
+            f'java_import(name = "{name}", jars = ["@graal_shaded_inputs//:{filename}"], deps = {json.dumps(deps)})'
+        )
+    rules.append(
+        'java_plugin(name = "jmh_processor", processor_class = "org.openjdk.jmh.generators.BenchmarkProcessor", deps = [":JMH_1_21"])'
+    )
+    return pins, "\n".join(rules) + "\n"
 
 
 def library_rules(suite):
@@ -369,35 +496,23 @@ def shading_inputs(directory):
     suite = runpy.run_path(str(directory / f"mx.{directory.name}/suite.py"))["suite"]
     inputs = {}
     flags = []
+    if directory.name == "truffle":
+        inputs.update(jmh_rules(directory)[0])
     for project in SHADED_PROJECTS.get(directory.name, ()):
         for qualified in suite["projects"][project]["shadedDependencies"]:
             owner, name = qualified.split(":")
             if owner != directory.name:
                 raise ValueError(f"Unmapped external shaded library {qualified}")
             lib = suite["libraries"][name]
-            mvn = lib["maven"]
-            artifact, version = mvn["artifactId"], mvn["version"]
-            base = f"{mvn['groupId'].replace('.', '/')}/{artifact}/{version}/{artifact}-{version}"
             for suffix, key in [("", "digest"), ("-sources", "sourceDigest")]:
                 filename = qualified.replace(":", "_") + suffix + ".jar"
-                algo, digest = lib[key].split(":")
-                inputs[filename] = [
-                    base + suffix + ".jar",
-                    algo + "-" + base64.b64encode(bytes.fromhex(digest)).decode(),
-                ]
+                inputs[filename] = maven_pin(lib, suffix, key)
                 flags.extend(
                     ["--shaded-input", f"{qualified}=@graal_shaded_inputs//:{filename}"]
                 )
     for name in JAVA_LIBRARIES.get(directory.name, ()):
         lib = suite["libraries"][name]
-        mvn = lib["maven"]
-        artifact, version = mvn["artifactId"], mvn["version"]
-        path = f"{mvn['groupId'].replace('.', '/')}/{artifact}/{version}/{artifact}-{version}.jar"
-        algo, digest = lib["digest"].split(":")
-        inputs[f"{directory.name}_{name}.jar"] = [
-            path,
-            algo + "-" + base64.b64encode(bytes.fromhex(digest)).decode(),
-        ]
+        inputs[f"{directory.name}_{name}.jar"] = maven_pin(lib)
         flags.extend(["--java-dep", f"{directory.name}:{name}=:{name}"])
     return inputs, flags
 
@@ -620,6 +735,27 @@ def truffle_native_projects(directory):
         file_list=nfi["fileListEntry"],
         hash_entry=nfi["hashEntry"],
     )
+    bench = suite["projects"]["nfi-native"]
+    header_flag = "-I<path:truffle:TRUFFLE_NFI_GRAALVM_SUPPORT>/include"
+    if (
+        bench["buildDependencies"] != ["TRUFFLE_NFI_GRAALVM_SUPPORT"]
+        or header_flag not in bench["cflags"]
+    ):
+        raise ValueError("Unknown NFI benchmark header layout")
+    bench_dir = directory / bench["subDir"] / "nfi-native/src"
+    nfi_attrs["benchmark"] = dict(
+        name="nfi-native",
+        deliverable=bench["deliverable"],
+        sources=sorted(
+            p.relative_to(directory).as_posix() for p in bench_dir.glob("*.c")
+        ),
+        os_arch={
+            "<others>": {
+                "<others>": {"cflags": [f for f in bench["cflags"] if f != header_flag]}
+            }
+        },
+    )
+    inventory = sorted(":" + name for name in suite["projects"])
     fixture_rules = []
     fixture_root = directory / "src/com.oracle.truffle.sl.test/src/tests"
     for parent in sorted({p.parent for p in fixture_root.rglob("*.sl")}):
@@ -636,9 +772,15 @@ def truffle_native_projects(directory):
         )
     projects = json.loads((directory / "mx-graph.json").read_text())["projects"]
     tck = next(p for p in projects if p["name"] == "com.oracle.truffle.tck.tests")
+    nfi_tests = next(p for p in projects if p["name"] == "com.oracle.truffle.nfi.test")
     return (
         'load("@rules_mx//graal:attach.bzl", "truffle_attach")\n\n'
-        + 'load("@rules_mx//graal:simplelanguage.bzl", "optimizing_junit", "simplelanguage", "sl_fixture_tests")\n\n'
+        + 'load("@rules_mx//graal:simplelanguage.bzl", "modular_test_runner", "optimizing_junit", "panama_test", "simplelanguage", "sl_fixture_tests")\n'
+        + 'modular_test_runner(name = "modular_junit")\n'
+        + "".join(
+            f'panama_test(name = "panama.{cls.rsplit(".", 1)[-1]}", test_class = "{cls}")\n'
+            for cls in nfi_tests["tests"]
+        )
         + 'simplelanguage(name = "sl")\n\n'
         + "".join(fixture_rules)
         + "".join(
@@ -652,6 +794,7 @@ def truffle_native_projects(directory):
             f"    {key} = {json.dumps(value)},\n" for key, value in nfi_attrs.items()
         )
         + ")\n"
+        + f'filegroup(name = "all_projects", srcs = {json.dumps(inventory)}, testonly = True, visibility = ["//visibility:public"])\n'
         + "truffle_attach(\n"
         + "".join(f"    {key} = {json.dumps(value)},\n" for key, value in attrs.items())
         + ")\n"
@@ -721,6 +864,7 @@ def generate(suite, stage):
             + "\n"
             + library_rules(suite)
             + qualified_tests(directory)
+            + jmh_rules(directory)[1]
             + truffle_native_projects(directory)
         )
     subprocess.run(
@@ -751,6 +895,13 @@ def generate(suite, stage):
     return "".join(patch)
 
 
+def bazel_source(label):
+    location = subprocess.check_output(
+        ["bazelisk", "query", "--output=location", label], cwd=ROOT, text=True
+    )
+    return Path(location.split(": source file ", 1)[0].rsplit(":", 2)[0])
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -767,13 +918,10 @@ def main():
         stage = Path(temp).resolve()
         source = args.graal
         if source is None:
-            location = subprocess.check_output(
-                ["bazelisk", "query", "--output=location", "@graal//sdk:BUILD.bazel"],
-                cwd=ROOT,
-                text=True,
-            )
-            filename = location.split(": source file ", 1)[0].rsplit(":", 2)[0]
-            source = Path(filename).parents[1]
+            source = bazel_source("@graal//sdk:BUILD.bazel").parents[1]
+        shutil.copyfile(
+            bazel_source("@graal_mx//:mx.mx/suite.py"), stage / "mx-suite.py"
+        )
         (stage / ".mx_vcs_root").touch()
         (stage / "WORKSPACE").touch()
         (stage / "BUILD.bazel").write_text(
@@ -789,6 +937,11 @@ def main():
                         "BUILD", "BUILD.bazel", "__pycache__"
                     ),
                 )
+        shutil.copytree(
+            source / "truffle/benchmarks/nfi-native",
+            stage / "truffle/benchmarks/nfi-native",
+            ignore=shutil.ignore_patterns("BUILD", "BUILD.bazel"),
+        )
         lib = runpy.run_path(str(stage / "truffle/mx.truffle/suite.py"))["suite"][
             "libraries"
         ]["LIBFFI_SOURCES"]

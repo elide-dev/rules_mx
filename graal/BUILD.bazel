@@ -142,3 +142,36 @@ py_binary(
     name = "native_test_layout",
     srcs = ["native_test_layout.py"],
 )
+
+java_library(
+    name = "named_module_junit",
+    testonly = True,
+    srcs = ["NamedModuleJUnit.java"],
+    visibility = ["//visibility:public"],
+    deps = ["@bazel_tools//tools/jdk:TestRunner"],
+)
+
+java_test(
+    name = "truffle_distributions_test",
+    size = "small",
+    srcs = ["TruffleDistributionTest.java"],
+    data = ["@graal//truffle:TRUFFLE_MICRO_BENCHMARKS"],
+    env = {"JMH_JAR": "$(rootpath @graal//truffle:TRUFFLE_MICRO_BENCHMARKS)"},
+    test_class = "graal.TruffleDistributionTest",
+    deps = [
+        "@contrib_rules_jvm_deps//:junit_junit",
+        "@graal//truffle:TRUFFLE_ANTLR4",
+        "@graal//truffle:TRUFFLE_ICU4J",
+        "@graal//truffle:TRUFFLE_JSON",
+    ],
+)
+
+java_test(
+    name = "panama_module_test",
+    size = "small",
+    srcs = ["PanamaModuleTest.java"],
+    data = ["@graal//truffle:TRUFFLE_NFI_PANAMA"],
+    env = {"PANAMA_JAR": "$(rootpath @graal//truffle:TRUFFLE_NFI_PANAMA)"},
+    test_class = "graal.PanamaModuleTest",
+    deps = ["@contrib_rules_jvm_deps//:junit_junit"],
+)

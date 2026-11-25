@@ -201,7 +201,7 @@ def _classpath_distribution(dist, suite, mappings, pending):
     }
 
 
-def _module_directives(dist, members, external, archives, mappings):
+def _module_directives(dist, members, external, archives, mappings, library_modules):
     info = dist.moduleInfo
     if set(info) - {
         "name",
@@ -232,12 +232,11 @@ def _module_directives(dist, members, external, archives, mappings):
                 visit(child)
 
     for dep in external:
-        if (
-            dep.isLibrary()
-            and getattr(dep, "moduleName", None)
-            and dep.qualifiedName() in mappings
-        ):
-            requires[dep.moduleName] = dep.moduleName
+        module = getattr(dep, "moduleName", None) or library_modules.get(
+            dep.qualifiedName()
+        )
+        if dep.isLibrary() and module and dep.qualifiedName() in mappings:
+            requires[module] = module
         else:
             visit(dep)
             requires[dep.moduleInfo["name"]] = dep.moduleInfo["name"]
@@ -262,7 +261,10 @@ def _module_directives(dist, members, external, archives, mappings):
         for entry in info.get(kind, []):
             subject, to, names = " ".join(entry.split()).partition(" to ")
             matches = [subject]
-            if subject.endswith("*"):
+            # Shaded package names are known after source relocation and compilation.
+            if subject.endswith("*") and not any(
+                getattr(p, "shadedDependencies", None) for p in members
+            ):
                 matches = sorted(
                     {
                         pkg
@@ -285,15 +287,16 @@ def _module_directives(dist, members, external, archives, mappings):
     return sorted(directives)
 
 
-def _jar_archive(dist, suite, mappings, pending, release, archives):
+def _jar_archive(dist, suite, mappings, pending, release, archives, library_modules):
     participants = {
         (type(p).__module__, type(p).__name__) for p in dist.archiveparticipants
     }
     bridge = ("mx_sdk", "NativeBridgeArchiveParticipant")
     truffle = ("mx_truffle", "TruffleArchiveParticipant")
     graal = ("mx_compiler", "GraalArchiveParticipant")
+    jmh = ("mx._impl.mx", "JMHArchiveParticipant")
     if (
-        participants - {bridge, truffle, graal}
+        participants - {bridge, truffle, graal, jmh}
         or type(dist).__name__ != "JARDistribution"
         or dist.overlaps
         or dist.is_stripped()
@@ -334,6 +337,7 @@ def _jar_archive(dist, suite, mappings, pending, release, archives):
         "jni_services": bridge in participants,
         "truffle_services": truffle in participants,
         "graal_services": graal in participants,
+        "jmh_metadata": jmh in participants,
         "release": release,
     }
     if any(
@@ -358,7 +362,7 @@ def _jar_archive(dist, suite, mappings, pending, release, archives):
     if getattr(dist, "moduleInfo", None):
         result["module"] = dist.moduleInfo["name"]
         result["directives"] = _module_directives(
-            dist, members, external, archives, mappings
+            dist, members, external, archives, mappings, library_modules
         )
     if dist.maven:
         manifest = {"Name": dist.maven_artifact_id()}
@@ -539,6 +543,13 @@ def bazel_buildfile(args):
         "--processor-plugin", action="append", default=[], metavar="SUITE:NAME=LABEL"
     )
     parser.add_argument(
+        "--library-module",
+        action="append",
+        default=[],
+        metavar="SUITE:LIB=MODULE",
+        help="JPMS name of a mapped automatic module",
+    )
+    parser.add_argument(
         "--java-dep", action="append", default=[], metavar="SUITE:NAME=LABEL"
     )
     parser.add_argument(
@@ -628,6 +639,18 @@ def bazel_buildfile(args):
     )
     parser.add_argument("projects", nargs="+")
     options = parser.parse_args(args)
+    library_modules = {}
+    for spec in options.library_module:
+        name, sep, module = spec.partition("=")
+        if (
+            not sep
+            or ":" not in name
+            or not re.fullmatch(r"[A-Za-z][\w]*(?:\.[A-Za-z][\w]*)*", module)
+        ):
+            parser.error("expected --library-module SUITE:LIB=MODULE")
+        if name in library_modules:
+            parser.error(f"duplicate --library-module mapping for {name}")
+        library_modules[name] = module
     test_launchers = _mappings(parser, options.test_launcher, "--test-launcher")
     test_runtimes = _mappings(parser, options.test_runtime, "--test-runtime")
     test_paths = _mappings(parser, options.test_path, "--test-path")
@@ -701,7 +724,13 @@ def bazel_buildfile(args):
             if project.isJARDistribution():
                 if project.name in archives:
                     distributions[project.name] = _jar_archive(
-                        project, suite, java_deps, pending, options.release, archives
+                        project,
+                        suite,
+                        java_deps,
+                        pending,
+                        options.release,
+                        archives,
+                        library_modules,
                     )
                     continue
                 distributions[project.name] = _classpath_distribution(
