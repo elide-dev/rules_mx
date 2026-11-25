@@ -255,17 +255,20 @@ filegroup(
     name = "source_native_image_files",
     srcs = ["@graal//substratevm:native-image.root"],
     output_group = "distribution",
+    tags = ["manual"],
 )
 
 graalvm_sdk(
     name = "source_native_image_sdk",
     gvm_files = ":source_native_image_files",
     native_image_bin = "@graal//substratevm:native-image",
+    tags = ["manual"],
     visibility = ["//visibility:public"],
 )
 
 toolchain(
     name = "source_native_image_toolchain",
+    tags = ["manual"],
     toolchain = ":source_native_image_sdk",
     toolchain_type = "@rules_graalvm//graalvm/toolchain",
     visibility = ["//visibility:public"],
