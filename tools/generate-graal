@@ -530,8 +530,24 @@ SUITES = {
                 "tools:com.oracle.truffle.tools.chromeinspector.test=" + flag,
             )
         ],
-        "--javac-opt",
-        "com.oracle.truffle.tools.utils.java_websocket=-Xep:BadShiftAmount:WARN",
+        *[
+            arg
+            for project, checks in {
+                "com.oracle.truffle.tools.agentscript": ["ImpossibleNullComparison"],
+                "com.oracle.truffle.tools.chromeinspector": ["BoxedPrimitiveEquality"],
+                "com.oracle.truffle.tools.chromeinspector.test": [
+                    "JUnit4TestNotRun",
+                    "ComparingThisWithNull",
+                ],
+                "com.oracle.truffle.tools.dap": ["ReturnValueIgnored"],
+                "com.oracle.truffle.tools.profiler": ["BoxedPrimitiveEquality"],
+                "com.oracle.truffle.tools.profiler.test": ["SelfAssertion"],
+                "com.oracle.truffle.tools.utils.java_websocket": ["BadShiftAmount"],
+                "org.graalvm.tools.insight.test": ["InvalidPatternSyntax"],
+            }.items()
+            for check in checks
+            for arg in ("--javac-opt", f"{project}=-Xep:{check}:WARN")
+        ],
         "--infer-source-deps",
         *[
             arg
