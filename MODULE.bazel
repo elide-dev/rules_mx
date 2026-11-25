@@ -7,14 +7,13 @@ module(
 bazel_dep(name = "rules_java", version = "9.9.0")
 bazel_dep(name = "rules_python", version = "1.9.2")
 bazel_dep(name = "rules_elide", version = "0.6.1")
+# rules_elide has no release with the unified JVM builder, Native Image toolchain and
+# JavaBuilder processor fixes yet, so pin its main branch by commit.
 archive_override(
     module_name = "rules_elide",
-    integrity = "sha256-vQiFTGKzDEn4lj5MinoePBom0oKLyZQKdnBRp8ExnTg=",
-    # Processor option precedence from rules_elide PR 133 atop unified builder PR 132.
-    patch_strip = 1,
-    patches = ["//mx:elide_javabuilder.patch"],
-    strip_prefix = "rules_elide-9d997fb3e0f0a5c95913db16d40d9a3869f813bf",
-    urls = ["https://github.com/elide-dev/rules_elide/archive/9d997fb3e0f0a5c95913db16d40d9a3869f813bf.tar.gz"],
+    integrity = "sha256-//E8/7JDZWKKiQg4edEJN8ye3S8VaD5EhsQe60GYhnM=",
+    strip_prefix = "rules_elide-50e0e8f8b3696a86b4294491740434db4e9d4260",
+    urls = ["https://github.com/elide-dev/rules_elide/archive/50e0e8f8b3696a86b4294491740434db4e9d4260.tar.gz"],
 )
 
 bazel_dep(name = "gazelle", version = "0.54.0")
