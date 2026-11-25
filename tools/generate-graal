@@ -123,6 +123,9 @@ SUITES = {
             )
             for arg in ("--archive-dist", dist)
         ],
+        # This benchmark intentionally measures self-normalization.
+        "--javac-opt",
+        "org.graalvm.micro.benchmarks=-Xep:IdentityBinaryExpression:WARN",
         # The compiler test corpus deliberately exercises invalid and pathological programs.
         "--javac-opt",
         "jdk.graal.compiler.test=-XepDisableAllChecks",

@@ -2,7 +2,7 @@ diff --git a/compiler/BUILD.bazel b/compiler/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/compiler/BUILD.bazel
-@@ -0,0 +1,13423 @@
+@@ -0,0 +1,13424 @@
 +load("@rules_java//java:java_import.bzl", "java_import")
 +load("@rules_java//java:java_plugin.bzl", "java_plugin")
 +load("@rules_mx//graal:simplelanguage.bzl", "compiler_test_runner", "simplelanguage")
@@ -12620,6 +12620,7 @@ new file mode 100644
 +        "--release",
 +        "21",
 +        "-parameters",
++        "-Xep:IdentityBinaryExpression:WARN",
 +    ],
 +    plugins = [":jmh_processor"],
 +    visibility = ["//visibility:public"],
