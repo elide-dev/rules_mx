@@ -2,7 +2,7 @@ diff --git a/tools/BUILD.bazel b/tools/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/tools/BUILD.bazel
-@@ -0,0 +1,1547 @@
+@@ -0,0 +1,1548 @@
 +load("@rules_java//java:java_import.bzl", "java_import")
 +load("@rules_mx//graal:layout.bzl", "mx_archive_layout")
 +load("@rules_mx//graal:visualvm.bzl", "visualvm_support")
@@ -788,6 +788,7 @@ new file mode 100644
 +        "--add-modules",
 +        "java.logging",
 +        "-Xlint:none",
++        "-Xep:BadShiftAmount:WARN",
 +    ],
 +    release = 17,
 +    shade = "{\"packages\": {\"org.java_websocket\": \"com.oracle.truffle.tools.utils.java_websocket\"}, \"exclude\": [\"META-INF/MANIFEST.MF\", \"META-INF/maven/org.java-websocket/Java-WebSocket/pom.xml\", \"META-INF/maven/org.java-websocket/Java-WebSocket/pom.properties\"], \"patch\": {\"org/java_websocket/server/WebSocketServer.java\": {\"\\\"Uncaught exception in thread \\\\{\\\\}: \\\\{\\\\}\\\", (t\\\\.getName\\\\(\\\\)|getName\\\\(\\\\)), e\": \"\\\"Uncaught exception in thread {0}: {1}\\\", new Object[] { \\\\g<1>, e }\"}, \"org/java_websocket/WebSocketImpl.java\": {\"\\\"process\\\\(\\\\{\\\\}\\\\): \\\\(\\\\{\\\\}\\\\)\\\", socketBuffer\\\\.remaining\\\\(\\\\),\": \"\\\"process({0}): ({1})\\\", new Object[] { socketBuffer.remaining(),\", \"socketBuffer\\\\.remaining\\\\(\\\\)\\\\)\\\\)\\\\);\": \"socketBuffer.remaining()))});\", \"\\\"write\\\\(\\\\{\\\\}\\\\): \\\\{\\\\}\\\", buf\\\\.remaining\\\\(\\\\),\": \"\\\"write({0}): {1}\\\", new Object[] { buf.remaining(),\", \"new String\\\\(buf\\\\.array\\\\(\\\\)\\\\)\\\\);\": \"new String(buf.array())});\"}, \"org/java_websocket/drafts/Draft_6455.java\": {\"\\\"after(Enconding|Decoding)\\\\(\\\\{\\\\}\\\\): \\\\{\\\\}\\\", (framedata|frame)\\\\.getPayloadData\\\\(\\\\)\\\\.remaining\\\\(\\\\),\": \"\\\"after\\\\g<1>({0}): {1}\\\", new Object[] { \\\\g<2>.getPayloadData().remaining(),\", \"new String\\\\((framedata|frame)\\\\.getPayloadData\\\\(\\\\)\\\\.array\\\\(\\\\)\\\\)\\\\)\\\\);\": \"new String(\\\\g<1>.getPayloadData().array()))});\", \"\\\"Payload limit reached\\\\. Allowed: \\\\{\\\\} Current: \\\\{\\\\}\\\", maxFrameSize, (length|totalSize)\": \"\\\"Payload limit reached. Allowed: {0} Current: {1}\\\", new Object[] { maxFrameSize, \\\\g<1> }\"}, \"org/java_websocket/**/*.java\": {\"import org\\\\.slf4j\\\\.Logger;\": \"import java.util.logging.Level;\", \"import org\\\\.slf4j\\\\.LoggerFactory;\": \"import java.util.logging.Logger;\", \"LoggerFactory\\\\.getLogger\\\\(([A-Za-z_][A-Za-z0-9_]*)\\\\.class\\\\);\": \"Logger.getLogger(\\\\g<1>.class.getName());\", \"log\\\\.trace\\\\(\": \"log.log(Level.FINER, \", \"log\\\\.error\\\\(\": \"log.log(Level.SEVERE, \", \"log\\\\.isTraceEnabled\\\\(\\\\)\": \"log.isLoggable(Level.FINER)\"}}}",

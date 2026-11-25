@@ -530,6 +530,8 @@ SUITES = {
                 "tools:com.oracle.truffle.tools.chromeinspector.test=" + flag,
             )
         ],
+        "--javac-opt",
+        "com.oracle.truffle.tools.utils.java_websocket=-Xep:BadShiftAmount:WARN",
         "--infer-source-deps",
         *[
             arg
