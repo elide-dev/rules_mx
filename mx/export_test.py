@@ -89,6 +89,93 @@ class ExportTest(unittest.TestCase):
         self.assertEqual(len(graph["plugins"]), 2)
         self.assertTrue(all(plugin["deps"] == [":proc"] for plugin in graph["plugins"]))
 
+    def test_resolved_graph_includes_processor_and_archive_edges(self):
+        result = self.run_mx("bazel-graph", "--imports", suite=self.processor_suite)
+        graph = json.loads(result.stdout)
+        self.assertEqual(graph["primary_suite"], "processing")
+        self.assertIn("mx", graph["suites"])
+        nodes = graph["suites"]["processing"]
+        self.assertEqual(
+            nodes["processing:app"]["edges"]["annotation processor dependency"],
+            ["processing:PROCESSORS"],
+        )
+        self.assertEqual(
+            nodes["processing:PROCESSORS"]["archive_members"], ["processing:proc"]
+        )
+
+    def test_whole_suite_emits_independent_projects_and_packs_nested_layouts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            suite = Path(directory).resolve()
+            (suite / ".mx_vcs_root").touch()
+            metadata = suite / "mx.inventory"
+            metadata.mkdir()
+            (metadata / "suite.py").write_text(
+                "suite = "
+                + repr(
+                    {
+                        "name": "inventory",
+                        "mxversion": "7.89.0",
+                        "projects": {
+                            name: {"javaCompliance": "17+", "sourceDirs": ["src"]}
+                            for name in ("first", "second")
+                        },
+                        "distributions": {
+                            "APP": {"dependencies": ["first"]},
+                            "BASE": {
+                                "native": True,
+                                "layout": {"docs/info": "file:info"},
+                            },
+                            "LAYER": {
+                                "native": True,
+                                "layout": {
+                                    "share/": "extracted-dependency:BASE/docs/info",
+                                    "archives/original.tar": "dependency:BASE",
+                                },
+                            },
+                            "CUSTOM": {"native": True, "layout": {"link": "link:info"}},
+                        },
+                    }
+                )
+            )
+            (suite / "info").write_text("info\n")
+            for name in ("first", "second"):
+                sources = suite / name / "src" / name
+                sources.mkdir(parents=True)
+                (sources / "Main.java").write_text(
+                    f"package {name}; public class Main {{}}"
+                )
+            failed = self.run_mx(
+                "bazel-buildfile", "--gazelle", "--all", check=False, suite=suite
+            )
+            self.assertNotEqual(failed.returncode, 0)
+            self.assertIn(
+                "CUSTOM: unsupported TAR input", failed.stderr + failed.stdout
+            )
+            result = self.run_mx(
+                "bazel-buildfile",
+                "--gazelle",
+                "--all",
+                "--provided-target",
+                "CUSTOM",
+                suite=suite,
+            )
+            graph = json.loads(result.stdout)
+            self.assertEqual(graph["suite_targets"]["projects"], ["first", "second"])
+            self.assertEqual(
+                graph["suite_targets"]["distributions"],
+                ["APP", "BASE", "CUSTOM", "LAYER"],
+            )
+            self.assertEqual(
+                [p["name"] for p in graph["projects"]], ["first", "second"]
+            )
+            self.assertEqual(graph["distributions"][0]["contents"], [":first"])
+            base, layer = graph["tar_layouts"]
+            self.assertEqual(base["members"], {"info": "docs/info"})
+            self.assertEqual(layer["members"], {":BASE": "archives/original.tar"})
+            self.assertEqual(
+                layer["archive_imports"], {":BASE": "docs/info=share/info"}
+            )
+
     def test_packaged_test_discovery(self):
         with tempfile.TemporaryDirectory() as directory:
             suite = Path(directory).resolve()

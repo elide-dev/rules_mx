@@ -24,6 +24,7 @@ import (
 )
 
 type project struct {
+	suite                                string
 	Name                                 string
 	Release                              int
 	Options, Dirs, Packages, Tests, Deps []string
@@ -52,10 +53,11 @@ type javaLanguage interface {
 
 type importer struct {
 	javaLanguage
-	filename, suite string
-	owners          map[string]*project
-	projects        map[string]*project
-	rules           map[string][]*rule.Rule
+	filenames []string
+	suites    map[string]bool
+	owners    map[string]*project
+	projects  map[label.Label]*project
+	rules     map[string][]*rule.Rule
 }
 
 func NewLanguage() language.Language {
@@ -64,17 +66,34 @@ func NewLanguage() language.Language {
 
 func (g *importer) RegisterFlags(fs *flag.FlagSet, cmd string, c *config.Config) {
 	g.javaLanguage.RegisterFlags(fs, cmd, c)
-	fs.StringVar(&g.filename, "mx_graph", "", "Repository-relative mx bazel-buildfile --gazelle JSON")
+	fs.Func("mx_graph", "Repository-relative mx bazel-buildfile --gazelle JSON (repeat for each suite)", func(filename string) error {
+		g.filenames = append(g.filenames, filename)
+		return nil
+	})
 }
 
 func (g *importer) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
-	if err := g.javaLanguage.CheckFlags(fs, c); err != nil || g.filename == "" {
+	if err := g.javaLanguage.CheckFlags(fs, c); err != nil || len(g.filenames) == 0 {
 		return err
 	}
-	if !filepath.IsLocal(g.filename) {
+	g.suites = map[string]bool{}
+	g.owners = map[string]*project{}
+	g.projects = map[label.Label]*project{}
+	g.rules = map[string][]*rule.Rule{}
+	seen := map[label.Label]bool{}
+	for _, filename := range g.filenames {
+		if err := g.loadGraph(c.RepoRoot, filename, seen); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (g *importer) loadGraph(root, filename string, seen map[label.Label]bool) error {
+	if !filepath.IsLocal(filename) {
 		return fmt.Errorf("-mx_graph must be repository-relative")
 	}
-	data, err := os.ReadFile(filepath.Join(c.RepoRoot, g.filename))
+	data, err := os.ReadFile(filepath.Join(root, filename))
 	if err != nil {
 		return err
 	}
@@ -103,6 +122,12 @@ func (g *importer) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
 			Literals, Copies map[string]string
 			Testonly         bool
 		}
+		TarLayouts []struct {
+			Name           string
+			Members        map[string]string
+			ArchiveImports map[string]string `json:"archive_imports"`
+			Testonly       bool
+		} `json:"tar_layouts"`
 		Plugins []struct {
 			Name           string
 			ProcessorClass string `json:"processor_class"`
@@ -116,14 +141,14 @@ func (g *importer) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
 	if graph.Version != 1 {
 		return fmt.Errorf("unsupported mx graph version %d", graph.Version)
 	}
-	g.suite = path.Dir(filepath.ToSlash(g.filename))
-	if g.suite == "." {
-		g.suite = ""
+	suite := path.Dir(filepath.ToSlash(filename))
+	if suite == "." {
+		suite = ""
 	}
-	g.owners = map[string]*project{}
-	g.projects = map[string]*project{}
-	g.rules = map[string][]*rule.Rule{}
-	seen := map[label.Label]bool{}
+	if g.suites[suite] {
+		return fmt.Errorf("%s: more than one mx graph provided for package %q", filename, suite)
+	}
+	g.suites[suite] = true
 	add := func(pkg string, r *rule.Rule) error {
 		key := label.New("", pkg, r.Name())
 		if seen[key] {
@@ -141,7 +166,7 @@ func (g *importer) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
 			if !filepath.IsLocal(file) {
 				return nil, fmt.Errorf("invalid %s in %s: %q", attr, p.Name, file)
 			}
-			pkg := path.Dir(path.Join(g.suite, file))
+			pkg := path.Dir(path.Join(suite, file))
 			if pkg == "." {
 				pkg = ""
 			}
@@ -151,7 +176,7 @@ func (g *importer) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
 		for pkg, members := range grouped {
 			r := rule.NewRule("mx_files", p.Name+"."+attr)
 			r.SetAttr("srcs", members)
-			r.SetAttr("visibility", []string{"//" + g.suite + ":__pkg__"})
+			r.SetAttr("visibility", []string{"//" + suite + ":__pkg__"})
 			if err := add(pkg, r); err != nil {
 				return nil, err
 			}
@@ -162,14 +187,15 @@ func (g *importer) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
 	}
 	for _, p := range graph.Projects {
 		if p == nil || p.Name == "" || (len(p.Dirs) == 0 && !p.Empty) || p.Release < 1 {
-			return fmt.Errorf("%s: expected a Java project with a name, source directories and release", g.filename)
+			return fmt.Errorf("%s: expected a Java project with a name, source directories and release", filename)
 		}
-		g.projects[p.Name] = p
+		p.suite = suite
+		g.projects[label.New("", suite, p.Name)] = p
 		for _, dir := range p.Dirs {
 			if !filepath.IsLocal(dir) {
 				return fmt.Errorf("invalid directory %q for %s", dir, p.Name)
 			}
-			pkg := path.Join(g.suite, dir)
+			pkg := path.Join(suite, dir)
 			if prev := g.owners[pkg]; prev != nil {
 				return fmt.Errorf("%s and %s both own %s", prev.Name, p.Name, pkg)
 			}
@@ -234,7 +260,7 @@ func (g *importer) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
 			r.SetAttr("deps", p.Deps)
 		}
 		r.SetAttr("visibility", []string{"//visibility:public"})
-		if err := add(g.suite, r); err != nil {
+		if err := add(suite, r); err != nil {
 			return err
 		}
 		for _, class := range p.Tests {
@@ -256,7 +282,7 @@ func (g *importer) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
 				t.SetAttr("tags", []string{"manual"})
 			}
 			t.SetAttr("test_class", class)
-			if err := add(g.suite, t); err != nil {
+			if err := add(suite, t); err != nil {
 				return err
 			}
 		}
@@ -316,7 +342,7 @@ func (g *importer) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
 		if dist.Testonly {
 			r.SetAttr("testonly", true)
 		}
-		if err := add(g.suite, r); err != nil {
+		if err := add(suite, r); err != nil {
 			return err
 		}
 	}
@@ -332,7 +358,22 @@ func (g *importer) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
 		if layout.Testonly {
 			r.SetAttr("testonly", true)
 		}
-		if err := add(g.suite, r); err != nil {
+		if err := add(suite, r); err != nil {
+			return err
+		}
+	}
+	for _, layout := range graph.TarLayouts {
+		r := rule.NewRule("mx_exported_tar", layout.Name)
+		r.SetAttr("format", "tar")
+		r.SetAttr("members", layout.Members)
+		if len(layout.ArchiveImports) > 0 {
+			r.SetAttr("archive_imports", layout.ArchiveImports)
+		}
+		r.SetAttr("visibility", []string{"//visibility:public"})
+		if layout.Testonly {
+			r.SetAttr("testonly", true)
+		}
+		if err := add(suite, r); err != nil {
 			return err
 		}
 	}
@@ -342,7 +383,7 @@ func (g *importer) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
 		r.SetAttr("visibility", []string{"//visibility:public"})
 		r.SetAttr("generates_api", plugin.GeneratesAPI)
 		r.SetAttr("deps", plugin.Deps)
-		if err := add(g.suite, r); err != nil {
+		if err := add(suite, r); err != nil {
 			return err
 		}
 	}
@@ -351,7 +392,7 @@ func (g *importer) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
 
 func graphKind(k string) bool {
 	switch k {
-	case "mx_jvmci_library", "mx_shaded_java", "mx_jar_dist", "mx_pom_dist", "mx_resource_layout", "mx_classpath_dist", "mx_files", "mx_project", "mx_whole_java", "mx_processed_java", "mx_processor", "mx_test_class":
+	case "mx_exported_tar", "mx_jvmci_library", "mx_shaded_java", "mx_jar_dist", "mx_pom_dist", "mx_resource_layout", "mx_classpath_dist", "mx_files", "mx_project", "mx_whole_java", "mx_processed_java", "mx_processor", "mx_test_class":
 		return true
 	}
 	return false
@@ -360,17 +401,18 @@ func graphKind(k string) bool {
 func (g *importer) Kinds() map[string]rule.KindInfo {
 	kinds := g.javaLanguage.Kinds()
 	managed := map[string]bool{}
-	for _, a := range strings.Fields("overlays shade shade_inputs manifest out content contents directives release snippets_pattern archived_libraries jmh_metadata jni_services truffle_services graal_services graal_test_services module_name add_exports module_exports jni_headers abi_after_javac copies literals srcs deps packages launcher tags data runtime_deps jvm_flags test_class project processor_class generates_api plugins resources mx_resource_root mx_resource_roots unified_release javac_opts javacopts testonly visibility") {
+	for _, a := range strings.Fields("format members archive_imports overlays shade shade_inputs manifest out content contents directives release snippets_pattern archived_libraries jmh_metadata jni_services truffle_services graal_services graal_test_services module_name add_exports module_exports jni_headers abi_after_javac copies literals srcs deps packages launcher tags data runtime_deps jvm_flags test_class project processor_class generates_api plugins resources mx_resource_root mx_resource_roots unified_release javac_opts javacopts testonly visibility") {
 		managed[a] = true
 	}
 	for _, k := range strings.Fields("mx_jvmci_library mx_shaded_java mx_files mx_project mx_whole_java mx_processed_java mx_processor mx_test_class") {
 		kinds[k] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"srcs": true, "packages": true, "project": true, "test_class": true, "processor_class": true}, MergeableAttrs: managed}
 	}
+	kinds["mx_exported_tar"] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"members": true, "archive_imports": true}, MergeableAttrs: managed}
 	kinds["mx_jar_dist"] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"contents": true}, MergeableAttrs: managed}
 	kinds["mx_pom_dist"] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"content": true}, MergeableAttrs: managed}
 	kinds["mx_resource_layout"] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"literals": true, "copies": true}, MergeableAttrs: managed}
 	kinds["mx_classpath_dist"] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"deps": true}, MergeableAttrs: managed}
-	if g.filename == "" {
+	if len(g.filenames) == 0 {
 		return kinds
 	}
 	k := kinds["java_library"]
@@ -382,7 +424,26 @@ func (g *importer) Kinds() map[string]rule.KindInfo {
 	return kinds
 }
 func (g *importer) Loads() []rule.LoadInfo {
-	return append(g.javaLanguage.Loads(), rule.LoadInfo{Name: "@rules_mx//mx:graph.bzl", Symbols: strings.Fields("mx_jvmci_library mx_shaded_java mx_jar_dist mx_classpath_dist mx_pom_dist mx_resource_layout mx_files mx_processed_java mx_processor mx_project mx_test_class mx_whole_java")})
+	return append(g.javaLanguage.Loads(),
+		rule.LoadInfo{Name: "@rules_mx//mx:graph.bzl", Symbols: strings.Fields("mx_exported_tar mx_jvmci_library mx_shaded_java mx_jar_dist mx_classpath_dist mx_pom_dist mx_resource_layout mx_files mx_processed_java mx_processor mx_project mx_test_class mx_whole_java")},
+	)
+}
+
+// A nested suite owns regeneration within its own packages.
+func (g *importer) suiteFor(pkg string) (string, bool) {
+	for {
+		if g.suites[pkg] {
+			return pkg, true
+		}
+		if pkg == "" {
+			return "", false
+		}
+		parent := path.Dir(pkg)
+		if parent == "." {
+			parent = ""
+		}
+		pkg = parent
+	}
 }
 
 func (g *importer) GenerateRules(a language.GenerateArgs) language.GenerateResult {
@@ -405,14 +466,14 @@ func (g *importer) GenerateRules(a language.GenerateArgs) language.GenerateResul
 			}
 		}
 	}
-	if a.Rel == g.suite || strings.HasPrefix(a.Rel+"/", g.suite+"/") || g.suite == "" {
+	if suite, ok := g.suiteFor(a.Rel); ok {
 		current := map[string]string{}
 		for _, r := range g.rules[a.Rel] {
 			if r.Kind() == "mx_project" {
 				var packages []string
 				configs := a.Config.Exts[g.Name()].(javaconfig.Configs)
-				for _, dir := range g.projects[r.Name()].Dirs {
-					pkg := path.Join(g.suite, dir)
+				for _, dir := range g.projects[label.New("", a.Rel, r.Name())].Dirs {
+					pkg := path.Join(suite, dir)
 					name := path.Base(pkg)
 					if cfg := configs[pkg]; cfg != nil {
 						name = cfg.MapLibraryName(name)
@@ -430,7 +491,7 @@ func (g *importer) GenerateRules(a language.GenerateArgs) language.GenerateResul
 				if !graphKind(r.Kind()) {
 					continue
 				}
-				if a.Rel != g.suite && (r.Kind() != "mx_files" || !slices.Contains(r.AttrStrings("visibility"), "//"+g.suite+":__pkg__")) {
+				if a.Rel != suite && (r.Kind() != "mx_files" || !slices.Contains(r.AttrStrings("visibility"), "//"+suite+":__pkg__")) {
 					continue
 				}
 				if kind := current[r.Name()]; kind != "" {
@@ -450,8 +511,8 @@ func (g *importer) Imports(c *config.Config, r *rule.Rule, f *rule.File) []resol
 	if !graphKind(r.Kind()) {
 		return g.javaLanguage.Imports(c, r, f)
 	}
-	p := g.projects[r.Name()]
-	if p == nil || len(p.Sources) == 0 || f.Pkg != g.suite {
+	p := g.projects[label.New("", f.Pkg, r.Name())]
+	if p == nil || len(p.Sources) == 0 {
 		return nil
 	}
 	var specs []resolve.ImportSpec
@@ -487,10 +548,10 @@ func (g *importer) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.Rem
 		if strings.HasPrefix(d, ":") {
 			// Gazelle already resolves imports from source-indexed projects to
 			// their owning packages. The aggregate preserves the full mx edge.
-			if project := g.projects[strings.TrimPrefix(d, ":")]; project != nil && len(project.Sources) == 0 {
+			if project := g.projects[label.New("", p.suite, strings.TrimPrefix(d, ":"))]; project != nil && len(project.Sources) == 0 {
 				continue
 			}
-			d = "//" + g.suite + d
+			d = "//" + p.suite + d
 		}
 		deps[d] = true
 	}

@@ -74,5 +74,36 @@
       ]
     }
   ],
+  "suite_targets": {
+    "distributions": [
+      "BASE_LAYOUT",
+      "NESTED_LAYOUT"
+    ],
+    "projects": [
+      "check",
+      "client",
+      "demo"
+    ]
+  },
+  "tar_layouts": [
+    {
+      "archive_imports": {},
+      "members": {
+        "mx.demo/suite.py": "docs/suite.py"
+      },
+      "name": "BASE_LAYOUT",
+      "testonly": false
+    },
+    {
+      "archive_imports": {
+        ":BASE_LAYOUT": "docs/suite.py=share/suite.py"
+      },
+      "members": {
+        ":BASE_LAYOUT": "archives/base.tar"
+      },
+      "name": "NESTED_LAYOUT",
+      "testonly": false
+    }
+  ],
   "version": 1
 }

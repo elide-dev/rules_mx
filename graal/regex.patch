@@ -2,11 +2,10 @@ diff --git a/regex/BUILD.bazel b/regex/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/regex/BUILD.bazel
-@@ -0,0 +1,403 @@
+@@ -0,0 +1,406 @@
 +load("@rules_java//java:java_import.bzl", "java_import")
 +load("@rules_java//java:java_plugin.bzl", "java_plugin")
-+load("@rules_mx//graal:layout.bzl", "mx_archive_layout")
-+load("@rules_mx//mx:graph.bzl", "mx_jar_dist", "mx_processed_java", "mx_test_class")
++load("@rules_mx//mx:graph.bzl", "mx_exported_tar", "mx_jar_dist", "mx_processed_java", "mx_test_class")
 +
 +java_import(
 +    name = "JMH_1_21",
@@ -40,20 +39,6 @@ new file mode 100644
 +    name = "jmh_processor",
 +    processor_class = "org.openjdk.jmh.generators.BenchmarkProcessor",
 +    deps = [":JMH_1_21"],
-+)
-+
-+mx_archive_layout(
-+    name = "TREGEX_GRAALVM_SUPPORT",
-+    format = "tar",
-+    members = {"mx.regex/native-image.properties": "native-image.properties"},
-+    visibility = ["//visibility:public"],
-+)
-+
-+mx_archive_layout(
-+    name = "TREGEX_TEST_DUMMY_LANG_GRAALVM_SUPPORT",
-+    format = "tar",
-+    members = {"mx.regex/dummylang-native-image.properties": "native-image.properties"},
-+    visibility = ["//visibility:public"],
 +)
 +
 +filegroup(
@@ -405,6 +390,24 @@ new file mode 100644
 +        ":TREGEX_TEST_DUMMY_LANG",
 +        "@contrib_rules_jvm_deps//:junit_junit",
 +    ],
++)
++
++mx_exported_tar(
++    name = "TREGEX_GRAALVM_SUPPORT",
++    format = "tar",
++    members = {
++        "mx.regex/native-image.properties": "native-image.properties",
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_exported_tar(
++    name = "TREGEX_TEST_DUMMY_LANG_GRAALVM_SUPPORT",
++    format = "tar",
++    members = {
++        "mx.regex/dummylang-native-image.properties": "native-image.properties",
++    },
++    visibility = ["//visibility:public"],
 +)
 diff --git a/regex/src/com.oracle.truffle.regex/src/META-INF/native-image/org.graalvm.regex/regex/BUILD.bazel b/regex/src/com.oracle.truffle.regex/src/META-INF/native-image/org.graalvm.regex/regex/BUILD.bazel
 new file mode 100644

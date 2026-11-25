@@ -15,4 +15,17 @@ suite = {
             "dependencies": ["demo", "client", "mx:JUNIT"],
         },
     },
+    "distributions": {
+        "BASE_LAYOUT": {
+            "native": True,
+            "layout": {"docs/suite.py": "file:mx.demo/suite.py"},
+        },
+        "NESTED_LAYOUT": {
+            "native": True,
+            "layout": {
+                "share/": "extracted-dependency:BASE_LAYOUT/docs/suite.py",
+                "archives/base.tar": "dependency:BASE_LAYOUT",
+            },
+        },
+    },
 }

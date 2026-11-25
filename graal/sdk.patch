@@ -236,74 +236,74 @@ new file mode 100644
 +
 +mx_test_class(
 +    name = "org.graalvm.collections.test.org.graalvm.collections.test.EconomicMapImplTest",
-+    project = ":org.graalvm.collections.test",
 +    test_class = "org.graalvm.collections.test.EconomicMapImplTest",
++    runtime_deps = [":SDK_TEST"],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.collections.test.org.graalvm.collections.test.EconomicMapLargeTest",
-+    project = ":org.graalvm.collections.test",
 +    test_class = "org.graalvm.collections.test.EconomicMapLargeTest",
++    runtime_deps = [":SDK_TEST"],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.collections.test.org.graalvm.collections.test.EconomicMapTest",
-+    project = ":org.graalvm.collections.test",
 +    test_class = "org.graalvm.collections.test.EconomicMapTest",
++    runtime_deps = [":SDK_TEST"],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.collections.test.org.graalvm.collections.test.EconomicMapUtilTest",
-+    project = ":org.graalvm.collections.test",
 +    test_class = "org.graalvm.collections.test.EconomicMapUtilTest",
++    runtime_deps = [":SDK_TEST"],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.collections.test.org.graalvm.collections.test.EconomicSetTest",
-+    project = ":org.graalvm.collections.test",
 +    test_class = "org.graalvm.collections.test.EconomicSetTest",
++    runtime_deps = [":SDK_TEST"],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.collections.test.org.graalvm.collections.test.EmptyEconomicMapTest",
-+    project = ":org.graalvm.collections.test",
 +    test_class = "org.graalvm.collections.test.EmptyEconomicMapTest",
++    runtime_deps = [":SDK_TEST"],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.collections.test.org.graalvm.collections.test.EmptyEconomicSetTest",
-+    project = ":org.graalvm.collections.test",
 +    test_class = "org.graalvm.collections.test.EmptyEconomicSetTest",
++    runtime_deps = [":SDK_TEST"],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.collections.test.org.graalvm.collections.test.EquivalenceTest",
-+    project = ":org.graalvm.collections.test",
 +    test_class = "org.graalvm.collections.test.EquivalenceTest",
++    runtime_deps = [":SDK_TEST"],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.collections.test.org.graalvm.collections.test.LockFreePoolTest",
-+    project = ":org.graalvm.collections.test",
 +    test_class = "org.graalvm.collections.test.LockFreePoolTest",
++    runtime_deps = [":SDK_TEST"],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.collections.test.org.graalvm.collections.test.LockFreePrefixTreeTest",
-+    project = ":org.graalvm.collections.test",
 +    test_class = "org.graalvm.collections.test.LockFreePrefixTreeTest",
++    runtime_deps = [":SDK_TEST"],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.collections.test.org.graalvm.collections.test.PairTest",
-+    project = ":org.graalvm.collections.test",
 +    test_class = "org.graalvm.collections.test.PairTest",
++    runtime_deps = [":SDK_TEST"],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.collections.test.org.graalvm.collections.test.SeqLockPrefixTreeTest",
-+    project = ":org.graalvm.collections.test",
 +    test_class = "org.graalvm.collections.test.SeqLockPrefixTreeTest",
++    runtime_deps = [":SDK_TEST"],
 +)
 +
 +mx_whole_java(
@@ -343,8 +343,8 @@ new file mode 100644
 +
 +mx_test_class(
 +    name = "org.graalvm.home.test.org.graalvm.home.test.VersionTest",
-+    project = ":org.graalvm.home.test",
 +    test_class = "org.graalvm.home.test.VersionTest",
++    runtime_deps = [":SDK_TEST"],
 +)
 +
 +mx_processed_java(
@@ -403,8 +403,8 @@ new file mode 100644
 +
 +mx_test_class(
 +    name = "org.graalvm.launcher.test.org.graalvm.launcher.test.LauncherTest",
-+    project = ":org.graalvm.launcher.test",
 +    test_class = "org.graalvm.launcher.test.LauncherTest",
++    runtime_deps = [":SDK_TEST"],
 +)
 +
 +mx_whole_java(
@@ -500,8 +500,8 @@ new file mode 100644
 +
 +mx_test_class(
 +    name = "org.graalvm.nativebridge.processor.test.org.graalvm.nativebridge.processor.test.BinaryOutputTest",
-+    project = ":org.graalvm.nativebridge.processor.test",
 +    test_class = "org.graalvm.nativebridge.processor.test.BinaryOutputTest",
++    runtime_deps = [":NATIVEBRIDGE_PROCESSOR_TEST"],
 +)
 +
 +mx_whole_java(
@@ -570,8 +570,8 @@ new file mode 100644
 +
 +mx_test_class(
 +    name = "org.graalvm.nativeimage.test.org.graalvm.nativeimage.test.ImageSingletonsTest",
-+    project = ":org.graalvm.nativeimage.test",
 +    test_class = "org.graalvm.nativeimage.test.ImageSingletonsTest",
++    runtime_deps = [":SDK_TEST"],
 +)
 +
 +mx_project(
@@ -743,8 +743,8 @@ new file mode 100644
 +
 +mx_test_class(
 +    name = "org.graalvm.word.test.org.graalvm.word.test.WordTests",
-+    project = ":org.graalvm.word.test",
 +    test_class = "org.graalvm.word.test.WordTests",
++    runtime_deps = [":SDK_TEST"],
 +)
 +
 +mx_jar_dist(

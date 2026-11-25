@@ -2,4 +2,4 @@
 +++ b/mx.mx/mx_mx.py
 @@ -1 +1,2 @@
  from mx_native import NinjaToolchainTemplate  # pylint: disable=unused-import
-+import mx_bazel_export  # registers bazel-projects
++import mx_bazel_export  # registers Bazel graph and BUILD export commands
