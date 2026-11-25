@@ -2,7 +2,7 @@ diff --git a/sdk/BUILD.bazel b/sdk/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/sdk/BUILD.bazel
-@@ -0,0 +1,1053 @@
+@@ -0,0 +1,1055 @@
 +load("@rules_mx//graal:nativebridge.bzl", "nativebridge_launcher")
 +load("@rules_mx//graal:toolchain_test.bzl", "sdk_toolchain_test")
 +load("@rules_mx//mx:graph.bzl", "mx_jar_dist", "mx_processed_java", "mx_processor", "mx_project", "mx_resource_layout", "mx_shaded_java", "mx_test_class", "mx_whole_java")
@@ -517,6 +517,7 @@ new file mode 100644
 +        "17",
 +        "--add-modules",
 +        "java.logging",
++        "-Xlint:none",
 +        "-Xep:UnnecessaryTypeArgument:OFF",
 +    ],
 +    mx_resource_root = "src/org.graalvm.shadowed.org.jline/src",
@@ -524,12 +525,12 @@ new file mode 100644
 +    resources = ["//sdk/src/org.graalvm.shadowed.org.jline/src/META-INF/native-image/org.graalvm.shadowed/jline:org.graalvm.shadowed.org.jline.resources"],
 +    shade = "{\"packages\": {\"org.jline\": \"org.graalvm.shadowed.org.jline\"}, \"include\": [\"org/jline/utils/*.caps\", \"org/jline/utils/*.txt\", \"org/jline/builtins/*.txt\"], \"exclude\": [\"META-INF/MANIFEST.MF\", \"org/jline/builtins/TTop.java\", \"META-INF/services/**\", \"META-INF/maven/**\", \"META-INF/native-image/**\"], \"patch\": {\"org/jline/builtins/Nano.java\": {\"import org.mozilla.universalchardet.UniversalDetector;\": \"\", \"\\\\Z\": \"\\n                // Stub for the removed class, we put it at the end of the file\\n                class UniversalDetector {\\n                    UniversalDetector(Object dummy) {}\\n                    void handleData(byte[] a, int b, int c) {}\\n                    void dataEnd() {}\\n                    String getDetectedCharset() { return null; }\\n                }\"}, \"org/jline/terminal/TerminalBuilder.java\": {\"private TerminalBuilder\\\\(\\\\) {}\": \"private TerminalBuilder() { org.graalvm.shadowed.org.jline.terminal.JLineLoggingSupport.init(); }\"}, \"org/jline/terminal/impl/AbstractPty.java\": {\"import org.graalvm.shadowed.org.jline.nativ.JLineLibrary;\": \"\", \"import org.graalvm.shadowed.org.jline.nativ.JLineNativeLoader;\": \"\", \"JLineNativeLoader.initialize\\\\(\\\\);\": \"\", \"return JLineLibrary.newFileDescriptor\\\\(fd\\\\);\": \"throw new RuntimeException(\\\"not implemented\\\");\"}, \"org/jline/terminal/impl/exec/ExecTerminalProvider.java\": {\"import org.graalvm.shadowed.org.jline.nativ.JLineLibrary;\": \"\", \"import org.graalvm.shadowed.org.jline.nativ.JLineNativeLoader;\": \"\", \"JLineNativeLoader.initialize\\\\(\\\\);\": \"\", \"return JLineLibrary.newRedirectPipe\\\\(fd\\\\);\": \"throw new RuntimeException(\\\"not implemented\\\");\"}, \"org/jline/terminal/spi/TerminalProvider.java\": {\"import org.graalvm.shadowed.org.jline.terminal.Terminal;\": \"\\n                import org.graalvm.shadowed.org.jline.terminal.Terminal;\\n                import org.graalvm.shadowed.org.jline.terminal.impl.exec.ExecTerminalProvider;\\n              \", \"static TerminalProvider load\\\\(String name\\\\) throws IOException \\\\x7b\": \"\\n              static TerminalProvider load(String name) throws IOException {\\n                  switch (name) {\\n                      case \\\"exec\\\":\\n                          return new ExecTerminalProvider();\\n                      case \\\"ffm\\\":\\n                          TerminalProvider p = org.graalvm.shadowed.org.jline.terminal.impl.ffm.FFMTerminalProviderLoader.load();\\n                          if (p != null) {\\n                              return p;\\n                          }\\n                      default:\\n                          if (Boolean.TRUE) { // to avoid unreachable code below the switch\\n                              throw new IOException(\\\"Unable to find terminal provider \\\" + name);\\n                          }\\n                  }\\n                  // }\\n              \"}}}",
 +    shade_inputs = [
-+        "@graal_shaded_inputs//:JLINE_READER.jar",
-+        "@graal_shaded_inputs//:JLINE_READER-sources.jar",
-+        "@graal_shaded_inputs//:JLINE_TERMINAL.jar",
-+        "@graal_shaded_inputs//:JLINE_TERMINAL-sources.jar",
-+        "@graal_shaded_inputs//:JLINE_BUILTINS.jar",
-+        "@graal_shaded_inputs//:JLINE_BUILTINS-sources.jar",
++        "@graal_shaded_inputs//:sdk_JLINE_READER.jar",
++        "@graal_shaded_inputs//:sdk_JLINE_READER-sources.jar",
++        "@graal_shaded_inputs//:sdk_JLINE_TERMINAL.jar",
++        "@graal_shaded_inputs//:sdk_JLINE_TERMINAL-sources.jar",
++        "@graal_shaded_inputs//:sdk_JLINE_BUILTINS.jar",
++        "@graal_shaded_inputs//:sdk_JLINE_BUILTINS-sources.jar",
 +    ],
 +    visibility = ["//visibility:public"],
 +    deps = [":NATIVEIMAGE"],
@@ -543,12 +544,13 @@ new file mode 100644
 +        "22",
 +        "--add-modules",
 +        "java.logging",
++        "-Xlint:none",
 +    ],
 +    release = 22,
 +    shade = "{\"packages\": {\"org.jline\": \"org.graalvm.shadowed.org.jline\"}, \"exclude\": [\"META-INF/MANIFEST.MF\", \"META-INF/services/**\", \"META-INF/maven/**\", \"META-INF/native-image/**\"]}",
 +    shade_inputs = [
-+        "@graal_shaded_inputs//:JLINE_TERMINAL_FFM.jar",
-+        "@graal_shaded_inputs//:JLINE_TERMINAL_FFM-sources.jar",
++        "@graal_shaded_inputs//:sdk_JLINE_TERMINAL_FFM.jar",
++        "@graal_shaded_inputs//:sdk_JLINE_TERMINAL_FFM-sources.jar",
 +    ],
 +    visibility = ["//visibility:public"],
 +    deps = [

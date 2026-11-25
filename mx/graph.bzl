@@ -62,6 +62,7 @@ def mx_processed_java(name, mx_resource_root = None, abi_after_javac = False, de
     java_import(
         name = name,
         jars = [":lib" + compiled + ".jar"],
+        add_exports = kwargs.get("add_exports", []),
         srcjar = ":lib" + compiled + "-src.jar",
         deps = deps,
         testonly = testonly,
@@ -99,7 +100,7 @@ def mx_resource_layout(name, literals = {}, copies = {}, testonly = False, **kwa
             content = literals.get(path, ""),
             src = copies.get(path),
             testonly = testonly,
-            visibility = ["//visibility:private"],
+            visibility = kwargs.get("visibility"),
         )
         resources.append(out)
     java_library(

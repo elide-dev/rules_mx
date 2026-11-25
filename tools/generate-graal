@@ -77,33 +77,55 @@ SUITES = {
         *SDK,
     ],
     "truffle": [
+        "--infer-source-deps",
+        "--generated-dep",
+        "truffle:com.oracle.truffle.api.exception=:com.oracle.truffle.api.dsl",
+        "--generated-dep",
+        "truffle:com.oracle.truffle.api.bytecode=:com.oracle.truffle.api.utilities",
+        "--java-dep",
+        "sdk:VERSION=//sdk:VERSION",
+        "--java-dep",
+        "sdk:NATIVEIMAGE=//sdk:NATIVEIMAGE",
+        "--java-dep",
+        "sdk:COLLECTIONS=//sdk:COLLECTIONS",
         "--java-dep",
         "sdk:POLYGLOT=//sdk:POLYGLOT",
         "--java-dep",
         "truffle:ANTLR4=@contrib_rules_jvm_deps//:org_antlr_antlr4_runtime_4_13_2",
         "--javac-only-processor",
         "truffle:TRUFFLE_DSL_PROCESSOR",
+        "--java-dep",
+        "sdk:NATIVEBRIDGE=//sdk:NATIVEBRIDGE",
+        "--processor-plugin",
+        "sdk:NATIVEBRIDGE_PROCESSOR=//sdk:mx_plugin.NATIVEBRIDGE_PROCESSOR.org.graalvm.nativebridge.processor.NativeBridgeProcessor",
         "com.oracle.truffle.api.library",
-        "com.oracle.truffle.api.profiles",
+        "com.oracle.truffle.polyglot",
+        "TRUFFLE_API_VERSION",
     ],
 }
 
 
-def shading_inputs(sdk):
-    suite = runpy.run_path(str(sdk / "mx.sdk/suite.py"))["suite"]
+SHADED_PROJECTS = {
+    "sdk": ("org.graalvm.shadowed.org.jline", "org.graalvm.shadowed.org.jline.jdk22"),
+    "truffle": ("com.oracle.truffle.api.impl.asm",),
+}
+
+
+def shading_inputs(directory):
+    suite = runpy.run_path(str(directory / f"mx.{directory.name}/suite.py"))["suite"]
     inputs = {}
     flags = []
-    for project in suite["projects"].values():
-        for qualified in project.get("shadedDependencies", []):
+    for project in SHADED_PROJECTS[directory.name]:
+        for qualified in suite["projects"][project]["shadedDependencies"]:
             owner, name = qualified.split(":")
-            if owner != "sdk":
+            if owner != directory.name:
                 raise ValueError(f"Unmapped external shaded library {qualified}")
             lib = suite["libraries"][name]
             mvn = lib["maven"]
             artifact, version = mvn["artifactId"], mvn["version"]
             base = f"{mvn['groupId'].replace('.', '/')}/{artifact}/{version}/{artifact}-{version}"
             for suffix, key in [("", "digest"), ("-sources", "sourceDigest")]:
-                filename = name + suffix + ".jar"
+                filename = qualified.replace(":", "_") + suffix + ".jar"
                 algo, digest = lib[key].split(":")
                 inputs[filename] = [
                     base + suffix + ".jar",
@@ -174,7 +196,7 @@ def generate(suite, stage):
                 "--classpath-dists",
                 "--release",
                 "21",
-                *(shading_inputs(directory)[1] if suite == "sdk" else []),
+                *shading_inputs(directory)[1],
                 *SUITES[suite],
             ],
             cwd=ROOT,
@@ -256,7 +278,15 @@ def main():
                 )
         lock = ROOT / "graal/shaded_inputs.json"
         lock_text = (
-            json.dumps(shading_inputs(stage / "sdk")[0], indent=2, sort_keys=True)
+            json.dumps(
+                {
+                    k: v
+                    for suite in SUITES
+                    for k, v in shading_inputs(stage / suite)[0].items()
+                },
+                indent=2,
+                sort_keys=True,
+            )
             + "\n"
         )
         if args.check:

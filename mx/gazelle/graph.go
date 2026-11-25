@@ -159,7 +159,7 @@ func (g *importer) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
 			g.owners[pkg] = p
 		}
 		var r *rule.Rule
-		if len(p.Sources) != 0 {
+		if len(p.Sources) != 0 || p.Shade != "" {
 			kind, opts := "mx_whole_java", "javac_opts"
 			if p.Shade != "" {
 				kind, opts = "mx_shaded_java", "javacopts"

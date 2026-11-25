@@ -55,3 +55,16 @@ java_test(
     test_class = "graal.LauncherModulesTest",
     deps = ["@contrib_rules_jvm_deps//:junit_junit"],
 )
+
+java_test(
+    name = "truffle_polyglot_test",
+    size = "small",
+    srcs = ["TrufflePolyglotTest.java"],
+    test_class = "com.oracle.truffle.polyglot.isolate.TrufflePolyglotTest",
+    runtime_deps = ["@graal//truffle:TRUFFLE_API_VERSION"],
+    deps = [
+        "@contrib_rules_jvm_deps//:junit_junit",
+        "@graal//sdk:POLYGLOT",
+        "@graal//truffle:com.oracle.truffle.polyglot",
+    ],
+)

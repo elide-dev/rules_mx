@@ -20,7 +20,7 @@ The default Python is managed CPython 3.13. The alternate configuration selects 
 
 ## Build upstream GraalVM
 
-The pinned Oracle source tree builds the SDK foundation and the first Truffle projects as native Bazel targets. Run the upstream SDK JUnit classes individually or build the selected closures and run their tests together.
+The pinned Oracle source tree builds every SDK project and the Truffle Polyglot implementation as native Bazel targets. Run the upstream SDK JUnit classes individually or build the selected closures and run their tests together.
 
 ```sh
 bazelisk query 'tests(//graal:sdk_tests)'
@@ -90,7 +90,7 @@ bazelisk query 'deps(//tests/gazelle:check.example.check.ConsumerTest, 3)'
 bazelisk test //tests/gazelle:check.example.check.ConsumerTest
 ```
 
-The Java extension resolves source imports. The mx importer preserves declared project dependencies and Java releases and exposes each project by name. Building that label produces its package jars, and Java consumers receive their combined compile and runtime classpaths. Plain Java projects use one library per source package using the configured Gazelle Java naming convention. Test projects, projects with resources, and annotation-processed projects keep one compilation unit. Each discovered JUnit 4 test class gets a runnable label. Add `--whole-project NAME` at export time for packages that must compile together. Run generation across the entire selected suite when the graph changes and review removed targets and any old nested BUILD files when changing granularity.
+The Java extension resolves source imports. For whole-project compilations, `--infer-source-deps` promotes Java imports found on the resolved mx classpath to direct Bazel dependencies. Use `--generated-dep SUITE:PROJECT=LABEL` for dependencies referenced by generated Java. The mx importer preserves declared project dependencies and Java releases and exposes each project by name. Building that label produces its package jars, and Java consumers receive their combined compile and runtime classpaths. Plain Java projects use one library per source package using the configured Gazelle Java naming convention. Test projects, projects with resources, and annotation-processed projects keep one compilation unit. Each discovered JUnit 4 test class gets a runnable label. Add `--whole-project NAME` at export time for packages that must compile together. Run generation across the entire selected suite when the graph changes and review removed targets and any old nested BUILD files when changing granularity.
 
 ## Consume from another Bzlmod root
 

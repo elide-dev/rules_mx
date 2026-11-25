@@ -112,6 +112,60 @@ def _dependency_labels(deps, suite, mappings, pending, classpath_dists=False):
     return list(dict.fromkeys(labels))
 
 
+def _source_dependencies(graph, suite, mappings, distributions):
+    """Promote imported types from the resolved mx classpath to direct Bazel deps."""
+    imports = re.compile(r"^\s*import\s+(?:static\s+)?([\w.$*]+)\s*;", re.MULTILINE)
+    packages = {}
+
+    def provided(dep):
+        if dep not in packages:
+            members = dep.archived_deps() if dep.isJARDistribution() else [dep]
+            packages[dep] = {
+                pkg
+                for p in members
+                if type(p).__name__ == "JavaProject"
+                for pkg in p.defined_java_packages()
+            }
+        return packages[dep]
+
+    for name, record in graph.items():
+        if not record.get("sources"):
+            continue
+        owners = {}
+        todo = list(mx.project(name).deps)
+        visited = set()
+        while todo:
+            dep = todo.pop()
+            if dep in visited:
+                continue
+            visited.add(dep)
+            if dep.isJARDistribution():
+                todo.extend(d for d in dep.deps if d.isJARDistribution())
+            elif dep.isJavaProject():
+                todo.extend(dep.deps)
+            else:
+                continue
+            labels = mappings.get(dep.qualifiedName())
+            if dep.suite == suite and (dep.name in graph or dep.name in distributions):
+                labels = [":" + dep.name]
+            if labels:
+                for pkg in provided(dep):
+                    owners.setdefault(pkg, set()).update(labels)
+        direct = set(record["deps"])
+        for src in record["sources"]:
+            for qualified in imports.findall(
+                (Path(suite.dir) / src).read_text(encoding="utf-8")
+            ):
+                parts = qualified.split(".")[:-1]
+                while parts:
+                    pkg = ".".join(parts)
+                    if pkg in owners:
+                        direct.update(owners[pkg])
+                        break
+                    parts.pop()
+        record["deps"] += sorted(direct.difference(record["deps"]))
+
+
 def _classpath_distribution(dist, suite, mappings, pending):
     if (
         type(dist).__name__ != "JARDistribution"
@@ -251,7 +305,7 @@ def _resource_path(path):
     )
 
 
-def _resource_layout(dist, pending):
+def _resource_layout(dist, pending, mappings):
     if (
         dist.isPlatformDependent()
         or dist.deps
@@ -279,19 +333,26 @@ def _resource_layout(dist, pending):
             and _resource_path(source["path"])
         ):
             dep = mx.dependency(source["dependency"], context=dist)
-            if type(dep).__name__ != "LayoutDirDistribution" or dep.suite != dist.suite:
-                mx.abort(
-                    f"{dist.name}: expected a file from a same-suite resource layout"
-                )
+            if type(dep).__name__ != "LayoutDirDistribution":
+                mx.abort(f"{dist.name}: expected a file from a resource layout")
             inputs.add(dep)
-            copies[dest] = f":{dep.name}.files/{source['path']}"
+            if dep.suite == dist.suite:
+                target = ":" + dep.name
+                pending.append(dep)
+            else:
+                labels = mappings.get(dep.qualifiedName(), [])
+                if len(labels) != 1:
+                    mx.abort(
+                        f"{dist.name}: bind {dep.qualifiedName()} to a migrated resource layout"
+                    )
+                target = labels[0]
+            copies[dest] = f"{target}.files/{source['path']}"
         else:
             mx.abort(
                 f"{dist.name}: unsupported resource layout source {source['_str_']}"
             )
     if not (literals or copies) or inputs != set(dist.buildDependencies):
         mx.abort(f"{dist.name}: expected a nonempty file layout with explicit inputs")
-    pending.extend(inputs)
     return {
         "name": dist.name,
         "literals": literals,
@@ -409,6 +470,18 @@ def bazel_buildfile(args):
         metavar="SUITE:LIB=LABEL",
         help="bind a shaded library to its binary or source archive (repeat for both)",
     )
+    parser.add_argument(
+        "--infer-source-deps",
+        action="store_true",
+        help="add direct imports of projects and distributions on the resolved mx classpath",
+    )
+    parser.add_argument(
+        "--generated-dep",
+        action="append",
+        default=[],
+        metavar="SUITE:PROJECT=LABEL",
+        help="direct Java dependency referenced by generated sources",
+    )
     parser.add_argument("projects", nargs="+")
     options = parser.parse_args(args)
     project_options = {}
@@ -418,6 +491,9 @@ def bazel_buildfile(args):
             parser.error("expected --javac-opt PROJECT=OPTION")
         project_options.setdefault(name, []).append(value)
     shaded_inputs = _mappings(parser, options.shaded_input, "--shaded-input")
+    if options.infer_source_deps and not options.gazelle:
+        parser.error("--infer-source-deps requires --gazelle")
+    generated_deps = _mappings(parser, options.generated_dep, "--generated-dep")
     archives = set(options.archive_dist)
     if archives and not (options.classpath_dists and options.release):
         parser.error("--archive-dist requires --classpath-dists and --release")
@@ -462,7 +538,7 @@ def bazel_buildfile(args):
                 )
                 continue
             if type(project).__name__ == "LayoutDirDistribution":
-                layouts[project.name] = _resource_layout(project, pending)
+                layouts[project.name] = _resource_layout(project, pending, java_deps)
                 continue
         shaded = options.gazelle and (
             type(project).__module__,
@@ -481,10 +557,14 @@ def bazel_buildfile(args):
         if options.gazelle and excluded_from_jacoco:
             allowed = allowed | {"jacoco"}
         if options.gazelle:
-            allowed = allowed | {"requiresConcealed"}
+            allowed = allowed | {"requiresConcealed", "generatedDependencies"}
+            if project._orig_attrs.get("javac.lint.overrides") == "none":
+                allowed = allowed | {"javac.lint.overrides"}
         if shaded:
             allowed = allowed | {
                 "class",
+                "spotbugsIgnoresGenerated",
+                "forceJavac",
                 "shadedDependencies",
                 "shade",
                 "description",
@@ -512,6 +592,8 @@ def bazel_buildfile(args):
             if not shaded or s != project.source_gen_dir()
         ]
         for directory in map(Path, source_dirs):
+            if shaded and not directory.exists():
+                continue  # The suite may contain only generated sources.
             if not directory.is_dir():
                 mx.abort(f"{project.name}: missing source root {directory}")
             for source in sorted(directory.rglob("*")):
@@ -522,11 +604,12 @@ def bazel_buildfile(args):
                     else:
                         resources.append(path)
                         resource_roots.add(directory.relative_to(suite.dir).as_posix())
-        if not sources:
+        if not sources and not shaded:
             mx.abort(f"{project.name}: no Java sources")
         deps = _dependency_labels(
             project.deps, suite, java_deps, pending, options.classpath_dists
         )
+        deps.extend(generated_deps.pop(project.qualifiedName(), []))
         release = (
             project.javaCompliance.value if options.release is None else options.release
         )
@@ -545,6 +628,8 @@ def bazel_buildfile(args):
             attrs["javac_opts"].extend(
                 ["--add-modules", ",".join(project._orig_attrs["requires"])]
             )
+        if project._orig_attrs.get("javac.lint.overrides") == "none":
+            attrs["javac_opts"].append("-Xlint:none")
         attrs["javac_opts"].extend(project_options.pop(project.name, []))
         if processors:
             processed = True
@@ -590,6 +675,8 @@ def bazel_buildfile(args):
                 "packages": [] if shaded else sorted(project.defined_java_packages()),
                 "dirs": sorted({str(Path(src).parent) for src in sources}),
             }
+            if shaded and not record["dirs"]:
+                record["dirs"] = record["roots"]
             if concealed:
                 record["add_exports"] = [
                     f"{mod}/{pkg}" for mod, pkgs in concealed.items() for pkg in pkgs
@@ -646,6 +733,8 @@ def bazel_buildfile(args):
         rules[project.name] = _rule(
             "java_library" if processors else "elide_java_library", attrs, resource_attr
         )
+    if generated_deps:
+        mx.abort(f"Unknown generated dependency project: {sorted(generated_deps)}")
     if project_options:
         mx.abort(f"Unknown javac option project: {sorted(project_options)}")
     if rules.keys() & plugins.keys():
@@ -663,6 +752,8 @@ def bazel_buildfile(args):
         missing = set(options.whole_project) - graph.keys()
         if missing:
             mx.abort(f"Unknown whole project in selected closure: {sorted(missing)}")
+        if options.infer_source_deps:
+            _source_dependencies(graph, suite, java_deps, distributions)
         result = {
             "version": 1,
             "projects": [graph[n] for n in sorted(graph)],
