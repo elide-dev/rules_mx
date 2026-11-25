@@ -78,6 +78,23 @@ SUITES = {
     ],
     "truffle": [
         "--infer-source-deps",
+        # Preserve diagnostics for the pinned upstream sources on stock JavaBuilder.
+        *(
+            arg
+            for project, checks in {
+                "com.oracle.truffle.api.strings": ["ReturnValueIgnored"],
+                "com.oracle.truffle.api.instrumentation": [
+                    "BoxedPrimitiveEquality",
+                    "InfiniteRecursion",
+                ],
+                "com.oracle.truffle.polyglot": [
+                    "FormatString",
+                    "IdentityBinaryExpression",
+                ],
+            }.items()
+            for check in checks
+            for arg in ("--javac-opt", f"{project}=-Xep:{check}:WARN")
+        ),
         "--generated-dep",
         "truffle:com.oracle.truffle.api.exception=:com.oracle.truffle.api.dsl",
         "--generated-dep",

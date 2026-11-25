@@ -2,7 +2,7 @@ diff --git a/truffle/BUILD.bazel b/truffle/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/truffle/BUILD.bazel
-@@ -0,0 +1,427 @@
+@@ -0,0 +1,432 @@
 +load("@rules_mx//mx:graph.bzl", "mx_processed_java", "mx_processor", "mx_project", "mx_resource_layout", "mx_shaded_java", "mx_whole_java")
 +
 +mx_whole_java(
@@ -139,6 +139,8 @@ new file mode 100644
 +        "21",
 +        "--add-modules",
 +        "java.logging",
++        "-Xep:BoxedPrimitiveEquality:WARN",
++        "-Xep:InfiniteRecursion:WARN",
 +    ],
 +    plugins = [
 +        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
@@ -242,6 +244,7 @@ new file mode 100644
 +        "21",
 +        "--add-modules",
 +        "jdk.unsupported",
++        "-Xep:ReturnValueIgnored:WARN",
 +    ],
 +    plugins = [
 +        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
@@ -325,6 +328,8 @@ new file mode 100644
 +        "21",
 +        "--add-modules",
 +        "java.logging,jdk.management,jdk.unsupported",
++        "-Xep:FormatString:WARN",
++        "-Xep:IdentityBinaryExpression:WARN",
 +    ],
 +    mx_resource_root = "src/com.oracle.truffle.polyglot/src",
 +    plugins = [
