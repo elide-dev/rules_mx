@@ -2,9 +2,26 @@ diff --git a/compiler/BUILD.bazel b/compiler/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/compiler/BUILD.bazel
-@@ -0,0 +1,630 @@
-+load("@rules_mx//graal:simplelanguage.bzl", "simplelanguage")
-+load("@rules_mx//mx:graph.bzl", "mx_jar_dist", "mx_jvmci_library", "mx_processor", "mx_resource_layout", "mx_whole_java")
+@@ -0,0 +1,920 @@
++load("@rules_mx//graal:simplelanguage.bzl", "simplelanguage", "truffle_compiler_test")
++load("@rules_mx//mx:graph.bzl", "mx_jar_dist", "mx_jvmci_library", "mx_processor", "mx_resource_layout", "mx_test_class", "mx_whole_java")
++
++truffle_compiler_test(
++    name = "GR35581Test",
++    processors = [
++        "TruffleProcessor",
++        "LanguageRegistrationProcessor",
++    ],
++)
++
++truffle_compiler_test(name = "GR36613Test")
++
++truffle_compiler_test(
++    name = "GR42688Test",
++    processors = ["TruffleProcessor"],
++)
++
++truffle_compiler_test(name = "TruffleDirectCallNodeTest")
 +
 +simplelanguage(
 +    name = "sl_jit",
@@ -295,6 +312,279 @@ new file mode 100644
 +    resources = ["//compiler/src/jdk.graal.compiler.processor/src/META-INF/services:jdk.graal.compiler.processor.resources"],
 +    unified_release = 21,
 +    visibility = ["//visibility:public"],
++)
++
++mx_whole_java(
++    name = "org.graalvm.igvutil",
++    srcs = ["//compiler/src/org.graalvm.igvutil/src/org/graalvm/igvutil:org.graalvm.igvutil.srcs"],
++    javac_opts = [
++        "--release",
++        "21",
++    ],
++    unified_release = 21,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":jdk.graal.compiler",
++        "//sdk:COLLECTIONS",
++    ],
++)
++
++mx_whole_java(
++    name = "org.graalvm.igvutil.test",
++    testonly = True,
++    srcs = ["//compiler/src/org.graalvm.igvutil.test/src/org/graalvm/igvutil/test:org.graalvm.igvutil.test.srcs"],
++    javac_opts = [
++        "--release",
++        "21",
++    ],
++    unified_release = 21,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":jdk.graal.compiler",
++        ":org.graalvm.igvutil",
++        "@contrib_rules_jvm_deps//:junit_junit",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.igvutil.test.org.graalvm.igvutil.test.FlattenerTest",
++    project = ":org.graalvm.igvutil.test",
++    test_class = "org.graalvm.igvutil.test.FlattenerTest",
++)
++
++mx_test_class(
++    name = "org.graalvm.igvutil.test.org.graalvm.igvutil.test.JsonExporterTest",
++    project = ":org.graalvm.igvutil.test",
++    test_class = "org.graalvm.igvutil.test.JsonExporterTest",
++)
++
++mx_test_class(
++    name = "org.graalvm.igvutil.test.org.graalvm.igvutil.test.PrinterTest",
++    project = ":org.graalvm.igvutil.test",
++    test_class = "org.graalvm.igvutil.test.PrinterTest",
++)
++
++mx_whole_java(
++    name = "org.graalvm.profdiff",
++    srcs = [
++        "//compiler/src/org.graalvm.profdiff/src/org/graalvm/profdiff:org.graalvm.profdiff.srcs",
++        "//compiler/src/org.graalvm.profdiff/src/org/graalvm/profdiff/args:org.graalvm.profdiff.srcs",
++        "//compiler/src/org.graalvm.profdiff/src/org/graalvm/profdiff/command:org.graalvm.profdiff.srcs",
++        "//compiler/src/org.graalvm.profdiff/src/org/graalvm/profdiff/core:org.graalvm.profdiff.srcs",
++        "//compiler/src/org.graalvm.profdiff/src/org/graalvm/profdiff/core/inlining:org.graalvm.profdiff.srcs",
++        "//compiler/src/org.graalvm.profdiff/src/org/graalvm/profdiff/core/optimization:org.graalvm.profdiff.srcs",
++        "//compiler/src/org.graalvm.profdiff/src/org/graalvm/profdiff/core/pair:org.graalvm.profdiff.srcs",
++        "//compiler/src/org.graalvm.profdiff/src/org/graalvm/profdiff/diff:org.graalvm.profdiff.srcs",
++        "//compiler/src/org.graalvm.profdiff/src/org/graalvm/profdiff/parser:org.graalvm.profdiff.srcs",
++    ],
++    javac_opts = [
++        "--release",
++        "21",
++    ],
++    unified_release = 21,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":jdk.graal.compiler",
++        "//sdk:COLLECTIONS",
++    ],
++)
++
++mx_whole_java(
++    name = "org.graalvm.profdiff.test",
++    testonly = True,
++    srcs = ["//compiler/src/org.graalvm.profdiff.test/src/org/graalvm/profdiff/test:org.graalvm.profdiff.test.srcs"],
++    javac_opts = [
++        "--release",
++        "21",
++    ],
++    unified_release = 21,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":jdk.graal.compiler",
++        ":org.graalvm.profdiff",
++        "//sdk:COLLECTIONS",
++        "@contrib_rules_jvm_deps//:junit_junit",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.profdiff.test.org.graalvm.profdiff.test.ArgumentParserTest",
++    jvm_flags = [
++        "--add-modules=jdk.internal.vm.ci",
++        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
++    ],
++    project = ":org.graalvm.profdiff.test",
++    test_class = "org.graalvm.profdiff.test.ArgumentParserTest",
++)
++
++mx_test_class(
++    name = "org.graalvm.profdiff.test.org.graalvm.profdiff.test.CompilationFragmentTest",
++    jvm_flags = [
++        "--add-modules=jdk.internal.vm.ci",
++        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
++    ],
++    project = ":org.graalvm.profdiff.test",
++    test_class = "org.graalvm.profdiff.test.CompilationFragmentTest",
++)
++
++mx_test_class(
++    name = "org.graalvm.profdiff.test.org.graalvm.profdiff.test.CompilationUnitTest",
++    jvm_flags = [
++        "--add-modules=jdk.internal.vm.ci",
++        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
++    ],
++    project = ":org.graalvm.profdiff.test",
++    test_class = "org.graalvm.profdiff.test.CompilationUnitTest",
++)
++
++mx_test_class(
++    name = "org.graalvm.profdiff.test.org.graalvm.profdiff.test.ConcatListTest",
++    jvm_flags = [
++        "--add-modules=jdk.internal.vm.ci",
++        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
++    ],
++    project = ":org.graalvm.profdiff.test",
++    test_class = "org.graalvm.profdiff.test.ConcatListTest",
++)
++
++mx_test_class(
++    name = "org.graalvm.profdiff.test.org.graalvm.profdiff.test.DeltaTreeTest",
++    jvm_flags = [
++        "--add-modules=jdk.internal.vm.ci",
++        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
++    ],
++    project = ":org.graalvm.profdiff.test",
++    test_class = "org.graalvm.profdiff.test.DeltaTreeTest",
++)
++
++mx_test_class(
++    name = "org.graalvm.profdiff.test.org.graalvm.profdiff.test.ExperimentPairTest",
++    jvm_flags = [
++        "--add-modules=jdk.internal.vm.ci",
++        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
++    ],
++    project = ":org.graalvm.profdiff.test",
++    test_class = "org.graalvm.profdiff.test.ExperimentPairTest",
++)
++
++mx_test_class(
++    name = "org.graalvm.profdiff.test.org.graalvm.profdiff.test.ExperimentParserTest",
++    jvm_flags = [
++        "--add-modules=jdk.internal.vm.ci",
++        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
++    ],
++    project = ":org.graalvm.profdiff.test",
++    test_class = "org.graalvm.profdiff.test.ExperimentParserTest",
++)
++
++mx_test_class(
++    name = "org.graalvm.profdiff.test.org.graalvm.profdiff.test.ExplanationWriterTest",
++    jvm_flags = [
++        "--add-modules=jdk.internal.vm.ci",
++        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
++    ],
++    project = ":org.graalvm.profdiff.test",
++    test_class = "org.graalvm.profdiff.test.ExplanationWriterTest",
++)
++
++mx_test_class(
++    name = "org.graalvm.profdiff.test.org.graalvm.profdiff.test.HotCompilationUnitPolicyTest",
++    jvm_flags = [
++        "--add-modules=jdk.internal.vm.ci",
++        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
++    ],
++    project = ":org.graalvm.profdiff.test",
++    test_class = "org.graalvm.profdiff.test.HotCompilationUnitPolicyTest",
++)
++
++mx_test_class(
++    name = "org.graalvm.profdiff.test.org.graalvm.profdiff.test.InliningPathTest",
++    jvm_flags = [
++        "--add-modules=jdk.internal.vm.ci",
++        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
++    ],
++    project = ":org.graalvm.profdiff.test",
++    test_class = "org.graalvm.profdiff.test.InliningPathTest",
++)
++
++mx_test_class(
++    name = "org.graalvm.profdiff.test.org.graalvm.profdiff.test.InliningTreeTest",
++    jvm_flags = [
++        "--add-modules=jdk.internal.vm.ci",
++        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
++    ],
++    project = ":org.graalvm.profdiff.test",
++    test_class = "org.graalvm.profdiff.test.InliningTreeTest",
++)
++
++mx_test_class(
++    name = "org.graalvm.profdiff.test.org.graalvm.profdiff.test.MainTest",
++    jvm_flags = [
++        "--add-modules=jdk.internal.vm.ci",
++        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
++    ],
++    project = ":org.graalvm.profdiff.test",
++    test_class = "org.graalvm.profdiff.test.MainTest",
++)
++
++mx_test_class(
++    name = "org.graalvm.profdiff.test.org.graalvm.profdiff.test.MethodTest",
++    jvm_flags = [
++        "--add-modules=jdk.internal.vm.ci",
++        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
++    ],
++    project = ":org.graalvm.profdiff.test",
++    test_class = "org.graalvm.profdiff.test.MethodTest",
++)
++
++mx_test_class(
++    name = "org.graalvm.profdiff.test.org.graalvm.profdiff.test.OptimizationContextTreeTest",
++    jvm_flags = [
++        "--add-modules=jdk.internal.vm.ci",
++        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
++    ],
++    project = ":org.graalvm.profdiff.test",
++    test_class = "org.graalvm.profdiff.test.OptimizationContextTreeTest",
++)
++
++mx_test_class(
++    name = "org.graalvm.profdiff.test.org.graalvm.profdiff.test.OptimizationTreeTest",
++    jvm_flags = [
++        "--add-modules=jdk.internal.vm.ci",
++        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
++    ],
++    project = ":org.graalvm.profdiff.test",
++    test_class = "org.graalvm.profdiff.test.OptimizationTreeTest",
++)
++
++mx_test_class(
++    name = "org.graalvm.profdiff.test.org.graalvm.profdiff.test.PositionTest",
++    jvm_flags = [
++        "--add-modules=jdk.internal.vm.ci",
++        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
++    ],
++    project = ":org.graalvm.profdiff.test",
++    test_class = "org.graalvm.profdiff.test.PositionTest",
++)
++
++mx_test_class(
++    name = "org.graalvm.profdiff.test.org.graalvm.profdiff.test.TreeMatcherTest",
++    jvm_flags = [
++        "--add-modules=jdk.internal.vm.ci",
++        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
++    ],
++    project = ":org.graalvm.profdiff.test",
++    test_class = "org.graalvm.profdiff.test.TreeMatcherTest",
++)
++
++mx_test_class(
++    name = "org.graalvm.profdiff.test.org.graalvm.profdiff.test.TreeNodeTest",
++    jvm_flags = [
++        "--add-modules=jdk.internal.vm.ci",
++        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
++    ],
++    project = ":org.graalvm.profdiff.test",
++    test_class = "org.graalvm.profdiff.test.TreeNodeTest",
 +)
 +
 +mx_jar_dist(
@@ -5540,5 +5830,253 @@ new file mode 100644
 +mx_files(
 +    name = "jdk.graal.compiler.processor.srcs",
 +    srcs = ["ServiceProviderProcessor.java"],
++    visibility = ["//compiler:__pkg__"],
++)
+diff --git a/compiler/src/org.graalvm.igvutil/src/org/graalvm/igvutil/BUILD.bazel b/compiler/src/org.graalvm.igvutil/src/org/graalvm/igvutil/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/compiler/src/org.graalvm.igvutil/src/org/graalvm/igvutil/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.igvutil.srcs",
++    srcs = [
++        "Flattener.java",
++        "IgvUtility.java",
++        "JsonExporter.java",
++        "Printer.java",
++    ],
++    visibility = ["//compiler:__pkg__"],
++)
+diff --git a/compiler/src/org.graalvm.igvutil.test/src/org/graalvm/igvutil/test/BUILD.bazel b/compiler/src/org.graalvm.igvutil.test/src/org/graalvm/igvutil/test/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/compiler/src/org.graalvm.igvutil.test/src/org/graalvm/igvutil/test/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.igvutil.test.srcs",
++    srcs = [
++        "FlattenerTest.java",
++        "JsonExporterTest.java",
++        "PrinterTest.java",
++    ],
++    visibility = ["//compiler:__pkg__"],
++)
+diff --git a/compiler/src/org.graalvm.profdiff/src/org/graalvm/profdiff/BUILD.bazel b/compiler/src/org.graalvm.profdiff/src/org/graalvm/profdiff/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/compiler/src/org.graalvm.profdiff/src/org/graalvm/profdiff/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.profdiff.srcs",
++    srcs = ["Profdiff.java"],
++    visibility = ["//compiler:__pkg__"],
++)
+diff --git a/compiler/src/org.graalvm.profdiff/src/org/graalvm/profdiff/args/BUILD.bazel b/compiler/src/org.graalvm.profdiff/src/org/graalvm/profdiff/args/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/compiler/src/org.graalvm.profdiff/src/org/graalvm/profdiff/args/BUILD.bazel
+@@ -0,0 +1,21 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.profdiff.srcs",
++    srcs = [
++        "Argument.java",
++        "ArgumentParser.java",
++        "BooleanArgument.java",
++        "CommandGroup.java",
++        "DoubleArgument.java",
++        "FlagArgument.java",
++        "IntegerArgument.java",
++        "InvalidArgumentException.java",
++        "MissingArgumentException.java",
++        "ProgramArgumentParser.java",
++        "StringArgument.java",
++        "UnknownArgumentException.java",
++        "ValuedArgument.java",
++    ],
++    visibility = ["//compiler:__pkg__"],
++)
+diff --git a/compiler/src/org.graalvm.profdiff/src/org/graalvm/profdiff/command/BUILD.bazel b/compiler/src/org.graalvm.profdiff/src/org/graalvm/profdiff/command/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/compiler/src/org.graalvm.profdiff/src/org/graalvm/profdiff/command/BUILD.bazel
+@@ -0,0 +1,18 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.profdiff.srcs",
++    srcs = [
++        "AOTAOTCommand.java",
++        "AOTAOTWithJITProfileCommand.java",
++        "Command.java",
++        "CompareReplayedCommand.java",
++        "ExperimentMatcher.java",
++        "ExplanationWriter.java",
++        "HelpCommand.java",
++        "JITAOTCommand.java",
++        "JITJITCommand.java",
++        "ReportCommand.java",
++    ],
++    visibility = ["//compiler:__pkg__"],
++)
+diff --git a/compiler/src/org.graalvm.profdiff/src/org/graalvm/profdiff/core/BUILD.bazel b/compiler/src/org.graalvm.profdiff/src/org/graalvm/profdiff/core/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/compiler/src/org.graalvm.profdiff/src/org/graalvm/profdiff/core/BUILD.bazel
+@@ -0,0 +1,20 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.profdiff.srcs",
++    srcs = [
++        "CompilationFragment.java",
++        "CompilationUnit.java",
++        "Experiment.java",
++        "ExperimentId.java",
++        "HotCompilationUnitPolicy.java",
++        "Method.java",
++        "OptimizationContextTree.java",
++        "OptimizationContextTreeNode.java",
++        "OptionValues.java",
++        "ProftoolMethod.java",
++        "TreeNode.java",
++        "Writer.java",
++    ],
++    visibility = ["//compiler:__pkg__"],
++)
+diff --git a/compiler/src/org.graalvm.profdiff/src/org/graalvm/profdiff/core/inlining/BUILD.bazel b/compiler/src/org.graalvm.profdiff/src/org/graalvm/profdiff/core/inlining/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/compiler/src/org.graalvm.profdiff/src/org/graalvm/profdiff/core/inlining/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.profdiff.srcs",
++    srcs = [
++        "InliningPath.java",
++        "InliningTree.java",
++        "InliningTreeNode.java",
++        "ReceiverTypeProfile.java",
++    ],
++    visibility = ["//compiler:__pkg__"],
++)
+diff --git a/compiler/src/org.graalvm.profdiff/src/org/graalvm/profdiff/core/optimization/BUILD.bazel b/compiler/src/org.graalvm.profdiff/src/org/graalvm/profdiff/core/optimization/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/compiler/src/org.graalvm.profdiff/src/org/graalvm/profdiff/core/optimization/BUILD.bazel
+@@ -0,0 +1,13 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.profdiff.srcs",
++    srcs = [
++        "Optimization.java",
++        "OptimizationPhase.java",
++        "OptimizationTree.java",
++        "OptimizationTreeNode.java",
++        "Position.java",
++    ],
++    visibility = ["//compiler:__pkg__"],
++)
+diff --git a/compiler/src/org.graalvm.profdiff/src/org/graalvm/profdiff/core/pair/BUILD.bazel b/compiler/src/org.graalvm.profdiff/src/org/graalvm/profdiff/core/pair/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/compiler/src/org.graalvm.profdiff/src/org/graalvm/profdiff/core/pair/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.profdiff.srcs",
++    srcs = [
++        "CompilationUnitPair.java",
++        "ExperimentPair.java",
++        "MethodPair.java",
++    ],
++    visibility = ["//compiler:__pkg__"],
++)
+diff --git a/compiler/src/org.graalvm.profdiff/src/org/graalvm/profdiff/diff/BUILD.bazel b/compiler/src/org.graalvm.profdiff/src/org/graalvm/profdiff/diff/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/compiler/src/org.graalvm.profdiff/src/org/graalvm/profdiff/diff/BUILD.bazel
+@@ -0,0 +1,21 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.profdiff.srcs",
++    srcs = [
++        "ConcatList.java",
++        "DeltaTree.java",
++        "DeltaTreeNode.java",
++        "DeltaTreeVisitor.java",
++        "DeltaTreeWriterVisitor.java",
++        "EditScript.java",
++        "InliningDeltaTreeWriterVisitor.java",
++        "InliningTreeEditPolicy.java",
++        "OptimizationContextTreeEditPolicy.java",
++        "OptimizationContextTreeWriterVisitor.java",
++        "OptimizationTreeEditPolicy.java",
++        "TreeEditPolicy.java",
++        "TreeMatcher.java",
++    ],
++    visibility = ["//compiler:__pkg__"],
++)
+diff --git a/compiler/src/org.graalvm.profdiff/src/org/graalvm/profdiff/parser/BUILD.bazel b/compiler/src/org.graalvm.profdiff/src/org/graalvm/profdiff/parser/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/compiler/src/org.graalvm.profdiff/src/org/graalvm/profdiff/parser/BUILD.bazel
+@@ -0,0 +1,16 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.profdiff.srcs",
++    srcs = [
++        "CompilationUnitTreeParser.java",
++        "ExperimentFiles.java",
++        "ExperimentFilesImpl.java",
++        "ExperimentJSONParser.java",
++        "ExperimentParser.java",
++        "ExperimentParserError.java",
++        "ExperimentParserTypeError.java",
++        "FileView.java",
++    ],
++    visibility = ["//compiler:__pkg__"],
++)
+diff --git a/compiler/src/org.graalvm.profdiff.test/src/org/graalvm/profdiff/test/BUILD.bazel b/compiler/src/org.graalvm.profdiff.test/src/org/graalvm/profdiff/test/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/compiler/src/org.graalvm.profdiff.test/src/org/graalvm/profdiff/test/BUILD.bazel
+@@ -0,0 +1,26 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.profdiff.test.srcs",
++    srcs = [
++        "ArgumentParserTest.java",
++        "CompilationFragmentTest.java",
++        "CompilationUnitTest.java",
++        "ConcatListTest.java",
++        "DeltaTreeTest.java",
++        "ExperimentPairTest.java",
++        "ExperimentParserTest.java",
++        "ExplanationWriterTest.java",
++        "HotCompilationUnitPolicyTest.java",
++        "InliningPathTest.java",
++        "InliningTreeTest.java",
++        "MainTest.java",
++        "MethodTest.java",
++        "OptimizationContextTreeTest.java",
++        "OptimizationTreeTest.java",
++        "PositionTest.java",
++        "TreeMatcherTest.java",
++        "TreeNodeTest.java",
++    ],
 +    visibility = ["//compiler:__pkg__"],
 +)

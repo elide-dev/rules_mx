@@ -20,13 +20,14 @@ The default Python is managed CPython 3.13. The alternate configuration selects 
 
 ## Build upstream GraalVM
 
-The pinned Oracle source tree builds every SDK project, the modular Truffle runtime and the Graal optimizing compiler as native Bazel targets. Run the upstream SDK JUnit classes individually or build the selected closures and run their tests together.
+The pinned Oracle source tree builds every SDK project, the modular Truffle runtime and the Graal optimizing compiler as native Bazel targets. Run individual upstream SDK, SimpleLanguage, TCK and compiler regression tests by Bazel label.
 
 ```sh
 bazelisk query 'tests(//graal:sdk_tests)'
 bazelisk test @graal//truffle:sl.test.Fibonacci
 bazelisk test --config=elide-processors @graal//compiler:sl_compilation_test
-bazelisk test --config=elide-processors //graal/... @graal//sdk/... @graal//truffle/...
+bazelisk test --config=elide-processors @graal//truffle:sl_jit.tck.IdentityFunctionTest @graal//compiler:GR42688Test
+bazelisk test --config=elide-processors //graal/... @graal//sdk/... @graal//truffle/... @graal//compiler/...
 bazelisk test --config=elide-processors //graal/nativebridge:native_isolate_test
 ```
 
@@ -92,7 +93,7 @@ bazelisk query 'deps(//tests/gazelle:check.example.check.ConsumerTest, 3)'
 bazelisk test //tests/gazelle:check.example.check.ConsumerTest
 ```
 
-The Java extension resolves source imports. For whole-project compilations, `--infer-source-deps` promotes Java imports found on the resolved mx classpath to direct Bazel dependencies. Use `--generated-dep SUITE:PROJECT=LABEL` for dependencies referenced by generated Java. The mx importer preserves declared project dependencies and Java releases and exposes each project by name. Building that label produces its package jars, and Java consumers receive their combined compile and runtime classpaths. Plain Java projects use one library per source package using the configured Gazelle Java naming convention. Test projects, projects with resources, and annotation-processed projects keep one compilation unit. Each discovered JUnit 4 test class gets a runnable label. Add `--whole-project NAME` at export time for packages that must compile together. Run generation across the entire selected suite when the graph changes and review removed targets and any old nested BUILD files when changing granularity.
+The Java extension resolves source imports. For whole-project compilations, `--infer-source-deps` promotes Java imports found on the resolved mx classpath to direct Bazel dependencies. Use `--generated-dep SUITE:PROJECT=LABEL` for dependencies referenced by generated Java. The mx importer preserves declared project dependencies and Java releases and exposes each project by name. Building that label produces its package jars, and Java consumers receive their combined compile and runtime classpaths. Plain Java projects use one library per source package using the configured Gazelle Java naming convention. Test projects, projects with resources, and annotation-processed projects keep one compilation unit. Each discovered concrete JUnit 4 test class gets a runnable label. Repeat `--test-runtime SUITE:PROJECT=LABEL` to discover tests in a published library and supply the packaged test and provider JARs. Use `--test-jvm-flag SUITE:PROJECT=FLAG` for suite-specific JVM settings. Add `--whole-project NAME` at export time for packages that must compile together. Run generation across the entire selected suite when the graph changes and review removed targets and any old nested BUILD files when changing granularity.
 
 ## Consume from another Bzlmod root
 

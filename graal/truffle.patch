@@ -2,8 +2,8 @@ diff --git a/truffle/BUILD.bazel b/truffle/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/truffle/BUILD.bazel
-@@ -0,0 +1,1035 @@
-+load("@rules_mx//mx:graph.bzl", "mx_jar_dist", "mx_jvmci_library", "mx_processed_java", "mx_processor", "mx_project", "mx_resource_layout", "mx_shaded_java", "mx_whole_java")
+@@ -0,0 +1,1896 @@
++load("@rules_mx//mx:graph.bzl", "mx_jar_dist", "mx_jvmci_library", "mx_processed_java", "mx_processor", "mx_project", "mx_resource_layout", "mx_shaded_java", "mx_test_class", "mx_whole_java")
 +
 +# gazelle:resolve java com.oracle.truffle.api.impl //truffle:com.oracle.truffle.api
 +# gazelle:resolve java com.oracle.truffle.api.impl.asm //truffle:com.oracle.truffle.api.impl.asm
@@ -12,11 +12,172 @@ new file mode 100644
 +# gazelle:resolve java org.graalvm.polyglot //sdk:POLYGLOT
 +
 +load("@rules_mx//graal:attach.bzl", "truffle_attach")
-+load("@rules_mx//graal:simplelanguage.bzl", "simplelanguage", "sl_fixture_tests")
++load("@rules_mx//graal:simplelanguage.bzl", "optimizing_junit", "simplelanguage", "sl_fixture_tests")
 +
 +simplelanguage(name = "sl")
 +
-+sl_fixture_tests("src/com.oracle.truffle.sl.test/src/tests")
++sl_fixture_tests(
++    inputs = [],
++    names = [
++        "Add",
++        "Arithmetic",
++        "Break",
++        "Builtins",
++        "Call",
++        "Comparison",
++        "ControlFlow",
++        "CreateContext",
++        "DefineFunction",
++        "Div",
++        "Equal",
++        "Eval",
++        "Fibonacci",
++        "FunctionLiteral",
++        "HelloEqualsWorld",
++        "HelloWorld",
++        "Inlining",
++        "IsMetaInstance",
++        "LocalTypeChange",
++        "Logical",
++        "Loop",
++        "LoopCall",
++        "LoopInvalidate",
++        "LoopObject",
++        "LoopObjectDyn",
++        "LoopPolymorphic",
++        "LoopPrint",
++        "Mul",
++        "Null",
++        "Object",
++        "ObjectDyn",
++        "String",
++        "Sub",
++        "Sum",
++        "SumCall",
++        "SumObject",
++        "SumPrint",
++        "TypeOf",
++    ],
++    package = "//truffle/src/com.oracle.truffle.sl.test/src/tests",
++    prefix = "",
++)
++
++sl_fixture_tests(
++    inputs = [],
++    names = [
++        "InvalidAssignmentInAssignment",
++        "InvalidAssignmentInBinOp",
++        "InvalidAssignmentInBlock",
++        "InvalidAssignmentInIfCond",
++        "InvalidAssignmentInWhileCond",
++        "InvalidBreak",
++        "InvalidContinue",
++        "ParseError01",
++        "ParseError02",
++        "TypeError01",
++        "TypeError02",
++        "TypeError03",
++        "TypeError04",
++        "TypeError05",
++        "TypeError06",
++        "TypeError07",
++        "UndefinedFunction01",
++        "UndefinedFunction02",
++        "UndefinedFunction03",
++    ],
++    package = "//truffle/src/com.oracle.truffle.sl.test/src/tests/error",
++    prefix = "error.",
++)
++
++optimizing_junit(
++    name = "sl_jit.tck.ErrorTypeTest",
++    jvm_flags = ["-Dtck.language=sl"],
++    test_class = "com.oracle.truffle.tck.tests.ErrorTypeTest",
++    runtime_deps = [
++        ":TRUFFLE_SL_TCK",
++        ":TRUFFLE_TCK_TESTS",
++    ],
++)
++
++optimizing_junit(
++    name = "sl_jit.tck.ExpressionTest",
++    jvm_flags = ["-Dtck.language=sl"],
++    test_class = "com.oracle.truffle.tck.tests.ExpressionTest",
++    runtime_deps = [
++        ":TRUFFLE_SL_TCK",
++        ":TRUFFLE_TCK_TESTS",
++    ],
++)
++
++optimizing_junit(
++    name = "sl_jit.tck.IdentityFunctionTest",
++    jvm_flags = ["-Dtck.language=sl"],
++    test_class = "com.oracle.truffle.tck.tests.IdentityFunctionTest",
++    runtime_deps = [
++        ":TRUFFLE_SL_TCK",
++        ":TRUFFLE_TCK_TESTS",
++    ],
++)
++
++optimizing_junit(
++    name = "sl_jit.tck.InlineExecutionTest",
++    jvm_flags = ["-Dtck.language=sl"],
++    test_class = "com.oracle.truffle.tck.tests.InlineExecutionTest",
++    runtime_deps = [
++        ":TRUFFLE_SL_TCK",
++        ":TRUFFLE_TCK_TESTS",
++    ],
++)
++
++optimizing_junit(
++    name = "sl_jit.tck.InvalidSyntaxTest",
++    jvm_flags = ["-Dtck.language=sl"],
++    test_class = "com.oracle.truffle.tck.tests.InvalidSyntaxTest",
++    runtime_deps = [
++        ":TRUFFLE_SL_TCK",
++        ":TRUFFLE_TCK_TESTS",
++    ],
++)
++
++optimizing_junit(
++    name = "sl_jit.tck.ScriptTest",
++    jvm_flags = ["-Dtck.language=sl"],
++    test_class = "com.oracle.truffle.tck.tests.ScriptTest",
++    runtime_deps = [
++        ":TRUFFLE_SL_TCK",
++        ":TRUFFLE_TCK_TESTS",
++    ],
++)
++
++optimizing_junit(
++    name = "sl_jit.tck.StatementTest",
++    jvm_flags = ["-Dtck.language=sl"],
++    test_class = "com.oracle.truffle.tck.tests.StatementTest",
++    runtime_deps = [
++        ":TRUFFLE_SL_TCK",
++        ":TRUFFLE_TCK_TESTS",
++    ],
++)
++
++optimizing_junit(
++    name = "sl_jit.tck.TypeDescriptorTest",
++    jvm_flags = ["-Dtck.language=sl"],
++    test_class = "com.oracle.truffle.tck.tests.TypeDescriptorTest",
++    runtime_deps = [
++        ":TRUFFLE_SL_TCK",
++        ":TRUFFLE_TCK_TESTS",
++    ],
++)
++
++optimizing_junit(
++    name = "sl_jit.tck.ValueTest",
++    jvm_flags = ["-Dtck.language=sl"],
++    test_class = "com.oracle.truffle.tck.tests.ValueTest",
++    runtime_deps = [
++        ":TRUFFLE_SL_TCK",
++        ":TRUFFLE_TCK_TESTS",
++    ],
++)
 +
 +truffle_attach(
 +    name = "com.oracle.truffle.attach",
@@ -731,6 +892,589 @@ new file mode 100644
 +    deps = ["//sdk:POLYGLOT"],
 +)
 +
++mx_whole_java(
++    name = "com.oracle.truffle.sl.tck",
++    srcs = ["//truffle/src/com.oracle.truffle.sl.tck/src/com/oracle/truffle/sl/tck:com.oracle.truffle.sl.tck.srcs"],
++    javac_opts = [
++        "--release",
++        "21",
++    ],
++    mx_resource_root = "src/com.oracle.truffle.sl.tck/src",
++    resources = [
++        "//truffle/src/com.oracle.truffle.sl.tck/src/META-INF/native-image/org.graalvm.truffle/sl-truffle-tck:com.oracle.truffle.sl.tck.resources",
++        "//truffle/src/com.oracle.truffle.sl.tck/src/META-INF/services:com.oracle.truffle.sl.tck.resources",
++        "//truffle/src/com.oracle.truffle.sl.tck/src/com/oracle/truffle/sl/tck/resources:com.oracle.truffle.sl.tck.resources",
++    ],
++    unified_release = 21,
++    visibility = ["//visibility:public"],
++    deps = [
++        "//sdk:POLYGLOT",
++        "//sdk:POLYGLOT_TCK",
++        "@contrib_rules_jvm_deps//:junit_junit",
++    ],
++)
++
++mx_processed_java(
++    name = "com.oracle.truffle.sl.test",
++    testonly = True,
++    srcs = ["//truffle/src/com.oracle.truffle.sl.test/src/com/oracle/truffle/sl/test:com.oracle.truffle.sl.test.srcs"],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "--add-modules",
++        "java.logging",
++    ],
++    mx_resource_root = "src/com.oracle.truffle.sl.test/src",
++    plugins = [
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    resources = [
++        "//truffle/src/com.oracle.truffle.sl.test/src/tests:com.oracle.truffle.sl.test.resources",
++        "//truffle/src/com.oracle.truffle.sl.test/src/tests/error:com.oracle.truffle.sl.test.resources",
++        "//truffle/src/com.oracle.truffle.sl.test/src/tests_disabled:com.oracle.truffle.sl.test.resources",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":TRUFFLE_API",
++        ":com.oracle.truffle.sl",
++        ":com.oracle.truffle.tck",
++        "//sdk:POLYGLOT",
++        "@contrib_rules_jvm_deps//:junit_junit",
++        "@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
++    ],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.sl.test.com.oracle.truffle.sl.test.PassItselfBackViaContextTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.sl.test.PassItselfBackViaContextTest",
++    runtime_deps = [":TRUFFLE_SL_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.sl.test.com.oracle.truffle.sl.test.SLCodeSharingTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.sl.test.SLCodeSharingTest",
++    runtime_deps = [":TRUFFLE_SL_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.sl.test.com.oracle.truffle.sl.test.SLDebugALot",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.sl.test.SLDebugALot",
++    runtime_deps = [":TRUFFLE_SL_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.sl.test.com.oracle.truffle.sl.test.SLDebugDirectTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.sl.test.SLDebugDirectTest",
++    runtime_deps = [":TRUFFLE_SL_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.sl.test.com.oracle.truffle.sl.test.SLDebugTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.sl.test.SLDebugTest",
++    runtime_deps = [":TRUFFLE_SL_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.sl.test.com.oracle.truffle.sl.test.SLExceptionTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.sl.test.SLExceptionTest",
++    runtime_deps = [":TRUFFLE_SL_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.sl.test.com.oracle.truffle.sl.test.SLExecutionListenerTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.sl.test.SLExecutionListenerTest",
++    runtime_deps = [":TRUFFLE_SL_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.sl.test.com.oracle.truffle.sl.test.SLExitTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.sl.test.SLExitTest",
++    runtime_deps = [":TRUFFLE_SL_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.sl.test.com.oracle.truffle.sl.test.SLFactorialTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.sl.test.SLFactorialTest",
++    runtime_deps = [":TRUFFLE_SL_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.sl.test.com.oracle.truffle.sl.test.SLInstrumentTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.sl.test.SLInstrumentTest",
++    runtime_deps = [":TRUFFLE_SL_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.sl.test.com.oracle.truffle.sl.test.SLInteropControlFlowTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.sl.test.SLInteropControlFlowTest",
++    runtime_deps = [":TRUFFLE_SL_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.sl.test.com.oracle.truffle.sl.test.SLInteropObjectTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.sl.test.SLInteropObjectTest",
++    runtime_deps = [":TRUFFLE_SL_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.sl.test.com.oracle.truffle.sl.test.SLInteropOperatorTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.sl.test.SLInteropOperatorTest",
++    runtime_deps = [":TRUFFLE_SL_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.sl.test.com.oracle.truffle.sl.test.SLInteropPrimitiveTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.sl.test.SLInteropPrimitiveTest",
++    runtime_deps = [":TRUFFLE_SL_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.sl.test.com.oracle.truffle.sl.test.SLJavaInteropConversionTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.sl.test.SLJavaInteropConversionTest",
++    runtime_deps = [":TRUFFLE_SL_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.sl.test.com.oracle.truffle.sl.test.SLJavaInteropDebugTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.sl.test.SLJavaInteropDebugTest",
++    runtime_deps = [":TRUFFLE_SL_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.sl.test.com.oracle.truffle.sl.test.SLJavaInteropExceptionTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.sl.test.SLJavaInteropExceptionTest",
++    runtime_deps = [":TRUFFLE_SL_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.sl.test.com.oracle.truffle.sl.test.SLJavaInteropTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.sl.test.SLJavaInteropTest",
++    runtime_deps = [":TRUFFLE_SL_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.sl.test.com.oracle.truffle.sl.test.SLLoggerTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.sl.test.SLLoggerTest",
++    runtime_deps = [":TRUFFLE_SL_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.sl.test.com.oracle.truffle.sl.test.SLParseErrorTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.sl.test.SLParseErrorTest",
++    runtime_deps = [":TRUFFLE_SL_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.sl.test.com.oracle.truffle.sl.test.SLParseInContextTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.sl.test.SLParseInContextTest",
++    runtime_deps = [":TRUFFLE_SL_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.sl.test.com.oracle.truffle.sl.test.SLReadPropertyTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.sl.test.SLReadPropertyTest",
++    runtime_deps = [":TRUFFLE_SL_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.sl.test.com.oracle.truffle.sl.test.SLSeparatedClassLoadersTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.sl.test.SLSeparatedClassLoadersTest",
++    runtime_deps = [":TRUFFLE_SL_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.sl.test.com.oracle.truffle.sl.test.SLSharedCodeSeparatedEnvTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.sl.test.SLSharedCodeSeparatedEnvTest",
++    runtime_deps = [":TRUFFLE_SL_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.sl.test.com.oracle.truffle.sl.test.SLTestSuiteAST",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.sl.test.SLTestSuiteAST",
++    runtime_deps = [":TRUFFLE_SL_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.sl.test.com.oracle.truffle.sl.test.SLTestSuiteBytecode",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.sl.test.SLTestSuiteBytecode",
++    runtime_deps = [":TRUFFLE_SL_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.sl.test.com.oracle.truffle.sl.test.SLTestSuiteBytecodeCached",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.sl.test.SLTestSuiteBytecodeCached",
++    runtime_deps = [":TRUFFLE_SL_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.sl.test.com.oracle.truffle.sl.test.SLTestSuiteBytecodeUncached",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.sl.test.SLTestSuiteBytecodeUncached",
++    runtime_deps = [":TRUFFLE_SL_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.sl.test.com.oracle.truffle.sl.test.SLValueSharingTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.sl.test.SLValueSharingTest",
++    runtime_deps = [":TRUFFLE_SL_TEST"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.sl.test.com.oracle.truffle.sl.test.ToStringOfEvalTest",
++    jvm_flags = [
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.sl.test.ToStringOfEvalTest",
++    runtime_deps = [":TRUFFLE_SL_TEST"],
++)
++
++mx_processed_java(
++    name = "com.oracle.truffle.tck",
++    srcs = [
++        "//truffle/src/com.oracle.truffle.tck/src/com/oracle/truffle/tck:com.oracle.truffle.tck.srcs",
++        "//truffle/src/com.oracle.truffle.tck/src/com/oracle/truffle/tck/impl:com.oracle.truffle.tck.srcs",
++    ],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++    ],
++    plugins = [
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":TRUFFLE_API",
++        "//sdk:COLLECTIONS",
++        "//sdk:POLYGLOT",
++        "//sdk:POLYGLOT_TCK",
++        "@contrib_rules_jvm_deps//:junit_junit",
++    ],
++)
++
++mx_whole_java(
++    name = "com.oracle.truffle.tck.common",
++    srcs = ["//truffle/src/com.oracle.truffle.tck.common/src/com/oracle/truffle/tck/common/inline:com.oracle.truffle.tck.common.srcs"],
++    javac_opts = [
++        "--release",
++        "21",
++    ],
++    unified_release = 21,
++    visibility = ["//visibility:public"],
++    deps = [
++        "//sdk:POLYGLOT",
++        "//sdk:POLYGLOT_TCK",
++    ],
++)
++
++mx_processed_java(
++    name = "com.oracle.truffle.tck.instrumentation",
++    srcs = ["//truffle/src/com.oracle.truffle.tck.instrumentation/src/com/oracle/truffle/tck/instrumentation:com.oracle.truffle.tck.instrumentation.srcs"],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++    ],
++    plugins = [
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        ":mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":TRUFFLE_API",
++        ":com.oracle.truffle.tck.common",
++        "//sdk:POLYGLOT",
++        "//sdk:POLYGLOT_TCK",
++        "@contrib_rules_jvm_deps//:junit_junit",
++    ],
++)
++
++mx_whole_java(
++    name = "com.oracle.truffle.tck.tests",
++    srcs = ["//truffle/src/com.oracle.truffle.tck.tests/src/com/oracle/truffle/tck/tests:com.oracle.truffle.tck.tests.srcs"],
++    javac_opts = [
++        "--release",
++        "21",
++    ],
++    mx_resource_root = "src/com.oracle.truffle.tck.tests/src",
++    resources = [
++        "//truffle/src/com.oracle.truffle.tck.tests/src/META-INF/native-image/org.graalvm.truffle/truffle-tck-tests:com.oracle.truffle.tck.tests.resources",
++        "//truffle/src/com.oracle.truffle.tck.tests/src/META-INF/services:com.oracle.truffle.tck.tests.resources",
++    ],
++    unified_release = 21,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":com.oracle.truffle.tck.common",
++        "//sdk:NATIVEIMAGE",
++        "//sdk:POLYGLOT",
++        "//sdk:POLYGLOT_TCK",
++        "@contrib_rules_jvm_deps//:junit_junit",
++    ],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tck.tests.com.oracle.truffle.tck.tests.ErrorTypeTest",
++    jvm_flags = [
++        "-Dtck.language=sl",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.tck.tests.ErrorTypeTest",
++    runtime_deps = [
++        ":TRUFFLE_SL_TCK",
++        ":TRUFFLE_TCK_TESTS",
++    ],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tck.tests.com.oracle.truffle.tck.tests.ExpressionTest",
++    jvm_flags = [
++        "-Dtck.language=sl",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.tck.tests.ExpressionTest",
++    runtime_deps = [
++        ":TRUFFLE_SL_TCK",
++        ":TRUFFLE_TCK_TESTS",
++    ],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tck.tests.com.oracle.truffle.tck.tests.IdentityFunctionTest",
++    jvm_flags = [
++        "-Dtck.language=sl",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.tck.tests.IdentityFunctionTest",
++    runtime_deps = [
++        ":TRUFFLE_SL_TCK",
++        ":TRUFFLE_TCK_TESTS",
++    ],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tck.tests.com.oracle.truffle.tck.tests.InlineExecutionTest",
++    jvm_flags = [
++        "-Dtck.language=sl",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.tck.tests.InlineExecutionTest",
++    runtime_deps = [
++        ":TRUFFLE_SL_TCK",
++        ":TRUFFLE_TCK_TESTS",
++    ],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tck.tests.com.oracle.truffle.tck.tests.InvalidSyntaxTest",
++    jvm_flags = [
++        "-Dtck.language=sl",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.tck.tests.InvalidSyntaxTest",
++    runtime_deps = [
++        ":TRUFFLE_SL_TCK",
++        ":TRUFFLE_TCK_TESTS",
++    ],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tck.tests.com.oracle.truffle.tck.tests.ScriptTest",
++    jvm_flags = [
++        "-Dtck.language=sl",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.tck.tests.ScriptTest",
++    runtime_deps = [
++        ":TRUFFLE_SL_TCK",
++        ":TRUFFLE_TCK_TESTS",
++    ],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tck.tests.com.oracle.truffle.tck.tests.StatementTest",
++    jvm_flags = [
++        "-Dtck.language=sl",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.tck.tests.StatementTest",
++    runtime_deps = [
++        ":TRUFFLE_SL_TCK",
++        ":TRUFFLE_TCK_TESTS",
++    ],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tck.tests.com.oracle.truffle.tck.tests.TypeDescriptorTest",
++    jvm_flags = [
++        "-Dtck.language=sl",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.tck.tests.TypeDescriptorTest",
++    runtime_deps = [
++        ":TRUFFLE_SL_TCK",
++        ":TRUFFLE_TCK_TESTS",
++    ],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.tck.tests.com.oracle.truffle.tck.tests.ValueTest",
++    jvm_flags = [
++        "-Dtck.language=sl",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "com.oracle.truffle.tck.tests.ValueTest",
++    runtime_deps = [
++        ":TRUFFLE_SL_TCK",
++        ":TRUFFLE_TCK_TESTS",
++    ],
++)
++
 +mx_jar_dist(
 +    name = "TRUFFLE_API",
 +    contents = [
@@ -965,6 +1709,123 @@ new file mode 100644
 +    snippets_pattern = ".*(Snippets|doc-files).*",
 +    visibility = ["//visibility:public"],
 +    deps = ["//sdk:POLYGLOT"],
++)
++
++mx_jar_dist(
++    name = "TRUFFLE_SL_TCK",
++    contents = [":com.oracle.truffle.sl.tck"],
++    jni_services = True,
++    manifest = {
++        "Implementation-Vendor": "Oracle Corporation",
++        "Implementation-Version": "25.5.5-dev",
++        "Name": "sl-truffle-tck",
++        "Specification-Vendor": "Oracle Corporation",
++        "Specification-Version": "25.5.5-dev",
++    },
++    snippets_pattern = ".*(Snippets|doc-files).*",
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":TRUFFLE_SL",
++        "//sdk:POLYGLOT_TCK",
++        "@contrib_rules_jvm_deps//:junit_junit",
++    ],
++)
++
++mx_jar_dist(
++    name = "TRUFFLE_SL_TEST",
++    testonly = True,
++    contents = [":com.oracle.truffle.sl.test"],
++    jni_services = True,
++    snippets_pattern = ".*(Snippets|doc-files).*",
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":TRUFFLE_API",
++        ":TRUFFLE_SL",
++        ":TRUFFLE_TCK",
++        ":TRUFFLE_TCK_TESTS",
++        "@contrib_rules_jvm_deps//:junit_junit",
++    ],
++)
++
++mx_jar_dist(
++    name = "TRUFFLE_TCK",
++    contents = [":com.oracle.truffle.tck"],
++    jni_services = True,
++    manifest = {
++        "Implementation-Vendor": "Oracle Corporation",
++        "Implementation-Version": "25.5.5-dev",
++        "Name": "truffle-tck",
++        "Specification-Vendor": "Oracle Corporation",
++        "Specification-Version": "25.5.5-dev",
++    },
++    snippets_pattern = ".*(Snippets|doc-files).*",
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":TRUFFLE_API",
++        "//sdk:POLYGLOT_TCK",
++        "@contrib_rules_jvm_deps//:junit_junit",
++    ],
++)
++
++mx_jar_dist(
++    name = "TRUFFLE_TCK_COMMON",
++    contents = [":com.oracle.truffle.tck.common"],
++    manifest = {
++        "Implementation-Vendor": "Oracle Corporation",
++        "Implementation-Version": "25.5.5-dev",
++        "Name": "truffle-tck-common",
++        "Specification-Vendor": "Oracle Corporation",
++        "Specification-Version": "25.5.5-dev",
++    },
++    snippets_pattern = ".*(Snippets|doc-files).*",
++    visibility = ["//visibility:public"],
++    deps = ["//sdk:POLYGLOT_TCK"],
++)
++
++mx_jar_dist(
++    name = "TRUFFLE_TCK_INSTRUMENTATION",
++    contents = [":com.oracle.truffle.tck.instrumentation"],
++    jni_services = True,
++    manifest = {
++        "Implementation-Vendor": "Oracle Corporation",
++        "Implementation-Version": "25.5.5-dev",
++        "Name": "truffle-tck-instrumentation",
++        "Specification-Vendor": "Oracle Corporation",
++        "Specification-Version": "25.5.5-dev",
++    },
++    snippets_pattern = ".*(Snippets|doc-files).*",
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":TRUFFLE_API",
++        ":TRUFFLE_TCK_COMMON",
++        "@contrib_rules_jvm_deps//:junit_junit",
++    ],
++)
++
++mx_jar_dist(
++    name = "TRUFFLE_TCK_TESTS",
++    contents = [":com.oracle.truffle.tck.tests"],
++    jni_services = True,
++    manifest = {
++        "Implementation-Vendor": "Oracle Corporation",
++        "Implementation-Version": "25.5.5-dev",
++        "Name": "truffle-tck-tests",
++        "Specification-Vendor": "Oracle Corporation",
++        "Specification-Version": "25.5.5-dev",
++    },
++    snippets_pattern = ".*(Snippets|doc-files).*",
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":TRUFFLE_TCK_COMMON",
++        ":TRUFFLE_TCK_INSTRUMENTATION",
++        "//sdk:POLYGLOT_TCK",
++        "@contrib_rules_jvm_deps//:junit_junit",
++    ],
 +)
 +
 +mx_resource_layout(
@@ -3259,4 +4120,408 @@ new file mode 100644
 +    main_class = "com.oracle.truffle.sl.launcher.SLMain",
 +    visibility = ["//visibility:public"],
 +    runtime_deps = [":launcher"],
++)
+diff --git a/truffle/src/com.oracle.truffle.sl.tck/src/META-INF/native-image/org.graalvm.truffle/sl-truffle-tck/BUILD.bazel b/truffle/src/com.oracle.truffle.sl.tck/src/META-INF/native-image/org.graalvm.truffle/sl-truffle-tck/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.sl.tck/src/META-INF/native-image/org.graalvm.truffle/sl-truffle-tck/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.sl.tck.resources",
++    srcs = [
++        "native-image.properties",
++        "resource-config.json",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.sl.tck/src/META-INF/services/BUILD.bazel b/truffle/src/com.oracle.truffle.sl.tck/src/META-INF/services/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.sl.tck/src/META-INF/services/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.sl.tck.resources",
++    srcs = ["org.graalvm.polyglot.tck.LanguageProvider"],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.sl.tck/src/com/oracle/truffle/sl/tck/BUILD.bazel b/truffle/src/com.oracle.truffle.sl.tck/src/com/oracle/truffle/sl/tck/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.sl.tck/src/com/oracle/truffle/sl/tck/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.sl.tck.srcs",
++    srcs = ["SLTCKLanguageProvider.java"],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.sl.tck/src/com/oracle/truffle/sl/tck/resources/BUILD.bazel b/truffle/src/com.oracle.truffle.sl.tck/src/com/oracle/truffle/sl/tck/resources/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.sl.tck/src/com/oracle/truffle/sl/tck/resources/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.sl.tck.resources",
++    srcs = [
++        "Ackermann.sl",
++        "Fibonacci.sl",
++        "InvalidSyntax01.sl",
++        "InvalidSyntax02.sl",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.sl.test/src/com/oracle/truffle/sl/test/BUILD.bazel b/truffle/src/com.oracle.truffle.sl.test/src/com/oracle/truffle/sl/test/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.sl.test/src/com/oracle/truffle/sl/test/BUILD.bazel
+@@ -0,0 +1,42 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.sl.test.srcs",
++    srcs = [
++        "AbstractSLTest.java",
++        "PassItselfBackViaContextTest.java",
++        "SLCodeSharingTest.java",
++        "SLDebugALot.java",
++        "SLDebugDirectTest.java",
++        "SLDebugTest.java",
++        "SLExceptionTest.java",
++        "SLExecutionListenerTest.java",
++        "SLExitTest.java",
++        "SLFactorialTest.java",
++        "SLInstrumentTest.java",
++        "SLInteropControlFlowTest.java",
++        "SLInteropObjectTest.java",
++        "SLInteropOperatorTest.java",
++        "SLInteropPrimitiveTest.java",
++        "SLJavaInteropConversionTest.java",
++        "SLJavaInteropDebugTest.java",
++        "SLJavaInteropExceptionTest.java",
++        "SLJavaInteropTest.java",
++        "SLLoggerTest.java",
++        "SLParseErrorTest.java",
++        "SLParseInContextTest.java",
++        "SLReadPropertyTest.java",
++        "SLSeparatedClassLoadersTest.java",
++        "SLSharedCodeSeparatedEnvTest.java",
++        "SLTestRunner.java",
++        "SLTestSuite.java",
++        "SLTestSuiteAST.java",
++        "SLTestSuiteBytecode.java",
++        "SLTestSuiteBytecodeCached.java",
++        "SLTestSuiteBytecodeUncached.java",
++        "SLValueSharingTest.java",
++        "ToStringOfEvalTest.java",
++        "TruffleTestAssumptions.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.sl.test/src/tests/BUILD.bazel b/truffle/src/com.oracle.truffle.sl.test/src/tests/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.sl.test/src/tests/BUILD.bazel
+@@ -0,0 +1,96 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++exports_files(
++    glob(
++        [
++            "*.sl",
++            "*.output",
++            "*.input",
++        ],
++        allow_empty = True,
++    ),
++    visibility = ["//truffle:__pkg__"],
++)
++
++mx_files(
++    name = "com.oracle.truffle.sl.test.resources",
++    srcs = [
++        "Add.output",
++        "Add.sl",
++        "Arithmetic.output",
++        "Arithmetic.sl",
++        "Break.output",
++        "Break.sl",
++        "Builtins.output",
++        "Builtins.sl",
++        "Call.output",
++        "Call.sl",
++        "Comparison.output",
++        "Comparison.sl",
++        "ControlFlow.output",
++        "ControlFlow.sl",
++        "CreateContext.output",
++        "CreateContext.sl",
++        "DefineFunction.output",
++        "DefineFunction.sl",
++        "Div.output",
++        "Div.sl",
++        "Equal.output",
++        "Equal.sl",
++        "Eval.output",
++        "Eval.sl",
++        "Fibonacci.output",
++        "Fibonacci.sl",
++        "FunctionLiteral.output",
++        "FunctionLiteral.sl",
++        "HelloEqualsWorld.output",
++        "HelloEqualsWorld.sl",
++        "HelloWorld.output",
++        "HelloWorld.sl",
++        "Inlining.output",
++        "Inlining.sl",
++        "IsMetaInstance.output",
++        "IsMetaInstance.sl",
++        "LocalTypeChange.output",
++        "LocalTypeChange.sl",
++        "Logical.output",
++        "Logical.sl",
++        "Loop.output",
++        "Loop.sl",
++        "LoopCall.output",
++        "LoopCall.sl",
++        "LoopInvalidate.output",
++        "LoopInvalidate.sl",
++        "LoopObject.output",
++        "LoopObject.sl",
++        "LoopObjectDyn.output",
++        "LoopObjectDyn.sl",
++        "LoopPolymorphic.output",
++        "LoopPolymorphic.sl",
++        "LoopPrint.output",
++        "LoopPrint.sl",
++        "Mul.output",
++        "Mul.sl",
++        "Null.output",
++        "Null.sl",
++        "Object.output",
++        "Object.sl",
++        "ObjectDyn.output",
++        "ObjectDyn.sl",
++        "String.output",
++        "String.sl",
++        "Sub.output",
++        "Sub.sl",
++        "Sum.output",
++        "Sum.sl",
++        "SumCall.output",
++        "SumCall.sl",
++        "SumObject.output",
++        "SumObject.sl",
++        "SumPrint.output",
++        "SumPrint.sl",
++        "TypeOf.output",
++        "TypeOf.sl",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.sl.test/src/tests/error/BUILD.bazel b/truffle/src/com.oracle.truffle.sl.test/src/tests/error/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.sl.test/src/tests/error/BUILD.bazel
+@@ -0,0 +1,58 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++exports_files(
++    glob(
++        [
++            "*.sl",
++            "*.output",
++            "*.input",
++        ],
++        allow_empty = True,
++    ),
++    visibility = ["//truffle:__pkg__"],
++)
++
++mx_files(
++    name = "com.oracle.truffle.sl.test.resources",
++    srcs = [
++        "InvalidAssignmentInAssignment.output",
++        "InvalidAssignmentInAssignment.sl",
++        "InvalidAssignmentInBinOp.output",
++        "InvalidAssignmentInBinOp.sl",
++        "InvalidAssignmentInBlock.output",
++        "InvalidAssignmentInBlock.sl",
++        "InvalidAssignmentInIfCond.output",
++        "InvalidAssignmentInIfCond.sl",
++        "InvalidAssignmentInWhileCond.output",
++        "InvalidAssignmentInWhileCond.sl",
++        "InvalidBreak.output",
++        "InvalidBreak.sl",
++        "InvalidContinue.output",
++        "InvalidContinue.sl",
++        "ParseError01.output",
++        "ParseError01.sl",
++        "ParseError02.output",
++        "ParseError02.sl",
++        "TypeError01.output",
++        "TypeError01.sl",
++        "TypeError02.output",
++        "TypeError02.sl",
++        "TypeError03.output",
++        "TypeError03.sl",
++        "TypeError04.output",
++        "TypeError04.sl",
++        "TypeError05.output",
++        "TypeError05.sl",
++        "TypeError06.output",
++        "TypeError06.sl",
++        "TypeError07.output",
++        "TypeError07.sl",
++        "UndefinedFunction01.output",
++        "UndefinedFunction01.sl",
++        "UndefinedFunction02.output",
++        "UndefinedFunction02.sl",
++        "UndefinedFunction03.output",
++        "UndefinedFunction03.sl",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.sl.test/src/tests_disabled/BUILD.bazel b/truffle/src/com.oracle.truffle.sl.test/src/tests_disabled/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.sl.test/src/tests_disabled/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.sl.test.resources",
++    srcs = [
++        "CalcShell.input",
++        "CalcShell.output",
++        "CalcShell.sl",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.tck/src/com/oracle/truffle/tck/BUILD.bazel b/truffle/src/com.oracle.truffle.tck/src/com/oracle/truffle/tck/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.tck/src/com/oracle/truffle/tck/BUILD.bazel
+@@ -0,0 +1,13 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.tck.srcs",
++    srcs = [
++        "DebuggerTester.java",
++        "TruffleRunner.java",
++        "TruffleTCKAccessor.java",
++        "TruffleTestInvoker.java",
++        "package-info.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.tck/src/com/oracle/truffle/tck/impl/BUILD.bazel b/truffle/src/com.oracle.truffle.tck/src/com/oracle/truffle/tck/impl/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.tck/src/com/oracle/truffle/tck/impl/BUILD.bazel
+@@ -0,0 +1,13 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.tck.srcs",
++    srcs = [
++        "PolyglotEngineWithJavaScript.java",
++        "PolyglotEngineWithR.java",
++        "PolyglotEngineWithRuby.java",
++        "TckLanguage.java",
++        "TruffleLanguageRunner.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.tck.common/src/com/oracle/truffle/tck/common/inline/BUILD.bazel b/truffle/src/com.oracle.truffle.tck.common/src/com/oracle/truffle/tck/common/inline/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.tck.common/src/com/oracle/truffle/tck/common/inline/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.tck.common.srcs",
++    srcs = ["InlineVerifier.java"],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.tck.instrumentation/src/com/oracle/truffle/tck/instrumentation/BUILD.bazel b/truffle/src/com.oracle.truffle.tck.instrumentation/src/com/oracle/truffle/tck/instrumentation/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.tck.instrumentation/src/com/oracle/truffle/tck/instrumentation/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.tck.instrumentation.srcs",
++    srcs = [
++        "DebugALot.java",
++        "VerifierInstrument.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.tck.tests/src/META-INF/native-image/org.graalvm.truffle/truffle-tck-tests/BUILD.bazel b/truffle/src/com.oracle.truffle.tck.tests/src/META-INF/native-image/org.graalvm.truffle/truffle-tck-tests/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.tck.tests/src/META-INF/native-image/org.graalvm.truffle/truffle-tck-tests/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.tck.tests.resources",
++    srcs = [
++        "native-image.properties",
++        "proxy-config.json",
++        "reflect-config.json",
++    ],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.tck.tests/src/META-INF/services/BUILD.bazel b/truffle/src/com.oracle.truffle.tck.tests/src/META-INF/services/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.tck.tests/src/META-INF/services/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.tck.tests.resources",
++    srcs = ["org.graalvm.polyglot.tck.LanguageProvider"],
++    visibility = ["//truffle:__pkg__"],
++)
+diff --git a/truffle/src/com.oracle.truffle.tck.tests/src/com/oracle/truffle/tck/tests/BUILD.bazel b/truffle/src/com.oracle.truffle.tck.tests/src/com/oracle/truffle/tck/tests/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/truffle/src/com.oracle.truffle.tck.tests/src/com/oracle/truffle/tck/tests/BUILD.bazel
+@@ -0,0 +1,25 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.tck.tests.srcs",
++    srcs = [
++        "ErrorTypeTest.java",
++        "ExpressionTest.java",
++        "IdentityFunctionTest.java",
++        "InlineExecutionTest.java",
++        "InlineTestRun.java",
++        "InvalidSyntaxTest.java",
++        "JavaHostLanguageProvider.java",
++        "ScriptTest.java",
++        "StatementTest.java",
++        "TestContext.java",
++        "TestRun.java",
++        "TestUtil.java",
++        "TruffleTCKFeature.java",
++        "TruffleTestAssumptions.java",
++        "TypeDescriptorTest.java",
++        "ValueAssert.java",
++        "ValueTest.java",
++    ],
++    visibility = ["//truffle:__pkg__"],
 +)

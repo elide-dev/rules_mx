@@ -15,8 +15,8 @@ tools/buildbuddy test --config=buildbuddy-rbe --config=elide-processors //graal/
 | Suite | Native Bazel build | Test coverage |
 | --- | --- | --- |
 | SDK | All 29 declared projects. All 19 Java distributions produce JARs, including Polyglot, Native Bridge, JLine and Launcher Common. Three additional targets expose the version and launcher resource layouts. | All 17 discovered upstream JUnit classes and the C and C++ toolchain probes. Runtime tests verify packaged version resources, JPMS module loading and JLine provider selection on JDK 21 and Labs JDK 25. |
-| Truffle | 26 of 69 declared projects, including the JNI attach library, host interop and SimpleLanguage. Bazel packages the multi-release Truffle API, SL language, SL launcher, Truffle compiler interface and HotSpot runtime as named modules. | 57 upstream guest fixtures each run on the AST and bytecode interpreters. Additional tests check both JPMS descriptors, the native resource layout, Polyglot services and generated factories. |
-| Compiler | The compiler processor, options and `jdk.graal.compiler` projects produce `GRAAL_PROCESSOR`, `GRAAL_OPTIONS` and `GRAAL`. Gazelle generates the projects and their eight processor targets. | A compiled guest test loads the Bazel-built compiler, forces last-tier compilation of a SimpleLanguage function, calls it, checks its result, and verifies the installed code remains valid for both AST and cached-bytecode execution. |
+| Truffle | 32 of 69 declared projects, including the JNI attach library, host interop and SimpleLanguage. Bazel packages the multi-release Truffle API, SL language, SL launcher, Truffle compiler interface and HotSpot runtime as named modules. | 57 guest fixtures run independently. All 30 concrete SL JUnit classes run on the default runtime, including the four interpreter configurations of the upstream fixture runner. Nine TCK classes run against the SL provider on both the interpreter and the source-built optimizing runtime. |
+| Compiler | 7 of 17 projects, including the compiler processor, options, optimizing compiler, IGV utility and profile comparison tool. | 21 compiler-tool JUnit classes, four selected upstream Truffle compiler regressions on the Labs JDK and a last-tier compiled guest test for both AST and cached-bytecode execution. |
 
 The SDK and Truffle slice generally targets Java 21. Shaded libraries compile at their declared releases, including the JDK 22 JLine overlay. Some SDK projects declare an older minimum while using newer APIs, including `java.io.Serial`. The libgraal API compiles as one unit because its packages depend on each other. Gazelle keeps project resources, processors and tests with their owning compilations and splits eligible source-only projects by package.
 
@@ -44,6 +44,19 @@ bazelisk test --config=elide-processors @graal//compiler:sl_compilation_test
 The compiler requires Labs JDK 25.0.4.1.1+1 with JVMCI 25.4-b23, as specified in the pinned Graal tree. JavaBuilder uses that JDK for projects importing concealed JVMCI APIs, with strict dependencies, annotation processing and ABI extraction. Four upstream compiler diagnostics are reported as warnings. The distribution merges generated service providers and option descriptors into its JPMS descriptor. The compiled guest test also verifies the file origin of the loaded compiler module.
 
 The archive action consumes Truffle registration markers, filters documentation snippets using the suite pattern, and assembles the Java 9 and 21 overlays. The pinned mx includes a fix for repeated module descriptor rendering so both releases retain singleton qualified exports and service providers.
+
+## Run upstream JUnit tests
+
+```sh
+bazelisk query 'filter("sl_jit[.]tck[.]", tests(@graal//truffle/...))'
+bazelisk test --config=elide-processors @graal//truffle:sl_jit.tck.IdentityFunctionTest
+bazelisk test --config=elide-processors @graal//truffle:com.oracle.truffle.sl.test.com.oracle.truffle.sl.test.SLTestSuiteBytecodeCached
+bazelisk test --config=elide-processors @graal//compiler:GR35581Test @graal//compiler:GR36613Test @graal//compiler:GR42688Test @graal//compiler:TruffleDirectCallNodeTest
+```
+
+Each JUnit label supports Bazel test filtering and writes JUnit XML. The TCK loads the SL provider from its distribution JAR and requires it through `-Dtck.language=sl`. At this source pin the TCK reports 16,564 cases per runtime. SL supplies no inline snippets, so `InlineExecutionTest` has zero cases. The SL JUnit suite reports 685 cases, including the 57 upstream programs in each of its four runner configurations.
+
+The four compiler regression labels compile individual files from `jdk.graal.compiler.test`. Their test launchers place the Bazel-built `GRAAL` JAR on the upgrade module path and package generated test language registrations for service loading. The complete compiler test project and its shared harness are still pending.
 
 ## SDK launchers and toolchain tests
 
@@ -78,7 +91,7 @@ Run `tools/generate-graal --check` to reproduce the checked-in patches from the 
 | Next checkpoint | Acceptance under Bazel |
 | --- | --- |
 | SDK toolchain distributions | Assemble the five LLVM, Ninja, CMake and musl redistribution layouts with their upstream contents and platform filters. Their packaged payloads are separate from the Elide LLVM toolchain used for Bazel compilation. |
-| Complete Truffle | Migrate the upstream Java test projects and qualify the TCK on the optimizing runtime. |
+| Complete Truffle | Migrate the broader `TRUFFLE_TEST` Java projects, including API, DSL, instrumentation and library tests with their external dependencies. |
 | Compiler and SubstrateVM | Migrate the upstream Graal compiler test projects and their fixtures. Build the required Espresso Shared dependencies and SubstrateVM, then produce and execute an image with the newly built toolchain. |
 | Languages and tools | Migrate Regex, Sulong, Wasm, Espresso, Espresso Compiler Stub, Tools, Visualizer, Web Image and Sandbox Toolchains with their Java, native and external inputs. Run each suite's upstream tests. |
 | VM assembly | Pin the external components required by each selected VM configuration. Assemble the distribution and run its launchers, component tests and corresponding mx gate equivalents from a clean Linux RBE build. |

@@ -34,6 +34,8 @@ type project struct {
 	ShadeInputs                          []string `json:"shade_inputs"`
 	AddExports                           []string `json:"add_exports"`
 	ResourceRoot                         string   `json:"resource_root"`
+	TestRuntime                          []string `json:"test_runtime"`
+	TestJVMFlags                         []string `json:"test_jvm_flags"`
 	Testonly                             bool
 }
 
@@ -221,7 +223,14 @@ func (g *importer) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
 		}
 		for _, class := range p.Tests {
 			t := rule.NewRule("mx_test_class", p.Name+"."+class)
-			t.SetAttr("project", ":"+p.Name)
+			if len(p.TestRuntime) > 0 {
+				t.SetAttr("runtime_deps", p.TestRuntime)
+			} else {
+				t.SetAttr("project", ":"+p.Name)
+			}
+			if len(p.TestJVMFlags) > 0 {
+				t.SetAttr("jvm_flags", p.TestJVMFlags)
+			}
 			t.SetAttr("test_class", class)
 			if err := add(g.suite, t); err != nil {
 				return err
@@ -314,11 +323,11 @@ func graphKind(k string) bool {
 func (g *importer) Kinds() map[string]rule.KindInfo {
 	kinds := g.javaLanguage.Kinds()
 	managed := map[string]bool{}
-	for _, a := range strings.Fields("overlays shade shade_inputs manifest contents directives release snippets_pattern archived_libraries jni_services truffle_services graal_services module_name add_exports abi_after_javac copies literals srcs deps packages test_class project processor_class generates_api plugins resources mx_resource_root unified_release javac_opts javacopts testonly visibility") {
+	for _, a := range strings.Fields("overlays shade shade_inputs manifest contents directives release snippets_pattern archived_libraries jni_services truffle_services graal_services module_name add_exports abi_after_javac copies literals srcs deps packages runtime_deps jvm_flags test_class project processor_class generates_api plugins resources mx_resource_root unified_release javac_opts javacopts testonly visibility") {
 		managed[a] = true
 	}
 	for _, k := range strings.Fields("mx_jvmci_library mx_shaded_java mx_files mx_project mx_whole_java mx_processed_java mx_processor mx_test_class") {
-		kinds[k] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"srcs": true, "packages": true, "project": true, "processor_class": true}, MergeableAttrs: managed}
+		kinds[k] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"srcs": true, "packages": true, "project": true, "test_class": true, "processor_class": true}, MergeableAttrs: managed}
 	}
 	kinds["mx_jar_dist"] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"contents": true}, MergeableAttrs: managed}
 	kinds["mx_resource_layout"] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"literals": true, "copies": true}, MergeableAttrs: managed}

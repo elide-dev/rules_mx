@@ -434,6 +434,27 @@ def _resource_layout(dist, pending, mappings):
     }
 
 
+def _junit_classes(project):
+    candidates = project.find_classes_with_annotations(
+        None, ["@Test", "@org.junit.Test", "@RunWith", "@org.junit.runner.RunWith"]
+    )
+    # mx finds annotated source files, including abstract parameterized test bases.
+    # Ignore comments and literals before inspecting the class declaration.
+    non_code = re.compile(
+        r'''//[^\n]*|/\*.*?\*/|""".*?"""|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*[']''',
+        re.DOTALL,
+    )
+    abstract = re.compile(
+        r"\babstract\s+(?:(?:public|protected|private|static|sealed|non-sealed|strictfp)\s+)*class\s+(\w+)"
+    )
+    classes = []
+    for classname, (source, _) in candidates.items():
+        declarations = abstract.findall(non_code.sub(" ", Path(source).read_text()))
+        if classname.rsplit(".", 1)[-1] not in declarations:
+            classes.append(classname)
+    return sorted(classes)
+
+
 def _mappings(parser, values, flag):
     result = {}
     for mapping in values:
@@ -561,8 +582,30 @@ def bazel_buildfile(args):
         metavar="SUITE:PROJECT=LABEL",
         help="direct Java dependency referenced by generated sources",
     )
+    parser.add_argument(
+        "--test-runtime",
+        action="append",
+        default=[],
+        metavar="SUITE:PROJECT=LABEL",
+        help="discover JUnit classes and run them against these packaged runtime dependencies",
+    )
+    parser.add_argument(
+        "--test-jvm-flag",
+        action="append",
+        default=[],
+        metavar="SUITE:PROJECT=FLAG",
+    )
     parser.add_argument("projects", nargs="+")
     options = parser.parse_args(args)
+    test_runtimes = _mappings(parser, options.test_runtime, "--test-runtime")
+    test_flags = {}
+    for spec in options.test_jvm_flag:
+        name, sep, value = spec.partition("=")
+        if not sep or ":" not in name or not value.startswith("-"):
+            parser.error("expected --test-jvm-flag SUITE:PROJECT=FLAG")
+        test_flags.setdefault(name, []).append(value)
+    if (test_runtimes or test_flags) and not options.gazelle:
+        parser.error("test configuration requires --gazelle")
     project_options = {}
     for spec in options.javac_opt:
         name, sep, value = spec.partition("=")
@@ -744,6 +787,7 @@ def bazel_buildfile(args):
             attrs["deps"] = deps
         if options.gazelle:
             test = project.is_test_project()
+            test_runtime = test_runtimes.pop(project.qualifiedName(), [])
             concealed = project._orig_attrs.get("requiresConcealed", {})
             coarse = bool(
                 shaded
@@ -751,6 +795,7 @@ def bazel_buildfile(args):
                 or processors
                 or resources
                 or test
+                or test_runtime
                 or project.name in options.whole_project
             )
             record = {
@@ -811,20 +856,19 @@ def bazel_buildfile(args):
                         record["abi_after_javac"] = True
                 if test:
                     record["testonly"] = True
-                    record["tests"] = sorted(
-                        project.find_classes_with_annotations(
-                            None,
-                            [
-                                "@Test",
-                                "@org.junit.Test",
-                                "@RunWith",
-                                "@org.junit.runner.RunWith",
-                            ],
-                        )
-                    )
+                if test or test_runtime:
+                    record["tests"] = _junit_classes(project)
+                    if test_runtime:
+                        record["test_runtime"] = test_runtime
+                    if flags := test_flags.pop(project.qualifiedName(), []):
+                        record["test_jvm_flags"] = flags
             graph[project.name] = record
         rules[project.name] = _rule(
             "java_library" if processors else "elide_java_library", attrs, resource_attr
+        )
+    if test_runtimes or test_flags:
+        mx.abort(
+            f"Unused test configuration: {sorted(test_runtimes.keys() | test_flags.keys())}"
         )
     if generated_deps:
         mx.abort(f"Unknown generated dependency project: {sorted(generated_deps)}")

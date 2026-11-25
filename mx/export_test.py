@@ -89,6 +89,70 @@ class ExportTest(unittest.TestCase):
         self.assertEqual(len(graph["plugins"]), 2)
         self.assertTrue(all(plugin["deps"] == [":proc"] for plugin in graph["plugins"]))
 
+    def test_packaged_test_discovery(self):
+        with tempfile.TemporaryDirectory() as directory:
+            suite = Path(directory).resolve()
+            (suite / ".mx_vcs_root").touch()
+            metadata = suite / "mx.published"
+            metadata.mkdir()
+            (metadata / "suite.py").write_text(
+                "suite = "
+                + repr(
+                    {
+                        "name": "published",
+                        "mxversion": "7.89.0",
+                        "projects": {
+                            "tck": {
+                                "sourceDirs": ["src"],
+                                "javaCompliance": "17+",
+                                "testProject": False,
+                            }
+                        },
+                    }
+                )
+            )
+            pkg = suite / "tck/src/example"
+            pkg.mkdir(parents=True)
+            for name, decl in [
+                ("Base", "abstract public class Base"),
+                ("Concrete", "public class Concrete extends Base"),
+            ]:
+                (pkg / (name + ".java")).write_text(
+                    f"package example;\n/* abstract class Concrete */\n@RunWith(Parameterized.class)\n{decl} {{}}\n"
+                )
+            args = (
+                "bazel-buildfile",
+                "--gazelle",
+                "--test-runtime",
+                "published:tck=:TCK_TESTS",
+                "--test-runtime",
+                "published:tck=:LANGUAGE_PROVIDER",
+            )
+            result = self.run_mx(
+                *args,
+                "--test-jvm-flag",
+                "published:tck=-Dtck.language=sl",
+                "tck",
+                suite=suite,
+            )
+            (project,) = json.loads(result.stdout)["projects"]
+            self.assertEqual(project["tests"], ["example.Concrete"])
+            self.assertEqual(
+                project["test_runtime"], [":TCK_TESTS", ":LANGUAGE_PROVIDER"]
+            )
+            self.assertEqual(project["test_jvm_flags"], ["-Dtck.language=sl"])
+            self.assertFalse(project.get("testonly"))
+            invalid = self.run_mx(
+                *args,
+                "--test-runtime",
+                "published:typo=:TCK_TESTS",
+                "tck",
+                suite=suite,
+                check=False,
+            )
+            self.assertNotEqual(invalid.returncode, 0)
+            self.assertIn("published:typo", invalid.stderr + invalid.stdout)
+
     def test_classpath_distribution_root(self):
         args = ("bazel-buildfile", "--classpath-dists")
         result = self.run_mx(

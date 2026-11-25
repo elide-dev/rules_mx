@@ -78,6 +78,17 @@ SUITES = {
         *SDK,
     ],
     "compiler": [
+        "--test-jvm-flag",
+        "compiler:org.graalvm.profdiff.test=--add-modules=jdk.internal.vm.ci",
+        "--test-jvm-flag",
+        "compiler:org.graalvm.profdiff.test=--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
+        "--java-dep",
+        "mx:JUNIT=@contrib_rules_jvm_deps//:junit_junit",
+        "--whole-project",
+        "org.graalvm.profdiff",
+        "--whole-project",
+        "org.graalvm.igvutil",
+        "--infer-source-deps",
         *(
             arg
             for check in (
@@ -105,8 +116,54 @@ SUITES = {
         "--archive-dist",
         "GRAAL",
         "GRAAL",
+        "org.graalvm.igvutil.test",
+        "org.graalvm.profdiff.test",
     ],
     "truffle": [
+        "--generated-dep",
+        "truffle:com.oracle.truffle.sl.test=@contrib_rules_jvm_deps//:junit_junit",
+        "--generated-dep",
+        "truffle:com.oracle.truffle.sl.test=@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
+        "--test-runtime",
+        "truffle:com.oracle.truffle.sl.test=:TRUFFLE_SL_TEST",
+        "--test-runtime",
+        "truffle:com.oracle.truffle.tck.tests=:TRUFFLE_TCK_TESTS",
+        "--test-runtime",
+        "truffle:com.oracle.truffle.tck.tests=:TRUFFLE_SL_TCK",
+        "--test-jvm-flag",
+        "truffle:com.oracle.truffle.tck.tests=-Dtck.language=sl",
+        *(
+            arg
+            for project in (
+                "com.oracle.truffle.sl.test",
+                "com.oracle.truffle.tck.tests",
+            )
+            for flag in (
+                "-Dpolyglot.engine.WarnInterpreterOnly=false",
+                "--enable-native-access=ALL-UNNAMED",
+            )
+            for arg in ("--test-jvm-flag", f"truffle:{project}={flag}")
+        ),
+        "--java-dep",
+        "mx:JUNIT=@contrib_rules_jvm_deps//:junit_junit",
+        "--java-dep",
+        "sdk:POLYGLOT_TCK=//sdk:POLYGLOT_TCK",
+        "--whole-project",
+        "com.oracle.truffle.tck.common",
+        "--whole-project",
+        "com.oracle.truffle.tck.tests",
+        *(
+            arg
+            for dist in (
+                "TRUFFLE_TCK",
+                "TRUFFLE_TCK_COMMON",
+                "TRUFFLE_TCK_TESTS",
+                "TRUFFLE_TCK_INSTRUMENTATION",
+                "TRUFFLE_SL_TCK",
+                "TRUFFLE_SL_TEST",
+            )
+            for arg in ("--archive-dist", dist)
+        ),
         "--infer-source-deps",
         "--archive-dist",
         "TRUFFLE_COMPILER",
@@ -169,6 +226,8 @@ SUITES = {
         "TRUFFLE_SL",
         "TRUFFLE_SL_LAUNCHER",
         "TRUFFLE_RUNTIME",
+        "TRUFFLE_SL_TEST",
+        "TRUFFLE_SL_TCK",
     ],
 }
 
@@ -276,11 +335,32 @@ def truffle_native_projects(directory):
         file_list=dist["fileListEntry"],
         hash_entry=dist["hashEntry"],
     )
+    fixture_rules = []
+    fixture_root = directory / "src/com.oracle.truffle.sl.test/src/tests"
+    for parent in sorted({p.parent for p in fixture_root.rglob("*.sl")}):
+        (parent / "BUILD.bazel").write_text(
+            'exports_files(glob(["*.sl", "*.output", "*.input"], allow_empty = True), visibility = ["//truffle:__pkg__"])\n'
+        )
+        names = sorted(p.stem for p in parent.glob("*.sl"))
+        inputs = sorted(p.stem for p in parent.glob("*.input"))
+        prefix = ".".join(parent.relative_to(fixture_root).parts)
+        package = "//" + parent.relative_to(directory.parent).as_posix()
+        fixture_rules.append(
+            f"sl_fixture_tests(package = {json.dumps(package)}, names = {json.dumps(names)}, "
+            f"inputs = {json.dumps(inputs)}, prefix = {json.dumps(prefix + '.' if prefix else '')})\n"
+        )
+    projects = json.loads((directory / "mx-graph.json").read_text())["projects"]
+    tck = next(p for p in projects if p["name"] == "com.oracle.truffle.tck.tests")
     return (
         'load("@rules_mx//graal:attach.bzl", "truffle_attach")\n\n'
-        + 'load("@rules_mx//graal:simplelanguage.bzl", "simplelanguage", "sl_fixture_tests")\n\n'
+        + 'load("@rules_mx//graal:simplelanguage.bzl", "optimizing_junit", "simplelanguage", "sl_fixture_tests")\n\n'
         + 'simplelanguage(name = "sl")\n\n'
-        + 'sl_fixture_tests("src/com.oracle.truffle.sl.test/src/tests")\n\n'
+        + "".join(fixture_rules)
+        + "".join(
+            f'optimizing_junit(name = "sl_jit.tck.{cls.rsplit(".", 1)[1]}", test_class = "{cls}", '
+            f'runtime_deps = {json.dumps(tck["test_runtime"])}, jvm_flags = ["-Dtck.language=sl"])\n'
+            for cls in tck["tests"]
+        )
         + "truffle_attach(\n"
         + "".join(f"    {key} = {json.dumps(value)},\n" for key, value in attrs.items())
         + ")\n"
@@ -327,7 +407,11 @@ def generate(suite, stage):
         )
     elif suite == "compiler":
         (directory / "BUILD.bazel").write_text(
-            'load("@rules_mx//graal:simplelanguage.bzl", "simplelanguage")\n\n'
+            'load("@rules_mx//graal:simplelanguage.bzl", "simplelanguage", "truffle_compiler_test")\n\n'
+            'truffle_compiler_test(name = "GR35581Test", processors = ["TruffleProcessor", "LanguageRegistrationProcessor"])\n'
+            'truffle_compiler_test(name = "GR36613Test")\n'
+            'truffle_compiler_test(name = "GR42688Test", processors = ["TruffleProcessor"])\n'
+            'truffle_compiler_test(name = "TruffleDirectCallNodeTest")\n\n'
             'simplelanguage(name = "sl_jit", compiler = ":GRAAL")\n\n'
             'simplelanguage(name = "sl_compilation_test", compiler = ":GRAAL", probe = "@rules_mx//graal:compiled_guest")\n'
         )

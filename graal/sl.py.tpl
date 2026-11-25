@@ -35,6 +35,13 @@ if __name__ == "__main__":
                         "org.graalvm.sl/com.oracle.truffle.sl.runtime"):
             options.append("--add-exports=" + package + "=ALL-UNNAMED")
         entry = ["-cp", str(root / probe), "graal.CompiledGuest", str(root / compiler)]
+    elif test_class := {TEST_CLASS}:
+        options.extend(["-ea", "-esa", "-Dbazel.test_suite=" + test_class,
+                        "--add-exports=org.graalvm.truffle.compiler/com.oracle.truffle.compiler=ALL-UNNAMED",
+                        "--add-exports=org.graalvm.truffle.runtime/com.oracle.truffle.runtime=ALL-UNNAMED"])
+        options.extend({JVM_FLAGS})
+        classpath = os.pathsep.join(str(root / jar) for jar in {CLASSPATH})
+        entry = ["-cp", classpath, "com.google.testing.junit.runner.BazelTestRunner"]
     else:
         entry = ["-m", "org.graalvm.sl_launcher/com.oracle.truffle.sl.launcher.SLMain"]
     os.execv(java, [java, *options, "--module-path", modules, "--add-modules", ",".join(roots), *entry, *sys.argv[1:]])
