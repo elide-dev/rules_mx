@@ -1,4 +1,4 @@
-"""Check NativeBridgeArchiveParticipant semantics for multi-release input markers."""
+"""Check mx archive participants and suite snippet filtering."""
 
 from pathlib import Path
 import subprocess
@@ -11,6 +11,44 @@ PACKER = Path(sys.argv[1]).absolute()
 
 
 class PackJarTest(unittest.TestCase):
+    def test_filters_project_snippets_and_merges_both_registration_kinds(self):
+        with tempfile.TemporaryDirectory() as directory:
+            project = Path(directory) / "project.jar"
+            library = project.with_name("vendor.jar")
+            out = project.with_name("dist.jar")
+            with ZipFile(project, "w") as jar:
+                jar.writestr("p/Snippets.class", b"doc")
+                jar.writestr("META-INF/truffle-registrations/p.Guest", b"p.Service")
+                jar.writestr("META-INF/jni-entry-points/p.Bridge", b"p.Service")
+            with ZipFile(library, "w") as jar:
+                jar.writestr("other/Snippets.class", b"vendor")
+            subprocess.run(
+                [
+                    PACKER,
+                    "--input",
+                    project,
+                    "--input",
+                    library,
+                    "--archived-library",
+                    library,
+                    "--snippets-pattern",
+                    ".*Snippets.*",
+                    "--jni-services",
+                    "--truffle-services",
+                    "--output",
+                    out,
+                ],
+                check=True,
+            )
+            with ZipFile(out) as jar:
+                self.assertEqual(
+                    set(jar.namelist()),
+                    {"META-INF/services/p.Service", "other/Snippets.class"},
+                )
+                self.assertEqual(
+                    jar.read("META-INF/services/p.Service"), b"p.Bridge\np.Guest\n"
+                )
+
     def test_accumulates_versioned_providers_and_consumes_markers(self):
         with tempfile.TemporaryDirectory() as directory:
             jar = Path(directory) / "members.jar"

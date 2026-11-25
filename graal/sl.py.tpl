@@ -1,15 +1,15 @@
 """Run the upstream SL launcher on the resolved Bazel module path."""
 
 import os
+from pathlib import Path
 import sys
-
-from python.runfiles import runfiles
 
 
 if __name__ == "__main__":
-    files = runfiles.Create()
-    java = os.path.abspath(files.Rlocation({JAVA}))
-    modules = os.pathsep.join(os.path.abspath(files.Rlocation(jar)) for jar in {MODULES})
+    # The entry point sits at <runfiles>/<graal repository>/truffle/sl.py.
+    root = Path(__file__).absolute().parents[2]
+    java = str(root / {JAVA})
+    modules = os.pathsep.join(str(root / jar) for jar in {MODULES})
     options = [
         "--enable-native-access=org.graalvm.truffle",
         "-Dpolyglot.engine.WarnInterpreterOnly=false",

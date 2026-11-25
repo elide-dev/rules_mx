@@ -38,7 +38,7 @@ _sl_main = rule(
 
 def simplelanguage(name):
     _sl_main(name = name + ".main", out = name + ".py", modules = [":TRUFFLE_SL", ":TRUFFLE_SL_LAUNCHER"])
-    py_binary(name = name, srcs = [":" + name + ".main"], main = name + ".py", data = [":" + name + ".main"], deps = ["@rules_python//python/runfiles"], visibility = ["//visibility:public"])
+    py_binary(name = name, srcs = [":" + name + ".main"], main = name + ".py", data = [":" + name + ".main"], visibility = ["//visibility:public"])
 
 def sl_fixture_tests(directory):
     fixtures = native.glob([directory + "/**/*.sl"])
