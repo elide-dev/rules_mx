@@ -2,11 +2,11 @@ diff --git a/substratevm/BUILD.bazel b/substratevm/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/substratevm/BUILD.bazel
-@@ -0,0 +1,4169 @@
+@@ -0,0 +1,4540 @@
 +load("@rules_mx//graal:layout.bzl", "mx_archive_layout")
 +load("@rules_mx//graal:simplelanguage.bzl", "svm_driver_test_runner")
 +load("@rules_mx//graal:svm.bzl", "svm_compiler_flags", "svm_launcher", "svm_native_projects")
-+load("@rules_mx//mx:graph.bzl", "mx_jar_dist", "mx_jvmci_library", "mx_processed_java", "mx_processor", "mx_project", "mx_shaded_java", "mx_test_class", "mx_whole_java")
++load("@rules_mx//mx:graph.bzl", "mx_jar_dist", "mx_jvmci_library", "mx_processed_java", "mx_processor", "mx_project", "mx_resource_layout", "mx_shaded_java", "mx_test_class", "mx_whole_java")
 +
 +svm_compiler_flags(
 +    name = "svm-compiler-flags-builder",
@@ -97,6 +97,12 @@ new file mode 100644
 +    visibility = ["//visibility:public"],
 +)
 +
++mx_resource_layout(
++    name = "TRUFFLE_RUNTIME_SVM_VERSION",
++    copies = {"META-INF/graalvm/org.graalvm.truffle.runtime.svm/version": "//sdk:VERSION.files/version"},
++    visibility = ["//visibility:public"],
++)  # keep
++
 +filegroup(
 +    name = "support_distributions",
 +    srcs = [
@@ -113,8 +119,11 @@ new file mode 100644
 +        ":SVM_NFI_GRAALVM_SUPPORT",
 +        ":SVM_NFI_NONE_JAR",
 +        ":SVM_TRUFFLE_RUNTIME_GRAALVM_SUPPORT",
++        ":SVM_TRUFFLE_TCK",
 +        ":TRUFFLE_GRAALVM_SUPPORT",
 +        ":TRUFFLE_LANGUAGE_LIBRARY_COMMUNITY_GRAALVM_SUPPORT",
++        ":TRUFFLE_RUNTIME_SVM",
++        ":TRUFFLE_RUNTIME_SVM_VERSION",
 +        ":TRUFFLE_SVM_GRAALVM_SUPPORT",
 +    ],
 +    visibility = ["//visibility:public"],
@@ -2781,10 +2790,278 @@ new file mode 100644
 +    deps = ["//sdk:NATIVEIMAGE"],
 +)
 +
++mx_jvmci_library(
++    name = "com.oracle.svm.truffle",
++    srcs = [
++        "//substratevm/src/com.oracle.svm.truffle/src/com/oracle/svm/truffle:com.oracle.svm.truffle.srcs",
++        "//substratevm/src/com.oracle.svm.truffle/src/com/oracle/svm/truffle/api:com.oracle.svm.truffle.srcs",
++        "//substratevm/src/com.oracle.svm.truffle/src/com/oracle/svm/truffle/isolated:com.oracle.svm.truffle.srcs",
++    ],
++    add_exports = [
++        "java.base/jdk.internal.misc",
++        "jdk.internal.vm.ci/jdk.vm.ci.aarch64",
++        "jdk.internal.vm.ci/jdk.vm.ci.amd64",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta.annotation",
++        "jdk.internal.vm.ci/jdk.vm.ci.code",
++        "jdk.internal.vm.ci/jdk.vm.ci.code.stack",
++    ],
++    javacopts = [
++        "-source",
++        "24",
++        "-target",
++        "24",
++        "-parameters",
++        "-Xep:ReturnValueIgnored:WARN",
++    ],
++    mx_resource_root = "src/com.oracle.svm.truffle/src",
++    plugins = [
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.replacements.processor.ReplacementsAnnotationProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.nodeinfo.processor.GraphNodeProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.IntrinsicStubProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.SyncPortProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.core.match.processor.MatchProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.options.processor.OptionProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.serviceprovider.processor.ServiceProviderProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.libgraal.truffle.TruffleFromLibGraalProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredFeatureProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredImageSingletonProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.BasedOnJDKFileProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.LayeredAnnotationProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.GenerateAnnotationWrapperProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    resources = [
++        "//substratevm/src/com.oracle.svm.truffle/src/META-INF/native-image/org.graalvm.truffle.runtime.svm:com.oracle.svm.truffle.resources",
++        "//substratevm/src/com.oracle.svm.truffle/src/com/oracle/svm/truffle/isolated:com.oracle.svm.truffle.resources",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":NATIVE_IMAGE_BASE",
++        ":SVM_GUEST_STAGING",
++        ":SVM_SHARED",
++        ":com.oracle.graal.pointsto",
++        ":com.oracle.svm.common",
++        ":com.oracle.svm.core",
++        ":com.oracle.svm.core.auximage",
++        ":com.oracle.svm.graal",
++        ":com.oracle.svm.hosted",
++        ":com.oracle.svm.util",
++        "//compiler:GRAAL",
++        "//compiler:GRAAL_OPTIONS",
++        "//sdk:COLLECTIONS",
++        "//sdk:JNIUTILS",
++        "//sdk:NATIVEBRIDGE",
++        "//sdk:NATIVEIMAGE",
++        "//sdk:WORD",
++        "//truffle:TRUFFLE_API",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_processed_java(
++    name = "com.oracle.svm.truffle.nfi",
++    srcs = [
++        "//substratevm/src/com.oracle.svm.truffle.nfi/src/com/oracle/svm/truffle/nfi:com.oracle.svm.truffle.nfi.srcs",
++        "//substratevm/src/com.oracle.svm.truffle.nfi/src/com/oracle/svm/truffle/nfi/libffi:com.oracle.svm.truffle.nfi.srcs",
++    ],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "24",
++        "-parameters",
++    ],
++    plugins = [
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.replacements.processor.ReplacementsAnnotationProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.nodeinfo.processor.GraphNodeProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.IntrinsicStubProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.SyncPortProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.core.match.processor.MatchProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.options.processor.OptionProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.serviceprovider.processor.ServiceProviderProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.libgraal.truffle.TruffleFromLibGraalProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredFeatureProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredImageSingletonProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.BasedOnJDKFileProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.LayeredAnnotationProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.GenerateAnnotationWrapperProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":SVM_GUEST_STAGING",
++        ":SVM_SHARED",
++        ":com.oracle.graal.pointsto",
++        ":com.oracle.svm.core",
++        ":com.oracle.svm.truffle",
++        "//sdk:NATIVEIMAGE",
++        "//sdk:WORD",
++        "//truffle:TRUFFLE_API",
++    ],
++)
++
 +mx_project(
 +    name = "com.oracle.svm.truffle.nfi.none",
 +    packages = ["//substratevm/src/com.oracle.svm.truffle.nfi.none/src/com/oracle/svm/truffle/nfi/none"],
 +    visibility = ["//visibility:public"],
++)
++
++mx_processed_java(
++    name = "com.oracle.svm.truffle.nfi.posix",
++    srcs = ["//substratevm/src/com.oracle.svm.truffle.nfi.posix/src/com/oracle/svm/truffle/nfi/posix:com.oracle.svm.truffle.nfi.posix.srcs"],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "24",
++        "-parameters",
++    ],
++    plugins = [
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.replacements.processor.ReplacementsAnnotationProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.nodeinfo.processor.GraphNodeProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.IntrinsicStubProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.SyncPortProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.core.match.processor.MatchProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.options.processor.OptionProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.serviceprovider.processor.ServiceProviderProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.libgraal.truffle.TruffleFromLibGraalProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredFeatureProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredImageSingletonProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.BasedOnJDKFileProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.LayeredAnnotationProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.GenerateAnnotationWrapperProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":SVM_GUEST_STAGING",
++        ":SVM_SHARED",
++        ":com.oracle.svm.core",
++        ":com.oracle.svm.core.posix",
++        ":com.oracle.svm.truffle.nfi",
++        "//sdk:NATIVEIMAGE",
++        "//sdk:WORD",
++        "//truffle:TRUFFLE_API",
++    ],
++)
++
++mx_processed_java(
++    name = "com.oracle.svm.truffle.nfi.windows",
++    srcs = ["//substratevm/src/com.oracle.svm.truffle.nfi.windows/src/com/oracle/svm/truffle/nfi/windows:com.oracle.svm.truffle.nfi.windows.srcs"],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "24",
++        "-parameters",
++    ],
++    plugins = [
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.replacements.processor.ReplacementsAnnotationProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.nodeinfo.processor.GraphNodeProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.IntrinsicStubProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.SyncPortProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.core.match.processor.MatchProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.options.processor.OptionProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.serviceprovider.processor.ServiceProviderProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.libgraal.truffle.TruffleFromLibGraalProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredFeatureProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredImageSingletonProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.BasedOnJDKFileProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.LayeredAnnotationProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.GenerateAnnotationWrapperProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":SVM_SHARED",
++        ":com.oracle.svm.core",
++        ":com.oracle.svm.core.windows",
++        ":com.oracle.svm.truffle.nfi",
++        "//sdk:NATIVEIMAGE",
++        "//sdk:WORD",
++        "//truffle:TRUFFLE_API",
++    ],
++)
++
++mx_jvmci_library(
++    name = "com.oracle.svm.truffle.tck",
++    srcs = ["//substratevm/src/com.oracle.svm.truffle.tck/src/com/oracle/svm/truffle/tck:com.oracle.svm.truffle.tck.srcs"],
++    add_exports = [
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta.annotation",
++        "jdk.internal.vm.ci/jdk.vm.ci.code",
++        "jdk.internal.vm.ci/jdk.vm.ci.common",
++    ],
++    javacopts = [
++        "-source",
++        "24",
++        "-target",
++        "24",
++        "-parameters",
++    ],
++    mx_resource_root = "src/com.oracle.svm.truffle.tck/src",
++    plugins = [
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.replacements.processor.ReplacementsAnnotationProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.nodeinfo.processor.GraphNodeProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.IntrinsicStubProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.SyncPortProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.core.match.processor.MatchProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.options.processor.OptionProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.serviceprovider.processor.ServiceProviderProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.libgraal.truffle.TruffleFromLibGraalProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredFeatureProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredImageSingletonProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.BasedOnJDKFileProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.LayeredAnnotationProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.GenerateAnnotationWrapperProcessor",
++    ],
++    resources = [
++        "//substratevm/src/com.oracle.svm.truffle.tck/src/META-INF/native-image:com.oracle.svm.truffle.tck.resources",
++        "//substratevm/src/com.oracle.svm.truffle.tck/src/com/oracle/svm/truffle/tck/resources:com.oracle.svm.truffle.tck.resources",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":NATIVE_IMAGE_BASE",
++        ":SVM_CONFIGURE",
++        ":SVM_SHARED",
++        ":com.oracle.graal.pointsto",
++        ":com.oracle.svm.core",
++        ":com.oracle.svm.hosted",
++        ":com.oracle.svm.util",
++        "//compiler:GRAAL",
++        "//compiler:GRAAL_OPTIONS",
++        "//sdk:COLLECTIONS",
++        "//sdk:NATIVEBRIDGE",
++        "//sdk:NATIVEIMAGE",
++        "//truffle:TRUFFLE_API",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
 +)
 +
 +mx_jvmci_library(
@@ -4131,6 +4408,100 @@ new file mode 100644
 +    },
 +    visibility = ["//visibility:public"],
 +    deps = ["//sdk:NATIVEIMAGE"],
++)
++
++mx_jar_dist(
++    name = "SVM_TRUFFLE_TCK",
++    contents = [":com.oracle.svm.truffle.tck"],
++    graal_services = True,
++    jni_services = True,
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":SVM",
++        "//sdk:NATIVEBRIDGE",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_jar_dist(
++    name = "TRUFFLE_RUNTIME_SVM",
++    add_exports = [
++        "java.management/sun.management",
++        "jdk.internal.vm.ci/jdk.vm.ci.aarch64",
++        "jdk.internal.vm.ci/jdk.vm.ci.amd64",
++        "jdk.internal.vm.ci/jdk.vm.ci.code",
++        "jdk.internal.vm.ci/jdk.vm.ci.common",
++        "jdk.internal.vm.ci/jdk.vm.ci.hotspot",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta.annotation",
++        "jdk.internal.vm.ci/jdk.vm.ci.runtime",
++        "jdk.internal.vm.ci/jdk.vm.ci.services",
++    ],
++    contents = [
++        ":com.oracle.svm.truffle",
++        ":com.oracle.svm.truffle.nfi",
++        ":com.oracle.svm.truffle.nfi.posix",
++        ":com.oracle.svm.truffle.nfi.windows",
++        ":TRUFFLE_RUNTIME_SVM_VERSION",
++    ],
++    directives = [
++        "exports com.oracle.svm.truffle to org.graalvm.truffle.runtime.svm, com.oracle.truffle.enterprise.svm",
++        "exports com.oracle.svm.truffle.api to org.graalvm.truffle, org.graalvm.truffle.runtime.svm, com.oracle.truffle.enterprise.svm",
++        "exports com.oracle.svm.truffle.isolated to org.graalvm.truffle.runtime.svm, com.oracle.truffle.enterprise.svm",
++        "exports com.oracle.svm.truffle.nfi to org.graalvm.truffle.runtime.svm, com.oracle.truffle.enterprise.svm",
++        "exports com.oracle.svm.truffle.nfi.libffi to org.graalvm.truffle.runtime.svm, com.oracle.truffle.enterprise.svm",
++        "exports com.oracle.svm.truffle.nfi.posix to org.graalvm.truffle.runtime.svm, com.oracle.truffle.enterprise.svm",
++        "exports com.oracle.svm.truffle.nfi.windows to org.graalvm.truffle.runtime.svm, com.oracle.truffle.enterprise.svm",
++        "opens com.oracle.svm.truffle to org.graalvm.nativeimage.builder, jdk.graal.compiler",
++        "opens com.oracle.svm.truffle.api to org.graalvm.nativeimage.builder, jdk.graal.compiler",
++        "opens com.oracle.svm.truffle.isolated to org.graalvm.nativeimage.builder, jdk.graal.compiler",
++        "opens com.oracle.svm.truffle.nfi to org.graalvm.nativeimage.builder, jdk.graal.compiler",
++        "opens com.oracle.svm.truffle.nfi.posix to org.graalvm.nativeimage.builder, jdk.graal.compiler",
++        "opens com.oracle.svm.truffle.nfi.windows to org.graalvm.nativeimage.builder, jdk.graal.compiler",
++        "requires java.management",
++        "requires jdk.graal.compiler",
++        "requires jdk.internal.vm.ci",
++        "requires jdk.management",
++        "requires org.graalvm.collections",
++        "requires org.graalvm.nativeimage.builder",
++        "requires org.graalvm.polyglot",
++        "requires org.graalvm.truffle",
++        "requires org.graalvm.truffle.compiler",
++        "requires static org.graalvm.jniutils",
++        "requires static org.graalvm.nativebridge",
++        "requires static org.graalvm.truffle.runtime",
++        "requires transitive jdk.graal.compiler.options",
++        "requires transitive org.graalvm.nativeimage",
++        "requires transitive org.graalvm.nativeimage.base",
++        "requires transitive org.graalvm.nativeimage.guest.staging",
++        "requires transitive org.graalvm.nativeimage.jvmci.shared",
++        "requires transitive org.graalvm.nativeimage.objectfile",
++        "requires transitive org.graalvm.nativeimage.pointsto",
++        "requires transitive org.graalvm.nativeimage.shared",
++        "requires transitive org.graalvm.word",
++    ],
++    graal_services = True,
++    jni_services = True,
++    module_exports = [
++        "java.base/jdk.internal.misc",
++        "jdk.internal.vm.ci/jdk.vm.ci.aarch64",
++        "jdk.internal.vm.ci/jdk.vm.ci.amd64",
++        "jdk.internal.vm.ci/jdk.vm.ci.code",
++        "jdk.internal.vm.ci/jdk.vm.ci.code.stack",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta.annotation",
++    ],
++    module_name = "org.graalvm.truffle.runtime.svm",
++    release = 21,
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":OBJECTFILE",
++        ":POINTSTO",
++        ":SVM",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
 +)
 +
 +mx_processor(
@@ -13492,6 +13863,176 @@ new file mode 100644
 +    ],
 +    visibility = ["//substratevm:__pkg__"],
 +)
+diff --git a/substratevm/src/com.oracle.svm.truffle/src/META-INF/native-image/org.graalvm.truffle.runtime.svm/BUILD.bazel b/substratevm/src/com.oracle.svm.truffle/src/META-INF/native-image/org.graalvm.truffle.runtime.svm/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.truffle/src/META-INF/native-image/org.graalvm.truffle.runtime.svm/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.truffle.resources",
++    srcs = ["native-image.properties"],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.truffle/src/com/oracle/svm/truffle/BUILD.bazel b/substratevm/src/com.oracle.svm.truffle/src/com/oracle/svm/truffle/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.truffle/src/com/oracle/svm/truffle/BUILD.bazel
+@@ -0,0 +1,28 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.truffle.srcs",
++    srcs = [
++        "AuxiliaryEngineCacheSupport.java",
++        "HostedTruffleConstantFieldProvider.java",
++        "NeedsAllEncodings.java",
++        "NodeClassSupport.java",
++        "OptionalTrufflePolyglotGuestFeatureEnabled.java",
++        "PolyglotIsolateCreateSupport.java",
++        "PolyglotIsolateGuestFeature.java",
++        "PolyglotIsolateTearDownSupport.java",
++        "SizeInBytesOptionType.java",
++        "SubstrateEarlyInliningPhase.java",
++        "SubstrateHostInliningPhase.java",
++        "SubstrateTruffleCompilationIdentifier.java",
++        "SubstrateTruffleHostEnvironment.java",
++        "SubstrateTruffleHostEnvironmentLookup.java",
++        "TruffleBaseFeature.java",
++        "TruffleFeature.java",
++        "TruffleJFRFeature.java",
++        "TruffleRuntimeCompiledMethodSupport.java",
++        "TruffleSupport.java",
++        "package-info.java",
++    ],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.truffle/src/com/oracle/svm/truffle/api/BUILD.bazel b/substratevm/src/com.oracle.svm.truffle/src/com/oracle/svm/truffle/api/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.truffle/src/com/oracle/svm/truffle/api/BUILD.bazel
+@@ -0,0 +1,31 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.truffle.srcs",
++    srcs = [
++        "SubstrateCompilableTruffleAST.java",
++        "SubstrateFastThreadLocal.java",
++        "SubstrateKnownTruffleTypes.java",
++        "SubstrateOptimizedCallTarget.java",
++        "SubstrateOptimizedCallTargetInstalledCode.java",
++        "SubstratePEGraphDecoder.java",
++        "SubstratePartialEvaluator.java",
++        "SubstratePostPartialEvaluationSuite.java",
++        "SubstrateThreadLocalHandshake.java",
++        "SubstrateThreadLocalHandshakeSnippets.java",
++        "SubstrateTruffleCompilationSupport.java",
++        "SubstrateTruffleCompiler.java",
++        "SubstrateTruffleCompilerImpl.java",
++        "SubstrateTruffleField.java",
++        "SubstrateTruffleGraphBuilderPlugins.java",
++        "SubstrateTruffleMethod.java",
++        "SubstrateTruffleRuntime.java",
++        "SubstrateTruffleType.java",
++        "SubstrateTruffleUniverseFactory.java",
++        "TruffleBoundaryPhase.java",
++        "TruffleField.java",
++        "TruffleMethod.java",
++        "TruffleType.java",
++    ],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.truffle/src/com/oracle/svm/truffle/isolated/BUILD.bazel b/substratevm/src/com.oracle.svm.truffle/src/com/oracle/svm/truffle/isolated/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.truffle/src/com/oracle/svm/truffle/isolated/BUILD.bazel
+@@ -0,0 +1,24 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.truffle.srcs",
++    srcs = [
++        "BinaryInput.java",
++        "BinaryOutput.java",
++        "IsolateAwareTruffleCompiler.java",
++        "IsolatedCompilableTruffleAST.java",
++        "IsolatedStringSupplier.java",
++        "IsolatedTruffleCompilationIdentifier.java",
++        "IsolatedTruffleCompilationTask.java",
++        "IsolatedTruffleCompilerEventForwarder.java",
++        "IsolatedTruffleRuntimeSupport.java",
++        "IsolatedTruffleSourceLanguagePosition.java",
++    ],
++    visibility = ["//substratevm:__pkg__"],
++)
++
++mx_files(
++    name = "com.oracle.svm.truffle.resources",
++    srcs = ["OWNERS.toml"],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.truffle.nfi/src/com/oracle/svm/truffle/nfi/BUILD.bazel b/substratevm/src/com.oracle.svm.truffle.nfi/src/com/oracle/svm/truffle/nfi/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.truffle.nfi/src/com/oracle/svm/truffle/nfi/BUILD.bazel
+@@ -0,0 +1,40 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.truffle.nfi.srcs",
++    srcs = [
++        "ErrnoMirror.java",
++        "LibFFI.java",
++        "LocalNativeScope.java",
++        "NFIInitialization.java",
++        "NativeAPI.java",
++        "NativeAPIImpl.java",
++        "NativeClosure.java",
++        "NativeObjectReplacer.java",
++        "NativeSignature.java",
++        "Target_com_oracle_truffle_nfi_NFISignature.java",
++        "Target_com_oracle_truffle_nfi_NFISymbol.java",
++        "Target_com_oracle_truffle_nfi_backend_libffi_ClosureNativePointer.java",
++        "Target_com_oracle_truffle_nfi_backend_libffi_LibFFIClosure_RetPatches.java",
++        "Target_com_oracle_truffle_nfi_backend_libffi_LibFFIContext.java",
++        "Target_com_oracle_truffle_nfi_backend_libffi_LibFFILanguage.java",
++        "Target_com_oracle_truffle_nfi_backend_libffi_LibFFILibrary.java",
++        "Target_com_oracle_truffle_nfi_backend_libffi_LibFFISignature.java",
++        "Target_com_oracle_truffle_nfi_backend_libffi_LibFFISymbol.java",
++        "Target_com_oracle_truffle_nfi_backend_libffi_LibFFIType.java",
++        "Target_com_oracle_truffle_nfi_backend_libffi_NFIUnsatisfiedLinkError.java",
++        "Target_com_oracle_truffle_nfi_backend_libffi_NativeAllocation.java",
++        "Target_com_oracle_truffle_nfi_backend_libffi_NativeAllocation_Queue.java",
++        "Target_com_oracle_truffle_nfi_backend_libffi_NativeArgumentBuffer_Pointer.java",
++        "Target_com_oracle_truffle_nfi_backend_libffi_NativeArgumentBuffer_TypeTag.java",
++        "Target_com_oracle_truffle_nfi_backend_libffi_NativeLibVersion.java",
++        "Target_com_oracle_truffle_nfi_backend_libffi_NativePointer.java",
++        "Target_com_oracle_truffle_nfi_backend_libffi_NativeString.java",
++        "Target_com_oracle_truffle_nfi_backend_spi_NFIState.java",
++        "Target_com_oracle_truffle_nfi_backend_spi_types_NativeSimpleType.java",
++        "TruffleNFIFeature.java",
++        "TruffleNFISupport.java",
++        "TruffleObjectHandle.java",
++    ],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.truffle.nfi/src/com/oracle/svm/truffle/nfi/libffi/BUILD.bazel b/substratevm/src/com.oracle.svm.truffle.nfi/src/com/oracle/svm/truffle/nfi/libffi/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.truffle.nfi/src/com/oracle/svm/truffle/nfi/libffi/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.truffle.nfi.srcs",
++    srcs = [
++        "LibFFI.java",
++        "LibFFIHeaderDirectives.java",
++    ],
++    visibility = ["//substratevm:__pkg__"],
++)
 diff --git a/substratevm/src/com.oracle.svm.truffle.nfi.none/src/com/oracle/svm/truffle/nfi/none/BUILD.bazel b/substratevm/src/com.oracle.svm.truffle.nfi.none/src/com/oracle/svm/truffle/nfi/none/BUILD.bazel
 new file mode 100644
 --- /dev/null
@@ -13509,6 +14050,80 @@ new file mode 100644
 +    ],
 +    unified_release = 21,
 +    visibility = ["//:__subpackages__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.truffle.nfi.posix/src/com/oracle/svm/truffle/nfi/posix/BUILD.bazel b/substratevm/src/com.oracle.svm.truffle.nfi.posix/src/com/oracle/svm/truffle/nfi/posix/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.truffle.nfi.posix/src/com/oracle/svm/truffle/nfi/posix/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.truffle.nfi.posix.srcs",
++    srcs = [
++        "PosixTruffleNFIFeature.java",
++        "Target_com_oracle_truffle_nfi_backend_libffi_LibFFIContext_Linux.java",
++        "Target_com_oracle_truffle_nfi_backend_libffi_LibFFIContext_Posix.java",
++    ],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.truffle.nfi.windows/src/com/oracle/svm/truffle/nfi/windows/BUILD.bazel b/substratevm/src/com.oracle.svm.truffle.nfi.windows/src/com/oracle/svm/truffle/nfi/windows/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.truffle.nfi.windows/src/com/oracle/svm/truffle/nfi/windows/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.truffle.nfi.windows.srcs",
++    srcs = ["WindowsTruffleNFIFeature.java"],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.truffle.tck/src/META-INF/native-image/BUILD.bazel b/substratevm/src/com.oracle.svm.truffle.tck/src/META-INF/native-image/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.truffle.tck/src/META-INF/native-image/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.truffle.tck.resources",
++    srcs = ["native-image.properties"],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.truffle.tck/src/com/oracle/svm/truffle/tck/BUILD.bazel b/substratevm/src/com.oracle.svm.truffle.tck/src/com/oracle/svm/truffle/tck/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.truffle.tck/src/com/oracle/svm/truffle/tck/BUILD.bazel
+@@ -0,0 +1,13 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.truffle.tck.srcs",
++    srcs = [
++        "AbstractMethodListParser.java",
++        "AllowListParser.java",
++        "MockMain.java",
++        "PermissionsFeature.java",
++        "PrivilegedListParser.java",
++    ],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.truffle.tck/src/com/oracle/svm/truffle/tck/resources/BUILD.bazel b/substratevm/src/com.oracle.svm.truffle.tck/src/com/oracle/svm/truffle/tck/resources/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.truffle.tck/src/com/oracle/svm/truffle/tck/resources/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.truffle.tck.resources",
++    srcs = [
++        "jdk_allowed_methods.json",
++        "jdk_inlined_implementations.json",
++        "jdk_privileged_methods.json",
++    ],
++    visibility = ["//substratevm:__pkg__"],
 +)
 diff --git a/substratevm/src/com.oracle.svm.util/src/com/oracle/svm/util/BUILD.bazel b/substratevm/src/com.oracle.svm.util/src/com/oracle/svm/util/BUILD.bazel
 new file mode 100644
