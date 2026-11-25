@@ -47,6 +47,8 @@ SVM_SUPPORT_JARS = (
     "SVM_NFI_NONE_JAR",
     "SVM_FOREIGN",
     "SVM_JDWP_SERVER",
+    "TRUFFLE_RUNTIME_SVM",
+    "SVM_TRUFFLE_TCK",
 )
 
 SVM_TEST_JARS = ("SVM_DRIVER_TESTS", "SVM_TEST_TERMINUS", "SVM_TESTS WITH SPACE")
@@ -593,6 +595,18 @@ SUITES = {
         "substratevm:com.oracle.svm.with.space.test=@rules_mx//graal:svm_native_resource_guest",
         "--manual-test-project",
         "com.oracle.svm.with.space.test",
+        "--java-dep",
+        "substratevm:TRUFFLE_RUNTIME_SVM_VERSION=:TRUFFLE_RUNTIME_SVM_VERSION",
+        "--java-dep",
+        "truffle:TRUFFLE_RUNTIME=//truffle:TRUFFLE_RUNTIME",
+        "--java-dep",
+        "sdk:NATIVEBRIDGE=//sdk:NATIVEBRIDGE",
+        "--java-dep",
+        "sdk:JNIUTILS=//sdk:JNIUTILS",
+        "--javac-only-processor",
+        "truffle:TRUFFLE_DSL_PROCESSOR",
+        "--javac-opt",
+        "com.oracle.svm.truffle=-Xep:ReturnValueIgnored:WARN",
         "--infer-source-deps",
         "--javac-opt",
         "com.oracle.svm.configure.test=-Xep:ReturnValueIgnored:WARN",
@@ -852,6 +866,19 @@ def harness_options(directory):
             "SVM_GUEST",
             "SVM_JVMCI_GUEST",
         ]
+        service = (
+            directory.parent
+            / "truffle/src/com.oracle.truffle.dsl.processor/src/META-INF/services/javax.annotation.processing.Processor"
+        )
+        truffle_processors = [
+            arg
+            for name in service.read_text().splitlines()
+            if name.strip() and not name.startswith("#")
+            for arg in (
+                "--processor-plugin",
+                f"truffle:TRUFFLE_DSL_PROCESSOR=//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.{name}",
+            )
+        ]
         seen = set()
         releases = []
         while pending:
@@ -872,6 +899,7 @@ def harness_options(directory):
                 )
         return [
             *releases,
+            *truffle_processors,
             *[
                 arg
                 for proc in source.read_text().splitlines()
@@ -1603,9 +1631,17 @@ def svm_support_layouts(directory):
         "SVM_TRUFFLE_RUNTIME_GRAALVM_SUPPORT",
         "TRUFFLE_LANGUAGE_LIBRARY_COMMUNITY_GRAALVM_SUPPORT",
     )
-    targets = [":" + name for name in (*names, *SVM_SUPPORT_JARS)]
+    metadata = runpy.run_path(str(directory / "mx.substratevm/suite.py"))["suite"]
+    version_name = "TRUFFLE_RUNTIME_SVM_VERSION"
+    ((destination, source),) = metadata["distributions"][version_name]["layout"].items()
+    if source != "dependency:sdk:VERSION/version":
+        raise ValueError("Unsupported SubstrateVM Truffle runtime version layout")
+    copies = {destination: "//sdk:VERSION.files/version"}
+    targets = [":" + name for name in (*names, *SVM_SUPPORT_JARS, version_name)]
     tests = [":" + name for name in SVM_TEST_JARS]
     return support_layout_rules(directory, names) + (
+        'load("@rules_mx//mx:graph.bzl", "mx_resource_layout")\n'
+        f'mx_resource_layout(name = "{version_name}", copies = {json.dumps(copies)}, visibility = ["//visibility:public"]) # keep\n'
         f'filegroup(name = "support_distributions", srcs = {json.dumps(targets)}, visibility = ["//visibility:public"])\n'
         f'filegroup(name = "test_distributions", srcs = {json.dumps(tests)}, testonly = True, visibility = ["//visibility:public"])\n'
     )
