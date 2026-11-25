@@ -72,8 +72,10 @@ def mx_processed_java(name, mx_resource_root = None, abi_after_javac = False, de
         visibility = visibility,
     )
 
-def mx_test_class(name, test_class, project = None, runtime_deps = [], jvm_flags = []):
+def mx_test_class(name, project = None, test_class = None, runtime_deps = [], jvm_flags = []):
     """Run one mx JUnit 4 test class."""
+    if not test_class or not (project or runtime_deps):
+        fail("mx_test_class requires test_class and a project or runtime_deps")
     java_test(name = name, runtime_deps = ([project] if project else []) + runtime_deps, test_class = test_class, jvm_flags = jvm_flags)
 
 def _layout_file_impl(ctx):
