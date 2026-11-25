@@ -135,6 +135,99 @@ def _classpath_distribution(dist, suite, mappings, pending):
     }
 
 
+def _module_directives(dist, members, external, archives):
+    info = dist.moduleInfo
+    if set(info) - {"name", "requires", "exports", "opens", "uses"}:
+        mx.abort(f"{dist.name}: unsupported moduleInfo fields")
+    # mx adds observable distribution modules and preserves transitive reads
+    # from their declared module descriptors. Explicit requires take precedence.
+    requires = {}
+    seen = set()
+
+    def visit(dep):
+        if dep in seen:
+            return
+        seen.add(dep)
+        if dep.name not in archives or not getattr(dep, "moduleInfo", None):
+            mx.abort(
+                f"{dist.name}: module path needs an explicit --archive-dist {dep.name}"
+            )
+        requires.setdefault(dep.moduleInfo["name"], dep.moduleInfo["name"])
+        for req in dep.moduleInfo.get("requires", []):
+            if "transitive" in req.split()[:-1]:
+                requires[req.split()[-1]] = req
+        for child in dep.deps:
+            if child.isJARDistribution():
+                visit(child)
+
+    for dep in external:
+        visit(dep)
+    for project in members:
+        for req in getattr(project, "requires", []):
+            requires.setdefault(req, req)
+    for req in info.get("requires", []):
+        requires[req.split()[-1]] = req
+    return sorted(
+        ["requires " + req for req in requires.values()]
+        + [
+            kind + " " + " ".join(entry.split())
+            for kind in ("exports", "uses", "opens")
+            for entry in info.get(kind, [])
+        ]
+    )
+
+
+def _jar_archive(dist, suite, mappings, pending, release, archives):
+    participants = {
+        (type(p).__module__, type(p).__name__) for p in dist.archiveparticipants
+    }
+    bridge = ("mx_sdk", "NativeBridgeArchiveParticipant")
+    if (
+        participants - {bridge}
+        or type(dist).__name__ != "JARDistribution"
+        or dist.overlaps
+        or dist.is_stripped()
+        or dist.buildDependencies
+        or dist.optionalDependencies
+        or dist.manifestEntries
+        or getattr(dist, "javaProperties", None)
+        or dist.module_info_compilation_participants
+        or getattr(dist, "mainClass", None)
+    ):
+        mx.abort(f"{dist.name}: unsupported JAR archive configuration: {participants}")
+    members = dist.archived_deps()
+    if any(not (d.isJavaProject() or d.isLibrary()) for d in members):
+        mx.abort(f"{dist.name}: unsupported archive member")
+    external = [d for d in dist.deps if d not in members] + dist.excludedLibs
+    result = {
+        "name": dist.name,
+        "contents": _dependency_labels(members, suite, mappings, pending, True),
+        "deps": _dependency_labels(external, suite, mappings, pending, True),
+        "testonly": dist.is_test_distribution(),
+        "jni_services": bridge in participants,
+        "release": release,
+    }
+    concealed = getattr(dist, "requiresConcealed", {})
+    if concealed:
+        result["add_exports"] = sorted(
+            f"{mod}/{pkg}" for mod, packages in concealed.items() for pkg in packages
+        )
+    if getattr(dist, "moduleInfo", None):
+        result["module"] = dist.moduleInfo["name"]
+        result["directives"] = _module_directives(dist, members, external, archives)
+    if dist.maven:
+        manifest = {"Name": dist.maven_artifact_id()}
+        version = suite.release_version_from_suite()
+        vendor = suite.developer.get("organization")
+        for prefix in ("Specification", "Implementation"):
+            if version:
+                manifest[prefix + "-Version"] = version
+            if vendor:
+                manifest[prefix + "-Vendor"] = vendor
+        result["manifest"] = manifest
+    return result
+
+
 def _resource_path(path):
     return path and all(
         part not in (".", "..") and re.fullmatch(r"[a-zA-Z0-9._+-]+", part)
@@ -279,8 +372,31 @@ def bazel_buildfile(args):
         action="store_true",
         help="expose same-suite source JAR distributions as Java classpaths in Gazelle",
     )
+    parser.add_argument(
+        "--archive-dist",
+        action="append",
+        default=[],
+        metavar="DIST",
+        help="assemble a distribution JAR from its resolved mx archive members",
+    )
+    parser.add_argument(
+        "--javac-opt",
+        action="append",
+        default=[],
+        metavar="PROJECT=OPTION",
+        help="append a javac option for one project in the selected closure",
+    )
     parser.add_argument("projects", nargs="+")
     options = parser.parse_args(args)
+    project_options = {}
+    for spec in options.javac_opt:
+        name, sep, value = spec.partition("=")
+        if not sep or not name or not value.startswith("-"):
+            parser.error("expected --javac-opt PROJECT=OPTION")
+        project_options.setdefault(name, []).append(value)
+    archives = set(options.archive_dist)
+    if archives and not (options.classpath_dists and options.release):
+        parser.error("--archive-dist requires --classpath-dists and --release")
     if options.javac_only_processor and not options.gazelle:
         parser.error("--javac-only-processor requires --gazelle")
     if options.whole_project and not options.gazelle:
@@ -312,6 +428,11 @@ def bazel_buildfile(args):
             continue
         if options.classpath_dists and project.suite == suite:
             if project.isJARDistribution():
+                if project.name in archives:
+                    distributions[project.name] = _jar_archive(
+                        project, suite, java_deps, pending, options.release, archives
+                    )
+                    continue
                 distributions[project.name] = _classpath_distribution(
                     project, suite, java_deps, pending
                 )
@@ -372,6 +493,7 @@ def bazel_buildfile(args):
             attrs["javac_opts"].extend(
                 ["--add-modules", ",".join(project._orig_attrs["requires"])]
             )
+        attrs["javac_opts"].extend(project_options.pop(project.name, []))
         if processors:
             processed = True
             attrs["plugins"] = processors
@@ -445,9 +567,15 @@ def bazel_buildfile(args):
         rules[project.name] = _rule(
             "java_library" if processors else "elide_java_library", attrs, resource_attr
         )
+    if project_options:
+        mx.abort(f"Unknown javac option project: {sorted(project_options)}")
     if rules.keys() & plugins.keys():
         mx.abort("A generated plugin target conflicts with a project name")
     if options.gazelle:
+        if archives - distributions.keys():
+            mx.abort(
+                f"Unknown archive in selected closure: {sorted(archives - distributions.keys())}"
+            )
         unmatched = javac_only_processors - used_javac_only
         if unmatched:
             mx.abort(

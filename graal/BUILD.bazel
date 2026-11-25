@@ -1,6 +1,7 @@
 load("@rules_java//java:java_test.bzl", "java_test")
 
 exports_files([
+    "benchmark_timer.patch",
     "sdk.patch",
     "truffle.patch",
 ])

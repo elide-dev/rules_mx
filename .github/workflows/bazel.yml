@@ -21,7 +21,7 @@ jobs:
           tools/check-graph
           tools/generate-graal --check
           bazelisk test --config=elide-processors //... @graal//sdk/... @graal//truffle/...
-          bazelisk test --config=elide-python //mx:export_test
+          bazelisk test --config=elide-python //mx:export_test //mx:pack_jar_test //graal/nativebridge:launcher_test
       - name: Test on BuildBuddy
         if: github.event_name != 'pull_request'
         env:
@@ -30,5 +30,5 @@ jobs:
           tools/check-graph --config=buildbuddy-rbe
           tools/buildbuddy test --config=buildbuddy-rbe --config=elide-processors //... @graal//sdk/... @graal//truffle/...
           tools/buildbuddy test --config=buildbuddy-rbe --config=labsjdk //mx:export_test
-          tools/buildbuddy test --config=buildbuddy-rbe --config=elide-python //mx:export_test
-          tools/buildbuddy test --config=buildbuddy-rbe --config=native-image-linux //tests/native_image:checkcopy_test
+          tools/buildbuddy test --config=buildbuddy-rbe --config=elide-python //mx:export_test //mx:pack_jar_test //graal/nativebridge:launcher_test
+          tools/buildbuddy test --config=buildbuddy-rbe --config=native-image-linux //tests/native_image:checkcopy_test //graal/nativebridge:native_isolate_test

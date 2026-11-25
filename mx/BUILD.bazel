@@ -1,3 +1,4 @@
+load("@rules_python//python:py_binary.bzl", "py_binary")
 load("@rules_python//python:py_test.bzl", "py_test")
 
 exports_files([
@@ -29,4 +30,17 @@ config_setting(
     name = "unified_jvm",
     flag_values = {"@rules_elide//elide:unified_jvm_compile": "true"},
     visibility = ["//visibility:public"],
+)
+
+py_binary(
+    name = "pack_jar",
+    srcs = ["pack_jar.py"],
+)
+
+py_test(
+    name = "pack_jar_test",
+    size = "small",
+    srcs = ["pack_jar_test.py"],
+    args = ["$(rootpath :pack_jar)"],
+    data = [":pack_jar"],
 )

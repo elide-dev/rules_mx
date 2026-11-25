@@ -25,9 +25,10 @@ The pinned Oracle source tree builds the SDK foundation and the first Truffle pr
 ```sh
 bazelisk query 'tests(//graal:sdk_tests)'
 bazelisk test --config=elide-processors //graal/... @graal//sdk/... @graal//truffle/...
+bazelisk test --config=elide-processors //graal/nativebridge:native_isolate_test
 ```
 
-The migration notes track suite coverage, reproducible BUILD generation, BuildBuddy commands and the remaining milestones. [GraalVM migration](graal/README.md)
+The Native Bridge test builds a shared library and exercises the generated JNI bindings in the JVM process and through the C++ launcher. The migration notes cover the standalone benchmark, BuildBuddy commands and remaining suites. [GraalVM migration](graal/README.md)
 
 ## Import a suite
 

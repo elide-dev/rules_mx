@@ -1,0 +1,32 @@
+--- a/sdk/src/org.graalvm.nativebridge.benchmark/src/org/graalvm/nativebridge/benchmark/Main.java
++++ b/sdk/src/org.graalvm.nativebridge.benchmark/src/org/graalvm/nativebridge/benchmark/Main.java
+@@ -83,4 +83,3 @@
+                 long et = System.nanoTime();
+-                et = TimeUnit.NANOSECONDS.toMillis(et - st);
+-                long iterationsPerMs = iterCount / et;
++                long iterationsPerMs = TimeUnit.MILLISECONDS.toNanos(iterCount) / Math.max(1L, et - st);
+                 System.out.println("[BENCH] " + iterationsPerMs + " operations per ms.");
+@@ -93,4 +92,3 @@
+                 et = System.nanoTime();
+-                et = TimeUnit.NANOSECONDS.toMillis(et - st);
+-                iterationsPerMs = iterCount / et;
++                iterationsPerMs = TimeUnit.MILLISECONDS.toNanos(iterCount) / Math.max(1L, et - st);
+                 System.out.println("[BENCH] " + iterationsPerMs + " operations per ms.");
+@@ -104,4 +102,3 @@
+                 et = System.nanoTime();
+-                et = TimeUnit.NANOSECONDS.toMillis(et - st);
+-                iterationsPerMs = iterCount / et;
++                iterationsPerMs = TimeUnit.MILLISECONDS.toNanos(iterCount) / Math.max(1L, et - st);
+                 System.out.println("[BENCH] " + iterationsPerMs + " operations per ms.");
+@@ -116,4 +113,3 @@
+                 et = System.nanoTime();
+-                et = TimeUnit.NANOSECONDS.toMillis(et - st);
+-                iterationsPerMs = iterCount / et;
++                iterationsPerMs = TimeUnit.MILLISECONDS.toNanos(iterCount) / Math.max(1L, et - st);
+                 System.out.println("[BENCH] " + iterationsPerMs + " operations per ms.");
+@@ -133,4 +129,3 @@
+                 et = System.nanoTime();
+-                et = TimeUnit.NANOSECONDS.toMillis(et - st);
+-                iterationsPerMs = iterCount / et;
++                iterationsPerMs = TimeUnit.MILLISECONDS.toNanos(iterCount) / Math.max(1L, et - st);
+                 System.out.println("[BENCH] " + iterationsPerMs + " operations per ms.");

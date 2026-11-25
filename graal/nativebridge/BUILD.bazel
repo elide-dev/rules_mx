@@ -1,0 +1,92 @@
+load("@rules_graalvm//graalvm:defs.bzl", "native_image")
+load("@rules_java//java:java_binary.bzl", "java_binary")
+load("@rules_java//java:java_test.bzl", "java_test")
+load("@rules_python//python:py_test.bzl", "py_test")
+
+java_binary(
+    name = "roundtrip",
+    testonly = True,
+    srcs = ["BridgeRoundTrip.java"],
+    jvm_flags = ["--enable-native-access=ALL-UNNAMED"],
+    main_class = "org.graalvm.nativebridge.benchmark.BridgeRoundTrip",
+    deps = [
+        "@graal//sdk:NATIVEBRIDGE",
+        "@graal//sdk:NATIVEBRIDGE_BENCHMARK",
+    ],
+)
+
+py_test(
+    name = "launcher_test",
+    size = "medium",
+    srcs = ["roundtrip_test.py"],
+    args = [
+        "$(rootpath :roundtrip)",
+        "$(rootpath @graal//sdk:NATIVEBRIDGE_LAUNCHER_RESOURCES)",
+    ],
+    data = [
+        ":roundtrip",
+        "@graal//sdk:NATIVEBRIDGE_LAUNCHER_RESOURCES",
+    ],
+    main = "roundtrip_test.py",
+)
+
+native_image(
+    name = "benchmark_isolate",
+    testonly = True,
+    shared_library = True,
+    tags = ["manual"],
+    deps = ["@graal//sdk:NATIVEBRIDGE_BENCHMARK"],
+)
+
+py_test(
+    name = "native_isolate_test",
+    size = "medium",
+    srcs = ["roundtrip_test.py"],
+    args = [
+        "$(rootpath :roundtrip)",
+        "$(rootpath @graal//sdk:NATIVEBRIDGE_LAUNCHER_RESOURCES)",
+        "$(rootpath :benchmark_isolate)",
+    ],
+    data = [
+        ":benchmark_isolate",
+        ":roundtrip",
+        "@graal//sdk:NATIVEBRIDGE_LAUNCHER_RESOURCES",
+    ],
+    main = "roundtrip_test.py",
+    tags = ["manual"],
+)
+
+_MODULES = [
+    "WORD",
+    "COLLECTIONS",
+    "NATIVEIMAGE",
+    "JNIUTILS",
+    "NATIVEBRIDGE",
+]
+
+java_test(
+    name = "module_test",
+    size = "small",
+    srcs = ["BridgeModuleTest.java"],
+    data = ["@graal//sdk:" + name for name in _MODULES + ["NATIVEBRIDGE_PROCESSOR_TEST"]],
+    env = {name: "$(rootpath @graal//sdk:" + name + ")" for name in _MODULES + ["NATIVEBRIDGE_PROCESSOR_TEST"]},
+    test_class = "graal.nativebridge.BridgeModuleTest",
+    deps = ["@contrib_rules_jvm_deps//:junit_junit"],
+)
+
+java_binary(
+    name = "benchmark",
+    testonly = True,
+    args = [
+        "$(rootpath @graal//sdk:NATIVEBRIDGE_LAUNCHER_RESOURCES)",
+        "$(rootpath :benchmark_isolate)",
+    ],
+    data = [
+        ":benchmark_isolate",
+        "@graal//sdk:NATIVEBRIDGE_LAUNCHER_RESOURCES",
+    ],
+    jvm_flags = ["--enable-native-access=ALL-UNNAMED"],
+    main_class = "org.graalvm.nativebridge.benchmark.Main",
+    tags = ["manual"],
+    runtime_deps = ["@graal//sdk:NATIVEBRIDGE_BENCHMARK"],
+)

@@ -14,14 +14,29 @@ tools/buildbuddy test --config=buildbuddy-rbe --config=elide-processors //graal/
 
 | Suite | Native Bazel build | Test coverage |
 | --- | --- | --- |
-| SDK | 20 of 29 declared projects, including Collections, Word, Home, Polyglot, its TCK SPI, Native Image Java APIs, JNI utilities and the Native Bridge processor. Nine mx distributions expose their Java classpaths. | All 15 discovered JUnit classes across the Collections, Word, Home and Native Image API test projects. An integration test reads the exact upstream version resources through the Polyglot and Maven Downloader classpaths. |
+| SDK | 24 of 29 declared projects, including Collections, Word, Home, Polyglot, its TCK SPI, Native Image Java APIs, JNI utilities and the Native Bridge runtime, processor, test project, benchmark and C++ launcher. Eight distributions produce JARs and six expose their constituent classpaths. | All 16 discovered upstream JUnit classes across Collections, Word, Home, the Native Image API and Native Bridge. An integration test reads the exact upstream version resources through the Polyglot and Maven Downloader classpaths. |
 | Truffle | Six of 69 declared projects. The core API depends on the SDK Polyglot classpath. DSL, profiles, utilities, the DSL processor and the processed library API build from source. | A separate consumer compiles against two generated library factories and loads them from the runtime jar. The upstream Truffle test projects are pending. |
 
 The SDK and Truffle slice targets Java 21. Some SDK projects declare an older minimum while using newer APIs, including `java.io.Serial`. The libgraal API compiles as one unit because its packages depend on each other. Gazelle keeps project resources, processors and tests with their owning compilations and splits eligible source-only projects by package.
 
-`--classpath-dists` follows same-suite distribution dependencies during Gazelle export. `mx_classpath_dist` exposes their constituent jars and combined JavaInfo. Platform-independent file layouts support literal contents and exact file references to another layout. The SDK version layouts exercise both operations. Release JAR assembly, JPMS descriptors, signing and published artifacts are separate migration work.
+`--classpath-dists` follows same-suite distribution dependencies during Gazelle export. `mx_classpath_dist` exposes their constituent jars and combined JavaInfo. Platform-independent file layouts support literal contents and exact file references to another layout. The SDK version layouts exercise both operations. Select individual distributions for JAR assembly and JPMS descriptors with `--archive-dist DIST`. The Native Bridge closure uses this path. Signing, publication and multi-release module assembly remain separate migration work.
 
 Truffle's eight declared processors run on the execution platform. Its DSL processor inspects javac internals that Turbine does not implement. The generator selects `--javac-only-processor truffle:TRUFFLE_DSL_PROCESSOR` for that distribution. Bazel runs javac once on affected projects, then extracts an interface jar containing the generated types for downstream compilation. Eligible Elide compilations keep their worker and ABI settings.
+
+## Native Bridge
+
+```sh
+bazelisk build --config=elide-processors @graal//sdk:NATIVEBRIDGE @graal//sdk:NATIVEBRIDGE_LAUNCHER_RESOURCES
+bazelisk test --config=elide-processors //graal/nativebridge/... //graal/nativebridge:native_isolate_test
+tools/buildbuddy test --config=buildbuddy-rbe --config=native-image-linux //graal/nativebridge:native_isolate_test
+bazelisk run --config=elide-processors //graal/nativebridge:benchmark -- external-isolation
+```
+
+The archive action uses mx's resolved membership, consumes the processor's JNI markers and merges their providers with ordinary service files. The execution JDK compiles the JPMS descriptors against the packaged dependencies. A module-layer test loads both providers through Java's ServiceLoader. The upstream test project checks expected processor diagnostics during compilation and runs the 18 methods in `BinaryOutputTest`.
+
+The launcher uses the target JDK's JNI headers, the registered C++ toolchain and mx's OS-specific flags. Its resource target exposes the executable at `<os>/<arch>/launcher`. The round-trip tests use the upstream benchmark's generated factory and service implementation. They exercise a child JVM and a Native Image shared library, including in-process and cross-process calls, reference passing and marshalling. The shared library uses the registered Elide Native Image toolchain. Linux AMD64 CI runs this test in the existing Native Image step. macOS ARM64 uses the same targets. Other target platforms require compatible toolchains and separate qualification.
+
+The benchmark accepts `no-isolation`, `internal-isolation` and `external-isolation`. Omitting the mode runs all three. The pinned benchmark includes a timing patch so a batch shorter than one millisecond still reports throughput.
 
 ## Extending the graph
 
@@ -29,7 +44,7 @@ Run `tools/generate-graal --check` to reproduce the checked-in patches from the 
 
 | Next checkpoint | Acceptance under Bazel |
 | --- | --- |
-| Complete the SDK | Implement Native Bridge's archive participant, including generated JNI service descriptors. Build and exercise its platform launcher with the hermetic C++ toolchain. Reproduce the shaded JLine sources and JDK 22 multi-release overlay. Run the launcher, processor and toolchain tests. |
+| Complete the SDK | Reproduce the shaded JLine sources and JDK 22 multi-release overlay. Build the SDK command-line launcher and run its tests and the SDK toolchain tests. |
 | Complete Truffle | Model generated dependencies, concealed JDK exports, multi-release classes and modular distributions. Build the runtime and SimpleLanguage, execute a guest program, and run the upstream TCK and Truffle tests. |
 | Compiler and SubstrateVM | Use the pinned Labs JDK for JVMCI. Build the compiler and relevant Espresso Shared dependencies, run compiler tests, then build SubstrateVM and produce and execute an image with the newly built toolchain. |
 | Languages and tools | Migrate Regex, Sulong, Wasm, Espresso, Espresso Compiler Stub, Tools, Visualizer, Web Image and Sandbox Toolchains with their Java, native and external inputs. Run each suite's upstream tests. |

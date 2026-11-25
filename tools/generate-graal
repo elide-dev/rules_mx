@@ -3,6 +3,8 @@
 
 import argparse
 import difflib
+import json
+import runpy
 from pathlib import Path
 import shutil
 import subprocess
@@ -20,7 +22,9 @@ SDK = [
     "org.graalvm.polyglot.tck",
     "RESOURCECOPY",
     "org.graalvm.home.test",
-    "org.graalvm.jniutils",
+    "NATIVEBRIDGE_PROCESSOR_TEST",
+    "NATIVEBRIDGE_BENCHMARK",
+    "NATIVEBRIDGE_PROCESSOR",
     "MAVEN_DOWNLOADER",
     "jdk.graal.compiler.vmaccess.guest",
 ]
@@ -32,6 +36,25 @@ SUITES = {
         "org.graalvm.nativeimage.libgraal",
         "--java-dep",
         "mx:JUNIT=@contrib_rules_jvm_deps//:junit_junit",
+        "--java-dep",
+        "mx:HAMCREST=@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
+        # These callbacks detach threads and release JNI handles for their side effects.
+        "--javac-opt",
+        "org.graalvm.nativebridge=-Xep:ReturnValueIgnored:OFF",
+        *(
+            arg
+            for dist in (
+                "WORD",
+                "NATIVEIMAGE",
+                "COLLECTIONS",
+                "JNIUTILS",
+                "NATIVEBRIDGE",
+                "NATIVEBRIDGE_PROCESSOR",
+                "NATIVEBRIDGE_PROCESSOR_TEST",
+                "NATIVEBRIDGE_BENCHMARK",
+            )
+            for arg in ("--archive-dist", dist)
+        ),
         *SDK,
     ],
     "truffle": [
@@ -45,6 +68,37 @@ SUITES = {
         "com.oracle.truffle.api.profiles",
     ],
 }
+
+
+def sdk_launcher(sdk):
+    suite = runpy.run_path(str(sdk / "mx.sdk/suite.py"))["suite"]
+    name = "org.graalvm.nativebridge.launcher"
+    resource = "NATIVEBRIDGE_LAUNCHER_RESOURCES"
+    project = suite["projects"][name]
+    layout = suite["distributions"][resource]
+    if (
+        layout["layout"] != {"<os>/<arch>/": "dependency:" + name}
+        or not project["use_jdk_headers"]
+        or project["native"] != "executable"
+    ):
+        raise ValueError("Native Bridge launcher layout or project type changed")
+    src = sdk / project["subDir"] / name / "src"
+    platforms = {os: arch["<others>"] for os, arch in project["os_arch"].items()}
+    attrs = dict(
+        name=name,
+        deliverable=project["deliverable"],
+        srcs=sorted(p.relative_to(sdk).as_posix() for p in src.rglob("*.cc")),
+        cflags={os: cfg["cflags"] for os, cfg in platforms.items()},
+        ldlibs={os: cfg.get("ldlibs", []) for os, cfg in platforms.items()},
+        resource=resource,
+        platforms=layout["platforms"],
+    )
+    return (
+        'load("@rules_mx//graal:nativebridge.bzl", "nativebridge_launcher")\n\n'
+        + "nativebridge_launcher(\n"
+        + "".join(f"    {key} = {json.dumps(value)},\n" for key, value in attrs.items())
+        + ")\n\n"
+    )
 
 
 def generate(suite, stage):
@@ -73,7 +127,8 @@ def generate(suite, stage):
     # this package, so new test classes join the CI qualification on regeneration.
     if suite == "sdk":
         (directory / "BUILD.bazel").write_text(
-            'test_suite(name = "tests", visibility = ["//visibility:public"])\n'
+            sdk_launcher(directory)
+            + 'test_suite(name = "tests", visibility = ["//visibility:public"])\n'
         )
     subprocess.run(
         [

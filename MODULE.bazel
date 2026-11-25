@@ -99,6 +99,7 @@ graal_archive(
     dev_dependency = True,
     patch_strip = 1,
     patches = [
+        "//graal:benchmark_timer.patch",
         "//graal:sdk.patch",
         "//graal:truffle.patch",
     ],

@@ -2,8 +2,59 @@ diff --git a/sdk/BUILD.bazel b/sdk/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/sdk/BUILD.bazel
-@@ -0,0 +1,497 @@
-+load("@rules_mx//mx:graph.bzl", "mx_classpath_dist", "mx_processed_java", "mx_processor", "mx_project", "mx_resource_layout", "mx_test_class", "mx_whole_java")
+@@ -0,0 +1,734 @@
++load("@rules_mx//graal:nativebridge.bzl", "nativebridge_launcher")
++load("@rules_mx//mx:graph.bzl", "mx_classpath_dist", "mx_jar_dist", "mx_processed_java", "mx_processor", "mx_project", "mx_resource_layout", "mx_test_class", "mx_whole_java")
++
++nativebridge_launcher(
++    name = "org.graalvm.nativebridge.launcher",
++    srcs = ["src/org.graalvm.nativebridge.launcher/src/launcher.cc"],
++    cflags = {
++        "windows": ["/std:c++17"],
++        "linux": [
++            "-std=c++17",
++            "-g",
++            "-Wall",
++            "-Werror",
++            "-D_GNU_SOURCE",
++            "-stdlib=libc++",
++        ],
++        "darwin": [
++            "-std=c++17",
++            "-g",
++            "-Wall",
++            "-Werror",
++            "-pthread",
++            "-ObjC++",
++        ],
++    },
++    deliverable = "launcher",
++    ldlibs = {
++        "windows": [],
++        "linux": [
++            "-ldl",
++            "-pthread",
++            "-stdlib=libc++",
++            "-static-libstdc++",
++            "-l:libc++abi.a",
++        ],
++        "darwin": [
++            "-ldl",
++            "-pthread",
++            "-framework",
++            "Foundation",
++        ],
++    },
++    platforms = [
++        "linux-amd64",
++        "linux-aarch64",
++        "darwin-amd64",
++        "darwin-aarch64",
++        "windows-amd64",
++        "windows-aarch64",
++    ],
++    resource = "NATIVEBRIDGE_LAUNCHER_RESOURCES",
++)
 +
 +test_suite(
 +    name = "tests",
@@ -193,6 +244,36 @@ new file mode 100644
 +    deps = [":NATIVEIMAGE"],
 +)
 +
++mx_processed_java(
++    name = "org.graalvm.nativebridge",
++    srcs = ["//sdk/src/org.graalvm.nativebridge/src/org/graalvm/nativebridge:org.graalvm.nativebridge.srcs"],
++    javacopts = [
++        "--release",
++        "21",
++        "-Xep:ReturnValueIgnored:OFF",
++    ],
++    mx_resource_root = "src/org.graalvm.nativebridge/src",
++    plugins = [":mx_plugin.NATIVEBRIDGE_PROCESSOR.org.graalvm.nativebridge.processor.NativeBridgeProcessor"],
++    resources = ["//sdk/src/org.graalvm.nativebridge/src/META-INF/native-image/org.graalvm.sdk/nativebridge:org.graalvm.nativebridge.resources"],
++    visibility = ["//visibility:public"],
++    deps = [":JNIUTILS"],
++)
++
++mx_processed_java(
++    name = "org.graalvm.nativebridge.benchmark",
++    testonly = True,
++    srcs = ["//sdk/src/org.graalvm.nativebridge.benchmark/src/org/graalvm/nativebridge/benchmark:org.graalvm.nativebridge.benchmark.srcs"],
++    javacopts = [
++        "--release",
++        "21",
++    ],
++    mx_resource_root = "src/org.graalvm.nativebridge.benchmark/src",
++    plugins = [":mx_plugin.NATIVEBRIDGE_PROCESSOR.org.graalvm.nativebridge.processor.NativeBridgeProcessor"],
++    resources = ["//sdk/src/org.graalvm.nativebridge.benchmark/src/META-INF/native-image:org.graalvm.nativebridge.benchmark.resources"],
++    visibility = ["//visibility:public"],
++    deps = [":NATIVEBRIDGE"],
++)
++
 +mx_whole_java(
 +    name = "org.graalvm.nativebridge.processor",
 +    srcs = ["//sdk/src/org.graalvm.nativebridge.processor/src/org/graalvm/nativebridge/processor:org.graalvm.nativebridge.processor.srcs"],
@@ -206,6 +287,37 @@ new file mode 100644
 +    resources = ["//sdk/src/org.graalvm.nativebridge.processor/src/META-INF/services:org.graalvm.nativebridge.processor.resources"],
 +    unified_release = 21,
 +    visibility = ["//visibility:public"],
++)
++
++mx_processed_java(
++    name = "org.graalvm.nativebridge.processor.test",
++    testonly = True,
++    srcs = [
++        "//sdk/src/org.graalvm.nativebridge.processor.test/src/org/graalvm/nativebridge/processor/test:org.graalvm.nativebridge.processor.test.srcs",
++        "//sdk/src/org.graalvm.nativebridge.processor.test/src/org/graalvm/nativebridge/processor/test/common:org.graalvm.nativebridge.processor.test.srcs",
++        "//sdk/src/org.graalvm.nativebridge.processor.test/src/org/graalvm/nativebridge/processor/test/common/invalid:org.graalvm.nativebridge.processor.test.srcs",
++        "//sdk/src/org.graalvm.nativebridge.processor.test/src/org/graalvm/nativebridge/processor/test/marshaller:org.graalvm.nativebridge.processor.test.srcs",
++        "//sdk/src/org.graalvm.nativebridge.processor.test/src/org/graalvm/nativebridge/processor/test/nativetonative:org.graalvm.nativebridge.processor.test.srcs",
++        "//sdk/src/org.graalvm.nativebridge.processor.test/src/org/graalvm/nativebridge/processor/test/overload:org.graalvm.nativebridge.processor.test.srcs",
++        "//sdk/src/org.graalvm.nativebridge.processor.test/src/org/graalvm/nativebridge/processor/test/process:org.graalvm.nativebridge.processor.test.srcs",
++        "//sdk/src/org.graalvm.nativebridge.processor.test/src/org/graalvm/nativebridge/processor/test/references:org.graalvm.nativebridge.processor.test.srcs",
++    ],
++    javacopts = [
++        "--release",
++        "21",
++    ],
++    plugins = [":mx_plugin.NATIVEBRIDGE_PROCESSOR.org.graalvm.nativebridge.processor.NativeBridgeProcessor"],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":NATIVEBRIDGE",
++        "@contrib_rules_jvm_deps//:junit_junit",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.nativebridge.processor.test.org.graalvm.nativebridge.processor.test.BinaryOutputTest",
++    project = ":org.graalvm.nativebridge.processor.test",
++    test_class = "org.graalvm.nativebridge.processor.test.BinaryOutputTest",
 +)
 +
 +mx_whole_java(
@@ -389,10 +501,20 @@ new file mode 100644
 +    test_class = "org.graalvm.word.test.WordTests",
 +)
 +
-+mx_classpath_dist(
++mx_jar_dist(
 +    name = "COLLECTIONS",
++    contents = [":org.graalvm.collections"],
++    directives = ["exports org.graalvm.collections"],
++    manifest = {
++        "Implementation-Vendor": "Oracle Corporation",
++        "Implementation-Version": "25.5.5-dev",
++        "Name": "collections",
++        "Specification-Vendor": "Oracle Corporation",
++        "Specification-Version": "25.5.5-dev",
++    },
++    module_name = "org.graalvm.collections",
++    release = 21,
 +    visibility = ["//visibility:public"],
-+    deps = [":org.graalvm.collections"],
 +)
 +
 +mx_classpath_dist(
@@ -407,6 +529,32 @@ new file mode 100644
 +    ],
 +)
 +
++mx_jar_dist(
++    name = "JNIUTILS",
++    contents = [":org.graalvm.jniutils"],
++    directives = [
++        "exports org.graalvm.jniutils",
++        "requires org.graalvm.collections",
++        "requires org.graalvm.nativeimage",
++        "requires transitive org.graalvm.word",
++    ],
++    jni_services = True,
++    manifest = {
++        "Implementation-Vendor": "Oracle Corporation",
++        "Implementation-Version": "25.5.5-dev",
++        "Name": "jniutils",
++        "Specification-Vendor": "Oracle Corporation",
++        "Specification-Version": "25.5.5-dev",
++    },
++    module_name = "org.graalvm.jniutils",
++    release = 21,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":COLLECTIONS",
++        ":NATIVEIMAGE",
++    ],
++)
++
 +mx_classpath_dist(
 +    name = "MAVEN_DOWNLOADER",
 +    visibility = ["//visibility:public"],
@@ -417,14 +565,90 @@ new file mode 100644
 +    ],
 +)
 +
-+mx_classpath_dist(
-+    name = "NATIVEIMAGE",
-+    visibility = ["//visibility:public"],
-+    deps = [
-+        ":WORD",
-+        ":com.oracle.svm.core.annotate",
-+        ":org.graalvm.nativeimage",
++mx_jar_dist(
++    name = "NATIVEBRIDGE",
++    contents = [":org.graalvm.nativebridge"],
++    directives = [
++        "exports org.graalvm.nativebridge",
++        "requires org.graalvm.collections",
++        "requires org.graalvm.jniutils",
++        "requires org.graalvm.nativeimage",
++        "requires transitive org.graalvm.word",
 +    ],
++    jni_services = True,
++    manifest = {
++        "Implementation-Vendor": "Oracle Corporation",
++        "Implementation-Version": "25.5.5-dev",
++        "Name": "nativebridge",
++        "Specification-Vendor": "Oracle Corporation",
++        "Specification-Version": "25.5.5-dev",
++    },
++    module_name = "org.graalvm.nativebridge",
++    release = 21,
++    visibility = ["//visibility:public"],
++    deps = [":JNIUTILS"],
++)
++
++mx_jar_dist(
++    name = "NATIVEBRIDGE_BENCHMARK",
++    testonly = True,
++    contents = [":org.graalvm.nativebridge.benchmark"],
++    jni_services = True,
++    visibility = ["//visibility:public"],
++    deps = [":NATIVEBRIDGE"],
++)
++
++mx_jar_dist(
++    name = "NATIVEBRIDGE_PROCESSOR",
++    contents = [":org.graalvm.nativebridge.processor"],
++    visibility = ["//visibility:public"],
++)
++
++mx_jar_dist(
++    name = "NATIVEBRIDGE_PROCESSOR_TEST",
++    testonly = True,
++    add_exports = ["jdk.internal.vm.ci/jdk.vm.ci.services"],
++    contents = [
++        "@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
++        "@contrib_rules_jvm_deps//:junit_junit",
++        ":org.graalvm.nativebridge.processor.test",
++    ],
++    jni_services = True,
++    visibility = ["//visibility:public"],
++    deps = [":NATIVEBRIDGE"],
++)
++
++mx_jar_dist(
++    name = "NATIVEIMAGE",
++    contents = [
++        ":org.graalvm.nativeimage",
++        ":com.oracle.svm.core.annotate",
++    ],
++    directives = [
++        "exports com.oracle.svm.core.annotate",
++        "exports org.graalvm.nativeimage",
++        "exports org.graalvm.nativeimage.c",
++        "exports org.graalvm.nativeimage.c.constant",
++        "exports org.graalvm.nativeimage.c.function",
++        "exports org.graalvm.nativeimage.c.struct",
++        "exports org.graalvm.nativeimage.c.type",
++        "exports org.graalvm.nativeimage.dynamicaccess",
++        "exports org.graalvm.nativeimage.hosted",
++        "exports org.graalvm.nativeimage.impl to org.graalvm.nativeimage.pointsto, org.graalvm.nativeimage.base, org.graalvm.nativeimage.builder, org.graalvm.nativeimage.configure, org.graalvm.nativeimage.shared, org.graalvm.nativeimage.guest.staging, com.oracle.svm.svm_enterprise, org.graalvm.extraimage.builder, org.graalvm.truffle.runtime.svm, com.oracle.svm.enterprise.truffle, org.graalvm.nativeimage.foreign",
++        "exports org.graalvm.nativeimage.impl.clinit to org.graalvm.nativeimage.builder",
++        "requires transitive org.graalvm.word",
++    ],
++    manifest = {
++        "Implementation-Vendor": "Oracle Corporation",
++        "Implementation-Version": "25.5.5-dev",
++        "Name": "nativeimage",
++        "Specification-Vendor": "Oracle Corporation",
++        "Specification-Version": "25.5.5-dev",
++    },
++    module_name = "org.graalvm.nativeimage",
++    release = 21,
++    visibility = ["//visibility:public"],
++    deps = [":WORD"],
 +)
 +
 +mx_classpath_dist(
@@ -463,10 +687,23 @@ new file mode 100644
 +    deps = [":org.graalvm.webimage.api"],
 +)
 +
-+mx_classpath_dist(
++mx_jar_dist(
 +    name = "WORD",
++    contents = [":org.graalvm.word"],
++    directives = [
++        "exports org.graalvm.word",
++        "exports org.graalvm.word.impl to jdk.graal.compiler, org.graalvm.truffle.runtime.svm, org.graalvm.nativeimage.builder, org.graalvm.nativeimage.foreign, org.graalvm.nativeimage.guest.staging, org.graalvm.nativeimage.shared, com.oracle.graal.graal_enterprise, com.oracle.svm.svm_enterprise, com.oracle.truffle.enterprise.svm, com.oracle.svm.enterprise.truffle, org.graalvm.extraimage.builder",
++    ],
++    manifest = {
++        "Implementation-Vendor": "Oracle Corporation",
++        "Implementation-Version": "25.5.5-dev",
++        "Name": "word",
++        "Specification-Vendor": "Oracle Corporation",
++        "Specification-Version": "25.5.5-dev",
++    },
++    module_name = "org.graalvm.word",
++    release = 21,
 +    visibility = ["//visibility:public"],
-+    deps = [":org.graalvm.word"],
 +)
 +
 +mx_resource_layout(
@@ -736,6 +973,137 @@ new file mode 100644
 +    ],
 +    visibility = ["//sdk:__pkg__"],
 +)
+diff --git a/sdk/src/org.graalvm.nativebridge/src/META-INF/native-image/org.graalvm.sdk/nativebridge/BUILD.bazel b/sdk/src/org.graalvm.nativebridge/src/META-INF/native-image/org.graalvm.sdk/nativebridge/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.nativebridge/src/META-INF/native-image/org.graalvm.sdk/nativebridge/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.nativebridge.resources",
++    srcs = ["native-image.properties"],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.nativebridge/src/org/graalvm/nativebridge/BUILD.bazel b/sdk/src/org.graalvm.nativebridge/src/org/graalvm/nativebridge/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.nativebridge/src/org/graalvm/nativebridge/BUILD.bazel
+@@ -0,0 +1,72 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.nativebridge.srcs",
++    srcs = [
++        "AbstractIsolate.java",
++        "AbstractIsolateThread.java",
++        "AlwaysByLocalReference.java",
++        "AlwaysByLocalReferenceRepeated.java",
++        "AlwaysByRemoteReference.java",
++        "AlwaysByRemoteReferenceRepeated.java",
++        "BinaryInput.java",
++        "BinaryMarshaller.java",
++        "BinaryOutput.java",
++        "ByLocalReference.java",
++        "ByRemoteReference.java",
++        "CustomDispatchAccessor.java",
++        "CustomDispatchFactory.java",
++        "CustomReceiverAccessor.java",
++        "DefaultNativeIsolateHandler.java",
++        "DefaultStackTraceMarshaller.java",
++        "DefaultThrowableMarshaller.java",
++        "DispatchHandler.java",
++        "ForeignException.java",
++        "ForeignExceptionEndPoints.java",
++        "ForeignObject.java",
++        "ForeignObjectCleaner.java",
++        "GenerateHotSpotToNativeBridge.java",
++        "GenerateHotSpotToNativeFactory.java",
++        "GenerateNativeToHotSpotBridge.java",
++        "GenerateNativeToNativeBridge.java",
++        "GenerateNativeToNativeFactory.java",
++        "GenerateProcessToProcessBridge.java",
++        "GenerateProcessToProcessFactory.java",
++        "HSIsolate.java",
++        "HSIsolateThread.java",
++        "HSPeer.java",
++        "Idempotent.java",
++        "In.java",
++        "Isolate.java",
++        "IsolateCreateException.java",
++        "IsolateDeathException.java",
++        "IsolateDeathHandler.java",
++        "IsolateThread.java",
++        "JNIClassCache.java",
++        "MarshalledException.java",
++        "MarshallerAnnotation.java",
++        "MarshallerConfig.java",
++        "MutablePeer.java",
++        "NativeIsolate.java",
++        "NativeIsolateConfig.java",
++        "NativeIsolateHandler.java",
++        "NativeIsolateThread.java",
++        "NativePeer.java",
++        "NoImplementation.java",
++        "NullableBinaryMarshaller.java",
++        "Out.java",
++        "Peer.java",
++        "ProcessIsolate.java",
++        "ProcessIsolateConfig.java",
++        "ProcessIsolateStack.java",
++        "ProcessIsolateThread.java",
++        "ProcessIsolateThreadSupport.java",
++        "ProcessPeer.java",
++        "ReceiverMethod.java",
++        "ReferenceHandles.java",
++        "StackTraceElementMarshaller.java",
++        "StringMarshaller.java",
++        "TypeLiteral.java",
++    ],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.nativebridge.benchmark/src/META-INF/native-image/BUILD.bazel b/sdk/src/org.graalvm.nativebridge.benchmark/src/META-INF/native-image/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.nativebridge.benchmark/src/META-INF/native-image/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.nativebridge.benchmark.resources",
++    srcs = [
++        "jni-config.json",
++        "native-image.properties",
++    ],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.nativebridge.benchmark/src/org/graalvm/nativebridge/benchmark/BUILD.bazel b/sdk/src/org.graalvm.nativebridge.benchmark/src/org/graalvm/nativebridge/benchmark/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.nativebridge.benchmark/src/org/graalvm/nativebridge/benchmark/BUILD.bazel
+@@ -0,0 +1,22 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.nativebridge.benchmark.srcs",
++    srcs = [
++        "BenchmarkFactory.java",
++        "BenchmarkFeature.java",
++        "BenchmarkMarshallerConfig.java",
++        "ExternalIsolationRunner.java",
++        "ForeignService.java",
++        "InternalIsolationRunner.java",
++        "Main.java",
++        "NativeBridgeSupportImpl.java",
++        "NoIsolationRunner.java",
++        "Point.java",
++        "ProcessIsolate.java",
++        "Runner.java",
++        "Service.java",
++        "ServiceImplementation.java",
++    ],
++    visibility = ["//sdk:__pkg__"],
++)
 diff --git a/sdk/src/org.graalvm.nativebridge.processor/src/META-INF/services/BUILD.bazel b/sdk/src/org.graalvm.nativebridge.processor/src/META-INF/services/BUILD.bazel
 new file mode 100644
 --- /dev/null
@@ -790,6 +1158,229 @@ new file mode 100644
 +        "ProcessToProcessTypeCache.java",
 +        "SuppressFBWarnings.java",
 +        "Utilities.java",
++    ],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.nativebridge.processor.test/src/org/graalvm/nativebridge/processor/test/BUILD.bazel b/sdk/src/org.graalvm.nativebridge.processor.test/src/org/graalvm/nativebridge/processor/test/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.nativebridge.processor.test/src/org/graalvm/nativebridge/processor/test/BUILD.bazel
+@@ -0,0 +1,18 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.nativebridge.processor.test.srcs",
++    srcs = [
++        "AbstractService.java",
++        "BinaryOutputTest.java",
++        "CustomMarshallerService.java",
++        "CustomReceiverService.java",
++        "ExpectError.java",
++        "LocalService.java",
++        "Service.java",
++        "Service2.java",
++        "ServiceAPI.java",
++        "TestMarshallerConfig.java",
++    ],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.nativebridge.processor.test/src/org/graalvm/nativebridge/processor/test/common/BUILD.bazel b/sdk/src/org.graalvm.nativebridge.processor.test/src/org/graalvm/nativebridge/processor/test/common/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.nativebridge.processor.test/src/org/graalvm/nativebridge/processor/test/common/BUILD.bazel
+@@ -0,0 +1,70 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.nativebridge.processor.test.srcs",
++    srcs = [
++        "ForeignCustomReceiverService.java",
++        "ForeignServiceAsClass.java",
++        "ForeignServiceAsInterface.java",
++        "ForeignServiceFactory.java",
++        "ForeignServiceMutable.java",
++        "ForeignServiceWithIsolateDeathHandler1.java",
++        "ForeignServiceWithIsolateDeathHandler2.java",
++        "InnerClassTest.java",
++        "InvalidBaseType1Test.java",
++        "InvalidBaseType2Test.java",
++        "InvalidBaseType3Test.java",
++        "InvalidBaseType4Test.java",
++        "InvalidConstructor1Test.java",
++        "InvalidConstructorTestCustomDispatch.java",
++        "InvalidCustomDispatchAccessor1Test.java",
++        "InvalidCustomDispatchAccessor2Test.java",
++        "InvalidCustomDispatchAccessor3Test.java",
++        "InvalidCustomDispatchAccessor4Test.java",
++        "InvalidCustomDispatchAccessor5Test.java",
++        "InvalidCustomDispatchAccessor6Test.java",
++        "InvalidCustomDispatchAccessor7Test.java",
++        "InvalidCustomDispatchFactory1Test.java",
++        "InvalidCustomDispatchFactory2Test.java",
++        "InvalidCustomDispatchFactory3Test.java",
++        "InvalidCustomDispatchFactory4Test.java",
++        "InvalidCustomDispatchFactory5Test.java",
++        "InvalidCustomDispatchFactory6Test.java",
++        "InvalidCustomDispatchFactory7Test.java",
++        "InvalidCustomDispatchFactory8Test.java",
++        "InvalidCustomReceiverAccessor1Test.java",
++        "InvalidCustomReceiverAccessor2Test.java",
++        "InvalidCustomReceiverAccessor3Test.java",
++        "InvalidCustomReceiverAccessor4Test.java",
++        "InvalidCustomReceiverAccessor5Test.java",
++        "InvalidCustomReceiverAccessor6Test.java",
++        "InvalidCustomReceiverAccessor7Test.java",
++        "InvalidCustomReceiverAccessor8Test.java",
++        "InvalidFactory.java",
++        "InvalidIdempotentTest.java",
++        "InvalidImplementation.java",
++        "InvalidIsolateDeathHandler1Test.java",
++        "InvalidIsolateDeathHandler2Test.java",
++        "InvalidIsolateDeathHandler3Test.java",
++        "InvalidIsolateDeathHandler4Test.java",
++        "InvalidIsolateDeathHandler5Test.java",
++        "InvalidIsolateDeathHandler6Test.java",
++        "InvalidIsolateDeathHandler7Test.java",
++        "InvalidIsolateDeathHandler8Test.java",
++        "InvalidMarshallerConfig1Test.java",
++        "InvalidMarshallerConfig2Test.java",
++        "InvalidMarshallerConfig3Test.java",
++        "InvalidMarshallerConfig4Test.java",
++        "InvalidMarshallerConfig5Test.java",
++        "InvalidMarshallerConfig6Test.java",
++        "InvalidMarshallerConfig7Test.java",
++        "InvalidMethod1Test.java",
++        "InvalidMethod2Test.java",
++        "InvalidMethod3Test.java",
++        "InvalidMethod4Test.java",
++        "InvalidMethod5Test.java",
++        "InvalidMutablePeer.java",
++        "InvalidPackageFactory.java",
++    ],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.nativebridge.processor.test/src/org/graalvm/nativebridge/processor/test/common/invalid/BUILD.bazel b/sdk/src/org.graalvm.nativebridge.processor.test/src/org/graalvm/nativebridge/processor/test/common/invalid/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.nativebridge.processor.test/src/org/graalvm/nativebridge/processor/test/common/invalid/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.nativebridge.processor.test.srcs",
++    srcs = ["InvalidPackageService.java"],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.nativebridge.processor.test/src/org/graalvm/nativebridge/processor/test/marshaller/BUILD.bazel b/sdk/src/org.graalvm.nativebridge.processor.test/src/org/graalvm/nativebridge/processor/test/marshaller/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.nativebridge.processor.test/src/org/graalvm/nativebridge/processor/test/marshaller/BUILD.bazel
+@@ -0,0 +1,16 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.nativebridge.processor.test.srcs",
++    srcs = [
++        "ForeignCustomMarshallerTest.java",
++        "ForeignOutParameterService.java",
++        "ForeignPointTest.java",
++        "ForeignServiceFactory.java",
++        "LocalCustomMarshallerService.java",
++        "OutParameterService.java",
++        "Point.java",
++        "PointTest.java",
++    ],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.nativebridge.processor.test/src/org/graalvm/nativebridge/processor/test/nativetonative/BUILD.bazel b/sdk/src/org.graalvm.nativebridge.processor.test/src/org/graalvm/nativebridge/processor/test/nativetonative/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.nativebridge.processor.test/src/org/graalvm/nativebridge/processor/test/nativetonative/BUILD.bazel
+@@ -0,0 +1,16 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.nativebridge.processor.test.srcs",
++    srcs = [
++        "LocalService2.java",
++        "MixedDifferentImplementation.java",
++        "MixedDifferentIsolateHandler.java",
++        "MixedDifferentMarshallers.java",
++        "MixedSameMarshallers.java",
++        "OtherMarshallerConfig.java",
++        "PureHotSpotToNative.java",
++        "PureNativeToNative.java",
++    ],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.nativebridge.processor.test/src/org/graalvm/nativebridge/processor/test/overload/BUILD.bazel b/sdk/src/org.graalvm.nativebridge.processor.test/src/org/graalvm/nativebridge/processor/test/overload/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.nativebridge.processor.test/src/org/graalvm/nativebridge/processor/test/overload/BUILD.bazel
+@@ -0,0 +1,15 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.nativebridge.processor.test.srcs",
++    srcs = [
++        "CollidingOverload.java",
++        "ForeignCollidingOverload.java",
++        "ForeignCollidingOverloadResolved.java",
++        "ForeignNonCollidingOverload.java",
++        "ForeignService.java",
++        "ForeignServiceFactory.java",
++        "NonCollidingOverload.java",
++    ],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.nativebridge.processor.test/src/org/graalvm/nativebridge/processor/test/process/BUILD.bazel b/sdk/src/org.graalvm.nativebridge.processor.test/src/org/graalvm/nativebridge/processor/test/process/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.nativebridge.processor.test/src/org/graalvm/nativebridge/processor/test/process/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.nativebridge.processor.test.srcs",
++    srcs = [
++        "InvalidServices1.java",
++        "InvalidServices2.java",
++        "InvalidServices3.java",
++        "InvalidServices4.java",
++    ],
++    visibility = ["//sdk:__pkg__"],
++)
+diff --git a/sdk/src/org.graalvm.nativebridge.processor.test/src/org/graalvm/nativebridge/processor/test/references/BUILD.bazel b/sdk/src/org.graalvm.nativebridge.processor.test/src/org/graalvm/nativebridge/processor/test/references/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sdk/src/org.graalvm.nativebridge.processor.test/src/org/graalvm/nativebridge/processor/test/references/BUILD.bazel
+@@ -0,0 +1,29 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.nativebridge.processor.test.srcs",
++    srcs = [
++        "BaseReferenceService.java",
++        "Context.java",
++        "CustomLanguageDispatch.java",
++        "ForeignAlwaysByReferenceHandler.java",
++        "ForeignBaseReferenceService.java",
++        "ForeignContext.java",
++        "ForeignCustomLanguageDispatch.java",
++        "ForeignHandler.java",
++        "ForeignPeerReferenceService.java",
++        "ForeignRecord.java",
++        "ForeignReferenceArrayOperations.java",
++        "ForeignReferenceArrayOperationsOppositeDirection.java",
++        "ForeignService.java",
++        "ForeignServiceFactory.java",
++        "Handler.java",
++        "LanguageAPI.java",
++        "LocalService.java",
++        "PeerReferenceService.java",
++        "Record.java",
++        "ReferenceArrayOperations.java",
++        "Service.java",
 +    ],
 +    visibility = ["//sdk:__pkg__"],
 +)

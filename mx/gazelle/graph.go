@@ -70,9 +70,13 @@ func (g *importer) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
 		Version       int
 		Projects      []*project
 		Distributions []struct {
-			Name     string
-			Deps     []string
-			Testonly bool
+			Manifest                   map[string]string
+			Name, Module               string
+			Deps, Contents, Directives []string
+			AddExports                 []string `json:"add_exports"`
+			JNIServices                bool     `json:"jni_services"`
+			Release                    int
+			Testonly                   bool
 		}
 		Layouts []struct {
 			Name             string
@@ -207,7 +211,27 @@ func (g *importer) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
 	}
 	for _, dist := range graph.Distributions {
 		r := rule.NewRule("mx_classpath_dist", dist.Name)
-		r.SetAttr("deps", dist.Deps)
+		if len(dist.Contents) > 0 {
+			r.SetKind("mx_jar_dist")
+			r.SetAttr("contents", dist.Contents)
+			if len(dist.Manifest) > 0 {
+				r.SetAttr("manifest", dist.Manifest)
+			}
+			if dist.Module != "" {
+				r.SetAttr("module_name", dist.Module)
+				r.SetAttr("directives", dist.Directives)
+				r.SetAttr("release", dist.Release)
+			}
+			if dist.JNIServices {
+				r.SetAttr("jni_services", true)
+			}
+			if len(dist.AddExports) > 0 {
+				r.SetAttr("add_exports", dist.AddExports)
+			}
+		}
+		if len(dist.Deps) > 0 {
+			r.SetAttr("deps", dist.Deps)
+		}
 		r.SetAttr("visibility", []string{"//visibility:public"})
 		if dist.Testonly {
 			r.SetAttr("testonly", true)
@@ -247,7 +271,7 @@ func (g *importer) CheckFlags(fs *flag.FlagSet, c *config.Config) error {
 
 func graphKind(k string) bool {
 	switch k {
-	case "mx_resource_layout", "mx_classpath_dist", "mx_files", "mx_project", "mx_whole_java", "mx_processed_java", "mx_processor", "mx_test_class":
+	case "mx_jar_dist", "mx_resource_layout", "mx_classpath_dist", "mx_files", "mx_project", "mx_whole_java", "mx_processed_java", "mx_processor", "mx_test_class":
 		return true
 	}
 	return false
@@ -256,12 +280,13 @@ func graphKind(k string) bool {
 func (g *importer) Kinds() map[string]rule.KindInfo {
 	kinds := g.javaLanguage.Kinds()
 	managed := map[string]bool{}
-	for _, a := range strings.Fields("abi_after_javac copies literals srcs deps packages test_class project processor_class generates_api plugins resources mx_resource_root unified_release javac_opts javacopts testonly visibility") {
+	for _, a := range strings.Fields("manifest contents directives release jni_services module_name add_exports abi_after_javac copies literals srcs deps packages test_class project processor_class generates_api plugins resources mx_resource_root unified_release javac_opts javacopts testonly visibility") {
 		managed[a] = true
 	}
 	for _, k := range strings.Fields("mx_files mx_project mx_whole_java mx_processed_java mx_processor mx_test_class") {
 		kinds[k] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"srcs": true, "packages": true, "project": true, "processor_class": true}, MergeableAttrs: managed}
 	}
+	kinds["mx_jar_dist"] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"contents": true}, MergeableAttrs: managed}
 	kinds["mx_resource_layout"] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"literals": true, "copies": true}, MergeableAttrs: managed}
 	kinds["mx_classpath_dist"] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"deps": true}, MergeableAttrs: managed}
 	if g.filename == "" {
@@ -276,7 +301,7 @@ func (g *importer) Kinds() map[string]rule.KindInfo {
 	return kinds
 }
 func (g *importer) Loads() []rule.LoadInfo {
-	return append(g.javaLanguage.Loads(), rule.LoadInfo{Name: "@rules_mx//mx:graph.bzl", Symbols: strings.Fields("mx_classpath_dist mx_resource_layout mx_files mx_processed_java mx_processor mx_project mx_test_class mx_whole_java")})
+	return append(g.javaLanguage.Loads(), rule.LoadInfo{Name: "@rules_mx//mx:graph.bzl", Symbols: strings.Fields("mx_jar_dist mx_classpath_dist mx_resource_layout mx_files mx_processed_java mx_processor mx_project mx_test_class mx_whole_java")})
 }
 
 func (g *importer) GenerateRules(a language.GenerateArgs) language.GenerateResult {
