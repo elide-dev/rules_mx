@@ -11,6 +11,9 @@ exports_files([
     "benchmark_timer.patch",
     "compiler.patch",
     "espresso-shared.patch",
+    "espresso.patch",
+    "espresso-compiler-stub.patch",
+    "web-image.patch",
     "sdk.patch",
     "sdk_llvm.json",
     "sdk_musl.json",
@@ -89,6 +92,38 @@ java_test(
         "@contrib_rules_jvm_deps//:junit_junit",
         "@graal//sdk:POLYGLOT",
         "@graal//truffle:com.oracle.truffle.polyglot",
+    ],
+)
+
+py_test(
+    name = "espresso_package_test",
+    size = "small",
+    srcs = ["espresso_package_test.py"],
+    args = [
+        "$(rootpath @graal//espresso-compiler-stub:ESPRESSO_COMPILER_SUPPORT)",
+        "$(rootpath @graal//espresso:ESPRESSO_IO)",
+    ],
+    data = [
+        "@graal//espresso:ESPRESSO_IO",
+        "@graal//espresso-compiler-stub:ESPRESSO_COMPILER_SUPPORT",
+    ],
+    tags = ["manual"],
+)
+
+java_test(
+    name = "sulong_language_test",
+    size = "small",
+    srcs = ["SulongLanguageTest.java"],
+    test_class = "graal.SulongLanguageTest",
+    runtime_deps = [
+        "@graal//sulong:SULONG_CORE",
+        "@graal//sulong:SULONG_NATIVE",
+        "@graal//sulong:SULONG_NFI",
+        "@graal//truffle:TRUFFLE_RUNTIME",
+    ],
+    deps = [
+        "@contrib_rules_jvm_deps//:junit_junit",
+        "@graal//sdk:POLYGLOT",
     ],
 )
 

@@ -2,18 +2,35 @@ diff --git a/wasm/BUILD.bazel b/wasm/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/wasm/BUILD.bazel
-@@ -0,0 +1,1232 @@
-+load("@rules_mx//mx:graph.bzl", "mx_exported_tar", "mx_jar_dist", "mx_jvmci_library", "mx_pom_dist", "mx_processed_java", "mx_project", "mx_test_class")
+@@ -0,0 +1,1821 @@
++load("@rules_java//java:java_import.bzl", "java_import")
++
++# gazelle:resolve java org.openjdk.jol.info //wasm:JOL
++load("@rules_java//java:java_plugin.bzl", "java_plugin")
++load("@rules_mx//mx:graph.bzl", "mx_exported_tar", "mx_jar_dist", "mx_jvmci_library", "mx_pom_dist", "mx_processed_java", "mx_project", "mx_test_class", "mx_whole_java")
++load("@rules_mx//mx:project_files.bzl", "mx_project_files", "mx_wat_project")
++load("@rules_mx//mx:wasm_programs.bzl", "mx_wasm_programs")
++
++java_import(
++    name = "JOL",
++    jars = ["@graal_shaded_inputs//:wasm_JOL.jar"],
++    visibility = ["//visibility:public"],
++)
 +
 +filegroup(
 +    name = "all_distributions",
 +    testonly = True,
 +    srcs = [
 +        ":WASM",
++        ":WASM_BENCHMARKCASES",
++        ":WASM_BENCHMARKS",
 +        ":WASM_GRAALVM_LICENSES",
 +        ":WASM_GRAALVM_SUPPORT",
 +        ":WASM_LAUNCHER",
++        ":WASM_POLYBENCH_BENCHMARKS",
 +        ":WASM_POM",
++        ":WASM_TESTCASES",
++        ":WASM_TESTS",
 +    ],
 +    visibility = ["//visibility:public"],
 +)
@@ -22,13 +39,67 @@ new file mode 100644
 +    name = "all_projects",
 +    testonly = True,
 +    srcs = [
++        ":graalwasm_licenses",
 +        ":org.graalvm.wasm",
++        ":org.graalvm.wasm.benchcases",
++        ":org.graalvm.wasm.benchcases.bench",
++        ":org.graalvm.wasm.benchmark",
 +        ":org.graalvm.wasm.jdk25",
 +        ":org.graalvm.wasm.launcher",
++        ":org.graalvm.wasm.memory",
++        ":org.graalvm.wasm.polybench",
 +        ":org.graalvm.wasm.test",
++        ":org.graalvm.wasm.testcases",
++        ":org.graalvm.wasm.testcases.test",
 +        ":org.graalvm.wasm.utils",
 +    ],
 +    visibility = ["//visibility:public"],
++)
++
++java_import(
++    name = "JMH_1_21",
++    jars = ["@graal_shaded_inputs//:mx_JMH_1_21.jar"],
++    deps = [
++        ":COMMONS_MATH3_3_2",
++        ":JMH_GENERATOR_ANNPROCESS_1_21",
++        ":JOPTSIMPLE_4_6",
++    ],
++)
++
++java_import(
++    name = "JOPTSIMPLE_4_6",
++    jars = ["@graal_shaded_inputs//:mx_JOPTSIMPLE_4_6.jar"],
++    deps = [],
++)
++
++java_import(
++    name = "JMH_GENERATOR_ANNPROCESS_1_21",
++    jars = ["@graal_shaded_inputs//:mx_JMH_GENERATOR_ANNPROCESS_1_21.jar"],
++    deps = [],
++)
++
++java_import(
++    name = "COMMONS_MATH3_3_2",
++    jars = ["@graal_shaded_inputs//:mx_COMMONS_MATH3_3_2.jar"],
++    deps = [],
++)
++
++java_plugin(
++    name = "jmh_processor",
++    processor_class = "org.openjdk.jmh.generators.BenchmarkProcessor",
++    deps = [":JMH_1_21"],
++)
++
++java_import(
++    name = "testcases_resources",
++    testonly = True,
++    jars = [":org.graalvm.wasm.testcases.resources"],
++)
++
++java_import(
++    name = "benchcases_resources",
++    testonly = True,
++    jars = [":org.graalvm.wasm.benchcases.resources"],
 +)
 +
 +test_suite(
@@ -77,6 +148,8 @@ new file mode 100644
 +        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.wasi.WasiSuite",
 +        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.webassembly.EmscriptenSuite",
 +        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.webassembly.IssueSuite",
++        ":org.graalvm.wasm.testcases.test.org.graalvm.wasm.testcases.test.CSuite",
++        ":org.graalvm.wasm.testcases.test.org.graalvm.wasm.testcases.test.WatSuite",
 +    ],
 +    visibility = ["//visibility:public"],
 +)
@@ -149,6 +222,42 @@ new file mode 100644
 +    ],
 +)
 +
++mx_processed_java(
++    name = "org.graalvm.wasm.benchcases.bench",
++    testonly = True,
++    srcs = ["//wasm/src/org.graalvm.wasm.benchcases.bench/src/org/graalvm/wasm/benchcases/bench:org.graalvm.wasm.benchcases.bench.srcs"],
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++    ],
++    plugins = [":jmh_processor"],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":JMH_1_21",
++        ":org.graalvm.wasm.benchmark",
++    ],
++)
++
++mx_processed_java(
++    name = "org.graalvm.wasm.benchmark",
++    testonly = True,
++    srcs = ["//wasm/src/org.graalvm.wasm.benchmark/src/org/graalvm/wasm/benchmark:org.graalvm.wasm.benchmark.srcs"],
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++    ],
++    plugins = [":jmh_processor"],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":JMH_1_21",
++        ":org.graalvm.wasm",
++        ":org.graalvm.wasm.utils",
++        "//sdk:POLYGLOT",
++    ],
++)
++
 +mx_jvmci_library(
 +    name = "org.graalvm.wasm.jdk25",
 +    srcs = [
@@ -176,6 +285,17 @@ new file mode 100644
 +    visibility = ["//visibility:public"],
 +    deps = [
 +        "//sdk:LAUNCHER_COMMON",
++        "//sdk:POLYGLOT",
++    ],
++)
++
++mx_project(
++    name = "org.graalvm.wasm.memory",
++    packages = ["//wasm/src/org.graalvm.wasm.memory/src/org/graalvm/wasm/memory"],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":JOL",
++        ":org.graalvm.wasm",
 +        "//sdk:POLYGLOT",
 +    ],
 +)
@@ -268,8 +388,8 @@ new file mode 100644
 +        "//sdk:POLYGLOT",
 +        "//truffle:TRUFFLE_API",
 +        "//truffle:TRUFFLE_TCK",
-+        "@contrib_rules_jvm_deps//:junit_junit",
-+        "@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
++        "@rules_mx//graal:hamcrest",
++        "@rules_mx//graal:junit",
 +    ],
 +)
 +
@@ -1121,6 +1241,56 @@ new file mode 100644
 +    ],
 +)
 +
++mx_whole_java(
++    name = "org.graalvm.wasm.testcases.test",
++    testonly = True,
++    srcs = ["//wasm/src/org.graalvm.wasm.testcases.test/src/org/graalvm/wasm/testcases/test:org.graalvm.wasm.testcases.test.srcs"],
++    javac_opts = [
++        "--release",
++        "21",
++        "-parameters",
++    ],
++    unified_release = 21,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":org.graalvm.wasm.test",
++        "@rules_mx//graal:hamcrest",
++        "@rules_mx//graal:junit",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.testcases.test.org.graalvm.wasm.testcases.test.CSuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.testcases.test.CSuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.testcases.test",
++        ":testcases_resources",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.testcases.test.org.graalvm.wasm.testcases.test.WatSuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.testcases.test.WatSuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.testcases.test",
++        ":testcases_resources",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
 +mx_processed_java(
 +    name = "org.graalvm.wasm.utils",
 +    testonly = True,
@@ -1150,8 +1320,8 @@ new file mode 100644
 +        "//sdk:COLLECTIONS",
 +        "//sdk:POLYGLOT",
 +        "//truffle:TRUFFLE_API",
-+        "@contrib_rules_jvm_deps//:junit_junit",
-+        "@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
++        "@rules_mx//graal:hamcrest",
++        "@rules_mx//graal:junit",
 +    ],
 +)
 +
@@ -1190,6 +1360,83 @@ new file mode 100644
 +)
 +
 +mx_jar_dist(
++    name = "WASM_BENCHMARKCASES",
++    testonly = True,
++    archived_libraries = [
++        ":JOPTSIMPLE_4_6",
++        ":JMH_GENERATOR_ANNPROCESS_1_21",
++        ":COMMONS_MATH3_3_2",
++        ":JMH_1_21",
++    ],
++    contents = [
++        ":benchcases_resources",
++        ":JOPTSIMPLE_4_6",
++        ":JMH_GENERATOR_ANNPROCESS_1_21",
++        ":COMMONS_MATH3_3_2",
++        ":JMH_1_21",
++        ":org.graalvm.wasm.benchmark",
++        ":org.graalvm.wasm.benchcases.bench",
++    ],
++    jmh_metadata = True,
++    jni_services = True,
++    manifest = {
++        "Main-Class": "org.openjdk.jmh.Main",
++    },
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":WASM",
++        ":WASM_TESTS",
++        "//truffle:TRUFFLE_API",
++        "//truffle:TRUFFLE_RUNTIME",
++        "//truffle:TRUFFLE_TCK",
++    ],
++)
++
++mx_jar_dist(
++    name = "WASM_BENCHMARKS",
++    testonly = True,
++    archived_libraries = [
++        ":JOPTSIMPLE_4_6",
++        ":JMH_GENERATOR_ANNPROCESS_1_21",
++        ":COMMONS_MATH3_3_2",
++        ":JMH_1_21",
++    ],
++    contents = [
++        ":JOPTSIMPLE_4_6",
++        ":JMH_GENERATOR_ANNPROCESS_1_21",
++        ":COMMONS_MATH3_3_2",
++        ":JMH_1_21",
++        ":org.graalvm.wasm.benchmark",
++    ],
++    directives = [
++        "requires java.compiler",
++        "requires org.graalvm.polyglot",
++        "requires org.graalvm.truffle",
++        "requires org.graalvm.truffle.runtime",
++        "requires org.graalvm.wasm",
++        "requires org.graalvm.wasm.test",
++        "requires transitive org.graalvm.word",
++    ],
++    jmh_metadata = True,
++    jni_services = True,
++    manifest = {
++        "Main-Class": "org.openjdk.jmh.Main",
++    },
++    module_name = "org.graalvm.wasm.benchmark",
++    release = 21,
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":WASM",
++        ":WASM_TESTS",
++        "//truffle:TRUFFLE_API",
++        "//truffle:TRUFFLE_RUNTIME",
++        "//truffle:TRUFFLE_TCK",
++    ],
++)
++
++mx_jar_dist(
 +    name = "WASM_LAUNCHER",
 +    contents = [":org.graalvm.wasm.launcher"],
 +    directives = [
@@ -1218,6 +1465,336 @@ new file mode 100644
 +    ],
 +)
 +
++mx_jar_dist(
++    name = "WASM_TESTCASES",
++    testonly = True,
++    contents = [
++        ":testcases_resources",
++        ":org.graalvm.wasm.testcases.test",
++    ],
++    directives = [
++        "exports org.graalvm.wasm.testcases.test to junit",
++        "opens test.c",
++        "opens test.wat",
++        "requires junit",
++        "requires org.graalvm.wasm.test",
++        "requires transitive org.graalvm.word",
++    ],
++    jni_services = True,
++    module_name = "org.graalvm.wasm.testcases",
++    release = 21,
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":WASM_TESTS",
++        "@rules_mx//graal:hamcrest",
++        "@rules_mx//graal:junit",
++    ],
++)
++
++mx_jar_dist(
++    name = "WASM_TESTS",
++    testonly = True,
++    contents = [
++        ":org.graalvm.wasm.utils",
++        ":org.graalvm.wasm.test",
++    ],
++    directives = [
++        "exports org.graalvm.wasm.test",
++        "exports org.graalvm.wasm.test.gc",
++        "exports org.graalvm.wasm.test.options",
++        "exports org.graalvm.wasm.test.regress",
++        "exports org.graalvm.wasm.test.suites",
++        "exports org.graalvm.wasm.test.suites.arithmetic",
++        "exports org.graalvm.wasm.test.suites.bytecode",
++        "exports org.graalvm.wasm.test.suites.compiler",
++        "exports org.graalvm.wasm.test.suites.control",
++        "exports org.graalvm.wasm.test.suites.debugging",
++        "exports org.graalvm.wasm.test.suites.linker",
++        "exports org.graalvm.wasm.test.suites.memory",
++        "exports org.graalvm.wasm.test.suites.table",
++        "exports org.graalvm.wasm.test.suites.validation",
++        "exports org.graalvm.wasm.test.suites.wasi",
++        "exports org.graalvm.wasm.test.suites.webassembly",
++        "exports org.graalvm.wasm.utils",
++        "exports org.graalvm.wasm.utils.cases",
++        "requires hamcrest",
++        "requires java.logging",
++        "requires junit",
++        "requires org.graalvm.collections",
++        "requires org.graalvm.polyglot",
++        "requires org.graalvm.truffle",
++        "requires org.graalvm.wasm",
++        "requires transitive org.graalvm.word",
++    ],
++    jni_services = True,
++    module_name = "org.graalvm.wasm.test",
++    release = 21,
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":WASM",
++        "//truffle:TRUFFLE_API",
++        "//truffle:TRUFFLE_TCK",
++        "@rules_mx//graal:hamcrest",
++        "@rules_mx//graal:junit",
++    ],
++)
++
++mx_project_files(
++    name = "graalwasm_licenses",
++    testonly = False,
++    members = {
++        "LICENSE": "LICENSE.txt",
++        "THIRD_PARTY_LICENSE.txt": "3rd_party_licenses.txt",
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_wasm_programs(
++    name = "org.graalvm.wasm.benchcases",
++    testonly = True,
++    cases = [
++        "bench/c/micro/cdf.c",
++        "bench/c/micro/digitron.c",
++        "bench/c/micro/event-sim.c",
++        "bench/c/micro/fft.c",
++        "bench/c/micro/fib-vm.c",
++        "bench/c/micro/hash-join.c",
++        "bench/c/micro/merge-join.c",
++        "bench/c/micro/phong.c",
++        "bench/c/micro/qsort.c",
++        "bench/c/micro/strings.c",
++        "bench/wasm/memory/go-hello.wasm",
++        "bench/wat/collatz.wat",
++        "bench/wat/flat-double-mul.wat",
++        "bench/wat/flat-int-add.wat",
++        "bench/wat/flat-int-mix.wat",
++        "bench/wat/flat-int-mul.wat",
++        "bench/wat/vector-double-mul.wat",
++        "bench/wat/vector-double-nearest.wat",
++        "bench/wat/vector-double-round.wat",
++        "bench/wat/vector-i16x8-sat.wat",
++        "bench/wat/vector-i8x16-sat.wat",
++        "bench/wat/vector-int-add.wat",
++        "bench/wat/vector-int-mix.wat",
++        "bench/wat/vector-int-mul.wat",
++        "bench/wat/vector-narrow.wat",
++        "bench/wat/vector-q15mulr.wat",
++        "bench/wat/vector-trunc-sat.wat",
++    ],
++    includes = "includes/bench",
++    native_cases = [
++        "bench/c/micro/cdf.c",
++        "bench/c/micro/digitron.c",
++        "bench/c/micro/event-sim.c",
++        "bench/c/micro/fft.c",
++        "bench/c/micro/fib-vm.c",
++        "bench/c/micro/hash-join.c",
++        "bench/c/micro/merge-join.c",
++        "bench/c/micro/phong.c",
++        "bench/c/micro/qsort.c",
++        "bench/c/micro/strings.c",
++    ],
++    root = "src/org.graalvm.wasm.benchcases/src",
++    sidecars = [
++        "bench/c/micro/cdf.opts",
++        "bench/c/micro/cdf.result",
++        "bench/c/micro/digitron.opts",
++        "bench/c/micro/digitron.result",
++        "bench/c/micro/event-sim.opts",
++        "bench/c/micro/event-sim.result",
++        "bench/c/micro/fft.opts",
++        "bench/c/micro/fft.result",
++        "bench/c/micro/fib-vm.opts",
++        "bench/c/micro/fib-vm.result",
++        "bench/c/micro/hash-join.opts",
++        "bench/c/micro/hash-join.result",
++        "bench/c/micro/merge-join.opts",
++        "bench/c/micro/merge-join.result",
++        "bench/c/micro/phong.opts",
++        "bench/c/micro/phong.result",
++        "bench/c/micro/qsort.opts",
++        "bench/c/micro/qsort.result",
++        "bench/c/micro/strings.opts",
++        "bench/c/micro/strings.result",
++        "bench/wasm/memory/go-hello.result",
++        "bench/wat/collatz.result",
++        "bench/wat/flat-double-mul.opts",
++        "bench/wat/flat-double-mul.result",
++        "bench/wat/flat-int-add.opts",
++        "bench/wat/flat-int-add.result",
++        "bench/wat/flat-int-mix.opts",
++        "bench/wat/flat-int-mix.result",
++        "bench/wat/flat-int-mul.opts",
++        "bench/wat/flat-int-mul.result",
++        "bench/wat/vector-double-mul.opts",
++        "bench/wat/vector-double-mul.result",
++        "bench/wat/vector-double-nearest.opts",
++        "bench/wat/vector-double-nearest.result",
++        "bench/wat/vector-double-round.opts",
++        "bench/wat/vector-double-round.result",
++        "bench/wat/vector-i16x8-sat.opts",
++        "bench/wat/vector-i16x8-sat.result",
++        "bench/wat/vector-i8x16-sat.opts",
++        "bench/wat/vector-i8x16-sat.result",
++        "bench/wat/vector-int-add.opts",
++        "bench/wat/vector-int-add.result",
++        "bench/wat/vector-int-mix.opts",
++        "bench/wat/vector-int-mix.result",
++        "bench/wat/vector-int-mul.opts",
++        "bench/wat/vector-int-mul.result",
++        "bench/wat/vector-narrow.opts",
++        "bench/wat/vector-narrow.result",
++        "bench/wat/vector-q15mulr.opts",
++        "bench/wat/vector-q15mulr.result",
++        "bench/wat/vector-trunc-sat.opts",
++        "bench/wat/vector-trunc-sat.result",
++    ],
++    visibility = ["//visibility:public"],
++    wasm2wat = "@wabt//src/tools:wasm2wat",
++    wat2wasm = "@wabt//src/tools:wat2wasm",
++    exports = {
++        "bench/c/micro/cdf.c": [
++            "_benchmarkIterationsCount",
++            "_benchmarkSetupOnce",
++            "_benchmarkSetupEach",
++            "_benchmarkTeardownEach",
++            "_benchmarkRun",
++        ],
++        "bench/c/micro/digitron.c": [
++            "_benchmarkIterationsCount",
++            "_benchmarkSetupOnce",
++            "_benchmarkSetupEach",
++            "_benchmarkTeardownEach",
++            "_benchmarkRun",
++        ],
++        "bench/c/micro/event-sim.c": [
++            "_benchmarkIterationsCount",
++            "_benchmarkSetupOnce",
++            "_benchmarkSetupEach",
++            "_benchmarkTeardownEach",
++            "_benchmarkRun",
++        ],
++        "bench/c/micro/fft.c": [
++            "_benchmarkIterationsCount",
++            "_benchmarkSetupOnce",
++            "_benchmarkSetupEach",
++            "_benchmarkTeardownEach",
++            "_benchmarkRun",
++        ],
++        "bench/c/micro/fib-vm.c": [
++            "_benchmarkIterationsCount",
++            "_benchmarkSetupOnce",
++            "_benchmarkSetupEach",
++            "_benchmarkTeardownEach",
++            "_benchmarkRun",
++        ],
++        "bench/c/micro/hash-join.c": [
++            "_benchmarkIterationsCount",
++            "_benchmarkSetupOnce",
++            "_benchmarkSetupEach",
++            "_benchmarkTeardownEach",
++            "_benchmarkRun",
++        ],
++        "bench/c/micro/merge-join.c": [
++            "_benchmarkIterationsCount",
++            "_benchmarkSetupOnce",
++            "_benchmarkSetupEach",
++            "_benchmarkTeardownEach",
++            "_benchmarkRun",
++        ],
++        "bench/c/micro/phong.c": [
++            "_benchmarkIterationsCount",
++            "_benchmarkSetupOnce",
++            "_benchmarkSetupEach",
++            "_benchmarkTeardownEach",
++            "_benchmarkRun",
++        ],
++        "bench/c/micro/qsort.c": [
++            "_benchmarkIterationsCount",
++            "_benchmarkSetupOnce",
++            "_benchmarkSetupEach",
++            "_benchmarkTeardownEach",
++            "_benchmarkRun",
++        ],
++        "bench/c/micro/strings.c": [
++            "_benchmarkIterationsCount",
++            "_benchmarkSetupOnce",
++            "_benchmarkSetupEach",
++            "_benchmarkTeardownEach",
++            "_benchmarkRun",
++        ],
++    },
++)
++
++mx_wasm_programs(
++    name = "org.graalvm.wasm.testcases",
++    testonly = True,
++    cases = [
++        "test/c/allocate-string.c",
++        "test/c/collatz.c",
++        "test/c/floyd.c",
++        "test/c/hello.c",
++        "test/wat/branch-return-unconditional.wat",
++        "test/wat/branch-unconditional.wat",
++        "test/wat/fourty-two.wat",
++    ],
++    root = "src/org.graalvm.wasm.testcases/src",
++    sidecars = [
++        "test/c/allocate-string.opts",
++        "test/c/allocate-string.result",
++        "test/c/collatz.opts",
++        "test/c/collatz.result",
++        "test/c/floyd.opts",
++        "test/c/floyd.result",
++        "test/c/hello.opts",
++        "test/c/hello.result",
++        "test/wat/branch-return-unconditional.result",
++        "test/wat/branch-unconditional.result",
++        "test/wat/fourty-two.result",
++    ],
++    visibility = ["//visibility:public"],
++    wasm2wat = "@wabt//src/tools:wasm2wat",
++    wat2wasm = "@wabt//src/tools:wat2wasm",
++    exports = {
++        "test/c/allocate-string.c": [
++            "_test",
++        ],
++        "test/c/collatz.c": [
++            "_test",
++        ],
++        "test/c/floyd.c": [
++            "_test",
++        ],
++        "test/c/hello.c": [
++            "_test",
++        ],
++    },
++)
++
++mx_wat_project(
++    name = "org.graalvm.wasm.polybench",
++    testonly = True,
++    cases = [
++        "exceptions/throw-catch-legacy.wat",
++        "exceptions/throw-catch.wat",
++        "interpreter/deltablue.wat",
++        "interpreter/fibonacci.wat",
++        "interpreter/richards.wat",
++        "interpreter/sieve.wat",
++        "interpreter/vector-int-add-mul.wat",
++        "simd/vector-double-mul.wat",
++        "simd/vector-double-round.wat",
++        "simd/vector-int-add.wat",
++        "simd/vector-int-mix.wat",
++        "simd/vector-int-mul.wat",
++    ],
++    root = "benchmarks",
++    tool = "@wabt//src/tools:wat2wasm",
++    visibility = ["//visibility:public"],
++)
++
 +mx_exported_tar(
 +    name = "WASM_GRAALVM_LICENSES",
 +    format = "tar",
@@ -1232,6 +1809,18 @@ new file mode 100644
 +    format = "tar",
 +    members = {
 +        "mx.wasm/native-image.properties": "native-image.properties",
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_exported_tar(
++    name = "WASM_POLYBENCH_BENCHMARKS",
++    testonly = True,
++    archive_imports = {
++        ":org.graalvm.wasm.polybench": "=",
++    },
++    format = "jar",
++    members = {
 +    },
 +    visibility = ["//visibility:public"],
 +)
@@ -2022,6 +2611,38 @@ new file mode 100644
 +    ],
 +    visibility = ["//wasm:__pkg__"],
 +)
+diff --git a/wasm/src/org.graalvm.wasm.benchcases.bench/src/org/graalvm/wasm/benchcases/bench/BUILD.bazel b/wasm/src/org.graalvm.wasm.benchcases.bench/src/org/graalvm/wasm/benchcases/bench/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.benchcases.bench/src/org/graalvm/wasm/benchcases/bench/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.benchcases.bench.srcs",
++    srcs = [
++        "CMicroBenchmarkSuite.java",
++        "WasmMemoryCompilationBenchmarkSuite.java",
++        "WatBenchmarkSuite.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.benchmark/src/org/graalvm/wasm/benchmark/BUILD.bazel b/wasm/src/org.graalvm.wasm.benchmark/src/org/graalvm/wasm/benchmark/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.benchmark/src/org/graalvm/wasm/benchmark/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.benchmark.srcs",
++    srcs = [
++        "MemoryFootprintBenchmarkRunner.java",
++        "WasmBenchmarkSuiteBase.java",
++        "WasmCompilationBenchmarkSuiteBase.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
 diff --git a/wasm/src/org.graalvm.wasm.jdk25/src/org/graalvm/wasm/memory/BUILD.bazel b/wasm/src/org.graalvm.wasm.jdk25/src/org/graalvm/wasm/memory/BUILD.bazel
 new file mode 100644
 --- /dev/null
@@ -2050,7 +2671,7 @@ diff --git a/wasm/src/org.graalvm.wasm.launcher/src/org/graalvm/wasm/launcher/BU
 new file mode 100644
 --- /dev/null
 +++ b/wasm/src/org.graalvm.wasm.launcher/src/org/graalvm/wasm/launcher/BUILD.bazel
-@@ -0,0 +1,26 @@
+@@ -0,0 +1,27 @@
 +load("@rules_java//java:defs.bzl", "java_binary")
 +load("@rules_mx//mx:java.bzl", "elide_java_library")
 +
@@ -2066,6 +2687,7 @@ new file mode 100644
 +    visibility = ["//:__subpackages__"],
 +    exports = ["//sdk:POLYGLOT"],
 +    deps = [
++        "//espresso:com.oracle.truffle.espresso.io",
 +        "//sdk:LAUNCHER_COMMON",
 +        "//sdk:POLYGLOT",
 +    ],
@@ -2076,6 +2698,42 @@ new file mode 100644
 +    main_class = "org.graalvm.wasm.launcher.WasmLauncher",
 +    visibility = ["//visibility:public"],
 +    runtime_deps = [":launcher"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.memory/src/org/graalvm/wasm/memory/BUILD.bazel b/wasm/src/org.graalvm.wasm.memory/src/org/graalvm/wasm/memory/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.memory/src/org/graalvm/wasm/memory/BUILD.bazel
+@@ -0,0 +1,31 @@
++load("@rules_java//java:defs.bzl", "java_binary")
++load("@rules_mx//mx:java.bzl", "elide_java_library")
++
++elide_java_library(
++    name = "memory",
++    srcs = [
++        "MemoryLayoutRunner.java",
++        "MemoryNode.java",
++        "PathParser.java",
++    ],
++    javac_opts = [
++        "--release",
++        "21",
++        "-parameters",
++    ],
++    unified_release = 21,
++    visibility = ["//:__subpackages__"],
++    deps = [
++        "//espresso:com.oracle.truffle.espresso.io",
++        "//sdk:POLYGLOT",
++        "//wasm:JOL",
++        "//wasm:org.graalvm.wasm",
++    ],
++)
++
++java_binary(
++    name = "MemoryLayoutRunner",
++    main_class = "org.graalvm.wasm.memory.MemoryLayoutRunner",
++    visibility = ["//visibility:public"],
++    runtime_deps = [":memory"],
 +)
 diff --git a/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/BUILD.bazel
 new file mode 100644
@@ -3363,6 +4021,21 @@ new file mode 100644
 +        "sched_yield.result",
 +        "sched_yield.wat",
 +        "wasm_test_index",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.testcases.test/src/org/graalvm/wasm/testcases/test/BUILD.bazel b/wasm/src/org.graalvm.wasm.testcases.test/src/org/graalvm/wasm/testcases/test/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.testcases.test/src/org/graalvm/wasm/testcases/test/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.testcases.test.srcs",
++    srcs = [
++        "CSuite.java",
++        "WatSuite.java",
 +    ],
 +    visibility = ["//wasm:__pkg__"],
 +)

@@ -3,6 +3,8 @@
 load("@rules_java//java/common:java_common.bzl", "java_common")
 load("@rules_java//java/common:java_info.bzl", "JavaInfo")
 
+RenamedModuleInfo = provider(fields = ["originals"])
+
 _TOOLCHAIN = "@bazel_tools//tools/jdk:toolchain_type"
 
 def _automatic_module_impl(ctx):
@@ -19,6 +21,11 @@ def _automatic_module_impl(ctx):
     abi = java_common.run_ijar(ctx.actions, jar, target_label = ctx.label, java_toolchain = ctx.toolchains[_TOOLCHAIN].java)
     return [
         DefaultInfo(files = depset([jar])),
+        RenamedModuleInfo(originals = depset([source], transitive = [
+            dep[RenamedModuleInfo].originals
+            for dep in ctx.attr.deps
+            if RenamedModuleInfo in dep
+        ])),
         JavaInfo(output_jar = jar, compile_jar = abi, deps = deps, exports = deps),
     ]
 

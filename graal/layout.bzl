@@ -23,7 +23,7 @@ static_archive = rule(
 
 MxArchiveLayoutInfo = provider(
     doc = "Mapping of packaged archive paths to their declared Bazel files.",
-    fields = ["entries"],
+    fields = ["archive", "entries"],
 )
 
 def _add_entry(entries, path, file):
@@ -35,7 +35,7 @@ def _layout_impl(ctx):
     output = ctx.actions.declare_file(ctx.label.name.lower().replace("_", "-") + "." + ctx.attr.format)
     entries = {}
     for target, destinations in ctx.attr.members.items():
-        files = target.files.to_list()
+        files = [target[MxArchiveLayoutInfo].archive] if MxArchiveLayoutInfo in target and target[MxArchiveLayoutInfo].archive else target.files.to_list()
         if len(files) != 1:
             fail("Expected one file from " + str(target.label))
         source = files[0]
@@ -69,9 +69,16 @@ def _layout_impl(ctx):
         outputs = [output],
         mnemonic = "MxArchiveLayout",
     )
+    files = [output]
+    if ctx.attr.file_list:
+        if sorted(ctx.attr.file_list) != sorted(entries):
+            fail("mx file list differs from archive members for " + str(ctx.label))
+        file_list = ctx.actions.declare_file(output.basename + ".filelist")
+        ctx.actions.write(file_list, "\n".join(ctx.attr.file_list))
+        files.append(file_list)
     return [
-        DefaultInfo(files = depset([output])),
-        MxArchiveLayoutInfo(entries = entries),
+        DefaultInfo(files = depset(files)),
+        MxArchiveLayoutInfo(archive = output, entries = entries),
     ]
 
 mx_archive_layout = rule(
@@ -81,6 +88,7 @@ mx_archive_layout = rule(
         "members": attr.label_keyed_string_dict(allow_files = True, mandatory = True),
         # Map a member to a new path, or use an empty selector to import an entire layout.
         "archive_imports": attr.label_keyed_string_dict(providers = [MxArchiveLayoutInfo]),
+        "file_list": attr.string_list(),
         "format": attr.string(mandatory = True, values = ["jar", "tar"]),
         "target_prefix": attr.string(),
         "_pack": attr.label(default = Label("//mx:pack_layout"), executable = True, cfg = "exec"),

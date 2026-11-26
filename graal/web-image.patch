@@ -1,0 +1,3334 @@
+diff --git a/web-image/BUILD.bazel b/web-image/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/BUILD.bazel
+@@ -0,0 +1,1081 @@
++load("@rules_java//java:java_import.bzl", "java_import")
++load("@rules_mx//graal:simplelanguage.bzl", "svm_test_runner")
++load("@rules_mx//mx:graph.bzl", "mx_exported_tar", "mx_jar_dist", "mx_jvmci_library", "mx_processed_java", "mx_test_class")
++load("@rules_mx//mx:jar.bzl", "mx_native_image_properties")
++
++java_import(
++    name = "GOOGLE_CLOSURE",
++    jars = ["@graal_shaded_inputs//:web-image_GOOGLE_CLOSURE.jar"],
++    visibility = ["//visibility:public"],
++)
++
++java_import(
++    name = "NET_JAVA_HTML",
++    jars = ["@graal_shaded_inputs//:web-image_NET_JAVA_HTML.jar"],
++    visibility = ["//visibility:public"],
++)
++
++java_import(
++    name = "NET_JAVA_HTML_BOOT",
++    jars = ["@graal_shaded_inputs//:web-image_NET_JAVA_HTML_BOOT.jar"],
++    visibility = ["//visibility:public"],
++)
++
++java_import(
++    name = "NET_JAVA_HTML_JSON",
++    jars = ["@graal_shaded_inputs//:web-image_NET_JAVA_HTML_JSON.jar"],
++    visibility = ["//visibility:public"],
++)
++
++java_import(
++    name = "NET_JAVA_HTML_JSON_TCK",
++    jars = ["@graal_shaded_inputs//:web-image_NET_JAVA_HTML_JSON_TCK.jar"],
++    visibility = ["//visibility:public"],
++)
++
++java_import(
++    name = "JIMFS_BFS",
++    jars = ["@graal_shaded_inputs//:web-image_JIMFS_BFS.jar"],
++    visibility = ["//visibility:public"],
++    deps = [":GUAVA_BFS"],
++)
++
++java_import(
++    name = "GUAVA_BFS",
++    jars = ["@graal_shaded_inputs//:web-image_GUAVA_BFS.jar"],
++    visibility = ["//visibility:public"],
++)
++
++java_import(
++    name = "JUNIT-JUPITER-API",
++    jars = ["@graal_shaded_inputs//:mx_JUNIT-JUPITER-API.jar"],
++    deps = [
++        ":APIGUARDIAN-API",
++        ":OPENTEST4J",
++    ],
++)
++
++java_import(
++    name = "APIGUARDIAN-API",
++    jars = ["@graal_shaded_inputs//:mx_APIGUARDIAN-API.jar"],
++    deps = [],
++)
++
++java_import(
++    name = "OPENTEST4J",
++    jars = ["@graal_shaded_inputs//:mx_OPENTEST4J.jar"],
++    deps = [":JUNIT-PLATFORM-COMMONS"],
++)
++
++java_import(
++    name = "JUNIT-PLATFORM-COMMONS",
++    jars = ["@graal_shaded_inputs//:mx_JUNIT-PLATFORM-COMMONS.jar"],
++    deps = [":APIGUARDIAN-API"],
++)
++
++svm_test_runner(
++    name = "webimage_junit",
++    jvm_flags = [
++        "--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.reflect=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.util=ALL-UNNAMED",
++        "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
++        "--add-exports=java.base/sun.security.provider=ALL-UNNAMED",
++        "--add-exports=java.base/sun.util.calendar=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.access=jdk.graal.compiler.hostvmaccess",
++        "--add-exports=java.base/jdk.internal.loader=jdk.graal.compiler.hostvmaccess",
++        "--add-exports=java.base/jdk.internal.misc=jdk.graal.compiler.hostvmaccess",
++        "--add-exports=java.base/jdk.internal.module=jdk.graal.compiler.hostvmaccess",
++        "--add-exports=java.base/jdk.internal.module=jdk.graal.compiler.vmaccess",
++        "--add-exports=java.base/sun.reflect.annotation=jdk.graal.compiler.vmaccess",
++        "--add-exports=jdk.graal.compiler/jdk.graal.compiler.annotation=jdk.graal.compiler.hostvmaccess",
++        "--add-exports=jdk.graal.compiler/jdk.graal.compiler.annotation=jdk.graal.compiler.vmaccess",
++        "--add-exports=jdk.graal.compiler/jdk.graal.compiler.api.replacements=jdk.graal.compiler.hostvmaccess",
++        "--add-exports=jdk.graal.compiler/jdk.graal.compiler.api.runtime=jdk.graal.compiler.hostvmaccess",
++        "--add-exports=jdk.graal.compiler/jdk.graal.compiler.core.target=jdk.graal.compiler.hostvmaccess",
++        "--add-exports=jdk.graal.compiler/jdk.graal.compiler.phases.util=jdk.graal.compiler.hostvmaccess",
++        "--add-exports=jdk.graal.compiler/jdk.graal.compiler.phases.util=jdk.graal.compiler.vmaccess",
++        "--add-exports=jdk.graal.compiler/jdk.graal.compiler.runtime=jdk.graal.compiler.hostvmaccess",
++        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.code=jdk.graal.compiler.hostvmaccess",
++        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.code=jdk.graal.compiler.vmaccess",
++        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta.annotation=jdk.graal.compiler.hostvmaccess",
++        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta.annotation=jdk.graal.compiler.vmaccess",
++        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=jdk.graal.compiler.hostvmaccess",
++        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=jdk.graal.compiler.vmaccess",
++        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.runtime=jdk.graal.compiler.hostvmaccess",
++    ],
++    modules = [
++        "//compiler:VMACCESS",
++        "//compiler:HOSTVMACCESS",
++    ],
++    root_modules = [
++        "jdk.graal.compiler.hostvmaccess",
++        "jdk.graal.compiler.vmaccess",
++    ],
++    test_classpath = [":WEBIMAGE_TESTS"],
++)
++
++test_suite(
++    name = "unit_tests",
++    tests = [
++        ":com.oracle.svm.hosted.webimage.test.com.oracle.svm.hosted.webimage.test.unit.CanonicalizePathTest",
++        ":com.oracle.svm.hosted.webimage.test.com.oracle.svm.hosted.webimage.test.unit.MoveResolverTest",
++        ":com.oracle.svm.hosted.webimage.test.com.oracle.svm.hosted.webimage.test.unit.WasmActiveDataTest",
++        ":com.oracle.svm.hosted.webimage.test.com.oracle.svm.hosted.webimage.test.unit.WasmLMSingleThreadedAtomicsTest",
++    ],
++    visibility = ["//visibility:public"],
++)
++
++filegroup(
++    name = "all_distributions",
++    testonly = True,
++    srcs = [
++        ":NATIVE_IMAGE_WASM_SUPPORT",
++        ":SVM_WASM",
++        ":SVM_WASM_GUAVA",
++        ":SVM_WASM_JIMFS",
++        ":WEBIMAGE_CLOSURE_SUPPORT",
++        ":WEBIMAGE_DRIVER",
++        ":WEBIMAGE_DRIVER_SUPPORT",
++        ":WEBIMAGE_GOOGLE_CLOSURE",
++        ":WEBIMAGE_LIBRARY_SUPPORT",
++        ":WEBIMAGE_TESTCASES",
++        ":WEBIMAGE_TESTS",
++        ":WEBIMAGE_TOOLS",
++    ],
++    visibility = ["//visibility:public"],
++)
++
++filegroup(
++    name = "all_projects",
++    testonly = True,
++    srcs = [
++        ":com.oracle.svm.hosted.webimage",
++        ":com.oracle.svm.hosted.webimage.closurecompiler",
++        ":com.oracle.svm.hosted.webimage.test",
++        ":com.oracle.svm.webimage",
++        ":com.oracle.svm.webimage.driver",
++        ":com.oracle.svm.webimage.jtt",
++        ":com.oracle.svm.webimage.thirdparty",
++        ":com.oracle.svm.webimage.tools",
++    ],
++    visibility = ["//visibility:public"],
++)
++
++mx_jvmci_library(
++    name = "com.oracle.svm.hosted.webimage",
++    srcs = [
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/code:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/arithm:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/compatibility:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/heap:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/irwalk:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/long64:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/lowerer:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/node:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/oop:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/phase:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/reconstruction:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/reconstruction/stackifier:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/type:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/value:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/wrappers:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/compiletasks:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/jni:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/js:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/logging:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/logging/visualization:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/metrickeys:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/name:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/options:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/phases:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/pointsto:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/pointsto/flow:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/snippets:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/util:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/util/metrics:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/annotation:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/ast:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/ast/id:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/ast/visitors:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/codegen:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/debug:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/gc:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/jni:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/nodes:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/phases:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/print:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/snippets:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/stack:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/substitute:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/ast:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/ast/id:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/ast/visitors:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/codegen:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/debug:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/image:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/phases:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/snippets:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/substitute:com.oracle.svm.hosted.webimage.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/types:com.oracle.svm.hosted.webimage.srcs",
++    ],
++    add_exports = [
++        "java.base/sun.nio.ch",
++        "java.base/sun.security.provider",
++        "java.base/jdk.internal.reflect",
++        "jdk.internal.vm.ci/jdk.vm.ci.code.site",
++        "jdk.internal.vm.ci/jdk.vm.ci.code",
++        "jdk.internal.vm.ci/jdk.vm.ci.common",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta.annotation",
++    ],
++    javacopts = [
++        "-source",
++        "21",
++        "-target",
++        "21",
++        "-parameters",
++        "--add-modules",
++        "jdk.internal.vm.ci,java.logging,java.compiler",
++        "-Xep:DoubleBraceInitialization:WARN",
++    ],
++    mx_resource_roots = ["src/com.oracle.svm.hosted.webimage/src"],
++    plugins = [
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.replacements.processor.ReplacementsAnnotationProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.nodeinfo.processor.GraphNodeProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.IntrinsicStubProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.SyncPortProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.core.match.processor.MatchProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.options.processor.OptionProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.serviceprovider.processor.ServiceProviderProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.libgraal.truffle.TruffleFromLibGraalProcessor",
++        "//substratevm:mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredFeatureProcessor",
++        "//substratevm:mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredImageSingletonProcessor",
++        "//substratevm:mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.BasedOnJDKFileProcessor",
++        "//substratevm:mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.LayeredAnnotationProcessor",
++        "//substratevm:mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.GenerateAnnotationWrapperProcessor",
++    ],
++    resources = [
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/META-INF/services:com.oracle.svm.hosted.webimage.resources",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/runtime:com.oracle.svm.hosted.webimage.resources",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/logging/doc-files:com.oracle.svm.hosted.webimage.resources",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/codegen:com.oracle.svm.hosted.webimage.resources",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/codegen/runtime:com.oracle.svm.hosted.webimage.resources",
++        "//web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/codegen/runtime:com.oracle.svm.hosted.webimage.resources",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":com.oracle.svm.webimage",
++        "//compiler:GRAAL",
++        "//compiler:GRAAL_OPTIONS",
++        "//sdk:COLLECTIONS",
++        "//sdk:NATIVEIMAGE",
++        "//sdk:WEBIMAGE_PREVIEW",
++        "//sdk:WORD",
++        "//substratevm:NATIVE_IMAGE_BASE",
++        "//substratevm:OBJECTFILE",
++        "//substratevm:POINTSTO",
++        "//substratevm:SVM",
++        "//substratevm:SVM_CONFIGURE",
++        "//substratevm:SVM_GUEST_STAGING",
++        "//substratevm:SVM_JVMCI_SHARED",
++        "//substratevm:SVM_SHARED",
++    ],
++)
++
++mx_processed_java(
++    name = "com.oracle.svm.hosted.webimage.closurecompiler",
++    srcs = ["//web-image/src/com.oracle.svm.hosted.webimage.closurecompiler/src/com/oracle/svm/hosted/webimage/closurecompiler:com.oracle.svm.hosted.webimage.closurecompiler.srcs"],
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++        "--add-modules",
++        "java.logging",
++    ],
++    mx_resource_root = "src/com.oracle.svm.hosted.webimage.closurecompiler/src",
++    plugins = [
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.replacements.processor.ReplacementsAnnotationProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.nodeinfo.processor.GraphNodeProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.IntrinsicStubProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.SyncPortProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.core.match.processor.MatchProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.options.processor.OptionProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.serviceprovider.processor.ServiceProviderProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.libgraal.truffle.TruffleFromLibGraalProcessor",
++        "//substratevm:mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredFeatureProcessor",
++        "//substratevm:mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredImageSingletonProcessor",
++        "//substratevm:mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.BasedOnJDKFileProcessor",
++        "//substratevm:mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.LayeredAnnotationProcessor",
++        "//substratevm:mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.GenerateAnnotationWrapperProcessor",
++    ],
++    resources = ["//web-image/src/com.oracle.svm.hosted.webimage.closurecompiler/src/com/oracle/svm/hosted/webimage/closurecompiler/externs:com.oracle.svm.hosted.webimage.closurecompiler.resources"],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":SVM_WASM",
++        ":WEBIMAGE_GOOGLE_CLOSURE",
++        "//sdk:COLLECTIONS",
++        "//sdk:WEBIMAGE_PREVIEW",
++        "//substratevm:POINTSTO",
++        "//substratevm:SVM",
++        "//substratevm:SVM_SHARED",
++    ],
++)
++
++mx_jvmci_library(
++    name = "com.oracle.svm.hosted.webimage.test",
++    testonly = True,
++    srcs = [
++        "//web-image/src/com.oracle.svm.hosted.webimage.test/src/com/oracle/svm/hosted/webimage/test:com.oracle.svm.hosted.webimage.test.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage.test/src/com/oracle/svm/hosted/webimage/test/spec:com.oracle.svm.hosted.webimage.test.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage.test/src/com/oracle/svm/hosted/webimage/test/unit:com.oracle.svm.hosted.webimage.test.srcs",
++        "//web-image/src/com.oracle.svm.hosted.webimage.test/src/com/oracle/svm/hosted/webimage/test/util:com.oracle.svm.hosted.webimage.test.srcs",
++    ],
++    add_exports = [
++        "jdk.internal.vm.ci/jdk.vm.ci.common",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++    ],
++    javacopts = [
++        "-source",
++        "21",
++        "-target",
++        "21",
++        "-parameters",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":JUNIT-JUPITER-API",
++        ":NET_JAVA_HTML_JSON_TCK",
++        ":SVM_WASM",
++        ":com.oracle.svm.hosted.webimage",
++        ":com.oracle.svm.webimage",
++        ":com.oracle.svm.webimage.driver",
++        ":com.oracle.svm.webimage.jtt",
++        "//compiler:GRAAL",
++        "//compiler:GRAAL_OPTIONS",
++        "//compiler:GRAAL_TEST",
++        "//sdk:COLLECTIONS",
++        "//sdk:NATIVEIMAGE",
++        "//sdk:WORD",
++        "//substratevm:SVM",
++        "//substratevm:SVM_SHARED",
++        "@contrib_rules_jvm_deps//:junit_junit",
++        "@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
++    ],
++)
++
++mx_test_class(
++    name = "com.oracle.svm.hosted.webimage.test.com.oracle.svm.hosted.webimage.test.JS_JTT_Spec_Test",
++    launcher = ":webimage_junit",
++    test_class = "com.oracle.svm.hosted.webimage.test.JS_JTT_Spec_Test",
++)
++
++mx_test_class(
++    name = "com.oracle.svm.hosted.webimage.test.com.oracle.svm.hosted.webimage.test.WebImageUnitTests",
++    launcher = ":webimage_junit",
++    test_class = "com.oracle.svm.hosted.webimage.test.WebImageUnitTests",
++)
++
++mx_test_class(
++    name = "com.oracle.svm.hosted.webimage.test.com.oracle.svm.hosted.webimage.test.spec.JS_JTT_Bytecodes",
++    launcher = ":webimage_junit",
++    test_class = "com.oracle.svm.hosted.webimage.test.spec.JS_JTT_Bytecodes",
++)
++
++mx_test_class(
++    name = "com.oracle.svm.hosted.webimage.test.com.oracle.svm.hosted.webimage.test.spec.JS_JTT_JSAnnotation",
++    launcher = ":webimage_junit",
++    test_class = "com.oracle.svm.hosted.webimage.test.spec.JS_JTT_JSAnnotation",
++)
++
++mx_test_class(
++    name = "com.oracle.svm.hosted.webimage.test.com.oracle.svm.hosted.webimage.test.spec.JS_JTT_JavaScriptBody",
++    launcher = ":webimage_junit",
++    test_class = "com.oracle.svm.hosted.webimage.test.spec.JS_JTT_JavaScriptBody",
++)
++
++mx_test_class(
++    name = "com.oracle.svm.hosted.webimage.test.com.oracle.svm.hosted.webimage.test.spec.JS_JTT_TCK_Headless",
++    launcher = ":webimage_junit",
++    test_class = "com.oracle.svm.hosted.webimage.test.spec.JS_JTT_TCK_Headless",
++)
++
++mx_test_class(
++    name = "com.oracle.svm.hosted.webimage.test.com.oracle.svm.hosted.webimage.test.spec.JS_JTT_XHR",
++    launcher = ":webimage_junit",
++    test_class = "com.oracle.svm.hosted.webimage.test.spec.JS_JTT_XHR",
++)
++
++mx_test_class(
++    name = "com.oracle.svm.hosted.webimage.test.com.oracle.svm.hosted.webimage.test.spec.JS_JTT_Zip",
++    launcher = ":webimage_junit",
++    test_class = "com.oracle.svm.hosted.webimage.test.spec.JS_JTT_Zip",
++)
++
++mx_test_class(
++    name = "com.oracle.svm.hosted.webimage.test.com.oracle.svm.hosted.webimage.test.unit.CanonicalizePathTest",
++    launcher = ":webimage_junit",
++    test_class = "com.oracle.svm.hosted.webimage.test.unit.CanonicalizePathTest",
++)
++
++mx_test_class(
++    name = "com.oracle.svm.hosted.webimage.test.com.oracle.svm.hosted.webimage.test.unit.MoveResolverTest",
++    launcher = ":webimage_junit",
++    test_class = "com.oracle.svm.hosted.webimage.test.unit.MoveResolverTest",
++)
++
++mx_test_class(
++    name = "com.oracle.svm.hosted.webimage.test.com.oracle.svm.hosted.webimage.test.unit.WasmActiveDataTest",
++    launcher = ":webimage_junit",
++    test_class = "com.oracle.svm.hosted.webimage.test.unit.WasmActiveDataTest",
++)
++
++mx_test_class(
++    name = "com.oracle.svm.hosted.webimage.test.com.oracle.svm.hosted.webimage.test.unit.WasmLMSingleThreadedAtomicsTest",
++    launcher = ":webimage_junit",
++    test_class = "com.oracle.svm.hosted.webimage.test.unit.WasmLMSingleThreadedAtomicsTest",
++)
++
++mx_jvmci_library(
++    name = "com.oracle.svm.webimage",
++    srcs = [
++        "//web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage:com.oracle.svm.webimage.srcs",
++        "//web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/annotation:com.oracle.svm.webimage.srcs",
++        "//web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/api:com.oracle.svm.webimage.srcs",
++        "//web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/fs:com.oracle.svm.webimage.srcs",
++        "//web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/functionintrinsics:com.oracle.svm.webimage.srcs",
++        "//web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/heap:com.oracle.svm.webimage.srcs",
++        "//web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/hightiercodegen:com.oracle.svm.webimage.srcs",
++        "//web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/hightiercodegen/variables:com.oracle.svm.webimage.srcs",
++        "//web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/jni:com.oracle.svm.webimage.srcs",
++        "//web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/longemulation:com.oracle.svm.webimage.srcs",
++        "//web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/memory:com.oracle.svm.webimage.srcs",
++        "//web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/object:com.oracle.svm.webimage.srcs",
++        "//web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/platform:com.oracle.svm.webimage.srcs",
++        "//web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/posix:com.oracle.svm.webimage.srcs",
++        "//web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/print:com.oracle.svm.webimage.srcs",
++        "//web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/reflect:com.oracle.svm.webimage.srcs",
++        "//web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/substitute:com.oracle.svm.webimage.srcs",
++        "//web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/substitute/system:com.oracle.svm.webimage.srcs",
++        "//web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/threads:com.oracle.svm.webimage.srcs",
++        "//web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/truffle:com.oracle.svm.webimage.srcs",
++        "//web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/type:com.oracle.svm.webimage.srcs",
++        "//web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/wasm:com.oracle.svm.webimage.srcs",
++        "//web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/wasm/code:com.oracle.svm.webimage.srcs",
++        "//web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/wasm/stack:com.oracle.svm.webimage.srcs",
++        "//web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/wasm/types:com.oracle.svm.webimage.srcs",
++        "//web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/wasmgc:com.oracle.svm.webimage.srcs",
++        "//web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/wasmgc/annotation:com.oracle.svm.webimage.srcs",
++    ],
++    add_exports = [
++        "java.base/sun.nio.ch",
++        "java.base/sun.security.provider",
++        "java.base/sun.util.calendar",
++        "java.base/jdk.internal.misc",
++        "java.base/jdk.internal.util",
++        "jdk.internal.vm.ci/jdk.vm.ci.code.site",
++        "jdk.internal.vm.ci/jdk.vm.ci.code",
++        "jdk.internal.vm.ci/jdk.vm.ci.common",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta.annotation",
++    ],
++    javacopts = [
++        "-source",
++        "21",
++        "-target",
++        "21",
++        "-parameters",
++        "--add-modules",
++        "jdk.internal.vm.ci,java.logging",
++    ],
++    mx_resource_root = "src/com.oracle.svm.webimage/src",
++    plugins = [
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.replacements.processor.ReplacementsAnnotationProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.nodeinfo.processor.GraphNodeProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.IntrinsicStubProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.SyncPortProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.core.match.processor.MatchProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.options.processor.OptionProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.serviceprovider.processor.ServiceProviderProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.libgraal.truffle.TruffleFromLibGraalProcessor",
++        "//substratevm:mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredFeatureProcessor",
++        "//substratevm:mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredImageSingletonProcessor",
++        "//substratevm:mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.BasedOnJDKFileProcessor",
++        "//substratevm:mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.LayeredAnnotationProcessor",
++        "//substratevm:mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.GenerateAnnotationWrapperProcessor",
++    ],
++    resources = ["//web-image/src/com.oracle.svm.webimage/src/META-INF/services:com.oracle.svm.webimage.resources"],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":SVM_WASM_JIMFS",
++        "//compiler:GRAAL",
++        "//compiler:GRAAL_OPTIONS",
++        "//sdk:COLLECTIONS",
++        "//sdk:NATIVEIMAGE",
++        "//sdk:WEBIMAGE_PREVIEW",
++        "//sdk:WORD",
++        "//substratevm:NATIVE_IMAGE_BASE",
++        "//substratevm:SVM",
++        "//substratevm:SVM_CONFIGURE",
++        "//substratevm:SVM_GUEST_STAGING",
++        "//substratevm:SVM_SHARED",
++    ],
++)
++
++mx_processed_java(
++    name = "com.oracle.svm.webimage.driver",
++    srcs = ["//web-image/src/com.oracle.svm.webimage.driver/src/com/oracle/svm/webimage/driver:com.oracle.svm.webimage.driver.srcs"],
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++    ],
++    plugins = [
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.replacements.processor.ReplacementsAnnotationProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.nodeinfo.processor.GraphNodeProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.IntrinsicStubProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.SyncPortProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.core.match.processor.MatchProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.options.processor.OptionProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.serviceprovider.processor.ServiceProviderProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.libgraal.truffle.TruffleFromLibGraalProcessor",
++    ],
++    visibility = ["//visibility:public"],
++    deps = ["//substratevm:SVM_DRIVER"],
++)
++
++mx_jvmci_library(
++    name = "com.oracle.svm.webimage.jtt",
++    testonly = True,
++    srcs = [
++        "//web-image/src/com.oracle.svm.webimage.jtt/src/com/oracle/svm/webimage/jtt/api:com.oracle.svm.webimage.jtt.srcs",
++        "//web-image/src/com.oracle.svm.webimage.jtt/src/com/oracle/svm/webimage/jtt/api/htmlexamples/issue43707:com.oracle.svm.webimage.jtt.srcs",
++        "//web-image/src/com.oracle.svm.webimage.jtt/src/com/oracle/svm/webimage/jtt/api/htmlexamples/issue43842:com.oracle.svm.webimage.jtt.srcs",
++        "//web-image/src/com.oracle.svm.webimage.jtt/src/com/oracle/svm/webimage/jtt/api/jsobjectsubclass:com.oracle.svm.webimage.jtt.srcs",
++        "//web-image/src/com.oracle.svm.webimage.jtt/src/com/oracle/svm/webimage/jtt/bytecode:com.oracle.svm.webimage.jtt.srcs",
++        "//web-image/src/com.oracle.svm.webimage.jtt/src/com/oracle/svm/webimage/jtt/javascriptbody:com.oracle.svm.webimage.jtt.srcs",
++        "//web-image/src/com.oracle.svm.webimage.jtt/src/com/oracle/svm/webimage/jtt/testdispatcher:com.oracle.svm.webimage.jtt.srcs",
++        "//web-image/src/com.oracle.svm.webimage.jtt/src/com/oracle/svm/webimage/jtt/xhr:com.oracle.svm.webimage.jtt.srcs",
++        "//web-image/src/com.oracle.svm.webimage.jtt/src/com/oracle/svm/webimage/jtt/zip:com.oracle.svm.webimage.jtt.srcs",
++    ],
++    add_exports = ["jdk.internal.vm.ci/jdk.vm.ci.common"],
++    javacopts = [
++        "-source",
++        "21",
++        "-target",
++        "21",
++        "-parameters",
++        "-XepDisableAllChecks",
++    ],
++    mx_resource_root = "src/com.oracle.svm.webimage.jtt/src",
++    plugins = [
++        "//substratevm:mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredFeatureProcessor",
++        "//substratevm:mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredImageSingletonProcessor",
++        "//substratevm:mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.BasedOnJDKFileProcessor",
++        "//substratevm:mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.LayeredAnnotationProcessor",
++        "//substratevm:mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.GenerateAnnotationWrapperProcessor",
++    ],
++    resources = [
++        "//web-image/src/com.oracle.svm.webimage.jtt/src/META-INF/native-image:com.oracle.svm.webimage.jtt.resources",
++        "//web-image/src/com.oracle.svm.webimage.jtt/src/com/oracle/svm/webimage/jtt/api:com.oracle.svm.webimage.jtt.resources",
++        "//web-image/src/com.oracle.svm.webimage.jtt/src/com/oracle/svm/webimage/jtt/api/htmlexamples/issue43707:com.oracle.svm.webimage.jtt.resources",
++        "//web-image/src/com.oracle.svm.webimage.jtt/src/com/oracle/svm/webimage/jtt/api/htmlexamples/issue43842:com.oracle.svm.webimage.jtt.resources",
++        "//web-image/src/com.oracle.svm.webimage.jtt/src/com/oracle/svm/webimage/jtt/javascriptbody:com.oracle.svm.webimage.jtt.resources",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":JUNIT-JUPITER-API",
++        ":NET_JAVA_HTML",
++        ":NET_JAVA_HTML_BOOT",
++        ":NET_JAVA_HTML_JSON",
++        ":NET_JAVA_HTML_JSON_TCK",
++        ":SVM_WASM",
++        ":WEBIMAGE_LIBRARY_SUPPORT",
++        "//sdk:NATIVEIMAGE",
++        "//sdk:WEBIMAGE_PREVIEW",
++        "//substratevm:SVM",
++        "//substratevm:SVM_SHARED",
++        "@contrib_rules_jvm_deps//:junit_junit",
++        "@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
++    ],
++)
++
++mx_jvmci_library(
++    name = "com.oracle.svm.webimage.thirdparty",
++    srcs = [
++        "//web-image/src/com.oracle.svm.webimage.thirdparty/src/com/oracle/svm/webimage/thirdparty:com.oracle.svm.webimage.thirdparty.srcs",
++        "//web-image/src/com.oracle.svm.webimage.thirdparty/src/net/java/html/js:com.oracle.svm.webimage.thirdparty.srcs",
++    ],
++    add_exports = [
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta.annotation",
++    ],
++    javacopts = [
++        "-source",
++        "21",
++        "-target",
++        "21",
++        "-parameters",
++    ],
++    mx_resource_root = "src/com.oracle.svm.webimage.thirdparty/src",
++    plugins = [
++        "//substratevm:mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredFeatureProcessor",
++        "//substratevm:mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredImageSingletonProcessor",
++        "//substratevm:mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.BasedOnJDKFileProcessor",
++        "//substratevm:mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.LayeredAnnotationProcessor",
++        "//substratevm:mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.GenerateAnnotationWrapperProcessor",
++    ],
++    resources = [
++        "//web-image/src/com.oracle.svm.webimage.thirdparty/src/META-INF/native-image:com.oracle.svm.webimage.thirdparty.resources",
++        "//web-image/src/com.oracle.svm.webimage.thirdparty/src/com/oracle/svm/webimage/thirdparty:com.oracle.svm.webimage.thirdparty.resources",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":com.oracle.svm.hosted.webimage",
++        ":com.oracle.svm.webimage",
++        "//compiler:GRAAL",
++        "//sdk:NATIVEIMAGE",
++        "//sdk:WEBIMAGE_PREVIEW",
++        "//substratevm:NATIVE_IMAGE_BASE",
++        "//substratevm:POINTSTO",
++        "//substratevm:SVM",
++        "//substratevm:SVM_SHARED",
++    ],
++)
++
++mx_processed_java(
++    name = "com.oracle.svm.webimage.tools",
++    srcs = ["//web-image/src/com.oracle.svm.webimage.tools/src/com/oracle/svm/webimage/tools:com.oracle.svm.webimage.tools.srcs"],
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++        "--add-modules",
++        "jdk.httpserver",
++    ],
++    mx_resource_root = "src/com.oracle.svm.webimage.tools/resources",
++    plugins = [
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.replacements.processor.ReplacementsAnnotationProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.nodeinfo.processor.GraphNodeProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.IntrinsicStubProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.SyncPortProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.core.match.processor.MatchProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.options.processor.OptionProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.serviceprovider.processor.ServiceProviderProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.libgraal.truffle.TruffleFromLibGraalProcessor",
++    ],
++    resources = [
++        "//web-image/src/com.oracle.svm.webimage.tools/resources:com.oracle.svm.webimage.tools.resources",
++        "//web-image/src/com.oracle.svm.webimage.tools/resources/debug:com.oracle.svm.webimage.tools.resources",
++    ],
++    visibility = ["//visibility:public"],
++)
++
++mx_jar_dist(
++    name = "SVM_WASM",
++    contents = [
++        ":com.oracle.svm.webimage",
++        ":com.oracle.svm.hosted.webimage",
++    ],
++    directives = [
++        "exports com.oracle.svm.hosted.webimage to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.code to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.codegen to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.codegen.arithm to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.codegen.compatibility to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.codegen.heap to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.codegen.irwalk to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.codegen.long64 to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.codegen.lowerer to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.codegen.node to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.codegen.oop to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.codegen.phase to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.codegen.reconstruction to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.codegen.reconstruction.stackifier to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.codegen.type to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.codegen.value to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.codegen.wrappers to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.compiletasks to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.jni to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.js to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.logging to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.logging.visualization to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.metrickeys to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.name to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.options to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.phases to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.pointsto to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.pointsto.flow to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.snippets to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.util to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.util.metrics to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.wasm to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.wasm.annotation to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.wasm.ast to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.wasm.ast.id to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.wasm.ast.visitors to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.wasm.codegen to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.wasm.debug to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.wasm.gc to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.wasm.jni to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.wasm.nodes to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.wasm.phases to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.wasm.print to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.wasm.snippets to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.wasm.stack to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.wasm.substitute to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.wasmgc to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.wasmgc.ast to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.wasmgc.ast.id to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.wasmgc.ast.visitors to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.wasmgc.codegen to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.wasmgc.debug to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.wasmgc.image to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.wasmgc.phases to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.wasmgc.snippets to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.wasmgc.substitute to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.hosted.webimage.wasmgc.types to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.webimage to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.webimage.annotation to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.webimage.api to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.webimage.fs to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.webimage.functionintrinsics to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.webimage.heap to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.webimage.hightiercodegen to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.webimage.hightiercodegen.variables to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.webimage.jni to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.webimage.longemulation to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.webimage.memory to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.webimage.object to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.webimage.platform to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.webimage.posix to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.webimage.print to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.webimage.reflect to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.webimage.substitute to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.webimage.substitute.system to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.webimage.threads to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.webimage.truffle to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.webimage.type to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.webimage.wasm to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.webimage.wasm.code to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.webimage.wasm.stack to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.webimage.wasm.types to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.webimage.wasmgc to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "exports com.oracle.svm.webimage.wasmgc.annotation to org.graalvm.extraimage.driver, com.oracle.svm.extraimage_enterprise, org.graalvm.nativeimage.builder, jdk.graal.compiler, org.graalvm.extraimage.librarysupport, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "opens com.oracle.svm.webimage.substitute.system to org.graalvm.nativeimage.builder",
++        "requires java.compiler",
++        "requires java.logging",
++        "requires jdk.graal.compiler",
++        "requires jdk.internal.vm.ci",
++        "requires org.graalvm.collections",
++        "requires org.graalvm.nativeimage.builder",
++        "requires org.graalvm.nativeimage.configure",
++        "requires org.graalvm.nativeimage.pointsto",
++        "requires org.graalvm.webimage.api",
++        "requires org.graalvm.wrapped.google.jimfs",
++        "requires transitive jdk.graal.compiler.options",
++        "requires transitive org.graalvm.nativeimage",
++        "requires transitive org.graalvm.nativeimage.base",
++        "requires transitive org.graalvm.nativeimage.guest.staging",
++        "requires transitive org.graalvm.nativeimage.jvmci.shared",
++        "requires transitive org.graalvm.nativeimage.objectfile",
++        "requires transitive org.graalvm.nativeimage.shared",
++        "requires transitive org.graalvm.word",
++    ],
++    graal_services = True,
++    module_exports = [
++        "java.base/jdk.internal.misc",
++        "java.base/jdk.internal.reflect",
++        "java.base/jdk.internal.util",
++        "java.base/sun.nio.ch",
++        "java.base/sun.security.provider",
++        "java.base/sun.util.calendar",
++        "jdk.internal.vm.ci/jdk.vm.ci.code",
++        "jdk.internal.vm.ci/jdk.vm.ci.code.site",
++        "jdk.internal.vm.ci/jdk.vm.ci.common",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta.annotation",
++    ],
++    module_name = "org.graalvm.extraimage.builder",
++    release = 21,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":SVM_WASM_JIMFS",
++        "//compiler:GRAAL",
++        "//sdk:WEBIMAGE_PREVIEW",
++        "//substratevm:POINTSTO",
++        "//substratevm:SVM",
++    ],
++)
++
++mx_jar_dist(
++    name = "SVM_WASM_GUAVA",
++    archived_libraries = [":GUAVA_BFS"],
++    contents = [":GUAVA_BFS"],
++    directives = [
++        "exports org.graalvm.shadowed.com.google.common.* to org.graalvm.wrapped.google.jimfs",
++        "requires java.logging",
++    ],
++    graal_services = True,
++    module_name = "org.graalvm.wrapped.google.guava",
++    release = 21,
++    visibility = ["//visibility:public"],
++)
++
++mx_jar_dist(
++    name = "SVM_WASM_JIMFS",
++    archived_libraries = [":JIMFS_BFS"],
++    contents = [":JIMFS_BFS"],
++    directives = [
++        "exports org.graalvm.shadowed.com.google.common.jimfs to org.graalvm.extraimage.builder, com.oracle.svm.extraimage_enterprise",
++        "requires java.logging",
++        "requires org.graalvm.wrapped.google.guava",
++    ],
++    graal_services = True,
++    module_name = "org.graalvm.wrapped.google.jimfs",
++    release = 21,
++    visibility = ["//visibility:public"],
++    deps = [":SVM_WASM_GUAVA"],
++)
++
++mx_jar_dist(
++    name = "WEBIMAGE_CLOSURE_SUPPORT",
++    contents = [":com.oracle.svm.hosted.webimage.closurecompiler"],
++    directives = [
++        "exports com.oracle.svm.hosted.webimage.closurecompiler to org.graalvm.extraimage.builder, com.oracle.svm.extraimage_enterprise, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "requires java.logging",
++        "requires jdk.graal.compiler",
++        "requires org.graalvm.collections",
++        "requires org.graalvm.extraimage.builder",
++        "requires org.graalvm.nativeimage.builder",
++        "requires org.graalvm.webimage.api",
++        "requires org.graalvm.wrapped.google.closure",
++        "requires transitive jdk.graal.compiler.options",
++        "requires transitive org.graalvm.nativeimage",
++        "requires transitive org.graalvm.nativeimage.base",
++        "requires transitive org.graalvm.nativeimage.guest.staging",
++        "requires transitive org.graalvm.nativeimage.jvmci.shared",
++        "requires transitive org.graalvm.nativeimage.objectfile",
++        "requires transitive org.graalvm.nativeimage.pointsto",
++        "requires transitive org.graalvm.nativeimage.shared",
++        "requires transitive org.graalvm.word",
++    ],
++    graal_services = True,
++    module_name = "org.graalvm.extraimage.closurecompiler",
++    release = 21,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":SVM_WASM",
++        ":WEBIMAGE_GOOGLE_CLOSURE",
++    ],
++)
++
++mx_jar_dist(
++    name = "WEBIMAGE_DRIVER",
++    contents = [":com.oracle.svm.webimage.driver"],
++    directives = [
++        "requires org.graalvm.nativeimage.driver",
++        "requires transitive jdk.graal.compiler.options",
++        "requires transitive org.graalvm.nativeimage",
++        "requires transitive org.graalvm.nativeimage.base",
++        "requires transitive org.graalvm.nativeimage.guest.staging",
++        "requires transitive org.graalvm.nativeimage.jvmci.shared",
++        "requires transitive org.graalvm.nativeimage.objectfile",
++        "requires transitive org.graalvm.nativeimage.pointsto",
++        "requires transitive org.graalvm.nativeimage.shared",
++        "requires transitive org.graalvm.word",
++    ],
++    graal_services = True,
++    manifest = {
++        "Main-Class": "com.oracle.svm.webimage.driver.WebImage",
++    },
++    module_name = "org.graalvm.extraimage.driver",
++    release = 21,
++    visibility = ["//visibility:public"],
++    deps = ["//substratevm:SVM_DRIVER"],
++)
++
++mx_jar_dist(
++    name = "WEBIMAGE_GOOGLE_CLOSURE",
++    archived_libraries = [":GOOGLE_CLOSURE"],
++    contents = [":GOOGLE_CLOSURE"],
++    directives = [
++        "exports com.google.javascript.* to org.graalvm.extraimage.builder, com.oracle.svm.extraimage_enterprise, org.graalvm.extraimage.closurecompiler, com.oracle.svm.extraimage_enterprise.closurecompiler",
++        "requires java.sql",
++        "requires java.xml",
++    ],
++    graal_services = True,
++    module_name = "org.graalvm.wrapped.google.closure",
++    release = 21,
++    visibility = ["//visibility:public"],
++)
++
++mx_jar_dist(
++    name = "WEBIMAGE_LIBRARY_SUPPORT",
++    contents = [":com.oracle.svm.webimage.thirdparty"],
++    directives = [
++        "exports com.oracle.svm.webimage.thirdparty",
++        "exports net.java.html.js to org.graalvm.extraimage.builder",
++        "opens com.oracle.svm.webimage.thirdparty to org.graalvm.extraimage.builder",
++        "requires jdk.graal.compiler",
++        "requires jdk.internal.vm.ci",
++        "requires org.graalvm.extraimage.builder",
++        "requires org.graalvm.nativeimage.builder",
++        "requires org.graalvm.webimage.api",
++        "requires transitive jdk.graal.compiler.options",
++        "requires transitive org.graalvm.nativeimage",
++        "requires transitive org.graalvm.nativeimage.base",
++        "requires transitive org.graalvm.nativeimage.guest.staging",
++        "requires transitive org.graalvm.nativeimage.jvmci.shared",
++        "requires transitive org.graalvm.nativeimage.objectfile",
++        "requires transitive org.graalvm.nativeimage.pointsto",
++        "requires transitive org.graalvm.nativeimage.shared",
++        "requires transitive org.graalvm.word",
++    ],
++    graal_services = True,
++    manifest = {
++        "Implementation-Version": "1.0-dev",
++        "Name": "webimage-library-support",
++        "Specification-Version": "1.0-dev",
++    },
++    module_exports = [
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta.annotation",
++    ],
++    module_name = "org.graalvm.extraimage.librarysupport",
++    release = 21,
++    visibility = ["//visibility:public"],
++    deps = [":SVM_WASM"],
++)
++
++mx_jar_dist(
++    name = "WEBIMAGE_TESTCASES",
++    testonly = True,
++    archived_libraries = [
++        ":NET_JAVA_HTML",
++        ":NET_JAVA_HTML_BOOT",
++        ":NET_JAVA_HTML_JSON",
++        ":NET_JAVA_HTML_JSON_TCK",
++    ],
++    contents = [
++        ":NET_JAVA_HTML",
++        ":NET_JAVA_HTML_BOOT",
++        ":NET_JAVA_HTML_JSON",
++        ":NET_JAVA_HTML_JSON_TCK",
++        ":com.oracle.svm.webimage.jtt",
++    ],
++    graal_services = True,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":JUNIT-JUPITER-API",
++        ":WEBIMAGE_LIBRARY_SUPPORT",
++        "@contrib_rules_jvm_deps//:junit_junit",
++        "@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
++    ],
++)
++
++mx_jar_dist(
++    name = "WEBIMAGE_TESTS",
++    testonly = True,
++    contents = [":com.oracle.svm.hosted.webimage.test"],
++    graal_services = True,
++    jni_services = True,
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":JUNIT-JUPITER-API",
++        ":SVM_WASM",
++        ":WEBIMAGE_DRIVER",
++        ":WEBIMAGE_TESTCASES",
++        "//compiler:GRAAL_TEST",
++        "@contrib_rules_jvm_deps//:junit_junit",
++        "@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
++    ],
++)
++
++mx_jar_dist(
++    name = "WEBIMAGE_TOOLS",
++    contents = [":com.oracle.svm.webimage.tools"],
++    directives = [
++        "requires jdk.httpserver",
++        "requires org.graalvm.extraimage.builder",
++        "requires transitive jdk.graal.compiler.options",
++        "requires transitive org.graalvm.nativeimage",
++        "requires transitive org.graalvm.nativeimage.base",
++        "requires transitive org.graalvm.nativeimage.guest.staging",
++        "requires transitive org.graalvm.nativeimage.jvmci.shared",
++        "requires transitive org.graalvm.nativeimage.objectfile",
++        "requires transitive org.graalvm.nativeimage.pointsto",
++        "requires transitive org.graalvm.nativeimage.shared",
++        "requires transitive org.graalvm.word",
++    ],
++    graal_services = True,
++    manifest = {
++        "Main-Class": "com.oracle.svm.webimage.tools.ToolServer",
++    },
++    module_name = "org.graalvm.webimage.tools",
++    release = 21,
++    visibility = ["//visibility:public"],
++    deps = [":SVM_WASM"],
++)
++
++mx_native_image_properties(
++    name = "svm-wasm-macro-builder",
++    builders = [
++        ":SVM_WASM",
++        ":SVM_WASM_JIMFS",
++        ":SVM_WASM_GUAVA",
++    ],
++    java_args = [],
++    lines = [
++        "# This file is auto-generated",
++        "ExcludeFromAll = true",
++        "ProvidedHostedOptions = AnalyzeCompoundConditionals AutoRunLibraries= AutoRunVM BenchmarkName= ClearFreeMemory CLIVisualizationMonochrome ClosureCompiler ClosurePrettyPrint= CodeSizeDiagnostics DebugNames DisableStackTraces DumpCurrentCompiledFunction DumpPreClosure DumpTypeControlGraph EnableTruffle EncodeImageHeapArraysBase64 EntryPointsConfig= FatalUnsupportedNodes ForceSinglePrecision GCStressTest GenerateSourceMap GenTimingCode GrowthTriggerThreshold= HeapGrowthFactor= ImageHeapObjectsPerFunction= LegacyExceptions JSComments= JSRuntime= LogFilter= LoggingFile= LoggingStyle= NamingConvention= OutlineRuntimeChecks ReportImageSizeBreakdown RuntimeDebugChecks SILENT_COMPILE SourceMapSourceRoot= StrictWarnings UnsafeErrorMessages UseBinaryen UsePEA UseRandomForTempFiles UseVtable VerificationPhases VerifyAllocations Visualization= VMClassName= WasmAsPath= WasmComments= WasmVerifyReferences Wat2WasmPath=",
++        "ImageBuilderModulePath = ${.}/builder/svm-wasm-guava.jar\\:${.}/builder/svm-wasm-jimfs.jar\\:${.}/builder/svm-wasm.jar",
++    ],
++)
++
++mx_exported_tar(
++    name = "NATIVE_IMAGE_WASM_SUPPORT",
++    format = "tar",
++    members = {
++        ":svm-wasm-macro-builder": "native-image.properties",
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_native_image_properties(
++    name = "web-image-macro-builder",
++    builders = [
++        ":SVM_WASM",
++        ":SVM_WASM_JIMFS",
++        ":SVM_WASM_GUAVA",
++        ":WEBIMAGE_CLOSURE_SUPPORT",
++        ":WEBIMAGE_GOOGLE_CLOSURE",
++    ],
++    java_args = [
++        "-Dcom.oracle.graalvm.iswebimage\\=true",
++        "--add-modules\\=org.graalvm.extraimage.closurecompiler",
++        "--add-modules\\=org.graalvm.wrapped.google.closure",
++    ],
++    lines = [
++        "# This file is auto-generated",
++        "ExcludeFromAll = true",
++        "ProvidedHostedOptions = ",
++        "ImageBuilderModulePath = ${.}/../svm-wasm/builder/svm-wasm-guava.jar\\:${.}/../svm-wasm/builder/svm-wasm-jimfs.jar\\:${.}/../svm-wasm/builder/svm-wasm.jar\\:${.}/builder/webimage-closure-support.jar\\:${.}/builder/webimage-google-closure.jar",
++        "ImageProvidedJars = ${.}/webimage-library-support.jar",
++    ],
++)
++
++mx_exported_tar(
++    name = "WEBIMAGE_DRIVER_SUPPORT",
++    format = "tar",
++    members = {
++        ":web-image-macro-builder": "native-image.properties",
++    },
++    visibility = ["//visibility:public"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/META-INF/services/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/META-INF/services/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/META-INF/services/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.resources",
++    srcs = [
++        "com.oracle.svm.hosted.NativeImageClassLoaderPostProcessing",
++        "com.oracle.svm.hosted.NativeImageGeneratorRunnerProvider",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/BUILD.bazel
+@@ -0,0 +1,32 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "AnalysisUtil.java",
++        "CodeSizeDiagnostics.java",
++        "JSCodeBuffer.java",
++        "JSEntryPointRegistry.java",
++        "JSGraphBuilderPlugins.java",
++        "Labeler.java",
++        "LowerableFile.java",
++        "NativeImageWasmGeneratorRunner.java",
++        "NativeImageWasmGeneratorRunnerProvider.java",
++        "SourceMapBuilder.java",
++        "WebImageCodeCache.java",
++        "WebImageDelegateFeature.java",
++        "WebImageEntryPointData.java",
++        "WebImageFeature.java",
++        "WebImageGenerator.java",
++        "WebImageHost.java",
++        "WebImageHostedConfiguration.java",
++        "WebImageJSFeature.java",
++        "WebImageJSHeapBreakdownProvider.java",
++        "WebImageKnownOffsetsFeature.java",
++        "WebImageLoweringProvider.java",
++        "WebImagePlatformInjector.java",
++        "WebImageRuntimeJNIAccessSupport.java",
++        "package-info.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/code/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/code/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/code/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "WebImageCompileQueue.java",
++        "WebImageJSCompileQueue.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/BUILD.bazel
+@@ -0,0 +1,35 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "Array.java",
++        "ClosureCompilerSupport.java",
++        "JSBodyFeature.java",
++        "JSBodyTypeFlowFeature.java",
++        "JSCodeGenTool.java",
++        "JSIntrinsifyFile.java",
++        "KnownHubMapLowerer.java",
++        "LowerableResource.java",
++        "LowerableResources.java",
++        "NameSpaceHideLowerer.java",
++        "Runtime.java",
++        "RuntimeConstants.java",
++        "RuntimeModificationLowerer.java",
++        "WebImage.java",
++        "WebImageBackend.java",
++        "WebImageCodeGen.java",
++        "WebImageCompilationResult.java",
++        "WebImageEntryFunctionLowerer.java",
++        "WebImageImplicitExceptionsFeature.java",
++        "WebImageJSBackend.java",
++        "WebImageJSCodeGen.java",
++        "WebImageJSNodeLowerer.java",
++        "WebImageJSProviders.java",
++        "WebImageNoRegisterConfig.java",
++        "WebImageProviders.java",
++        "WebImageTypeControl.java",
++        "WebImageVariableAllocation.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/arithm/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/arithm/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/arithm/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "BinaryFloatOperationLowerer.java",
++        "BinaryIntOperationLowerer.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/compatibility/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/compatibility/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/compatibility/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "JSBenchmarkingCode.java",
++        "JSEntryPointCode.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/heap/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/heap/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/heap/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "ConstantMap.java",
++        "JSBootImageHeapLowerer.java",
++        "WebImageObjectInspector.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/irwalk/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/irwalk/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/irwalk/BUILD.bazel
+@@ -0,0 +1,14 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "BlockNestingVerifier.java",
++        "BlockVisitHistory.java",
++        "IRWalkVerifier.java",
++        "IRWalker.java",
++        "StackifierIRWalker.java",
++        "WebImageJSIRWalker.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/long64/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/long64/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/long64/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "Long64Lowerer.java",
++        "Long64Provider.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/lowerer/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/lowerer/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/lowerer/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "CommitAllocationLowerer.java",
++        "MoveResolver.java",
++        "PhiResolveLowerer.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/node/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/node/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/node/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "CompoundConditionNode.java",
++        "InterceptJSInvokeNode.java",
++        "ReadIdentityHashCodeNode.java",
++        "WriteIdentityHashCodeNode.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/oop/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/oop/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/oop/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "ClassLowerer.java",
++        "ClassWithMirrorLowerer.java",
++        "StaticFieldLowerer.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/phase/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/phase/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/phase/BUILD.bazel
+@@ -0,0 +1,29 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "DisableFrameStateVerificationPhase.java",
++        "ExpandControlSinkUtil.java",
++        "ExpandReturnPhase.java",
++        "ExpandUnwindPhase.java",
++        "IncrementalCompoundConditionalPhase.java",
++        "NormalizationPhase.java",
++        "NullUnsafeAccessPhase.java",
++        "OutlineRuntimeChecksPhase.java",
++        "ReconstructionVerificationPhase.java",
++        "RemoveAllocateWithExceptionPhase.java",
++        "RemoveMonitorPhase.java",
++        "RemoveProxyNodePhase.java",
++        "RemoveUnusedExitsPhase.java",
++        "RemoveUnusedVPPhase.java",
++        "WebImageHighTier.java",
++        "WebImageJSHighTier.java",
++        "WebImageJSLowTier.java",
++        "WebImageJSSuitesCreator.java",
++        "WebImageJSSuitesCreatorProvider.java",
++        "WebImageLowTier.java",
++        "WebImageSuitesCreator.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/reconstruction/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/reconstruction/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/reconstruction/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "ReconstructionData.java",
++        "ReconstructionPhase.java",
++        "ScheduleWithReconstructionResult.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/reconstruction/stackifier/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/reconstruction/stackifier/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/reconstruction/stackifier/BUILD.bazel
+@@ -0,0 +1,20 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "CFStackifierSortPhase.java",
++        "CatchScopeContainer.java",
++        "IfScopeContainer.java",
++        "LabeledBlock.java",
++        "LabeledBlockGeneration.java",
++        "LoopScopeContainer.java",
++        "Scope.java",
++        "ScopeContainer.java",
++        "StackifierData.java",
++        "StackifierReconstructionPhase.java",
++        "StackifierScopeComputation.java",
++        "SwitchScopeContainer.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/runtime/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/runtime/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/runtime/BUILD.bazel
+@@ -0,0 +1,34 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.resources",
++    srcs = [
++        "array-vtableinit.js",
++        "arraycopyof.js",
++        "arrayequals.js",
++        "arrayinit.js",
++        "class-object-init.js",
++        "clone-runtime.js",
++        "cwd.js",
++        "feature-detection.js",
++        "float-convert.js",
++        "instanceof-runtime.js",
++        "internal-error.js",
++        "jsconversion.js",
++        "jsconversion-js.js",
++        "library-loader.js",
++        "load-cmd-args.js",
++        "log-console.js",
++        "long64.js",
++        "reinterpret-for-lowering.js",
++        "runtime.js",
++        "stack-trace.js",
++        "string-extensions.js",
++        "string-util.js",
++        "timer.js",
++        "unmanaged-memory.js",
++        "unsafe-runtime.js",
++        "unsigned-math.js",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/type/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/type/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/type/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "ClassMetadataLowerer.java",
++        "InvokeLoweringUtil.java",
++        "TypeVtableLowerer.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/value/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/value/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/value/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = ["ResolvedVarLowerer.java"],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/wrappers/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/wrappers/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/codegen/wrappers/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = ["JSEmitter.java"],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/compiletasks/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/compiletasks/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/compiletasks/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = ["Long64PreparationTask.java"],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/jni/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/jni/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/jni/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "JSJNICallWrapperFeature.java",
++        "WebImageJSJNINativeCallWrapperMethod.java",
++        "WebImageJSJNINativeCallWrapperSubstitutionProcessor.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/js/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/js/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/js/BUILD.bazel
+@@ -0,0 +1,19 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "JSBody.java",
++        "JSBodyNode.java",
++        "JSBodyWithExceptionNode.java",
++        "JSKeyword.java",
++        "JSObjectAccessMethod.java",
++        "JSObjectAccessMethodHolder.java",
++        "JSObjectAccessMethodSupport.java",
++        "JSStaticMethodDefinition.java",
++        "JSStubMethod.java",
++        "JSSubstitutionProcessor.java",
++        "WebImageJSLoweringProvider.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/logging/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/logging/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/logging/BUILD.bazel
+@@ -0,0 +1,16 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "BenchmarkLoggerPrinter.java",
++        "LoggableCounter.java",
++        "LoggableMetric.java",
++        "LoggerContext.java",
++        "LoggerPrinter.java",
++        "LoggerScope.java",
++        "LoggerScopeImpl.java",
++        "ReadableTextLoggerPrinter.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/logging/doc-files/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/logging/doc-files/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/logging/doc-files/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.resources",
++    srcs = [
++        "LogFilter.txt",
++        "LoggingFile.txt",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/logging/visualization/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/logging/visualization/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/logging/visualization/BUILD.bazel
+@@ -0,0 +1,22 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "BarPlotWidget.java",
++        "CLIVisualizationSupport.java",
++        "Color.java",
++        "DrawKit.java",
++        "HeaderWidget.java",
++        "LogHistogramWidget.java",
++        "NoVisualizationSupport.java",
++        "PanelGroupWidget.java",
++        "PrintStreamDrawKit.java",
++        "StackedBarWidget.java",
++        "SummaryWidget.java",
++        "TitleBarWidget.java",
++        "VisualizationSupport.java",
++        "Widget.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/metrickeys/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/metrickeys/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/metrickeys/BUILD.bazel
+@@ -0,0 +1,14 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "BootHeapMetricKeys.java",
++        "IRMetricKeys.java",
++        "ImageBreakdownMetricKeys.java",
++        "MethodMetricKeys.java",
++        "StackifierMetricKeys.java",
++        "UniverseMetricKeys.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/name/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/name/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/name/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "NamingConventionUtil.java",
++        "WebImageNamingConvention.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/options/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/options/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/options/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = ["WebImageOptions.java"],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/phases/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/phases/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/phases/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "MaterializeAllocationsPhase.java",
++        "PrepareLongEmulationPhase.java",
++        "RemoveInterceptJSInvokePhase.java",
++        "WebImageHostedGraphKit.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/pointsto/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/pointsto/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/pointsto/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = ["WebImageMethodTypeFlowBuilder.java"],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/pointsto/flow/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/pointsto/flow/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/pointsto/flow/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = ["InterceptJSInvokeTypeFlow.java"],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/snippets/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/snippets/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/snippets/BUILD.bazel
+@@ -0,0 +1,13 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "JSSnippet.java",
++        "JSSnippetWithEmitterSupport.java",
++        "JSSnippets.java",
++        "WebImageIdentityHashCodeSnippets.java",
++        "WebImageNonSnippetLowerings.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/util/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/util/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/util/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "BenchmarkLogger.java",
++        "ReflectUtil.java",
++        "TypeControlGraphPrinter.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/util/metrics/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/util/metrics/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/util/metrics/BUILD.bazel
+@@ -0,0 +1,13 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "BootHeapMetricsCollector.java",
++        "CodeSizeCollector.java",
++        "ImageMetricsCollector.java",
++        "MethodMetricsCollector.java",
++        "MetricsUtil.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/BUILD.bazel
+@@ -0,0 +1,25 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "WasmImports.java",
++        "WasmJSCounterparts.java",
++        "WasmLMGraphBuilderPlugins.java",
++        "WasmLMStringSupport.java",
++        "WasmLMUnmanagedMemorySupport.java",
++        "WasmLogHandler.java",
++        "WebImageWasmCodeCache.java",
++        "WebImageWasmHeapBreakdownProvider.java",
++        "WebImageWasmLMCompileQueue.java",
++        "WebImageWasmLMFeature.java",
++        "WebImageWasmLMJavaMainSupport.java",
++        "WebImageWasmLMLoweringProvider.java",
++        "WebImageWasmLMStackOverflowSupport.java",
++        "WebImageWasmLMVMThreadSTFeature.java",
++        "WebImageWasmOptions.java",
++        "WebImageWasmReservedRegisters.java",
++        "WebImageWasmVMThreadLocalSTSupport.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/annotation/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/annotation/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/annotation/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = ["WasmStartFunction.java"],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/ast/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/ast/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/ast/BUILD.bazel
+@@ -0,0 +1,29 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "ActiveData.java",
++        "ActiveElements.java",
++        "ActiveFunctionElements.java",
++        "Data.java",
++        "Export.java",
++        "Function.java",
++        "FunctionTypeDescriptor.java",
++        "Global.java",
++        "Import.java",
++        "ImportDescriptor.java",
++        "Instruction.java",
++        "Instructions.java",
++        "Limit.java",
++        "Literal.java",
++        "Memory.java",
++        "ModuleField.java",
++        "StartFunction.java",
++        "Table.java",
++        "Tag.java",
++        "TypeUse.java",
++        "WasmModule.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/ast/id/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/ast/id/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/ast/id/BUILD.bazel
+@@ -0,0 +1,13 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "KnownIds.java",
++        "ResolverContext.java",
++        "WasmId.java",
++        "WasmIdFactory.java",
++        "WebImageWasmIds.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/ast/visitors/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/ast/visitors/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/ast/visitors/BUILD.bazel
+@@ -0,0 +1,14 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "WasmElementCreator.java",
++        "WasmIdResolver.java",
++        "WasmPrinter.java",
++        "WasmRelocationVisitor.java",
++        "WasmValidator.java",
++        "WasmVisitor.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/codegen/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/codegen/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/codegen/BUILD.bazel
+@@ -0,0 +1,37 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "AbsoluteIPConstant.java",
++        "BinaryenCompat.java",
++        "WasmAssembler.java",
++        "WasmBlockContext.java",
++        "WasmCodeGenTool.java",
++        "WasmFunctionTemplate.java",
++        "WasmIRWalker.java",
++        "WasmLMCodeGenTool.java",
++        "WasmLMLowerableResources.java",
++        "WasmWebImage.java",
++        "WebImageWasmBackend.java",
++        "WebImageWasmCodeGen.java",
++        "WebImageWasmCompilationResult.java",
++        "WebImageWasmEntryFunctionLowerer.java",
++        "WebImageWasmLMBackend.java",
++        "WebImageWasmLMCodeGen.java",
++        "WebImageWasmLMNodeLowerer.java",
++        "WebImageWasmNodeLowerer.java",
++        "WebImageWasmProviders.java",
++        "WebImageWasmVariableAllocation.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.resources",
++    srcs = [
++        "verify-wasm-as.wast",
++        "verify-wat2wasm.wast",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/codegen/runtime/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/codegen/runtime/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/codegen/runtime/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.resources",
++    srcs = [
++        "wasm-bootstrap.js",
++        "wasm-imports.js",
++        "wasm-interop.js",
++        "wasm-run.js",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/debug/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/debug/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/debug/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "NoStackVerification.java",
++        "WasmDebug.java",
++        "WasmLMDebugFeature.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/gc/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/gc/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/gc/BUILD.bazel
+@@ -0,0 +1,20 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "MemoryLayout.java",
++        "WasmAllocation.java",
++        "WasmGCCause.java",
++        "WasmHeap.java",
++        "WasmHeapVerifier.java",
++        "WasmLMAllocationSnippets.java",
++        "WasmLMAllocationSupport.java",
++        "WasmLMGC.java",
++        "WasmLMGCFeature.java",
++        "WasmLMHeapFeature.java",
++        "WasmObjectHeader.java",
++        "WasmStackVerifier.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/jni/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/jni/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/jni/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "WasmJNICallWrapperFeature.java",
++        "WebImageWasmJNINativeCallWrapperMethod.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/nodes/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/nodes/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/nodes/BUILD.bazel
+@@ -0,0 +1,18 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "WasmAddressNode.java",
++        "WasmIsNonZeroNode.java",
++        "WasmMemoryCopyNode.java",
++        "WasmMemoryFillNode.java",
++        "WasmMemoryGrowNode.java",
++        "WasmMemorySizeNode.java",
++        "WasmPopcntNode.java",
++        "WasmPrintNode.java",
++        "WasmTrapNode.java",
++        "WebImageWasmVMThreadLocalSTHolderNode.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/phases/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/phases/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/phases/BUILD.bazel
+@@ -0,0 +1,23 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "SingleThreadedAtomicsPhase.java",
++        "StackPointerVerificationPhase.java",
++        "UnorderedIsTruePhase.java",
++        "ValueDropPhase.java",
++        "WasmLMSingleThreadedAtomicsPhase.java",
++        "WasmLabeledBlockGeneration.java",
++        "WasmSimplification.java",
++        "WasmStackifierReconstructionPhase.java",
++        "WasmSwitchPhase.java",
++        "WebImageWasmLMAddressLowering.java",
++        "WebImageWasmLMHighTier.java",
++        "WebImageWasmLMLowTier.java",
++        "WebImageWasmLMMidTier.java",
++        "WebImageWasmLMSuitesCreator.java",
++        "WebImageWasmLMSuitesCreatorProvider.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/print/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/print/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/print/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = ["WebImageWasmLMPrintingProvider.java"],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/snippets/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/snippets/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/snippets/BUILD.bazel
+@@ -0,0 +1,14 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "SingleThreadedAtomics.java",
++        "SingleThreadedAtomicsFeature.java",
++        "WasmImportForeignCallDescriptor.java",
++        "WasmLMSnippetsFeature.java",
++        "WebImageWasmArithmeticSnippets.java",
++        "WebImageWasmLMStackOverflowCheckFeature.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/stack/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/stack/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/stack/BUILD.bazel
+@@ -0,0 +1,15 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "InitialStackPointerConstant.java",
++        "StackClearer.java",
++        "StackFrameSizeConstant.java",
++        "VirtualStackSlotConstant.java",
++        "WebImageWasmStackFrameVisitor.java",
++        "WebImageWasmStackWalk.java",
++        "WebImageWasmStackWalker.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/substitute/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/substitute/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasm/substitute/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = ["VMErrorSubstitutions.java"],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/BUILD.bazel
+@@ -0,0 +1,25 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "WasmFunctionIdConstant.java",
++        "WasmGCAllocationSupport.java",
++        "WasmGCArrayCopySupport.java",
++        "WasmGCConversion.java",
++        "WasmGCFunctionTemplateFeature.java",
++        "WasmGCGraphBuilderPlugins.java",
++        "WasmGCHeapFeature.java",
++        "WasmGCMetadataLowerer.java",
++        "WasmGCTypeCheckSupport.java",
++        "WasmGCUnalignedUnsafeSupport.java",
++        "WasmGCUnmanagedMemorySupport.java",
++        "WasmGCUnsafeSupport.java",
++        "WebImageWasmGCCodeCache.java",
++        "WebImageWasmGCCompileQueue.java",
++        "WebImageWasmGCFeature.java",
++        "WebImageWasmGCJavaMainSupport.java",
++        "WebImageWasmGCLoweringProvider.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/ast/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/ast/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/ast/BUILD.bazel
+@@ -0,0 +1,15 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "ArrayType.java",
++        "FieldType.java",
++        "FunctionType.java",
++        "RecTypeGroupBuilder.java",
++        "RecursiveGroup.java",
++        "StructType.java",
++        "TypeDefinition.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/ast/id/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/ast/id/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/ast/id/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "GCKnownIds.java",
++        "WebImageWasmGCIds.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/ast/visitors/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/ast/visitors/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/ast/visitors/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = ["WasmGCElementCreator.java"],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/codegen/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/codegen/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/codegen/BUILD.bazel
+@@ -0,0 +1,20 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "WasmGCBuilder.java",
++        "WasmGCCloneSupport.java",
++        "WasmGCCodeGenTool.java",
++        "WasmGCFunctionTemplates.java",
++        "WasmGCHeapWriter.java",
++        "WasmGCJSBodyTemplates.java",
++        "WasmGCLowerableResources.java",
++        "WasmGCUnsafeTemplates.java",
++        "WebImageWasmGCBackend.java",
++        "WebImageWasmGCCodeGen.java",
++        "WebImageWasmGCNodeLowerer.java",
++        "WebImageWasmGCProviders.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/codegen/runtime/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/codegen/runtime/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/codegen/runtime/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.resources",
++    srcs = [
++        "jsconversion-wasmgc.js",
++        "wasm-conversion.js",
++        "wasm-imports.js",
++        "wasm-run.js",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/debug/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/debug/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/debug/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = ["WasmGCDebugFeature.java"],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/image/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/image/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/image/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "WasmGCHeapLayouter.java",
++        "WasmGCImageHeapLayoutInfo.java",
++        "WasmGCPartition.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/phases/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/phases/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/phases/BUILD.bazel
+@@ -0,0 +1,14 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "WasmGCSingleThreadedAtomicsPhase.java",
++        "WebImageWasmGCHighTier.java",
++        "WebImageWasmGCLowTier.java",
++        "WebImageWasmGCMidTier.java",
++        "WebImageWasmGCSuitesCreator.java",
++        "WebImageWasmGCSuitesCreatorProvider.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/snippets/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/snippets/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/snippets/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "WasmGCAllocationSnippets.java",
++        "WasmGCSnippetsFeature.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/substitute/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/substitute/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/substitute/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = ["WasmGCVMErrorSubstitutions.java"],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/types/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/types/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage/src/com/oracle/svm/hosted/webimage/wasmgc/types/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.srcs",
++    srcs = [
++        "WasmGCUtil.java",
++        "WasmRefType.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage.closurecompiler/src/com/oracle/svm/hosted/webimage/closurecompiler/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage.closurecompiler/src/com/oracle/svm/hosted/webimage/closurecompiler/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage.closurecompiler/src/com/oracle/svm/hosted/webimage/closurecompiler/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.closurecompiler.srcs",
++    srcs = ["ClosureCompilerSupportImpl.java"],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage.closurecompiler/src/com/oracle/svm/hosted/webimage/closurecompiler/externs/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage.closurecompiler/src/com/oracle/svm/hosted/webimage/closurecompiler/externs/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage.closurecompiler/src/com/oracle/svm/hosted/webimage/closurecompiler/externs/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.closurecompiler.resources",
++    srcs = ["externs-node.js"],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage.test/src/com/oracle/svm/hosted/webimage/test/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage.test/src/com/oracle/svm/hosted/webimage/test/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage.test/src/com/oracle/svm/hosted/webimage/test/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.test.srcs",
++    srcs = [
++        "JS_JTT_Spec_Test.java",
++        "WebImageUnitTests.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage.test/src/com/oracle/svm/hosted/webimage/test/spec/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage.test/src/com/oracle/svm/hosted/webimage/test/spec/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage.test/src/com/oracle/svm/hosted/webimage/test/spec/BUILD.bazel
+@@ -0,0 +1,14 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.test.srcs",
++    srcs = [
++        "JS_JTT_Bytecodes.java",
++        "JS_JTT_JSAnnotation.java",
++        "JS_JTT_JavaScriptBody.java",
++        "JS_JTT_TCK_Headless.java",
++        "JS_JTT_XHR.java",
++        "JS_JTT_Zip.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage.test/src/com/oracle/svm/hosted/webimage/test/unit/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage.test/src/com/oracle/svm/hosted/webimage/test/unit/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage.test/src/com/oracle/svm/hosted/webimage/test/unit/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.test.srcs",
++    srcs = [
++        "CanonicalizePathTest.java",
++        "MoveResolverTest.java",
++        "WasmActiveDataTest.java",
++        "WasmLMSingleThreadedAtomicsTest.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.hosted.webimage.test/src/com/oracle/svm/hosted/webimage/test/util/BUILD.bazel b/web-image/src/com.oracle.svm.hosted.webimage.test/src/com/oracle/svm/hosted/webimage/test/util/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.hosted.webimage.test/src/com/oracle/svm/hosted/webimage/test/util/BUILD.bazel
+@@ -0,0 +1,15 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.webimage.test.srcs",
++    srcs = [
++        "FailFastSuite.java",
++        "FailureListener.java",
++        "JTTParameterizedTestSuite.java",
++        "JTTTestSuite.java",
++        "TestDirectory.java",
++        "WebImageTestOptions.java",
++        "WebImageTestUtil.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage/src/META-INF/services/BUILD.bazel b/web-image/src/com.oracle.svm.webimage/src/META-INF/services/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage/src/META-INF/services/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.resources",
++    srcs = ["org.graalvm.nativeimage.Platform"],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/BUILD.bazel b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/BUILD.bazel
+@@ -0,0 +1,16 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.srcs",
++    srcs = [
++        "ExitError.java",
++        "JSExceptionSupport.java",
++        "JSNameGenerator.java",
++        "JSUnmanagedMemorySupport.java",
++        "NamingConvention.java",
++        "WebImageJSJavaMainSupport.java",
++        "WebImageJavaMainSupport.java",
++        "WebImageSystemPropertiesSupport.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/annotation/BUILD.bazel b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/annotation/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/annotation/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.srcs",
++    srcs = [
++        "JSRawCall.java",
++        "LongEmulationTest.java",
++        "StackifierVerification.java",
++        "WebImage.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/api/BUILD.bazel b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/api/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/api/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.srcs",
++    srcs = ["Nothing.java"],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/fs/BUILD.bazel b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/fs/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/fs/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.srcs",
++    srcs = [
++        "FileSystemInitializer.java",
++        "WebImageNIOFileSystem.java",
++        "WebImageNIOFileSystemProvider.java",
++        "WebImageRawFileOperationSupport.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/functionintrinsics/BUILD.bazel b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/functionintrinsics/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/functionintrinsics/BUILD.bazel
+@@ -0,0 +1,17 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.srcs",
++    srcs = [
++        "ImplicitExceptions.java",
++        "JSCallNode.java",
++        "JSConversion.java",
++        "JSFunctionDefinition.java",
++        "JSFunctionIntrinsics.java",
++        "JSGenericFunctionDefinition.java",
++        "JSInternalErrors.java",
++        "JSJSConversion.java",
++        "JSSystemFunction.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/heap/BUILD.bazel b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/heap/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/heap/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.srcs",
++    srcs = [
++        "JSHeapFeature.java",
++        "WebImageJSGC.java",
++        "WebImageJSHeap.java",
++        "WebImageNopAllocationSupport.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/hightiercodegen/BUILD.bazel b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/hightiercodegen/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/hightiercodegen/BUILD.bazel
+@@ -0,0 +1,14 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.srcs",
++    srcs = [
++        "CodeBuffer.java",
++        "CodeGenTool.java",
++        "Emitter.java",
++        "IEmitter.java",
++        "Keyword.java",
++        "NodeLowerer.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/hightiercodegen/variables/BUILD.bazel b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/hightiercodegen/variables/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/hightiercodegen/variables/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.srcs",
++    srcs = [
++        "ResolvedVar.java",
++        "VariableAllocation.java",
++        "VariableMap.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/jni/BUILD.bazel b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/jni/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/jni/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.srcs",
++    srcs = ["WebImageNativeLibrarySupport.java"],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/longemulation/BUILD.bazel b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/longemulation/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/longemulation/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.srcs",
++    srcs = ["Long64.java"],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/memory/BUILD.bazel b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/memory/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/memory/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.srcs",
++    srcs = [
++        "WebImageUnsafeMemoryUtil.java",
++        "WebImageVirtualMemoryProvider.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/object/BUILD.bazel b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/object/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/object/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.srcs",
++    srcs = [
++        "ConstantIdentityMapping.java",
++        "ObjectInspector.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/platform/BUILD.bazel b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/platform/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/platform/BUILD.bazel
+@@ -0,0 +1,13 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.srcs",
++    srcs = [
++        "WebImageJSPlatform.java",
++        "WebImagePlatform.java",
++        "WebImagePlatformConfigurationProvider.java",
++        "WebImageWasmGCPlatform.java",
++        "WebImageWasmLMPlatform.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/posix/BUILD.bazel b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/posix/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/posix/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.srcs",
++    srcs = ["WebImageProcessPropertiesSupport.java"],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/print/BUILD.bazel b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/print/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/print/BUILD.bazel
+@@ -0,0 +1,15 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.srcs",
++    srcs = [
++        "JSDecodeBuffer.java",
++        "WebImageJSPrintingProvider.java",
++        "WebImageLogHandler.java",
++        "WebImageOutErrPrinters.java",
++        "WebImageOutputStream.java",
++        "WebImagePrintStream.java",
++        "WebImagePrintingProvider.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/reflect/BUILD.bazel b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/reflect/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/reflect/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.srcs",
++    srcs = ["WebImageMetadataAccessor.java"],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/substitute/BUILD.bazel b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/substitute/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/substitute/BUILD.bazel
+@@ -0,0 +1,15 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.srcs",
++    srcs = [
++        "WebImageCalendarSubstitutions.java",
++        "WebImageFastThreadLocal.java",
++        "WebImageHttpHandlerSubstitutions.java",
++        "WebImageInvalidMethodPointerHandler.java",
++        "WebImageJSFrameAccess.java",
++        "WebImageSVMSubstitutions.java",
++        "WebImageUtil.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/substitute/system/BUILD.bazel b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/substitute/system/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/substitute/system/BUILD.bazel
+@@ -0,0 +1,25 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.srcs",
++    srcs = [
++        "Target_java_lang_ProcessEnvironment_Web.java",
++        "Target_java_lang_ProcessImpl_Web.java",
++        "Target_java_lang_StackWalker_Web.java",
++        "Target_java_lang_Throwable_Web.java",
++        "Target_java_nio_ByteBuffer_Web.java",
++        "Target_java_util_concurrent_ForkJoinPool_Web.java",
++        "Target_java_util_concurrent_ForkJoinTask_Web.java",
++        "WebImageFileSystem.java",
++        "WebImageIOSubstitutions.java",
++        "WebImageJavaLangSubstitutions.java",
++        "WebImageSecuritySubstitutions.java",
++        "WebImageSunMiscSubstitutions.java",
++        "WebImageTempFileHelper.java",
++        "WebImageTempFileHelperSupport.java",
++        "WebImageTempFileHelperSupportWithoutSecureRandom.java",
++        "WebImageUnixIOSubstitutions.java",
++        "WebImageWindowsIOSubstitutions.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/threads/BUILD.bazel b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/threads/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/threads/BUILD.bazel
+@@ -0,0 +1,13 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.srcs",
++    srcs = [
++        "WebImageJSJavaThreads.java",
++        "WebImageMonitorFeature.java",
++        "WebImageSingleThreadedLockingSupport.java",
++        "WebImageSingleThreadedMonitorSupport.java",
++        "WebImageWasmLMVMThreads.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/truffle/BUILD.bazel b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/truffle/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/truffle/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.srcs",
++    srcs = [
++        "WebImageTruffleFeature.java",
++        "WebImageTruffleGraphBuilderPlugins.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/type/BUILD.bazel b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/type/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/type/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.srcs",
++    srcs = ["TypeControl.java"],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/wasm/BUILD.bazel b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/wasm/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/wasm/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.srcs",
++    srcs = [
++        "WasmForeignCallDescriptor.java",
++        "WasmLMJSConversion.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/wasm/code/BUILD.bazel b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/wasm/code/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/wasm/code/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.srcs",
++    srcs = [
++        "FrameData.java",
++        "WasmCodeInfoHolder.java",
++        "WasmCodeInfoQueryResult.java",
++        "WasmSimpleCodeInfoQueryResult.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/wasm/stack/BUILD.bazel b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/wasm/stack/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/wasm/stack/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.srcs",
++    srcs = [
++        "WebImageWasmFrameMap.java",
++        "WebImageWasmLMFrameAccess.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/wasm/types/BUILD.bazel b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/wasm/types/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/wasm/types/BUILD.bazel
+@@ -0,0 +1,14 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.srcs",
++    srcs = [
++        "WasmLMUtil.java",
++        "WasmPackedType.java",
++        "WasmPrimitiveType.java",
++        "WasmStorageType.java",
++        "WasmUtil.java",
++        "WasmValType.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/wasmgc/BUILD.bazel b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/wasmgc/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/wasmgc/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.srcs",
++    srcs = [
++        "WasmExtern.java",
++        "WasmGCJSConversion.java",
++        "WasmGCMetadata.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/wasmgc/annotation/BUILD.bazel b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/wasmgc/annotation/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage/src/com/oracle/svm/webimage/wasmgc/annotation/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.srcs",
++    srcs = ["WasmExport.java"],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage.driver/src/com/oracle/svm/webimage/driver/BUILD.bazel b/web-image/src/com.oracle.svm.webimage.driver/src/com/oracle/svm/webimage/driver/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage.driver/src/com/oracle/svm/webimage/driver/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.driver.srcs",
++    srcs = ["WebImage.java"],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage.jtt/src/META-INF/native-image/BUILD.bazel b/web-image/src/com.oracle.svm.webimage.jtt/src/META-INF/native-image/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage.jtt/src/META-INF/native-image/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.jtt.resources",
++    srcs = ["native-image.properties"],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage.jtt/src/com/oracle/svm/webimage/jtt/api/BUILD.bazel b/web-image/src/com.oracle.svm.webimage.jtt/src/com/oracle/svm/webimage/jtt/api/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage.jtt/src/com/oracle/svm/webimage/jtt/api/BUILD.bazel
+@@ -0,0 +1,35 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.jtt.srcs",
++    srcs = [
++        "ArrayProxyTest.java",
++        "CoercionConversionTest.java",
++        "ExternalProxyConversionTest.java",
++        "HtmlApiExamplesTest.java",
++        "JSErrorsTest.java",
++        "JSNumberTest.java",
++        "JSObjectCoercionTest.java",
++        "JSObjectConversionTest.java",
++        "JSObjectSubclassTest.java",
++        "JSObjectTest.java",
++        "JSPrimitiveConversionTest.java",
++        "JSRawCallTest.java",
++        "JSStringTest.java",
++        "JSSymbolTest.java",
++        "JavaDocExamplesTest.java",
++        "JavaProxyConversionTest.java",
++        "JavaProxyTest.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
++
++mx_files(
++    name = "com.oracle.svm.webimage.jtt.resources",
++    srcs = [
++        "imported-non-instantiated.js",
++        "java-doc-examples-test.js",
++        "js-object-subclass-test.js",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage.jtt/src/com/oracle/svm/webimage/jtt/api/htmlexamples/issue43707/BUILD.bazel b/web-image/src/com.oracle.svm.webimage.jtt/src/com/oracle/svm/webimage/jtt/api/htmlexamples/issue43707/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage.jtt/src/com/oracle/svm/webimage/jtt/api/htmlexamples/issue43707/BUILD.bazel
+@@ -0,0 +1,13 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.jtt.srcs",
++    srcs = ["Issue43707.java"],
++    visibility = ["//web-image:__pkg__"],
++)
++
++mx_files(
++    name = "com.oracle.svm.webimage.jtt.resources",
++    srcs = ["issue-43707.js"],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage.jtt/src/com/oracle/svm/webimage/jtt/api/htmlexamples/issue43842/BUILD.bazel b/web-image/src/com.oracle.svm.webimage.jtt/src/com/oracle/svm/webimage/jtt/api/htmlexamples/issue43842/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage.jtt/src/com/oracle/svm/webimage/jtt/api/htmlexamples/issue43842/BUILD.bazel
+@@ -0,0 +1,13 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.jtt.srcs",
++    srcs = ["Issue43842.java"],
++    visibility = ["//web-image:__pkg__"],
++)
++
++mx_files(
++    name = "com.oracle.svm.webimage.jtt.resources",
++    srcs = ["issue-43842.js"],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage.jtt/src/com/oracle/svm/webimage/jtt/api/jsobjectsubclass/BUILD.bazel b/web-image/src/com.oracle.svm.webimage.jtt/src/com/oracle/svm/webimage/jtt/api/jsobjectsubclass/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage.jtt/src/com/oracle/svm/webimage/jtt/api/jsobjectsubclass/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.jtt.srcs",
++    srcs = ["ImportedJSObject.java"],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage.jtt/src/com/oracle/svm/webimage/jtt/bytecode/BUILD.bazel b/web-image/src/com.oracle.svm.webimage.jtt/src/com/oracle/svm/webimage/jtt/bytecode/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage.jtt/src/com/oracle/svm/webimage/jtt/bytecode/BUILD.bazel
+@@ -0,0 +1,210 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.jtt.srcs",
++    srcs = [
++        "BC_aaload.java",
++        "BC_aaload_1.java",
++        "BC_aastore.java",
++        "BC_aload_0.java",
++        "BC_aload_1.java",
++        "BC_aload_2.java",
++        "BC_aload_3.java",
++        "BC_anewarray.java",
++        "BC_areturn.java",
++        "BC_arraylength.java",
++        "BC_athrow.java",
++        "BC_baload.java",
++        "BC_bastore.java",
++        "BC_caload.java",
++        "BC_castore.java",
++        "BC_checkcast01.java",
++        "BC_checkcast02.java",
++        "BC_checkcast03.java",
++        "BC_d2f.java",
++        "BC_d2i01.java",
++        "BC_d2i02.java",
++        "BC_d2l01.java",
++        "BC_d2l02.java",
++        "BC_dadd.java",
++        "BC_daload.java",
++        "BC_dastore.java",
++        "BC_dcmp01.java",
++        "BC_dcmp02.java",
++        "BC_dcmp03.java",
++        "BC_dcmp04.java",
++        "BC_dcmp05.java",
++        "BC_dcmp06.java",
++        "BC_dcmp07.java",
++        "BC_dcmp08.java",
++        "BC_dcmp09.java",
++        "BC_dcmp10.java",
++        "BC_ddiv.java",
++        "BC_dmul.java",
++        "BC_dneg.java",
++        "BC_dneg2.java",
++        "BC_drem.java",
++        "BC_dreturn.java",
++        "BC_dsub.java",
++        "BC_dsub2.java",
++        "BC_f2d.java",
++        "BC_f2i01.java",
++        "BC_f2i02.java",
++        "BC_f2l01.java",
++        "BC_f2l02.java",
++        "BC_fadd.java",
++        "BC_faload.java",
++        "BC_fastore.java",
++        "BC_fcmp01.java",
++        "BC_fcmp02.java",
++        "BC_fcmp03.java",
++        "BC_fcmp04.java",
++        "BC_fcmp05.java",
++        "BC_fcmp06.java",
++        "BC_fcmp07.java",
++        "BC_fcmp08.java",
++        "BC_fcmp09.java",
++        "BC_fcmp10.java",
++        "BC_fdiv.java",
++        "BC_fload.java",
++        "BC_fload_2.java",
++        "BC_fmul.java",
++        "BC_fneg.java",
++        "BC_frem.java",
++        "BC_freturn.java",
++        "BC_fsub.java",
++        "BC_getfield.java",
++        "BC_getstatic_b.java",
++        "BC_getstatic_c.java",
++        "BC_getstatic_d.java",
++        "BC_getstatic_f.java",
++        "BC_getstatic_i.java",
++        "BC_getstatic_l.java",
++        "BC_getstatic_s.java",
++        "BC_getstatic_z.java",
++        "BC_i2b.java",
++        "BC_i2c.java",
++        "BC_i2d.java",
++        "BC_i2f.java",
++        "BC_i2l.java",
++        "BC_i2s.java",
++        "BC_iadd.java",
++        "BC_iadd2.java",
++        "BC_iadd3.java",
++        "BC_iaload.java",
++        "BC_iand.java",
++        "BC_iastore.java",
++        "BC_iconst.java",
++        "BC_idiv.java",
++        "BC_idiv2.java",
++        "BC_ifeq.java",
++        "BC_ifeq_2.java",
++        "BC_ifeq_3.java",
++        "BC_ifge.java",
++        "BC_ifge_2.java",
++        "BC_ifge_3.java",
++        "BC_ifgt.java",
++        "BC_ificmplt1.java",
++        "BC_ificmplt2.java",
++        "BC_ificmpne1.java",
++        "BC_ificmpne2.java",
++        "BC_ifle.java",
++        "BC_iflt.java",
++        "BC_ifne.java",
++        "BC_ifnonnull.java",
++        "BC_ifnonnull_2.java",
++        "BC_ifnonnull_3.java",
++        "BC_ifnull.java",
++        "BC_ifnull_2.java",
++        "BC_ifnull_3.java",
++        "BC_iinc_1.java",
++        "BC_iinc_2.java",
++        "BC_iinc_3.java",
++        "BC_iinc_4.java",
++        "BC_iload_0.java",
++        "BC_iload_0_1.java",
++        "BC_iload_0_2.java",
++        "BC_iload_1.java",
++        "BC_iload_1_1.java",
++        "BC_iload_2.java",
++        "BC_iload_3.java",
++        "BC_imul.java",
++        "BC_ineg.java",
++        "BC_instanceof.java",
++        "BC_invokeinterface.java",
++        "BC_invokespecial.java",
++        "BC_invokespecial2.java",
++        "BC_invokestatic.java",
++        "BC_invokevirtual.java",
++        "BC_ior.java",
++        "BC_irem.java",
++        "BC_irem2.java",
++        "BC_irem3.java",
++        "BC_ireturn.java",
++        "BC_ishl.java",
++        "BC_ishr.java",
++        "BC_isub.java",
++        "BC_iushr.java",
++        "BC_ixor.java",
++        "BC_l2d.java",
++        "BC_l2f.java",
++        "BC_l2i.java",
++        "BC_l2i_2.java",
++        "BC_ladd.java",
++        "BC_ladd2.java",
++        "BC_laload.java",
++        "BC_land.java",
++        "BC_lastore.java",
++        "BC_lcmp.java",
++        "BC_ldc_01.java",
++        "BC_ldc_02.java",
++        "BC_ldc_03.java",
++        "BC_ldc_04.java",
++        "BC_ldc_05.java",
++        "BC_ldc_06.java",
++        "BC_ldiv.java",
++        "BC_ldiv2.java",
++        "BC_ldiv3.java",
++        "BC_lload_0.java",
++        "BC_lload_01.java",
++        "BC_lload_1.java",
++        "BC_lload_2.java",
++        "BC_lload_3.java",
++        "BC_lmul.java",
++        "BC_lneg.java",
++        "BC_lookupswitch01.java",
++        "BC_lookupswitch02.java",
++        "BC_lookupswitch03.java",
++        "BC_lookupswitch04.java",
++        "BC_lookupswitch05.java",
++        "BC_lor.java",
++        "BC_lrem.java",
++        "BC_lrem2.java",
++        "BC_lreturn.java",
++        "BC_lshl.java",
++        "BC_lshr.java",
++        "BC_lsub.java",
++        "BC_lushr.java",
++        "BC_lxor.java",
++        "BC_multianewarray01.java",
++        "BC_multianewarray02.java",
++        "BC_multianewarray03.java",
++        "BC_multianewarray04.java",
++        "BC_new.java",
++        "BC_newarray.java",
++        "BC_putfield_01.java",
++        "BC_putfield_02.java",
++        "BC_putfield_03.java",
++        "BC_putfield_04.java",
++        "BC_putstatic.java",
++        "BC_saload.java",
++        "BC_sastore.java",
++        "BC_tableswitch.java",
++        "BC_tableswitch2.java",
++        "BC_tableswitch3.java",
++        "BC_tableswitch4.java",
++        "BC_wide01.java",
++        "BC_wide02.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage.jtt/src/com/oracle/svm/webimage/jtt/javascriptbody/BUILD.bazel b/web-image/src/com.oracle.svm.webimage.jtt/src/com/oracle/svm/webimage/jtt/javascriptbody/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage.jtt/src/com/oracle/svm/webimage/jtt/javascriptbody/BUILD.bazel
+@@ -0,0 +1,37 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.jtt.srcs",
++    srcs = [
++        "BoolArgTest.java",
++        "BoolReturnTest.java",
++        "ByteReturnTest.java",
++        "CallFromCallbackTest.java",
++        "CallbackStaticTest.java",
++        "CallbackTest.java",
++        "CharReturnTest.java",
++        "CovariantCallbackTest.java",
++        "DoubleReturnTest.java",
++        "DynamicCallTest.java",
++        "FloatReturnTest.java",
++        "HeadlessTckTest.java",
++        "InitInCallbackTest.java",
++        "JavaScriptBodyObjectTest.java",
++        "JavaScriptResourceTest.java",
++        "LongArgTest.java",
++        "LongReturnTest.java",
++        "NestedJSArrayTest.java",
++        "NestedJavaScriptBodyObjectTest.java",
++        "SimpleOperationTest.java",
++        "StaticCallTest.java",
++        "StringArgTest.java",
++        "StringReturnTest.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
++
++mx_files(
++    name = "com.oracle.svm.webimage.jtt.resources",
++    srcs = ["JavaScriptResourceTest_ExampleResource.js"],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage.jtt/src/com/oracle/svm/webimage/jtt/testdispatcher/BUILD.bazel b/web-image/src/com.oracle.svm.webimage.jtt/src/com/oracle/svm/webimage/jtt/testdispatcher/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage.jtt/src/com/oracle/svm/webimage/jtt/testdispatcher/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.jtt.srcs",
++    srcs = [
++        "BytecodeTest.java",
++        "JSAnnotationTests.java",
++        "JTTTestDispatcher.java",
++        "JavaScriptBodyTests.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage.jtt/src/com/oracle/svm/webimage/jtt/xhr/BUILD.bazel b/web-image/src/com.oracle.svm.webimage.jtt/src/com/oracle/svm/webimage/jtt/xhr/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage.jtt/src/com/oracle/svm/webimage/jtt/xhr/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.jtt.srcs",
++    srcs = ["UrlStreamTest.java"],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage.jtt/src/com/oracle/svm/webimage/jtt/zip/BUILD.bazel b/web-image/src/com.oracle.svm.webimage.jtt/src/com/oracle/svm/webimage/jtt/zip/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage.jtt/src/com/oracle/svm/webimage/jtt/zip/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.jtt.srcs",
++    srcs = ["InflatedZipTest.java"],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage.thirdparty/src/META-INF/native-image/BUILD.bazel b/web-image/src/com.oracle.svm.webimage.thirdparty/src/META-INF/native-image/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage.thirdparty/src/META-INF/native-image/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.thirdparty.resources",
++    srcs = ["native-image.properties"],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage.thirdparty/src/com/oracle/svm/webimage/thirdparty/BUILD.bazel b/web-image/src/com.oracle.svm.webimage.thirdparty/src/com/oracle/svm/webimage/thirdparty/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage.thirdparty/src/com/oracle/svm/webimage/thirdparty/BUILD.bazel
+@@ -0,0 +1,20 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.thirdparty.srcs",
++    srcs = [
++        "JSBodyStubMethod.java",
++        "JavaScriptBodyConversion.java",
++        "JavaScriptBodyFeature.java",
++        "JavaScriptBodyIntrinsification.java",
++        "JavaScriptBodyObject.java",
++        "package-info.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
++
++mx_files(
++    name = "com.oracle.svm.webimage.thirdparty.resources",
++    srcs = ["jsbody-compat.js"],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage.thirdparty/src/net/java/html/js/BUILD.bazel b/web-image/src/com.oracle.svm.webimage.thirdparty/src/net/java/html/js/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage.thirdparty/src/net/java/html/js/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.thirdparty.srcs",
++    srcs = [
++        "JavaScriptBody.java",
++        "JavaScriptResource.java",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage.tools/resources/BUILD.bazel b/web-image/src/com.oracle.svm.webimage.tools/resources/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage.tools/resources/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.tools.resources",
++    srcs = ["index.html"],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage.tools/resources/debug/BUILD.bazel b/web-image/src/com.oracle.svm.webimage.tools/resources/debug/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage.tools/resources/debug/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.tools.resources",
++    srcs = [
++        "offheap.html",
++        "offheap.js",
++    ],
++    visibility = ["//web-image:__pkg__"],
++)
+diff --git a/web-image/src/com.oracle.svm.webimage.tools/src/com/oracle/svm/webimage/tools/BUILD.bazel b/web-image/src/com.oracle.svm.webimage.tools/src/com/oracle/svm/webimage/tools/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/web-image/src/com.oracle.svm.webimage.tools/src/com/oracle/svm/webimage/tools/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.webimage.tools.srcs",
++    srcs = ["ToolServer.java"],
++    visibility = ["//web-image:__pkg__"],
++)

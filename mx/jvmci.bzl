@@ -104,3 +104,42 @@ def mx_jvmci_library(name, mx_resource_root = None, mx_resource_roots = [], **kw
         resource_strip_prefix = native.package_name() + "/" + mx_resource_root if mx_resource_root else None,
         **kwargs
     )
+
+def _patch_module_impl(ctx):
+    runtime = ctx.attr.runtime[java_common.JavaRuntimeInfo]
+    jar = ctx.actions.declare_file(ctx.label.name + ".jar")
+    prefix = ctx.label.workspace_root + "/" if ctx.label.workspace_root else ""
+    prefix += (ctx.label.package + "/") if ctx.label.package else ""
+    args = ctx.actions.args()
+    args.add("--java", runtime.java_executable_exec_path)
+    args.add("--output", jar)
+    args.add("--module", ctx.attr.module_name)
+    args.add_all([prefix + root for root in ctx.attr.roots], before_each = "--source-root")
+    dependencies = [dep[JavaInfo] for dep in ctx.attr.deps]
+    patch_jars = depset(transitive = [dep.transitive_compile_time_jars for dep in dependencies])
+    args.add_all(patch_jars, before_each = "--patch-jar")
+    args.add_all(ctx.attr.javacopts, format_each = "--javac-opt=%s")
+    args.add_all(ctx.files.srcs)
+    ctx.actions.run(
+        executable = ctx.executable._compiler,
+        arguments = [args],
+        inputs = depset(ctx.files.srcs, transitive = [runtime.files, patch_jars]),
+        outputs = [jar],
+        mnemonic = "MxPatchModule",
+    )
+    abi = java_common.run_ijar(ctx.actions, jar, target_label = ctx.label, java_toolchain = ctx.toolchains["@bazel_tools//tools/jdk:toolchain_type"].java)
+    return [DefaultInfo(files = depset([jar])), JavaInfo(output_jar = jar, compile_jar = abi, deps = dependencies)]
+
+mx_patch_module = rule(
+    implementation = _patch_module_impl,
+    attrs = {
+        "module_name": attr.string(mandatory = True),
+        "roots": attr.string_list(mandatory = True),
+        "runtime": attr.label(mandatory = True, cfg = "exec", providers = [java_common.JavaRuntimeInfo]),
+        "srcs": attr.label_list(allow_files = [".java"], mandatory = True),
+        "deps": attr.label_list(providers = [JavaInfo]),
+        "javacopts": attr.string_list(),
+        "_compiler": attr.label(default = Label("//mx:patch_module"), executable = True, cfg = "exec"),
+    },
+    toolchains = ["@bazel_tools//tools/jdk:toolchain_type"],
+)

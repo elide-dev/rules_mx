@@ -2,10 +2,11 @@ diff --git a/sulong/BUILD.bazel b/sulong/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/sulong/BUILD.bazel
-@@ -0,0 +1,1785 @@
+@@ -0,0 +1,2221 @@
 +load("@rules_mx//graal:sulong_fixture_check.bzl", "sulong_fixture_check")
 +load("@rules_mx//mx:bitcode.bzl", "mx_bitcode_suite")
-+load("@rules_mx//mx:graph.bzl", "mx_exported_tar", "mx_jar_dist", "mx_processed_java", "mx_project")
++load("@rules_mx//mx:graph.bzl", "mx_exported_tar", "mx_jar_dist", "mx_processed_java", "mx_project", "mx_whole_java")
++load("@rules_mx//mx:project_files.bzl", "mx_project_files")
 +load("@rules_mx//mx:sulong_cmake.bzl", "mx_sulong_cmake_suite")
 +
 +filegroup(
@@ -13,9 +14,16 @@ new file mode 100644
 +    testonly = True,
 +    srcs = [
 +        ":SULONG_API",
++        ":SULONG_CMAKE_TOOLCHAIN",
++        ":SULONG_CORE",
++        ":SULONG_GRAALVM_DOCS",
++        ":SULONG_GRAALVM_LICENSES",
 +        ":SULONG_LAUNCHER",
 +        ":SULONG_LEGACY",
 +        ":SULONG_LIBCXX_COMPILER_WRAPPER",
++        ":SULONG_NATIVE",
++        ":SULONG_NFI",
++        ":SULONG_TOOLCHAIN_LAUNCHERS",
 +    ],
 +    visibility = ["//visibility:public"],
 +)
@@ -24,9 +32,13 @@ new file mode 100644
 +    name = "all_projects",
 +    testonly = True,
 +    srcs = [
++        ":com.oracle.truffle.llvm",
 +        ":com.oracle.truffle.llvm.api",
 +        ":com.oracle.truffle.llvm.asm.amd64",
++        ":com.oracle.truffle.llvm.docs",
 +        ":com.oracle.truffle.llvm.launcher",
++        ":com.oracle.truffle.llvm.libraries.graalvm.llvm",
++        ":com.oracle.truffle.llvm.nativemode",
 +        ":com.oracle.truffle.llvm.nativemode.resources",
 +        ":com.oracle.truffle.llvm.nfi",
 +        ":com.oracle.truffle.llvm.parser",
@@ -34,8 +46,11 @@ new file mode 100644
 +        ":com.oracle.truffle.llvm.runtime",
 +        ":com.oracle.truffle.llvm.spi",
 +        ":com.oracle.truffle.llvm.tests.bitcode.other.native",
++        ":com.oracle.truffle.llvm.tests.cmake",
 +        ":com.oracle.truffle.llvm.tests.irdebug.native",
++        ":com.oracle.truffle.llvm.toolchain.launchers",
 +        ":com.oracle.truffle.llvm.tools",
++        ":sulong_licenses",
 +    ] + select({
 +        "@rules_mx//tools:exec_linux_amd64": [
 +            ":com.oracle.truffle.llvm.tests.bitcode.amd64.native",
@@ -61,6 +76,39 @@ new file mode 100644
 +    project = "com.oracle.truffle.llvm.tests.sulong.Os.native",
 +    root = "tests/com.oracle.truffle.llvm.tests.sulong.Os.native",
 +    sdk = "@rules_mx//graal:sulong_fixture_sdk",
++)
++
++mx_processed_java(
++    name = "com.oracle.truffle.llvm",
++    srcs = [
++        "//sulong/projects/com.oracle.truffle.llvm/src/com/oracle/truffle/llvm:com.oracle.truffle.llvm.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm/src/com/oracle/truffle/llvm/initialization:com.oracle.truffle.llvm.srcs",
++    ],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++    ],
++    plugins = [
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":SULONG_API",
++        ":com.oracle.truffle.llvm.parser",
++        ":com.oracle.truffle.llvm.runtime",
++        "//sdk:COLLECTIONS",
++        "//sdk:POLYGLOT",
++        "//truffle:TRUFFLE_API",
++    ],
 +)
 +
 +mx_project(
@@ -107,6 +155,43 @@ new file mode 100644
 +    deps = [
 +        "//sdk:LAUNCHER_COMMON",
 +        "//sdk:POLYGLOT",
++    ],
++)
++
++mx_processed_java(
++    name = "com.oracle.truffle.llvm.nativemode",
++    srcs = [
++        "//sulong/projects/com.oracle.truffle.llvm.nativemode/src/com/oracle/truffle/llvm/nativemode:com.oracle.truffle.llvm.nativemode.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.nativemode/src/com/oracle/truffle/llvm/nativemode/runtime:com.oracle.truffle.llvm.nativemode.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.nativemode/src/com/oracle/truffle/llvm/nativemode/runtime/memory:com.oracle.truffle.llvm.nativemode.srcs",
++    ],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++        "--add-modules",
++        "jdk.unsupported",
++    ],
++    mx_resource_root = "projects/com.oracle.truffle.llvm.nativemode/src",
++    plugins = [
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    resources = ["//sulong/projects/com.oracle.truffle.llvm.nativemode/src/META-INF/services:com.oracle.truffle.llvm.nativemode.resources"],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":SULONG_CORE",
++        "//sdk:COLLECTIONS",
++        "//sdk:POLYGLOT",
++        "//truffle:TRUFFLE_API",
++        "//truffle:TRUFFLE_NFI",
 +    ],
 +)
 +
@@ -398,6 +483,29 @@ new file mode 100644
 +    deps = ["//truffle:TRUFFLE_API"],
 +)
 +
++mx_whole_java(
++    name = "com.oracle.truffle.llvm.toolchain.launchers",
++    srcs = [
++        "//sulong/projects/com.oracle.truffle.llvm.toolchain.launchers/src/com/oracle/truffle/llvm/toolchain/launchers:com.oracle.truffle.llvm.toolchain.launchers.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.toolchain.launchers/src/com/oracle/truffle/llvm/toolchain/launchers/common:com.oracle.truffle.llvm.toolchain.launchers.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.toolchain.launchers/src/com/oracle/truffle/llvm/toolchain/launchers/darwin:com.oracle.truffle.llvm.toolchain.launchers.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.toolchain.launchers/src/com/oracle/truffle/llvm/toolchain/launchers/linux:com.oracle.truffle.llvm.toolchain.launchers.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.toolchain.launchers/src/com/oracle/truffle/llvm/toolchain/launchers/windows:com.oracle.truffle.llvm.toolchain.launchers.srcs",
++    ],
++    javac_opts = [
++        "--release",
++        "21",
++        "-parameters",
++    ],
++    unified_release = 21,
++    visibility = ["//visibility:public"],
++    deps = [
++        "//sdk:LAUNCHER_COMMON",
++        "//sdk:NATIVEIMAGE",
++        "//sdk:POLYGLOT",
++    ],
++)
++
 +mx_project(
 +    name = "com.oracle.truffle.llvm.tools",
 +    packages = ["//sulong/projects/com.oracle.truffle.llvm.tools/src/com/oracle/truffle/llvm/tools"],
@@ -437,6 +545,156 @@ new file mode 100644
 +)
 +
 +mx_jar_dist(
++    name = "SULONG_CORE",
++    contents = [
++        ":com.oracle.truffle.llvm.runtime",
++        ":com.oracle.truffle.llvm.parser",
++        ":com.oracle.truffle.llvm",
++        ":com.oracle.truffle.llvm.asm.amd64",
++        ":com.oracle.truffle.llvm.parser.factories",
++    ],
++    directives = [
++        "exports com.oracle.truffle.llvm to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.asm.amd64 to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.initialization to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.parser to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.parser.binary to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.parser.coff to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.parser.elf to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.parser.factories to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.parser.factories.inlineasm to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.parser.filereader to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.parser.instructions to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.parser.listeners to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.parser.macho to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.parser.metadata to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.parser.metadata.debuginfo to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.parser.model to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.parser.model.attributes to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.parser.model.blocks to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.parser.model.enums to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.parser.model.functions to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.parser.model.symbols.constants to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.parser.model.symbols.constants.aggregate to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.parser.model.symbols.constants.floatingpoint to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.parser.model.symbols.constants.integer to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.parser.model.symbols.globals to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.parser.model.symbols.instructions to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.parser.model.target to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.parser.model.visitors to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.parser.nodes to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.parser.records to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.parser.scanner to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.parser.text to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.parser.util to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.config to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.datalayout to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.debug to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.debug.debugexpr.nodes to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.debug.debugexpr.parser to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.debug.debugexpr.parser.antlr to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.debug.scope to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.debug.type to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.debug.value to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.except to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.floating to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.global to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.inlineasm to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.instruments.trace to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.interop to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.interop.access to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.interop.convert to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.interop.export to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.interop.nfi to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.interop.values to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.library.internal to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.memory to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.api to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.asm to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.asm.base to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.asm.support to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.asm.syscall to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.asm.syscall.darwin to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.asm.syscall.linux.aarch64 to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.asm.syscall.linux.amd64 to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.asm.syscall.posix to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.base to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.cast to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.control to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.func to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.intrinsics.c to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.intrinsics.handles to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.intrinsics.interop to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.intrinsics.interop.typed to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.intrinsics.llvm to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.intrinsics.llvm.aarch64 to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.intrinsics.llvm.aarch64.darwin to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.intrinsics.llvm.aarch64.linux to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.intrinsics.llvm.arith to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.intrinsics.llvm.bit to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.intrinsics.llvm.debug to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.intrinsics.llvm.va to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.intrinsics.llvm.x86 to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.intrinsics.llvm.x86_win to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.intrinsics.multithreading to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.intrinsics.rust to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.intrinsics.sulong to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.literals to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.memory to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.memory.literal to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.memory.load to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.memory.move to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.memory.rmw to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.memory.store to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.op to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.others to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.util to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.vars to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.nodes.vector to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.options to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.pointer to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.profiling to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.pthread to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.target to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.types to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.types.symbols to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.types.visitors to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "exports com.oracle.truffle.llvm.runtime.vector to org.graalvm.llvm.nativemode, org.graalvm.llvm, org.graalvm.llvm.managed, org.graalvm.llvm.nativemode_community",
++        "requires com.oracle.truffle.truffle_nfi",
++        "requires java.logging",
++        "requires java.xml",
++        "requires jdk.unsupported",
++        "requires org.graalvm.collections",
++        "requires org.graalvm.llvm.api",
++        "requires org.graalvm.polyglot",
++        "requires org.graalvm.shadowed.antlr4",
++        "requires org.graalvm.truffle",
++        "requires transitive org.graalvm.word",
++        "uses com.oracle.truffle.llvm.runtime.config.ConfigurationFactory",
++        "uses com.oracle.truffle.llvm.spi.internal.LLVMResourceProvider",
++    ],
++    jni_services = True,
++    manifest = {
++        "Implementation-Vendor": "Oracle Corporation",
++        "Implementation-Version": "25.6.0-dev",
++        "Name": "llvm-language",
++        "Specification-Vendor": "Oracle Corporation",
++        "Specification-Version": "25.6.0-dev",
++    },
++    module_name = "org.graalvm.llvm_community",
++    release = 21,
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":SULONG_API",
++        "//truffle:TRUFFLE_ANTLR4",
++        "//truffle:TRUFFLE_API",
++        "//truffle:TRUFFLE_NFI",
++    ],
++)
++
++mx_jar_dist(
 +    name = "SULONG_LAUNCHER",
 +    contents = [":com.oracle.truffle.llvm.launcher"],
 +    directives = [
@@ -452,6 +710,151 @@ new file mode 100644
 +    release = 21,
 +    visibility = ["//visibility:public"],
 +    deps = ["//sdk:LAUNCHER_COMMON"],
++)
++
++mx_jar_dist(
++    name = "SULONG_NATIVE",
++    contents = [":com.oracle.truffle.llvm.nativemode"],
++    directives = [
++        "exports com.oracle.truffle.llvm.nativemode to org.graalvm.llvm.nativemode",
++        "exports com.oracle.truffle.llvm.nativemode.runtime to org.graalvm.llvm.nativemode",
++        "exports com.oracle.truffle.llvm.nativemode.runtime.memory to org.graalvm.llvm.nativemode",
++        "requires com.oracle.truffle.truffle_nfi",
++        "requires com.oracle.truffle.truffle_nfi_libffi",
++        "requires com.oracle.truffle.truffle_nfi_panama",
++        "requires jdk.unsupported",
++        "requires org.graalvm.collections",
++        "requires org.graalvm.llvm_community",
++        "requires org.graalvm.polyglot",
++        "requires org.graalvm.truffle",
++        "requires transitive org.graalvm.word",
++    ],
++    jni_services = True,
++    manifest = {
++        "Implementation-Vendor": "Oracle Corporation",
++        "Implementation-Version": "25.6.0-dev",
++        "Name": "llvm-language-native",
++        "Specification-Vendor": "Oracle Corporation",
++        "Specification-Version": "25.6.0-dev",
++    },
++    module_name = "org.graalvm.llvm.nativemode_community",
++    release = 21,
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":SULONG_CORE",
++        "//truffle:TRUFFLE_NFI",
++        "//truffle:TRUFFLE_NFI_LIBFFI",
++        "//truffle:TRUFFLE_NFI_PANAMA",
++    ],
++)
++
++mx_jar_dist(
++    name = "SULONG_NFI",
++    contents = [":com.oracle.truffle.llvm.nfi"],
++    directives = [
++        "requires com.oracle.truffle.truffle_nfi",
++        "requires org.graalvm.llvm_community",
++        "requires org.graalvm.truffle",
++        "requires transitive org.graalvm.word",
++    ],
++    jni_services = True,
++    manifest = {
++        "Implementation-Vendor": "Oracle Corporation",
++        "Implementation-Version": "25.6.0-dev",
++        "Name": "llvm-language-nfi",
++        "Specification-Vendor": "Oracle Corporation",
++        "Specification-Version": "25.6.0-dev",
++    },
++    module_name = "org.graalvm.llvm.nfi",
++    release = 21,
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":SULONG_CORE",
++        "//truffle:TRUFFLE_NFI",
++    ],
++)
++
++mx_jar_dist(
++    name = "SULONG_TOOLCHAIN_LAUNCHERS",
++    contents = [":com.oracle.truffle.llvm.toolchain.launchers"],
++    directives = [
++        "exports com.oracle.truffle.llvm.toolchain.launchers",
++        "exports com.oracle.truffle.llvm.toolchain.launchers.common",
++        "requires org.graalvm.launcher",
++        "requires org.graalvm.nativeimage",
++        "requires org.graalvm.polyglot",
++        "requires transitive org.graalvm.word",
++    ],
++    module_name = "org.graalvm.llvm.native_toolchain_wrappers",
++    release = 21,
++    visibility = ["//visibility:public"],
++    deps = ["//sdk:LAUNCHER_COMMON"],
++)
++
++mx_project_files(
++    name = "com.oracle.truffle.llvm.docs",
++    testonly = False,
++    srcs = [
++        "docs/contributor/BUILDING.md",
++        "docs/contributor/DEBUGGING.md",
++        "docs/contributor/FAQ.md",
++        "docs/contributor/FUZZING.md",
++        "docs/contributor/INTEROP.md",
++        "docs/contributor/PUBLICATIONS.md",
++        "docs/contributor/README.md",
++        "docs/contributor/TESTS.md",
++        "docs/contributor/TOOLCHAIN.md",
++    ],
++    visibility = ["//visibility:public"],
++)
++
++mx_project_files(
++    name = "com.oracle.truffle.llvm.libraries.graalvm.llvm",
++    testonly = False,
++    members = {
++        "projects/com.oracle.truffle.llvm.libraries.graalvm.llvm/include/graalvm/llvm/handles.h": "include/graalvm/llvm/handles.h",
++        "projects/com.oracle.truffle.llvm.libraries.graalvm.llvm/include/graalvm/llvm/internal/handles-impl.h": "include/graalvm/llvm/internal/handles-impl.h",
++        "projects/com.oracle.truffle.llvm.libraries.graalvm.llvm/include/graalvm/llvm/internal/polyglot-impl.h": "include/graalvm/llvm/internal/polyglot-impl.h",
++        "projects/com.oracle.truffle.llvm.libraries.graalvm.llvm/include/graalvm/llvm/internal/polyglot-time-impl.h": "include/graalvm/llvm/internal/polyglot-time-impl.h",
++        "projects/com.oracle.truffle.llvm.libraries.graalvm.llvm/include/graalvm/llvm/polyglot-buffer.h": "include/graalvm/llvm/polyglot-buffer.h",
++        "projects/com.oracle.truffle.llvm.libraries.graalvm.llvm/include/graalvm/llvm/polyglot-time.h": "include/graalvm/llvm/polyglot-time.h",
++        "projects/com.oracle.truffle.llvm.libraries.graalvm.llvm/include/graalvm/llvm/polyglot.h": "include/graalvm/llvm/polyglot.h",
++        "projects/com.oracle.truffle.llvm.libraries.graalvm.llvm/include/graalvm/llvm/toolchain-api.h": "include/graalvm/llvm/toolchain-api.h",
++        "projects/com.oracle.truffle.llvm.libraries.graalvm.llvm/include/llvm/api/toolchain.h": "include/llvm/api/toolchain.h",
++        "projects/com.oracle.truffle.llvm.libraries.graalvm.llvm/include/polyglot.h": "include/polyglot.h",
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_project_files(
++    name = "com.oracle.truffle.llvm.tests.cmake",
++    testonly = False,
++    srcs = [
++        "tests/com.oracle.truffle.llvm.tests.cmake/CMakeDetermineLLCompiler.cmake",
++        "tests/com.oracle.truffle.llvm.tests.cmake/CMakeLLCompiler.cmake.in",
++        "tests/com.oracle.truffle.llvm.tests.cmake/CMakeLLInformation.cmake",
++        "tests/com.oracle.truffle.llvm.tests.cmake/CMakeTestLLCompiler.cmake",
++        "tests/com.oracle.truffle.llvm.tests.cmake/SulongCommon.cmake",
++        "tests/com.oracle.truffle.llvm.tests.cmake/SulongTestSuite.cmake",
++        "tests/com.oracle.truffle.llvm.tests.cmake/SulongTestSuiteImpl.cmake",
++        "tests/com.oracle.truffle.llvm.tests.cmake/SulongTestSuiteVariantBitcode.cmake",
++        "tests/com.oracle.truffle.llvm.tests.cmake/SulongTestSuiteVariantExecutable.cmake",
++        "tests/com.oracle.truffle.llvm.tests.cmake/SulongTestSuiteVariantRefOut.cmake",
++        "tests/com.oracle.truffle.llvm.tests.cmake/SulongTestSuiteVariantToolchain.cmake",
++    ],
++    visibility = ["//visibility:public"],
++)
++
++mx_project_files(
++    name = "sulong_licenses",
++    testonly = False,
++    members = {
++        "LICENSE": "LICENSE.txt",
++        "THIRD_PARTY_LICENSE.txt": "3rd_party_licenses.txt",
++    },
++    visibility = ["//visibility:public"],
 +)
 +
 +mx_sulong_cmake_suite(
@@ -1772,6 +2175,39 @@ new file mode 100644
 +)
 +
 +mx_exported_tar(
++    name = "SULONG_CMAKE_TOOLCHAIN",
++    format = "tar",
++    members = {
++        "cmake/toolchain.cmake": "cmake/toolchain.cmake",
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_exported_tar(
++    name = "SULONG_GRAALVM_DOCS",
++    format = "tar",
++    members = {
++        "README.md": "README.md",
++        "mx.sulong/native-image.properties": "native-image.properties",
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_exported_tar(
++    name = "SULONG_GRAALVM_LICENSES",
++    file_list = [
++        "LICENSE_SULONG.txt",
++        "THIRD_PARTY_LICENSE_SULONG.txt",
++    ],
++    format = "tar",
++    members = {
++        "LICENSE": "LICENSE_SULONG.txt",
++        "THIRD_PARTY_LICENSE.txt": "THIRD_PARTY_LICENSE_SULONG.txt",
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_exported_tar(
 +    name = "SULONG_LEGACY",
 +    format = "tar",
 +    members = {
@@ -1787,6 +2223,49 @@ new file mode 100644
 +        "projects/com.oracle.truffle.llvm.libraries.bitcode.libcxx.compiler-wrapper/compiler-wrapper.py": "compiler-wrapper.py",
 +    },
 +    visibility = ["//visibility:public"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm/src/com/oracle/truffle/llvm/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm/src/com/oracle/truffle/llvm/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm/src/com/oracle/truffle/llvm/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.srcs",
++    srcs = [
++        "CXXDemangler.java",
++        "DefaultLoader.java",
++        "ParserDriver.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm/src/com/oracle/truffle/llvm/initialization/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm/src/com/oracle/truffle/llvm/initialization/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm/src/com/oracle/truffle/llvm/initialization/BUILD.bazel
+@@ -0,0 +1,22 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.srcs",
++    srcs = [
++        "AllocExternalSymbolNode.java",
++        "DataSectionFactory.java",
++        "InitObjcSelectorsNode.java",
++        "InitializeExternalNode.java",
++        "InitializeGlobalNode.java",
++        "InitializeGlobalsBlockNode.java",
++        "InitializeModuleNode.java",
++        "InitializeOverwriteNode.java",
++        "InitializeSymbolsNode.java",
++        "LoadDependencyNode.java",
++        "LoadModulesNode.java",
++        "LoadNativeNode.java",
++        "StaticInitsNode.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
 +)
 diff --git a/sulong/projects/com.oracle.truffle.llvm.api/src/com/oracle/truffle/llvm/api/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.api/src/com/oracle/truffle/llvm/api/BUILD.bazel
 new file mode 100644
@@ -1847,7 +2326,7 @@ diff --git a/sulong/projects/com.oracle.truffle.llvm.launcher/src/com/oracle/tru
 new file mode 100644
 --- /dev/null
 +++ b/sulong/projects/com.oracle.truffle.llvm.launcher/src/com/oracle/truffle/llvm/launcher/BUILD.bazel
-@@ -0,0 +1,35 @@
+@@ -0,0 +1,36 @@
 +load("@rules_java//java:defs.bzl", "java_binary")
 +load("@rules_mx//mx:java.bzl", "elide_java_library")
 +
@@ -1865,6 +2344,7 @@ new file mode 100644
 +    unified_release = 21,
 +    visibility = ["//:__subpackages__"],
 +    deps = [
++        "//espresso:com.oracle.truffle.espresso.io",
 +        "//sdk:LAUNCHER_COMMON",
 +        "//sdk:POLYGLOT",
 +    ],
@@ -1882,6 +2362,63 @@ new file mode 100644
 +    main_class = "com.oracle.truffle.llvm.launcher.LLVMMultiContextLauncher",
 +    visibility = ["//visibility:public"],
 +    runtime_deps = [":launcher"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.nativemode/src/META-INF/services/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.nativemode/src/META-INF/services/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.nativemode/src/META-INF/services/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.nativemode.resources",
++    srcs = ["com.oracle.truffle.llvm.runtime.config.ConfigurationFactory"],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.nativemode/src/com/oracle/truffle/llvm/nativemode/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.nativemode/src/com/oracle/truffle/llvm/nativemode/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.nativemode/src/com/oracle/truffle/llvm/nativemode/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.nativemode.srcs",
++    srcs = [
++        "NativeConfiguration.java",
++        "NativeConfigurationFactory.java",
++        "NativeToolchainConfig.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.nativemode/src/com/oracle/truffle/llvm/nativemode/runtime/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.nativemode/src/com/oracle/truffle/llvm/nativemode/runtime/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.nativemode/src/com/oracle/truffle/llvm/nativemode/runtime/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.nativemode.srcs",
++    srcs = [
++        "NFIContextExtension.java",
++        "SulongNativeOption.java",
++        "WellKnownNFIFunctionNode.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.nativemode/src/com/oracle/truffle/llvm/nativemode/runtime/memory/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.nativemode/src/com/oracle/truffle/llvm/nativemode/runtime/memory/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.nativemode/src/com/oracle/truffle/llvm/nativemode/runtime/memory/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.nativemode.srcs",
++    srcs = ["LLVMNativeMemory.java"],
++    visibility = ["//sulong:__pkg__"],
 +)
 diff --git a/sulong/projects/com.oracle.truffle.llvm.nativemode.resources/src/META-INF/native-image/org.graalvm.llvm/llvm-language-native-resources/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.nativemode.resources/src/META-INF/native-image/org.graalvm.llvm/llvm-language-native-resources/BUILD.bazel
 new file mode 100644
@@ -4250,11 +4787,88 @@ new file mode 100644
 +    srcs = ["LLVMResourceProvider.java"],
 +    visibility = ["//sulong:__pkg__"],
 +)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.toolchain.launchers/src/com/oracle/truffle/llvm/toolchain/launchers/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.toolchain.launchers/src/com/oracle/truffle/llvm/toolchain/launchers/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.toolchain.launchers/src/com/oracle/truffle/llvm/toolchain/launchers/BUILD.bazel
+@@ -0,0 +1,17 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.toolchain.launchers.srcs",
++    srcs = [
++        "AbstractToolchainWrapper.java",
++        "BinUtil.java",
++        "Clang.java",
++        "ClangCL.java",
++        "ClangXX.java",
++        "Flang.java",
++        "LLVMConfig.java",
++        "Linker.java",
++        "NativeToolchainWrapper.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.toolchain.launchers/src/com/oracle/truffle/llvm/toolchain/launchers/common/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.toolchain.launchers/src/com/oracle/truffle/llvm/toolchain/launchers/common/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.toolchain.launchers/src/com/oracle/truffle/llvm/toolchain/launchers/common/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.toolchain.launchers.srcs",
++    srcs = [
++        "ClangLike.java",
++        "ClangLikeBase.java",
++        "Driver.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.toolchain.launchers/src/com/oracle/truffle/llvm/toolchain/launchers/darwin/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.toolchain.launchers/src/com/oracle/truffle/llvm/toolchain/launchers/darwin/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.toolchain.launchers/src/com/oracle/truffle/llvm/toolchain/launchers/darwin/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.toolchain.launchers.srcs",
++    srcs = [
++        "DarwinClangLike.java",
++        "DarwinLinker.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.toolchain.launchers/src/com/oracle/truffle/llvm/toolchain/launchers/linux/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.toolchain.launchers/src/com/oracle/truffle/llvm/toolchain/launchers/linux/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.toolchain.launchers/src/com/oracle/truffle/llvm/toolchain/launchers/linux/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.toolchain.launchers.srcs",
++    srcs = ["LinuxLinker.java"],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.toolchain.launchers/src/com/oracle/truffle/llvm/toolchain/launchers/windows/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.toolchain.launchers/src/com/oracle/truffle/llvm/toolchain/launchers/windows/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.toolchain.launchers/src/com/oracle/truffle/llvm/toolchain/launchers/windows/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.toolchain.launchers.srcs",
++    srcs = ["WindowsLinker.java"],
++    visibility = ["//sulong:__pkg__"],
++)
 diff --git a/sulong/projects/com.oracle.truffle.llvm.tools/src/com/oracle/truffle/llvm/tools/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.tools/src/com/oracle/truffle/llvm/tools/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/sulong/projects/com.oracle.truffle.llvm.tools/src/com/oracle/truffle/llvm/tools/BUILD.bazel
-@@ -0,0 +1,25 @@
+@@ -0,0 +1,26 @@
 +load("@rules_java//java:defs.bzl", "java_binary")
 +load("@rules_mx//mx:java.bzl", "elide_java_library")
 +
@@ -4269,6 +4883,7 @@ new file mode 100644
 +    unified_release = 21,
 +    visibility = ["//:__subpackages__"],
 +    deps = [
++        "//espresso:com.oracle.truffle.espresso.io",
 +        "//sdk:POLYGLOT",
 +        "//sulong:com.oracle.truffle.llvm.parser",
 +    ],
