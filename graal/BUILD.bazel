@@ -172,7 +172,6 @@ mx_archive_layout(
 
 py_test(
     name = "sandbox_bash_launcher_test",
-    main = "sandbox_launcher_test.py",
     size = "medium",
     srcs = ["sandbox_launcher_test.py"],
     args = [
@@ -183,6 +182,7 @@ py_test(
         ":sandbox_bash_launcher_tar",
         ":sulong_fixture_sdk",
     ],
+    main = "sandbox_launcher_test.py",
     tags = ["manual"],
     target_compatible_with = [
         "@platforms//os:linux",
@@ -271,18 +271,18 @@ py_test(
         "$(rootpath @graal//:mx-source.json)",
     ],
     data = [
+        ":standalone_jdk_release",
+        "//tools/cc:llvm_nm",
+        "@graal//:mx-source.json",
+        "@graal//espresso:ESPRESSO_GRAALVM_SUPPORT",
         "@graal//espresso:ESPRESSO_IO",
         "@graal//espresso:ESPRESSO_JVM_STANDALONE_JAVA_LINKS",
-        "@graal//espresso:ESPRESSO_POLYBENCH_BENCHMARKS",
         "@graal//espresso:ESPRESSO_JVM_STANDALONE_MOKAPOT_SUPPORT",
-        "@graal//espresso:ESPRESSO_PD_SUPPORT",
-        "//tools/cc:llvm_nm",
-        "@graal//espresso:ESPRESSO_LIBS_RESOURCES",
-        "@graal//espresso:ESPRESSO_GRAALVM_SUPPORT",
         "@graal//espresso:ESPRESSO_JVM_SUPPORT",
+        "@graal//espresso:ESPRESSO_LIBS_RESOURCES",
+        "@graal//espresso:ESPRESSO_PD_SUPPORT",
+        "@graal//espresso:ESPRESSO_POLYBENCH_BENCHMARKS",
         "@graal//espresso:ESPRESSO_STANDALONE_COMMON",
-        ":standalone_jdk_release",
-        "@graal//:mx-source.json",
         "@graal//espresso-compiler-stub:ESPRESSO_COMPILER_SUPPORT",
     ],
     tags = ["manual"],
@@ -297,19 +297,54 @@ py_test(
     tags = ["manual"],
 )
 
+py_test(
+    name = "espresso_native_standalone_test",
+    size = "large",
+    srcs = ["espresso_standalone_test.py"],
+    args = [
+        "$(rootpath @graal//espresso:ESPRESSO_NATIVE_STANDALONE)",
+        "native",
+    ],
+    data = ["@graal//espresso:ESPRESSO_NATIVE_STANDALONE"],
+    main = "espresso_standalone_test.py",
+    tags = ["manual"],
+)
+
 java_test(
     name = "espresso_guest_test",
     size = "small",
     srcs = ["EspressoGuestTest.java"],
     jvm_flags = ["--enable-native-access=ALL-UNNAMED"],
+    tags = ["manual"],
+    test_class = "graal.EspressoGuestTest",
     runtime_deps = [
         "@graal//espresso:ESPRESSO",
         "@graal//espresso:ESPRESSO_LIBS_RESOURCES",
+        "@graal//espresso:ESPRESSO_RUNTIME_RESOURCES",
         "@graal//truffle:TRUFFLE_NFI_LIBFFI",
     ],
+    deps = [
+        "@contrib_rules_jvm_deps//:junit_junit",
+        "@graal//sdk:POLYGLOT",
+    ],
+)
+
+py_test(
+    name = "sulong_parser_fixture_test",
+    size = "small",
+    srcs = ["sulong_parser_fixture_test.py"],
+    args = [
+        "$(rootpath @graal//sulong:SULONG_PARSER_TORTURE)",
+        "$(rootpath :sulong_fixture_sdk)",
+        "$(rootpath @graal//sulong:parserTorture/gcc-5.2.0/gcc/testsuite/gcc.c-torture/compile/20031023-2.c.bitcode-O0)",
+    ],
+    data = [
+        ":sulong_fixture_sdk",
+        "@graal//sulong:SULONG_PARSER_TORTURE",
+        "@graal//sulong:parserTorture/gcc-5.2.0/gcc/testsuite/gcc.c-torture/compile/20031023-2.c.bitcode-O0",
+    ],
     tags = ["manual"],
-    test_class = "graal.EspressoGuestTest",
-    deps = ["@contrib_rules_jvm_deps//:junit_junit", "@graal//sdk:POLYGLOT"],
+    target_compatible_with = ["@platforms//os:linux", "@platforms//cpu:x86_64"],
 )
 
 py_test(
@@ -346,9 +381,9 @@ py_test(
     data = [
         "//tools/cc:llvm_nm",
         "//tools/cc:llvm_objdump",
+        "@graal//sulong:SULONG_NATIVE_LIB_RESOURCES",
         "@graal//sulong:com.oracle.truffle.llvm.libraries.graalvm.llvm.libs",
         "@graal//sulong:com.oracle.truffle.llvm.libraries.native",
-        "@graal//sulong:SULONG_NATIVE_LIB_RESOURCES",
     ],
     tags = ["manual"],
 )
@@ -369,7 +404,10 @@ java_test(
     data = ["@graal//sulong:com.oracle.truffle.llvm.tests.pipe.native.library"],
     jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath @graal//sulong:com.oracle.truffle.llvm.tests.pipe.native.library)"],
     test_class = "graal.SulongPipeTest",
-    deps = ["@contrib_rules_jvm_deps//:junit_junit", "@graal//sulong:com.oracle.truffle.llvm.tests.pipe"],
+    deps = [
+        "@contrib_rules_jvm_deps//:junit_junit",
+        "@graal//sulong:com.oracle.truffle.llvm.tests.pipe",
+    ],
 )
 
 java_test(

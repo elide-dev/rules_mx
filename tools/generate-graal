@@ -1032,6 +1032,12 @@ def packed_source_pins(source):
                 "urls": [url.format(**spec) for url in spec["urls"]],
                 "integrity": algorithm + "-" + base64.b64encode(bytes.fromhex(digest)).decode(),
             }
+    # The GCC archive contains several unrelated testsuites. Preserve mx's paths
+    # while materializing only the subtree used by each external test project.
+    for name, project in metadata["sulong"]["projects"].items():
+        if project.get("class") == "ExternalCMakeTestSuite" and "GCC_SOURCE" in project.get("buildDependencies", []):
+            parent = "graal_sulong_gcc_source"
+            pins[parent + "_" + name.lower()] = {**pins[parent], "subtree": project["testDir"].rstrip("/")}
     return pins
 
 
@@ -2200,6 +2206,7 @@ def prepare_suite(suite, stage):
     if suite == "espresso":
         export_options.extend(
             [
+                "--include-dynamic", "ESPRESSO_RUNTIME_RESOURCES",
                 "--standalone-source-provenance", "//:mx-source.json",
                 "--whole-project",
                 "com.oracle.truffle.espresso.libjavavm",
@@ -2233,6 +2240,8 @@ def prepare_suite(suite, stage):
                 "--sulong-bootstrap-ninja", str(stage / "gcc.ninja_template"),
                 "--sulong-packed-source", "sulong:NWCC_SUITE", "@graal_sulong_nwcc_suite//:",
                 str(bazel_source("@graal_sulong_nwcc_suite//:BUILD.bazel").parent),
+                "--sulong-packed-source", "sulong:GCC_SOURCE", "@graal_sulong_gcc_source_parsertorture//:",
+                str(bazel_source("@graal_sulong_gcc_source_parsertorture//:BUILD.bazel").parent),
                 "--sulong-llvm-link",
                 "@rules_mx//graal:sdk_llvm_link",
                 "--sulong-fixture-sdk",
@@ -2766,6 +2775,10 @@ def main():
                         "BUILD", "BUILD.bazel", "__pycache__"
                     ),
                 )
+        if "espresso" in (*selected, *providers):
+            patch = ROOT / "graal/espresso_native_image.patch"
+            if subprocess.run(["git", "apply", "--reverse", "--check", str(patch)], cwd=stage, stderr=subprocess.DEVNULL).returncode:
+                subprocess.run(["git", "apply", str(patch)], cwd=stage, check=True)
         shutil.copytree(source / "vm/mx.vm", stage / "vm/mx.vm")
         shutil.copytree(
             source / "truffle/benchmarks",

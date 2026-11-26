@@ -8,6 +8,8 @@ def _packed_sources(ctx):
             name = name,
             urls = pin["urls"],
             integrity = pin["integrity"],
+            strip_prefix = pin.get("subtree", ""),
+            add_prefix = pin.get("subtree", ""),
             build_file_content = """
 package(default_visibility = ["//visibility:public"])
 exports_files(["BUILD.bazel"] + glob(["**/*.c", "**/*.cpp", "**/*.cc", "**/*.C", "**/*.ll"], allow_empty = True))

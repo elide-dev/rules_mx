@@ -1,0 +1,77 @@
+diff --git a/sdk/mx.sdk/mx_sdk_vm_ng.py b/sdk/mx.sdk/mx_sdk_vm_ng.py
+--- a/sdk/mx.sdk/mx_sdk_vm_ng.py
++++ b/sdk/mx.sdk/mx_sdk_vm_ng.py
+@@ -260,12 +260,13 @@
+     def getBuildTask(self, args):
+         return NativeImageBuildTask(args, self)
+ 
+-    def get_build_args(self):
++    def get_build_args(self, substitute=None, dynamic_args=None):
+         explicit_build_args = getattr(self, 'build_args', [])
+-        dyn_build_args, dynamicBuildArgs = _get_dyn_attribute(self, 'dynamicBuildArgs', [])
++        dyn_build_args, dynamicBuildArgs = (_get_dyn_attribute(self, 'dynamicBuildArgs', []) if dynamic_args is None else (dynamic_args, self.dynamicBuildArgs))
+         if not (isinstance(dyn_build_args, list) and all(isinstance(d, str) for d in dyn_build_args)):
+             mx.abort(f"dynamicBuildArgs `{dynamicBuildArgs}` did not return a list of strings", context=self)
+-        return [mx_subst.string_substitutions.substitute(a) for a in explicit_build_args] + dyn_build_args
++        replace = substitute or mx_subst.string_substitutions.substitute
++        return [replace(a) for a in explicit_build_args] + dyn_build_args
+ 
+     def resolveDeps(self):
+         super().resolveDeps()
+@@ -363,12 +364,12 @@
+     def name_suffix(self):
+         return mx.add_lib_suffix("")
+ 
+-    def get_build_args(self):
++    def get_build_args(self, **kwargs):
+         extra_build_args = ['--shared']
+         if is_nativeimage_ee():
+             # PGO is supported
+             extra_build_args += mx_sdk_vm_impl.svm_experimental_options(['-H:+ProfilingEnableProfileDumpHooks'])
+-        return super().get_build_args() + extra_build_args
++        return super().get_build_args(**kwargs) + extra_build_args
+ 
+ 
+ # Common flags for most Truffle languages
+@@ -416,7 +417,7 @@
+     def newestOutput(self):
+         return mx.TimeStampFile.newest([_path for _path, _ in self.subject.getArchivableResults()])
+ 
+-    def get_build_args(self):
++    def get_build_args(self, project_args=None):
+         experimental_build_args = [
+             '-H:+GenerateBuildArtifactsFile',  # generate 'build-artifacts.json'
+             '-H:+AssertInitializationSpecifiedForAllClasses',
+@@ -471,7 +472,7 @@
+             build_args += ['-EJVMCI_VERSION_CHECK']
+         extra_build_args = mx_sdk_vm_impl._extra_image_builder_args(canonical_name)
+ 
+-        return build_args + self.subject.get_build_args() + extra_build_args
++        return build_args + (self.subject.get_build_args() if project_args is None else project_args) + extra_build_args
+ 
+     def needsBuild(self, newestInput) -> Tuple[bool, str]:
+         ts = TimeStampFile(self.subject.output_file())
+diff --git a/espresso/mx.espresso/mx_espresso.py b/espresso/mx.espresso/mx_espresso.py
+--- a/espresso/mx.espresso/mx_espresso.py
++++ b/espresso/mx.espresso/mx_espresso.py
+@@ -109,6 +109,11 @@
+     return result
+ 
+ def javavm_build_args():
++    return javavm_build_args_for_platform(
++        mx.get_os(), mx.get_os_variant(), mx_subst.path_substitutions.substitute("<multitarget_libc_selection>") if mx.is_linux() else None
++    )
++
++def javavm_build_args_for_platform(os_name, os_variant, target_libc):
+     result = []
+     # GR-64948: On GraalVM 21 CopyLanguageResources is incorrectly detected as experimental
+     if mx_sdk_vm_ng.get_bootstrap_graalvm_version() >= mx.VersionSpec("24.0"):
+@@ -117,7 +122,7 @@
+         result += mx_sdk_vm_impl.svm_experimental_options(['-H:+DumpThreadStacksOnSignal', '-H:+CopyLanguageResources'])
+     if mx_sdk_vm_ng.get_bootstrap_graalvm_version() >= mx.VersionSpec("25.0"):
+         result.append('-H:-IncludeLanguageResources')
+-    if mx.is_linux() and (mx.get_os_variant() != "musl" and mx_subst.path_substitutions.substitute("<multitarget_libc_selection>") == "glibc"):
++    if os_name == "linux" and os_variant != "musl" and target_libc == "glibc":
+         # Currently only enabled if the native image build runs on glibc and also targets glibc.
+         # In practice it's enough that host and target are matching, but we do not get this info out of mx.
+         result += [

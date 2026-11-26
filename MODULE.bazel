@@ -120,9 +120,9 @@ register_toolchains(
 bazel_dep(name = "rules_graalvm", version = "0.12.0")
 archive_override(
     module_name = "rules_graalvm",
-    integrity = "sha256-KN+4Pwe4X81JnQNLnxDXYfhUwGHAgrULmu2Pt8pTISE=",
-    strip_prefix = "rules_graalvm-bc5d221128382487bb7c2df1fed996114b40ea2e",
-    urls = ["https://github.com/sgammon/rules_graalvm/archive/bc5d221128382487bb7c2df1fed996114b40ea2e.tar.gz"],
+    integrity = "sha256-Ixpnwahukt2/1i87vAH88b4lMHJr18NCnlRx75mQsyo=",
+    strip_prefix = "rules_graalvm-93d1511e7d5406d2e399537b397073d3baa430f2",
+    urls = ["https://github.com/sgammon/rules_graalvm/archive/93d1511e7d5406d2e399537b397073d3baa430f2.tar.gz"],
 )
 
 inject_repo(elide, "rules_graalvm")
@@ -186,7 +186,7 @@ use_repo(
 )
 
 packed_sources = use_extension("//graal:packed_sources.bzl", "packed_sources", dev_dependency = True)
-use_repo(packed_sources, "graal_sulong_nwcc_suite")
+use_repo(packed_sources, "graal_sulong_gcc_source_parsertorture", "graal_sulong_nwcc_suite")
 
 shaded_inputs = use_extension("//graal:shaded_inputs.bzl", "shaded_inputs", dev_dependency = True)
 use_repo(shaded_inputs, "graal_shaded_inputs")
