@@ -86,7 +86,7 @@ bazelisk run //:mx -- -p "$consumer" bazel-buildfile --gazelle --all --partial \
     --bindings //provider=/tmp/provider.json > "$consumer/mx-graph.json"
 ```
 
-For Sulong, `bazel-graph --cmake-tests` includes source cases, variants, reference-build and shared-library settings for each in-tree CMake test project. This lets a generator inspect the test matrix without unpacking external test suites. Supply `--sulong-llvm-link LABEL` to lower the single-source LLVM IR recipe. Gazelle emits one independently buildable target per case and a project aggregate. The tool label is resolved for the execution platform.
+For Sulong, `bazel-graph --cmake-tests` includes source cases, variants, reference-build and shared-library settings for each in-tree CMake test project. This lets a generator inspect the test matrix without unpacking external test suites. Supply `--sulong-llvm-link LABEL` to lower the single-source LLVM IR recipe. Gazelle emits one independently buildable target per case and a project aggregate. The tool label is resolved for the execution platform. Supply `--sulong-fixture-sdk LABEL` for Linux x86-64 C, C++ and LLVM IR fixtures. The generated rules use the registered `rules_foreign_cc` CMake and Ninja toolchains to build individual upstream variants with the Graal LLVM SDK and Elide sysroot. [Build a Sulong fixture](graal/README.md#build-a-sulong-fixture)
 
 An exact mx test property such as `<path:PROVIDER_JAR>` resolves through the imported JAR index. Use `--test-data SUITE:PROJECT=LABEL` to give a discovered JUnit target a runtime tool or fixture. A matching `--test-jvm-flag` can refer to that input with Bazel's `$(rootpath LABEL)`.
 

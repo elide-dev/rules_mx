@@ -7,6 +7,7 @@ module(
 bazel_dep(name = "rules_java", version = "9.9.0")
 bazel_dep(name = "rules_python", version = "1.9.2")
 bazel_dep(name = "rules_elide", version = "0.6.1")
+
 # rules_elide has no release with the unified JVM builder, Native Image toolchain and
 # JavaBuilder processor fixes yet, so pin its main branch by commit.
 archive_override(
@@ -14,6 +15,14 @@ archive_override(
     integrity = "sha256-//E8/7JDZWKKiQg4edEJN8ye3S8VaD5EhsQe60GYhnM=",
     strip_prefix = "rules_elide-50e0e8f8b3696a86b4294491740434db4e9d4260",
     urls = ["https://github.com/elide-dev/rules_elide/archive/50e0e8f8b3696a86b4294491740434db4e9d4260.tar.gz"],
+)
+
+bazel_dep(name = "rules_foreign_cc", version = "0.17.0")
+
+foreign_tools = use_extension("@rules_foreign_cc//foreign_cc:extensions.bzl", "tools", dev_dependency = True)
+foreign_tools.cmake(
+    mode = "binary",
+    version = "3.31.12",
 )
 
 bazel_dep(name = "wabt", version = "1.0.37.bcr.1", dev_dependency = True)

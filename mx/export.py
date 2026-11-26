@@ -172,7 +172,7 @@ def _bitcode_suite(project, linker):
     if not linker:
         raise _UnsupportedLowering("Sulong CMake bitcode requires --sulong-llvm-link")
     matrix = _cmake_cases(project)
-    declaration = project.suite.suiteDict["projects"][project.name]
+    declaration = project._orig_attrs
     if (
         matrix["variants"] != ["bitcode-O0"]
         or matrix["build_reference"]
@@ -217,6 +217,61 @@ def _bitcode_suite(project, linker):
         "root": root.relative_to(project.suite.dir).as_posix(),
         "cases": matrix["cases"],
         "linker": linker,
+        "testonly": project.is_test_project(),
+    }
+
+
+def _cmake_fixture_suite(project, sdk):
+    matrix = _cmake_cases(project)
+    declaration = project._orig_attrs
+    if (
+        matrix["shared_object"]
+        or matrix["variant_config"]
+        or not matrix["cases"]
+        or any(
+            not re.fullmatch(r"bitcode-O(?:[0-3s])(?:-MEM2REG)?", v)
+            for v in matrix["variants"]
+        )
+    ):
+        raise _UnsupportedLowering(
+            "Sulong fixture requires its bootstrap toolchain or a custom variant"
+        )
+    # Configure for the target independently of the machine running Gazelle.
+    settings = dict(declaration.get("cmakeConfig", {}))
+    os_config = declaration.get("os", {})
+    linux = os_config.get("linux", os_config.get("<others>", {}))
+    if (
+        set(linux) - {"cmakeConfig"}
+        or "arch" in declaration
+        or "os_arch" in declaration
+    ):
+        raise _UnsupportedLowering("Sulong fixture needs platform-dependent inputs")
+    deps = set(declaration.get("buildDependencies", []))
+    if deps - {"SULONG_HOME", "LINUX_AMD64_SUPPORT"}:
+        raise _UnsupportedLowering("Sulong fixture needs another build-time dependency")
+    settings.update(linux.get("cmakeConfig", {}))
+    if settings.keys() - {
+        "CMAKE_C_FLAGS",
+        "CMAKE_CXX_FLAGS",
+        "CMAKE_C_LINK_FLAGS",
+        "CMAKE_EXE_LINKER_FLAGS",
+    } or any("<" in v for v in settings.values()):
+        raise _UnsupportedLowering("Sulong CMake flags require unresolved mx inputs")
+    languages = sorted(project._get_languages())
+    if set(languages) - {"C", "CXX", "LL"}:
+        raise _UnsupportedLowering("Sulong CMake needs another input language")
+    root = Path(project.source_dirs()[0]).relative_to(project.suite.dir)
+    modules = mx.project("com.oracle.truffle.llvm.tests.cmake")
+    return {
+        "name": project.name,
+        "root": root.as_posix(),
+        "sdk": sdk,
+        "config": settings,
+        "modules": Path(modules.dir).relative_to(project.suite.dir).as_posix(),
+        "cases": matrix["cases"],
+        "languages": languages,
+        "variants": matrix["variants"]
+        + (["ref.out"] if matrix["build_reference"] else []),
         "testonly": project.is_test_project(),
     }
 
@@ -1206,6 +1261,11 @@ def bazel_buildfile(args):
         help="export supported closures and report blocked suite roots",
     )
     parser.add_argument(
+        "--sulong-fixture-sdk",
+        metavar="LABEL",
+        help="execution-platform Graal LLVM SDK for Sulong CMake test fixtures",
+    )
+    parser.add_argument(
         "--sulong-llvm-link",
         metavar="LABEL",
         help="execution-platform llvm-link for Sulong bitcode fixtures",
@@ -1435,6 +1495,7 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
     layouts = {}
     tar_layouts = {}
     bitcode_suites = {}
+    cmake_suites = {}
     javac_only_processors = set(options.javac_only_processor)
     used_javac_only = set()
     processed = False
@@ -1447,6 +1508,7 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             or project.name in layouts
             or project.name in tar_layouts
             or project.name in bitcode_suites
+            or project.name in cmake_suites
         ):
             continue
         if options.classpath_dists and project.suite == suite:
@@ -1489,9 +1551,16 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             and _in_tree_sulong_tests(project)
             and project.suite == suite
         ):
-            bitcode_suites[project.name] = _bitcode_suite(
-                project, options.sulong_llvm_link
-            )
+            try:
+                bitcode_suites[project.name] = _bitcode_suite(
+                    project, options.sulong_llvm_link
+                )
+            except _UnsupportedLowering:
+                if not options.sulong_fixture_sdk:
+                    raise
+                cmake_suites[project.name] = _cmake_fixture_suite(
+                    project, options.sulong_fixture_sdk
+                )
             continue
         shaded = options.gazelle and _is_shaded_project(project)
         if (
@@ -1834,6 +1903,7 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             | rules.keys()
             | layouts.keys()
             | distributions.keys()
+            | cmake_suites.keys()
             | bitcode_suites.keys()
             | tar_layouts.keys()
         )
@@ -1897,6 +1967,8 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             result["distributions"] = [distributions[n] for n in sorted(distributions)]
         if layouts:
             result["layouts"] = [layouts[n] for n in sorted(layouts)]
+        if cmake_suites:
+            result["cmake_suites"] = [cmake_suites[n] for n in sorted(cmake_suites)]
         if bitcode_suites:
             result["bitcode_suites"] = [
                 bitcode_suites[n] for n in sorted(bitcode_suites)

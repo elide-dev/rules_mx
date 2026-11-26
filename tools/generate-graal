@@ -2034,7 +2034,14 @@ def prepare_suite(suite, stage):
     else:
         export_options = suite_args(directory)
     if suite == "sulong":
-        export_options.extend(["--sulong-llvm-link", "@rules_mx//graal:sdk_llvm_link"])
+        export_options.extend(
+            [
+                "--sulong-llvm-link",
+                "@rules_mx//graal:sdk_llvm_link",
+                "--sulong-fixture-sdk",
+                "@rules_mx//graal:sulong_fixture_sdk",
+            ]
+        )
     if suite == "wasm":
         wat2wasm = "@wabt//src/tools:wat2wasm"
         project = "wasm:org.graalvm.wasm.test"
@@ -2109,10 +2116,34 @@ def prepare_suite(suite, stage):
     if suite in PARTIAL_SUITES:
         graph = json.loads((directory / "mx-graph.json").read_text())
         inventory = graph["suite_targets"]
-        rules = [
-            f'filegroup(name = "all_{kind}", srcs = {json.dumps([":" + name for name in names])}, testonly = True, visibility = ["//visibility:public"])'
-            for kind, names in inventory.items()
-        ]
+        rules = []
+        linux_projects = {p["name"] for p in graph.get("cmake_suites", [])}
+        for kind, names in inventory.items():
+            platform_targets = [
+                ":" + n for n in names if kind == "projects" and n in linux_projects
+            ]
+            srcs = json.dumps(
+                [":" + n for n in names if ":" + n not in platform_targets]
+            )
+            if platform_targets:
+                srcs += (
+                    ' + select({"@rules_mx//tools:exec_linux_amd64": '
+                    + json.dumps(platform_targets)
+                    + ', "//conditions:default": []})'
+                )
+            rules.append(
+                f'filegroup(name = "all_{kind}", srcs = {srcs}, testonly = True, visibility = ["//visibility:public"])'
+            )
+        for fixture in graph.get("cmake_suites", []):
+            if fixture["name"] == "com.oracle.truffle.llvm.tests.sulong.Os.native":
+                rules += [
+                    'load("@rules_mx//graal:sulong_fixture_check.bzl", "sulong_fixture_check")',
+                    'sulong_fixture_check(name = "fixture_test", project = %s, root = %s, modules = %s, sdk = %s)'
+                    % tuple(
+                        json.dumps(fixture[k])
+                        for k in ("name", "root", "modules", "sdk")
+                    ),
+                ]
         if suite == "wasm":
             tests = {
                 cls: ":" + project["name"] + "." + cls
