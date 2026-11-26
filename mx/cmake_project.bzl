@@ -38,8 +38,8 @@ def mx_cmake_project(name, srcs, compiler, config, include_dirs, profiles, testo
         "CMAKE_CXX_COMPILER": "$(execpath %s)/bin/c++" % compiler,
         "CMAKE_AR": "$(execpath %s)/bin/ar" % compiler,
         "CMAKE_RANLIB": "$(execpath %s)/bin/ranlib" % compiler,
-        "CMAKE_C_FLAGS": cc_flags + config_file,
-        "CMAKE_CXX_FLAGS": cc_flags + config_file,
+        "CMAKE_C_FLAGS": cc_flags + "$$EXT_BUILD_ROOT$$/" + config_file,
+        "CMAKE_CXX_FLAGS": cc_flags + "$$EXT_BUILD_ROOT$$/" + config_file,
     })
     variants = {}
     modes = {}
@@ -74,8 +74,11 @@ def mx_cmake_project(name, srcs, compiler, config, include_dirs, profiles, testo
         for key, value in recipe["config"].items():
             if value == "@SOURCE_PREFIX_MAP@":
                 source = "$$EXT_BUILD_ROOT$$/" + native.package_relative_label(srcs[0]).workspace_root + "/src"
-                flags = "-ffile-prefix-map=" + source + "=llvm-project/src -ffile-prefix-map=$$BUILD_TMPDIR$$=llvm-project"
+                flags = "-ffile-prefix-map=" + source + "=llvm-project/src -ffile-prefix-map=$${BUILD_TMPDIR}=llvm-project"
                 platform_config[key] = platform_config.get(key, "") + " " + flags
+            elif key == "CMAKE_INSTALL_RPATH":
+                # The dynamic loader expands $ORIGIN when the installed library is loaded.
+                platform_config[key] = value.replace("$ORIGIN", r"\$$ORIGIN")
             else:
                 platform_config[key] = value.replace("@COMPILER@", "$(execpath %s)" % compiler).replace("@WRAPPER@", "$(execpath :%s.compiler_wrapper)" % name)
         if directories:
