@@ -27,13 +27,15 @@ def mx_cmake_project(name, srcs, compiler, config, include_dirs, profiles, testo
         mx_archive_layout(name = inc, format = "dir", members = {}, archive_imports = {spec[0]: spec[1] + "/*="}, testonly = testonly)
         data.append(":" + inc)
         cache[key] = "$(execpath :" + inc + ")"
+    config_file = "$(execpath %s)" % Label("//tools/cc:target_config")
+    cc_flags = "-Qunused-arguments --config="
     cache.update({
         "CMAKE_C_COMPILER": "$(execpath %s)/bin/cc" % compiler,
         "CMAKE_CXX_COMPILER": "$(execpath %s)/bin/c++" % compiler,
         "CMAKE_AR": "$(execpath %s)/bin/ar" % compiler,
         "CMAKE_RANLIB": "$(execpath %s)/bin/ranlib" % compiler,
-        "CMAKE_C_FLAGS": "-Qunused-arguments --config=$(execpath %s)" % Label("//tools/cc:target_config"),
-        "CMAKE_CXX_FLAGS": "-Qunused-arguments --config=$(execpath %s)" % Label("//tools/cc:target_config"),
+        "CMAKE_C_FLAGS": cc_flags + config_file,
+        "CMAKE_CXX_FLAGS": cc_flags + config_file,
     })
     variants = {}
     modes = {}
@@ -51,7 +53,12 @@ def mx_cmake_project(name, srcs, compiler, config, include_dirs, profiles, testo
         # Native CMake otherwise asks xcrun for the executor's default SDK.
         if profile == "macos_arm64":
             sdk = Label("@elide_toolchain_darwin_arm64//:all_files")
-            platform_config = {"CMAKE_OSX_SYSROOT": "$$EXT_BUILD_ROOT$$/" + sdk.workspace_root + "/apple-sdk"}
+            sysroot = "$$EXT_BUILD_ROOT$$/" + sdk.workspace_root + "/apple-sdk"
+            platform_config = {"CMAKE_OSX_SYSROOT": sysroot}
+            # The Sulong driver delegates to xcrun. CMake's compiler probes may
+            # omit CMAKE_OSX_SYSROOT until they have identified the compiler.
+            for key in ("CMAKE_C_FLAGS", "CMAKE_CXX_FLAGS"):
+                platform_config[key] = "-isysroot " + sysroot + " " + cc_flags + "$$EXT_BUILD_ROOT$$/" + config_file
         else:
             # CMake otherwise reads /etc/debian_version to choose shared library permissions.
             platform_config = {"CMAKE_INSTALL_SO_NO_EXE": "ON"}
