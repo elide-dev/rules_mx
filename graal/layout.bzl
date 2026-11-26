@@ -217,9 +217,54 @@ def mx_release_archive(name, install, prefix, **kwargs):
         **kwargs
     )
 
+def _jdk_resource_impl(ctx):
+    tree = ctx.actions.declare_directory(ctx.label.name + ".files")
+    jar = ctx.actions.declare_file(ctx.label.name + ".resources.jar")
+    manifest = ctx.actions.declare_file(ctx.label.name + ".metadata/files")
+    digest = ctx.actions.declare_file(ctx.label.name + ".metadata/sha256")
+    recipe = ctx.attr.recipe
+    ctx.actions.run(
+        executable = ctx.executable._pack,
+        arguments = ["--jdk-resource", ctx.file.jdk.path, recipe, tree.path, jar.path, manifest.path, digest.path],
+        inputs = [ctx.file.jdk],
+        outputs = [tree, jar, manifest, digest],
+        mnemonic = "MxJdkResource",
+    )
+    spec = json.decode(recipe)
+    return [
+        DefaultInfo(files = depset([tree])),
+        JavaInfo(output_jar = jar, compile_jar = None),
+        MxArchiveLayoutInfo(
+            archive = None,
+            entries = {spec["file_list_entry"]: manifest, spec["hash_entry"]: digest},
+            resource_jar = jar,
+            jdk_homes = [struct(bundle = ctx.file.jdk, directory = spec["directory"], exclude = spec["exclude"])],
+            modes = {},
+        ),
+    ]
+
+_jdk_resource = rule(
+    implementation = _jdk_resource_impl,
+    attrs = {
+        "jdk": attr.label(mandatory = True, allow_single_file = True),
+        "recipe": attr.string(mandatory = True),
+        "_pack": attr.label(default = Label("//mx:pack_layout"), executable = True, cfg = "exec"),
+    },
+)
+
 def mx_os_layout(name, os_layouts, **kwargs):
     """Select the mx layout using the target operating system."""
     branches = {Label("//tools/cc:profile_" + os) if "_" in os else Label("//tools/cc:linux_musl") if os == "linux-musl" else "@platforms//os:" + os: recipe for os, recipe in os_layouts.items()}
+    if all(["jdk" in recipe for recipe in branches.values()]):
+        kwargs.pop("format")
+        _jdk_resource(
+            name = name,
+            jdk = select({os: recipe["jdk"] for os, recipe in branches.items()}),
+            recipe = select({os: json.encode(recipe) for os, recipe in branches.items()}),
+            target_compatible_with = select({os: [] for os in branches} | {"//conditions:default": ["@platforms//:incompatible"]}),
+            **kwargs
+        )
+        return
     attrs = {
         key: select({os: recipe.get(key, empty) for os, recipe in branches.items()} | {"//conditions:default": empty})
         for key, empty in [("members", {}), ("archive_imports", {}), ("file_list", []), ("file_list_entry", ""), ("hash_entry", "")]

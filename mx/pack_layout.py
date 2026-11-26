@@ -129,7 +129,41 @@ def _resource_metadata(manifest, digest_path, args):
     Path(digest_path).write_bytes(digest.hexdigest().encode())
 
 
+def _jdk_resource(bundle, recipe, directory, jar, manifest, digest):
+    spec = json.loads(recipe)
+    tree = Path(directory)
+    prefix = _relative(spec["directory"])
+    _install_jdk(tree, {"directory": str(prefix), "exclude": spec["exclude"], "bundle": bundle}, set())
+    members = []
+    for file in sorted((tree / prefix).rglob("*")):
+        if file.is_symlink():
+            target = file.resolve(strict=True)
+            if not target.is_relative_to((tree / prefix).resolve()) or not target.is_file():
+                raise ValueError(f"Unexpected JDK resource link {file}")
+            file.unlink()
+            shutil.copy2(target, file)
+        if file.is_file():
+            members.append((file.relative_to(tree).as_posix(), file))
+    _resource_metadata(manifest, digest, [arg for name, file in members for arg in (name, file, "source")])
+    for key, generated in (("file_list_entry", manifest), ("hash_entry", digest)):
+        name = str(_relative(spec[key]))
+        location = tree / name
+        if location.exists():
+            raise ValueError(f"Duplicate resource metadata {name}")
+        shutil.copyfile(generated, location)
+        members.append((name, location))
+    with zipfile.ZipFile(jar, "w") as archive:
+        for name, file in members:
+            entry = zipfile.ZipInfo(name)
+            entry.external_attr = (stat.S_IFREG | (file.stat().st_mode & 0o777)) << 16
+            with file.open("rb") as src, archive.open(entry, "w") as dst:
+                shutil.copyfileobj(src, dst)
+
+
 def main():
+    if sys.argv[1] == "--jdk-resource":
+        _jdk_resource(*sys.argv[2:])
+        return
     if sys.argv[1] == "--metadata":
         _resource_metadata(sys.argv[2], sys.argv[3], sys.argv[4:])
         return
