@@ -10,7 +10,7 @@ load("@rules_java//java/common:java_info.bzl", "JavaInfo")
 load("@rules_mx//mx:jar.bzl", "MxJarInfo")
 load("@rules_python//python:py_binary.bzl", "py_binary")
 load("@rules_python//python:py_test.bzl", "py_test")
-load(":layout.bzl", "mx_archive_layout", "static_archive")
+load(":layout.bzl", "MxArchiveLayoutInfo", "mx_archive_layout", "static_archive")
 
 def _compiler_flags_impl(ctx):
     runtime = ctx.attr._jdk[java_common.JavaRuntimeInfo]
@@ -272,6 +272,7 @@ def svm_native_projects(projects):
         ])
     }
     common_headers["//substratevm/src/com.oracle.svm.core/src/com/oracle/svm/core/gc/shared/include:com.oracle.svm.core.resources"] = "include/sharedGCStructs.h"
+
     # Native Image reads a symbol manifest next to the libjvm replacement.
     svm_jvm_symbols(
         name = "libjvm.a.symbols",
@@ -371,6 +372,15 @@ def _native_image_root_impl(ctx):
         if len(files) != 1:
             fail("Expected one file for the macro path " + path)
         entries["lib/svm/macros/" + path] = files[0]
+    for target, path in ctx.attr.component_jars.items():
+        [jar] = target[JavaInfo].runtime_output_jars
+        entries[path] = jar
+    for target, directory in ctx.attr.component_layouts.items():
+        for member, artifact in target[MxArchiveLayoutInfo].entries.items():
+            path = directory + "/" + member
+            if path in entries:
+                fail("Duplicate Native Image installation path " + path)
+            entries[path] = artifact
     flags = ctx.actions.declare_file(ctx.label.name + ".exports")
     exports = sorted(driver[MxJarInfo].required_exports.to_list())
     ctx.actions.write(flags, "\n".join(exports) + "\n")
@@ -417,6 +427,8 @@ _native_image_root = rule(
         "reporter": attr.label(allow_single_file = True, mandatory = True),
         "builder_libs": attr.label_keyed_string_dict(providers = [JavaInfo]),
         "macros": attr.label_keyed_string_dict(allow_files = True),
+        "component_jars": attr.label_keyed_string_dict(providers = [JavaInfo]),
+        "component_layouts": attr.label_keyed_string_dict(providers = [MxArchiveLayoutInfo]),
         "native_archive": attr.label(allow_single_file = [".tar"], mandatory = True),
         "platform": attr.string(mandatory = True),
         "_jdk": attr.label(default = Label("//tools:labs_runtime")),
@@ -430,7 +442,7 @@ _native_image_root = rule(
     toolchains = use_cc_toolchain(),
 )
 
-def svm_launcher(name, builder_libs = {}):
+def svm_launcher(name, builder_libs = {}, component_jars = {}, component_layouts = {}):
     """Assemble a Native Image distribution root and its launcher.
 
     Args:
@@ -441,6 +453,8 @@ def svm_launcher(name, builder_libs = {}):
         name = name + ".root",
         out = name + ".py",
         driver = ":SVM_DRIVER",
+        component_jars = component_jars,
+        component_layouts = component_layouts,
         management = "//compiler:GRAAL_MANAGEMENT",
         builder = _BUILDER_JARS,
         guest = _GUEST_JARS,
@@ -472,6 +486,7 @@ def _svm_unittest_inputs_impl(ctx):
     runtime = ctx.attr._jdk[java_common.JavaRuntimeInfo]
     [java] = [f for f in runtime.files.to_list() if f.path == runtime.java_executable_exec_path]
     tests = depset(transitive = [dep[JavaInfo].transitive_runtime_jars for dep in ctx.attr.deps])
+
     # The image builder already provides its own distributions, as mx's implicit_excludes do.
     provided = {jar: True for jar in depset(transitive = [dep[JavaInfo].transitive_runtime_jars for dep in ctx.attr.provided]).to_list()}
     classpath = [jar for jar in tests.to_list() if jar not in provided]

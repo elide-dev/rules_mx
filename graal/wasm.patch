@@ -2,12 +2,13 @@ diff --git a/wasm/BUILD.bazel b/wasm/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/wasm/BUILD.bazel
-@@ -0,0 +1,1869 @@
+@@ -0,0 +1,2004 @@
 +load("@rules_java//java:java_import.bzl", "java_import")
 +
 +# gazelle:resolve java org.openjdk.jol.info //wasm:JOL
 +load("@rules_java//java:java_plugin.bzl", "java_plugin")
-+load("@rules_mx//mx:graph.bzl", "mx_exported_tar", "mx_jar_dist", "mx_jvmci_library", "mx_pom_dist", "mx_processed_java", "mx_project", "mx_test_class", "mx_whole_java")
++load("@rules_mx//mx:graph.bzl", "mx_distribution_alias", "mx_exported_tar", "mx_jar_dist", "mx_jvmci_library", "mx_pom_dist", "mx_processed_java", "mx_project", "mx_release_archive", "mx_test_class", "mx_whole_java")
++load("@rules_mx//mx:native_image.bzl", "mx_native_image_library")
 +load("@rules_mx//mx:project_files.bzl", "mx_project_files", "mx_wat_project")
 +load("@rules_mx//mx:thin_launcher.bzl", "mx_thin_launcher")
 +load("@rules_mx//mx:wasm_programs.bzl", "mx_wasm_programs")
@@ -22,6 +23,11 @@ new file mode 100644
 +    name = "all_distributions",
 +    testonly = True,
 +    srcs = [
++        ":GRAALWASM_JVM_STANDALONE",
++        ":GRAALWASM_JVM_STANDALONE_RELEASE_ARCHIVE",
++        ":GRAALWASM_NATIVE_STANDALONE",
++        ":GRAALWASM_NATIVE_STANDALONE_RELEASE_ARCHIVE",
++        ":GRAALWASM_STANDALONE_COMMON",
 +        ":GRAALWASM_STANDALONE_DEPENDENCIES",
 +        ":WASM",
 +        ":WASM_BENCHMARKCASES",
@@ -43,6 +49,7 @@ new file mode 100644
 +    srcs = [
 +        ":graalwasm_licenses",
 +        ":graalwasm_thin_launcher",
++        ":libwasmvm",
 +        ":org.graalvm.wasm",
 +        ":org.graalvm.wasm.benchcases",
 +        ":org.graalvm.wasm.benchcases.bench",
@@ -1599,6 +1606,55 @@ new file mode 100644
 +    visibility = ["//visibility:public"],
 +)
 +
++mx_native_image_library(
++    name = "libwasmvm",
++    image_args = [
++        "-march=compatibility",
++        "--link-at-build-time",
++        "-Dorg.graalvm.version=25.6.0-dev",
++        "-H:+UnlockExperimentalVMOptions",
++        "-H:+GenerateBuildArtifactsFile",
++        "-H:+AssertInitializationSpecifiedForAllClasses",
++        "-H:+EnforceMaxRuntimeCompileMethods",
++        "-H:+GuaranteeSubstrateTypesLinked",
++        "-H:+ReportExceptionStackTraces",
++        "-H:+DetectUserDirectoriesInImageHeap",
++        "-H:+VerifyRuntimeCompilationFrameStates",
++        "-H:-UnlockExperimentalVMOptions",
++        "-Dorg.graalvm.launcher.class=org.graalvm.wasm.launcher.WasmLauncher",
++        "--add-modules=jdk.incubator.vector",
++        "-H:+UnlockExperimentalVMOptions",
++        "-H:+VectorAPISupport",
++        "-R:+EnableSignalHandling",
++        "-R:+InstallSegfaultHandler",
++        "-H:+UnlockExperimentalVMOptions",
++        "-H:-InitializeVM",
++        "-H:+InstallExitHandlers",
++        "-H:-UnlockExperimentalVMOptions",
++        "--enable-monitoring=jvmstat,heapdump,jfr,threaddump",
++        "-H:+UnlockExperimentalVMOptions",
++        "-H:+DumpRuntimeCompilationOnSignal",
++        "-H:-UnlockExperimentalVMOptions",
++        "-R:-UsePerfData",
++    ],
++    modulepath = [
++        ":WASM_LAUNCHER",
++        "//sdk:COLLECTIONS",
++        "//sdk:WORD",
++        "//sdk:NATIVEIMAGE",
++        "//sdk:POLYGLOT",
++        "//sdk:JLINE3",
++        "//sdk:LAUNCHER_COMMON",
++        "//truffle:TRUFFLE_API",
++        "//sdk:JNIUTILS",
++        ":WASM",
++        "//truffle:TRUFFLE_RUNTIME",
++        "//truffle:TRUFFLE_COMPILER",
++    ],
++    output = "wasmvm",
++    visibility = ["//visibility:public"],
++)
++
 +mx_wasm_programs(
 +    name = "org.graalvm.wasm.benchcases",
 +    testonly = True,
@@ -1840,6 +1896,85 @@ new file mode 100644
 +    ],
 +    root = "benchmarks",
 +    tool = "@wabt//src/tools:wat2wasm",
++    visibility = ["//visibility:public"],
++)
++
++mx_distribution_alias(
++    name = "GRAALWASM_JVM_STANDALONE_RELEASE_ARCHIVE",
++    actual = ":WASM_JAVA_STANDALONE_SVM_JAVA25",
++    visibility = ["//visibility:public"],
++)
++
++mx_distribution_alias(
++    name = "GRAALWASM_NATIVE_STANDALONE_RELEASE_ARCHIVE",
++    actual = ":WASM_NATIVE_STANDALONE_SVM_JAVA25",
++    visibility = ["//visibility:public"],
++)
++
++mx_release_archive(
++    name = "WASM_JAVA_STANDALONE_SVM_JAVA25",
++    install = ":GRAALWASM_JVM_STANDALONE",
++    prefix = "graalwasm-community-jvm-25.6.0-dev-<graalvm_os>-<arch>",
++    visibility = ["//visibility:public"],
++)
++
++mx_release_archive(
++    name = "WASM_NATIVE_STANDALONE_SVM_JAVA25",
++    install = ":GRAALWASM_NATIVE_STANDALONE",
++    prefix = "graalwasm-community-25.6.0-dev-<graalvm_os>-<arch>",
++    visibility = ["//visibility:public"],
++)
++
++mx_exported_tar(
++    name = "GRAALWASM_JVM_STANDALONE",
++    archive_imports = {
++        "//truffle:TRUFFLE_ATTACH_GRAALVM_SUPPORT": "=jvmlibs/",
++        ":GRAALWASM_STANDALONE_COMMON": "=",
++    },
++    format = "dir",
++    jdk_homes = {
++        "@rules_mx//graal:standalone_jdk_archive": "{\"directory\": \"jvm/\", \"exclude\": [\"bin/native-image*\", \"lib/static\", \"lib/svm\", \"lib/<lib:native-image-agent>\", \"lib/<lib:native-image-diagnostics-agent>\", \"lib/src.zip\", \"jmods\"]}",
++    },
++    members = {
++        "//sdk:COLLECTIONS": "modules/collections.jar",
++        "//sdk:JLINE3": "modules/jline3.jar",
++        "//sdk:JNIUTILS": "modules/jniutils.jar",
++        "//sdk:LAUNCHER_COMMON": "modules/launcher-common.jar",
++        "//sdk:NATIVEIMAGE": "modules/nativeimage.jar",
++        "//sdk:POLYGLOT": "modules/polyglot.jar",
++        "//sdk:WORD": "modules/word.jar",
++        "//truffle:TRUFFLE_API": "modules/truffle-api.jar",
++        "//truffle:TRUFFLE_COMPILER": "modules/truffle-compiler.jar",
++        "//truffle:TRUFFLE_RUNTIME": "modules/truffle-runtime.jar",
++        ":WASM": "modules/wasm.jar",
++        ":WASM_LAUNCHER": "modules/wasm-launcher.jar",
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_exported_tar(
++    name = "GRAALWASM_NATIVE_STANDALONE",
++    archive_imports = {
++        ":GRAALWASM_STANDALONE_COMMON": "=",
++    },
++    format = "dir",
++    members = {
++        ":libwasmvm": "lib/{basename}",
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_exported_tar(
++    name = "GRAALWASM_STANDALONE_COMMON",
++    archive_imports = {
++        ":WASM_GRAALVM_SUPPORT": "=",
++        ":graalwasm_licenses": "=",
++    },
++    format = "dir",
++    members = {
++        ":graalwasm_thin_launcher": "bin/wasm",
++        "@rules_mx//graal:standalone_jdk_release": "release",
++    },
 +    visibility = ["//visibility:public"],
 +)
 +

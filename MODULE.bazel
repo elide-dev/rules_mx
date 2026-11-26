@@ -80,6 +80,9 @@ use_repo(
     "labsjdk_linux_aarch64_toolchain_config_repo",
     "labsjdk_linux_amd64",
     "labsjdk_linux_amd64_toolchain_config_repo",
+    "standalone_jdk_archive_darwin_aarch64",
+    "standalone_jdk_archive_linux_aarch64",
+    "standalone_jdk_archive_linux_amd64",
 )
 
 register_toolchains(

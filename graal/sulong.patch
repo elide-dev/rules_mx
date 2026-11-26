@@ -2,11 +2,11 @@ diff --git a/sulong/BUILD.bazel b/sulong/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/sulong/BUILD.bazel
-@@ -0,0 +1,2361 @@
+@@ -0,0 +1,2427 @@
 +load("@rules_mx//graal:sulong_fixture_check.bzl", "sulong_fixture_check")
 +load("@rules_mx//mx:bitcode.bzl", "mx_bitcode_suite")
 +load("@rules_mx//mx:graph.bzl", "mx_exported_tar", "mx_jar_dist", "mx_pom_dist", "mx_processed_java", "mx_project", "mx_whole_java")
-+load("@rules_mx//mx:native_image.bzl", "mx_native_image_executable", "mx_toolchain_tool_layout")
++load("@rules_mx//mx:native_image.bzl", "mx_native_image_executable", "mx_native_image_library", "mx_toolchain_tool_layout")
 +load("@rules_mx//mx:project_files.bzl", "mx_project_files")
 +load("@rules_mx//mx:sulong_cmake.bzl", "mx_sulong_cmake_suite")
 +load("@rules_mx//mx:thin_launcher.bzl", "mx_thin_launcher")
@@ -23,6 +23,7 @@ new file mode 100644
 +        ":SULONG_LAUNCHER",
 +        ":SULONG_LEGACY",
 +        ":SULONG_LIBCXX_COMPILER_WRAPPER",
++        ":SULONG_LIBLLVMVM",
 +        ":SULONG_NATIVE",
 +        ":SULONG_NATIVE_TOOLS",
 +        ":SULONG_NFI",
@@ -55,6 +56,7 @@ new file mode 100644
 +        ":com.oracle.truffle.llvm.toolchain.launchers",
 +        ":com.oracle.truffle.llvm.tools",
 +        ":graalvm-native-tool",
++        ":libllvmvm",
 +        ":sulong_licenses",
 +        ":sulong_thin_launcher",
 +    ] + select({
@@ -994,6 +996,61 @@ new file mode 100644
 +        "//sdk:LAUNCHER_COMMON",
 +    ],
 +    output = "graalvm-native-tool",
++    visibility = ["//visibility:public"],
++)
++
++mx_native_image_library(
++    name = "libllvmvm",
++    image_args = [
++        "-march=compatibility",
++        "--link-at-build-time",
++        "-Dorg.graalvm.version=25.6.0-dev",
++        "-H:+UnlockExperimentalVMOptions",
++        "-H:+GenerateBuildArtifactsFile",
++        "-H:+AssertInitializationSpecifiedForAllClasses",
++        "-H:+EnforceMaxRuntimeCompileMethods",
++        "-H:+GuaranteeSubstrateTypesLinked",
++        "-H:+ReportExceptionStackTraces",
++        "-H:+DetectUserDirectoriesInImageHeap",
++        "-H:+VerifyRuntimeCompilationFrameStates",
++        "-H:-UnlockExperimentalVMOptions",
++        "-H:+AddAllCharsets",
++        "-Dorg.graalvm.launcher.class=com.oracle.truffle.llvm.launcher.LLVMLauncher",
++        "-R:+EnableSignalHandling",
++        "-R:+InstallSegfaultHandler",
++        "-H:+UnlockExperimentalVMOptions",
++        "-H:-InitializeVM",
++        "-H:+InstallExitHandlers",
++        "-H:-UnlockExperimentalVMOptions",
++        "--enable-monitoring=jvmstat,heapdump,jfr,threaddump",
++        "-H:+UnlockExperimentalVMOptions",
++        "-H:+DumpRuntimeCompilationOnSignal",
++        "-H:-UnlockExperimentalVMOptions",
++        "-R:-UsePerfData",
++    ],
++    modulepath = [
++        ":SULONG_LAUNCHER",
++        "//sdk:COLLECTIONS",
++        "//sdk:WORD",
++        "//sdk:NATIVEIMAGE",
++        "//sdk:POLYGLOT",
++        "//sdk:JLINE3",
++        "//sdk:LAUNCHER_COMMON",
++        "//truffle:TRUFFLE_API",
++        "//sdk:JNIUTILS",
++        ":SULONG_API",
++        ":SULONG_CORE",
++        "//truffle:TRUFFLE_NFI",
++        "//truffle:TRUFFLE_ANTLR4",
++        ":SULONG_NFI",
++        ":SULONG_NATIVE",
++        "//truffle:TRUFFLE_NFI_LIBFFI",
++        "//truffle:TRUFFLE_NFI_PANAMA",
++        ":SULONG_TOOLCHAIN_LAUNCHERS",
++        "//truffle:TRUFFLE_RUNTIME",
++        "//truffle:TRUFFLE_COMPILER",
++    ],
++    output = "llvmvm",
 +    visibility = ["//visibility:public"],
 +)
 +
@@ -2361,6 +2418,15 @@ new file mode 100644
 +    format = "tar",
 +    members = {
 +        "projects/com.oracle.truffle.llvm.libraries.bitcode.libcxx.compiler-wrapper/compiler-wrapper.py": "compiler-wrapper.py",
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_exported_tar(
++    name = "SULONG_LIBLLVMVM",
++    format = "dir",
++    members = {
++        ":libllvmvm": "lib/{basename}",
 +    },
 +    visibility = ["//visibility:public"],
 +)

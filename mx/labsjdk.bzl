@@ -1,5 +1,6 @@
 """Oracle Labs JDK for suites that require the JVMCI build required by the selected Graal compiler."""
 
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
 load("@rules_java//toolchains:remote_java_repository.bzl", "remote_java_repository")
 
 _PLATFORMS = {
@@ -15,13 +16,23 @@ def _register(pin, prefix, repository):
     home = "labsjdk-" + jdk.split("+")[0] + "-" + release
     for platform, digest in pin["platforms"].items():
         cpu, os = _PLATFORMS[platform]
+        urls = ["https://github.com/graalvm/%s/releases/download/%s/labsjdk-%s-%s.tar.gz" % (repository, release, version.replace("+", "%2B"), platform)]
+        if prefix == "labsjdk":
+            http_file(
+                name = "standalone_jdk_archive_" + platform.replace("-", "_"),
+                sha256 = digest,
+                urls = urls,
+                downloaded_file_path = "jdk.tar.gz",
+            )
         remote_java_repository(
             name = prefix + "_" + platform.replace("-", "_"),
             version = jdk.removeprefix("ce-").split(".")[0],
             prefix = prefix,
             sha256 = digest,
+            patches = [Label("//mx:jdk_release.patch")] if prefix == "labsjdk" else [],
+            patch_args = ["-p1"],
             strip_prefix = home + ("/Contents/Home" if os == "macos" else ""),
-            urls = ["https://github.com/graalvm/%s/releases/download/%s/labsjdk-%s-%s.tar.gz" % (repository, release, version.replace("+", "%2B"), platform)],
+            urls = urls,
             target_compatible_with = ["@platforms//cpu:" + cpu, "@platforms//os:" + os],
         )
 
