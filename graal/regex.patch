@@ -2,7 +2,7 @@ diff --git a/regex/BUILD.bazel b/regex/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/regex/BUILD.bazel
-@@ -0,0 +1,406 @@
+@@ -0,0 +1,421 @@
 +load("@rules_java//java:java_import.bzl", "java_import")
 +load("@rules_java//java:java_plugin.bzl", "java_plugin")
 +load("@rules_mx//mx:graph.bzl", "mx_exported_tar", "mx_jar_dist", "mx_processed_java", "mx_test_class")
@@ -79,6 +79,7 @@ new file mode 100644
 +        "//regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/flavor/js:com.oracle.truffle.regex.srcs",
 +        "//regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/flavor/oracledb:com.oracle.truffle.regex.srcs",
 +        "//regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/flavor/python:com.oracle.truffle.regex.srcs",
++        "//regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/flavor/re2:com.oracle.truffle.regex.srcs",
 +        "//regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/flavor/ruby:com.oracle.truffle.regex.srcs",
 +        "//regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/literal:com.oracle.truffle.regex.srcs",
 +        "//regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/result:com.oracle.truffle.regex.srcs",
@@ -148,6 +149,7 @@ new file mode 100644
 +        "21",
 +        "-parameters",
 +    ],
++    mx_resource_root = "src/com.oracle.truffle.regex.test/src",
 +    plugins = [
 +        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
 +        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
@@ -159,6 +161,7 @@ new file mode 100644
 +        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
 +        ":jmh_processor",
 +    ],
++    resources = ["//regex/src/com.oracle.truffle.regex.test/src/com/oracle/truffle/regex/tregex/test/re2data:com.oracle.truffle.regex.test.resources"],
 +    visibility = ["//visibility:public"],
 +    deps = [
 +        ":JMH_1_21",
@@ -256,6 +259,18 @@ new file mode 100644
 +)
 +
 +mx_test_class(
++    name = "com.oracle.truffle.regex.test.com.oracle.truffle.regex.tregex.test.RE2ConformanceTest",
++    test_class = "com.oracle.truffle.regex.tregex.test.RE2ConformanceTest",
++    runtime_deps = [":TREGEX_UNIT_TESTS"],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.regex.test.com.oracle.truffle.regex.tregex.test.RE2Tests",
++    test_class = "com.oracle.truffle.regex.tregex.test.RE2Tests",
++    runtime_deps = [":TREGEX_UNIT_TESTS"],
++)
++
++mx_test_class(
 +    name = "com.oracle.truffle.regex.test.com.oracle.truffle.regex.tregex.test.RegexOptionsTest",
 +    test_class = "com.oracle.truffle.regex.tregex.test.RegexOptionsTest",
 +    runtime_deps = [":TREGEX_UNIT_TESTS"],
@@ -335,10 +350,10 @@ new file mode 100644
 +    jni_services = True,
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
-+        "Implementation-Version": "25.5.5-dev",
++        "Implementation-Version": "25.6.0-dev",
 +        "Name": "regex",
 +        "Specification-Vendor": "Oracle Corporation",
-+        "Specification-Version": "25.5.5-dev",
++        "Specification-Version": "25.6.0-dev",
 +    },
 +    module_name = "com.oracle.truffle.regex",
 +    release = 21,
@@ -618,6 +633,24 @@ new file mode 100644
 +        "PythonREMode.java",
 +        "PythonRegexLexer.java",
 +        "PythonRegexParser.java",
++    ],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/flavor/re2/BUILD.bazel b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/flavor/re2/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/flavor/re2/BUILD.bazel
+@@ -0,0 +1,13 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.srcs",
++    srcs = [
++        "RE2ErrorMessages.java",
++        "RE2Flags.java",
++        "RE2Flavor.java",
++        "RE2FlavorProvider.java",
++        "RE2RegexParser.java",
 +    ],
 +    visibility = ["//regex:__pkg__"],
 +)
@@ -1178,7 +1211,7 @@ diff --git a/regex/src/com.oracle.truffle.regex.test/src/com/oracle/truffle/rege
 new file mode 100644
 --- /dev/null
 +++ b/regex/src/com.oracle.truffle.regex.test/src/com/oracle/truffle/regex/tregex/test/BUILD.bazel
-@@ -0,0 +1,21 @@
+@@ -0,0 +1,23 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -1190,6 +1223,8 @@ new file mode 100644
 +        "OracleDBTests.java",
 +        "PythonByteTests.java",
 +        "PythonTests.java",
++        "RE2ConformanceTest.java",
++        "RE2Tests.java",
 +        "RegexOptionsTest.java",
 +        "RegexTestBase.java",
 +        "RegressionTests.java",
@@ -1216,6 +1251,21 @@ new file mode 100644
 +        "PythonGeneratedTests.java",
 +        "RubyGeneratedTests.java",
 +        "TestCase.java",
++    ],
++    visibility = ["//regex:__pkg__"],
++)
+diff --git a/regex/src/com.oracle.truffle.regex.test/src/com/oracle/truffle/regex/tregex/test/re2data/BUILD.bazel b/regex/src/com.oracle.truffle.regex.test/src/com/oracle/truffle/regex/tregex/test/re2data/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/regex/src/com.oracle.truffle.regex.test/src/com/oracle/truffle/regex/tregex/test/re2data/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.regex.test.resources",
++    srcs = [
++        "LICENSE",
++        "re2-search.txt",
 +    ],
 +    visibility = ["//regex:__pkg__"],
 +)

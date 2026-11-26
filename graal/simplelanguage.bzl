@@ -22,7 +22,13 @@ def _sl_main_impl(ctx):
     if ctx.file.compiletime:
         module_jars[ctx.file.compiletime] = True
     classpath = [jar for jar in depset(transitive = [dep[JavaInfo].transitive_runtime_jars for dep in ctx.attr.test_classpath]).to_list() if jar not in module_jars]
+    if ctx.attr.dependencies_first:
+        # Java rules list each JAR before its dependencies; mx lists dependencies first.
+        # Service providers, such as option descriptors, are then found in mx's order.
+        classpath = reversed(classpath)
     probe = ctx.file.probe
+    property_jars = [jar for dep in ctx.attr.property_jars for jar in dep[JavaInfo].runtime_output_jars]
+    jar_properties = {ctx.attr.jar_property: [_runfile(ctx, jar) for jar in property_jars]} if ctx.attr.jar_property else {}
     ctx.actions.expand_template(
         template = ctx.file._template,
         output = ctx.outputs.out,
@@ -40,9 +46,11 @@ def _sl_main_impl(ctx):
             "{TEST_CLASS}": repr(ctx.attr.test_class),
             "{CLASSPATH}": repr([_runfile(ctx, jar) for jar in classpath]),
             "{PROBE}": repr(_runfile(ctx, probe)) if probe else "None",
+            "{MODULE_ACCESS}": repr(ctx.attr.module_access),
+            "{JAR_PROPERTIES}": repr(jar_properties),
         },
     )
-    return [DefaultInfo(files = depset([ctx.outputs.out]), runfiles = ctx.runfiles(transitive_files = depset(classpath + ctx.files.hsdis + ctx.files.native_test + ([probe] if probe else []), transitive = [modules, runtime.files])))]
+    return [DefaultInfo(files = depset([ctx.outputs.out]), runfiles = ctx.runfiles(transitive_files = depset(classpath + property_jars + ctx.files.hsdis + ctx.files.native_test + ([probe] if probe else []), transitive = [modules, runtime.files])))]
 
 _sl_main = rule(
     implementation = _sl_main_impl,
@@ -58,6 +66,12 @@ _sl_main = rule(
         "native_test": attr.label(allow_single_file = True),
         "test_classpath": attr.label_list(providers = [JavaInfo]),
         "probe": attr.label(allow_single_file = [".jar"]),
+        # Open JVMCI, compiler and GraalVM module packages as mx's Graal unit test configuration does.
+        "module_access": attr.bool(),
+        "dependencies_first": attr.bool(),
+        # A system property listing the JARs of property_jars, such as the JARs a test inspects.
+        "jar_property": attr.string(),
+        "property_jars": attr.label_list(providers = [JavaInfo]),
         "labs_runtime": attr.label(),
         "modules": attr.label_list(providers = [JavaInfo], mandatory = True),
         "out": attr.output(mandatory = True),
@@ -187,6 +201,45 @@ def panama_test(name, test_class):
         testonly = True,
     )
     py_test(name = name, main = name + ".py", srcs = [":" + name + ".main"], data = [":" + name + ".main"], size = "medium")
+
+def svm_test_runner(name, test_classpath, jvm_flags = [], modules = [], root_modules = [], jar_property = None, property_jars = []):
+    """Run SubstrateVM JVM unit tests alongside the source-built Graal compiler.
+
+    The launcher opens JVMCI, compiler and GraalVM module packages to the tests, as mx's
+    Graal unit test configuration does.
+
+    Args:
+      name: launcher name.
+      test_classpath: test distributions and their dependencies.
+      jvm_flags: additional JVM flags of the unit test configuration.
+      modules: further distributions for the module path.
+      root_modules: modules of `modules` to resolve.
+      jar_property: a system property that lists the JARs of property_jars.
+      property_jars: JARs that the tests inspect.
+    """
+    _sl_main(
+        name = name + ".main",
+        out = name + ".py",
+        modules = ["//truffle:TRUFFLE_RUNTIME", "//compiler:GRAAL_MANAGEMENT"] + modules,
+        compiler = "//compiler:GRAAL",
+        root_modules = ["jdk.graal.compiler.management"] + root_modules,
+        classpath_junit = True,
+        module_access = True,
+        dependencies_first = True,
+        labs_runtime = Label("//tools:labs_runtime"),
+        test_classpath = test_classpath + [Label("//graal:compiler_junit")],
+        jvm_flags = ["--enable-native-access=ALL-UNNAMED", "--add-exports=java.base/jdk.internal.module=ALL-UNNAMED"] + jvm_flags,
+        jar_property = jar_property,
+        property_jars = property_jars,
+        testonly = True,
+    )
+    py_binary(
+        name = name,
+        srcs = [":" + name + ".main"],
+        main = name + ".py",
+        data = [":" + name + ".main"],
+        testonly = True,
+    )
 
 def svm_driver_test_runner(name):
     """Run the driver tests alongside the source-built named Graal compiler."""

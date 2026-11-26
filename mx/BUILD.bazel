@@ -2,7 +2,6 @@ load("@rules_python//python:py_binary.bzl", "py_binary")
 load("@rules_python//python:py_test.bzl", "py_test")
 
 exports_files([
-    "elide_javabuilder.patch",
     "export.py",
     "launcher.py.tpl",
     "module_descriptor.patch",

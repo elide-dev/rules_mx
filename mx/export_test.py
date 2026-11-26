@@ -1,5 +1,6 @@
 """Check the checked-in project graph against the pinned mx checkout."""
 
+import hashlib
 import json
 import shutil
 import subprocess
@@ -7,6 +8,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+import zipfile
 
 
 class ExportTest(unittest.TestCase):
@@ -306,6 +308,81 @@ class ExportTest(unittest.TestCase):
                 ["//upstream:" + p for p in expected],
             )
 
+    def test_archive_properties_and_platform_libraries(self):
+        with tempfile.TemporaryDirectory() as directory:
+            suite = Path(directory).resolve()
+            (suite / ".mx_vcs_root").touch()
+            metadata = suite / "mx.props"
+            metadata.mkdir()
+            native = metadata / "native.jar"
+            with zipfile.ZipFile(native, "w") as jar:
+                jar.writestr("native/linux-x86_64/libnative.so", b"")
+            (metadata / "suite.py").write_text(
+                "suite = "
+                + repr(
+                    {
+                        "name": "props",
+                        "mxversion": "7.89.0",
+                        "libraries": {
+                            "NATIVE": {
+                                "path": "mx.props/native.jar",
+                                "digest": "sha512:"
+                                + hashlib.sha512(native.read_bytes()).hexdigest(),
+                                # A host-specific name, like LLVM_PLATFORM_SPECIFIC_SHADOWED's.
+                                "moduleName": "demo.natives.linux.x86_64",
+                            }
+                        },
+                        "projects": {
+                            "lib": {
+                                "javaCompliance": "17+",
+                                "sourceDirs": ["src"],
+                                "dependencies": ["NATIVE"],
+                            }
+                        },
+                        "distributions": {
+                            "LIB": {
+                                "dependencies": ["lib"],
+                                "exclude": ["NATIVE"],
+                                # mx passes these to JVMs that use LIB; the JAR is unchanged.
+                                "javaProperties": {"lib.home": "<path:LIB>"},
+                                "moduleInfo": {"name": "demo.lib", "exports": ["lib"]},
+                            }
+                        },
+                    }
+                )
+            )
+            sources = suite / "lib/src/lib"
+            sources.mkdir(parents=True)
+            (sources / "Lib.java").write_text("package lib; public class Lib {}")
+            args = (
+                "bazel-buildfile",
+                "--gazelle",
+                "--classpath-dists",
+                "--release",
+                "17",
+                "--archive-dist",
+                "LIB",
+                "--java-dep",
+                "props:NATIVE=:NATIVE",
+            )
+            result = self.run_mx(*args, "LIB", suite=suite)
+            (dist,) = json.loads(result.stdout)["distributions"]
+            self.assertEqual(dist["module"], "demo.lib")
+            self.assertEqual(dist["contents"], [":lib"])
+            self.assertEqual(dist["deps"], [":NATIVE"])
+            self.assertIn("exports lib", dist["directives"])
+            self.assertIn("requires demo.natives.linux.x86_64", dist["directives"])
+            # A platform library stays a dependency without naming its host module.
+            result = self.run_mx(
+                *args, "--platform-library", "props:NATIVE", "LIB", suite=suite
+            )
+            (dist,) = json.loads(result.stdout)["distributions"]
+            self.assertEqual(dist["deps"], [":NATIVE"])
+            self.assertFalse(
+                [d for d in dist["directives"] if "demo.natives" in d],
+                dist["directives"],
+            )
+
     def test_packaged_test_discovery(self):
         with tempfile.TemporaryDirectory() as directory:
             suite = Path(directory).resolve()
@@ -379,6 +456,22 @@ class ExportTest(unittest.TestCase):
             self.assertEqual(launched["test_launcher"], ":runner")
             self.assertTrue(launched["manual_tests"])
             self.assertNotIn("test_runtime", launched)
+            result = self.run_mx(
+                *args, "--manual-test-class", "example.Concrete", "tck", suite=suite
+            )
+            (single,) = json.loads(result.stdout)["projects"]
+            self.assertEqual(single["manual_test_classes"], ["example.Concrete"])
+            self.assertNotIn("manual_tests", single)
+            unused = self.run_mx(
+                *args,
+                "--manual-test-class",
+                "example.Missing",
+                "tck",
+                suite=suite,
+                check=False,
+            )
+            self.assertNotEqual(unused.returncode, 0)
+            self.assertIn("example.Missing", unused.stderr + unused.stdout)
             invalid = self.run_mx(
                 *args,
                 "--test-runtime",

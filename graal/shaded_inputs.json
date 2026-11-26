@@ -20,36 +20,36 @@
     "sha512-GL9ZGR16RW52dchB34QR6+Ql2kBTLhA9uVSDvl0qdVENijitl1XN1OC+J6/nz9CzWFmTiKhPzsHuJ+icqjf1rw=="
   ],
   "sdk_JLINE_BUILTINS-sources.jar": [
-    "org/jline/jline-builtins/3.28.0/jline-builtins-3.28.0-sources.jar",
-    "sha512-M/BtfiuyMs5BPYz3I0vbQWw6Z3Dc8YpcF+OImIeyhzeP9fxTF1gUM4PD9QtWYT5b+AK1xJoqCbdIyARWjgVluA=="
+    "org/jline/jline-builtins/4.3.1/jline-builtins-4.3.1-sources.jar",
+    "sha512-Ic+383005AAPlZZuH7D2KHh322VfcBebspkMXaAKmEmCtNMeiWrwNXHCgF9X4N410DsXZnPcfl8zBndeQ1Cdhw=="
   ],
   "sdk_JLINE_BUILTINS.jar": [
-    "org/jline/jline-builtins/3.28.0/jline-builtins-3.28.0.jar",
-    "sha512-GJ2JNAUXCj7cYkprgiqKOUovi2I8I67Z4BXUsBiyMjB0CLYDgyJxkVX8fafpwEqbsKdshSH0ndhqX4TqOICstg=="
+    "org/jline/jline-builtins/4.3.1/jline-builtins-4.3.1.jar",
+    "sha512-iRRQFBlLfUKWCbqdOR3s9Q7dTvp3UT3a+nn4qZepMzYFFTS/ti2PplXSeFrxyx+7eGDKZwc7rsvR0P47LWO6yg=="
   ],
   "sdk_JLINE_READER-sources.jar": [
-    "org/jline/jline-reader/3.28.0/jline-reader-3.28.0-sources.jar",
-    "sha512-+OxiUI8+gyeBVre9FNXa3tcpdrENpjraxTvi97HF5saTQPrFsvEP/n6S2GsnQlvu5z5dWzx3XnJZW0cVi/vtGw=="
+    "org/jline/jline-reader/4.3.1/jline-reader-4.3.1-sources.jar",
+    "sha512-Uvz2oJfxWMcOIEHq0EWYYxYbSZx8vSGVYQoK5k6X44IT1uR/wFInx5XqDEQBO0YXx7y4/mOjTao4RWWaVccx6w=="
   ],
   "sdk_JLINE_READER.jar": [
-    "org/jline/jline-reader/3.28.0/jline-reader-3.28.0.jar",
-    "sha512-2v1Fr3mph017QdFG03OG2mBeGewr+ciYnxIflAOQLOYMqXCPsBav7XhRhpNdLd3UtbMwSsojTJJrDkNoYHsR7Q=="
+    "org/jline/jline-reader/4.3.1/jline-reader-4.3.1.jar",
+    "sha512-mpi3JUBtmq+fUv65ux0/mZ0lDHflFKqUhM+uRo5hGmH986RuqUZblqzdV9pdPls/zztuov0FzIjesmYdlfLdBA=="
   ],
   "sdk_JLINE_TERMINAL-sources.jar": [
-    "org/jline/jline-terminal/3.28.0/jline-terminal-3.28.0-sources.jar",
-    "sha512-y3CtK+4vdxP6U1jBb8fFOXTIYuM5V9PsgJRoq8vAsg3oVG7LQZVdzCAD5wLlRpBp/YVqHOUbEy4p0Chr7sT+fg=="
+    "org/jline/jline-terminal/4.3.1/jline-terminal-4.3.1-sources.jar",
+    "sha512-5R2l7D4vCDsf2MlWND6ij19ekPs3dFuTkhc6foRzyNyY0+hwjdfYI2bc6FANfxP7sNNvKDAp4PpA5SB+oLZAyw=="
   ],
   "sdk_JLINE_TERMINAL.jar": [
-    "org/jline/jline-terminal/3.28.0/jline-terminal-3.28.0.jar",
-    "sha512-q+CtAwPl64G1STAd/c80qs4USVJAgW8UMC0ZMpbHqL4xSI5GjRiiFZdrjk6Pop9y2DDkku7X1Kb58EyBpuNsPA=="
+    "org/jline/jline-terminal/4.3.1/jline-terminal-4.3.1.jar",
+    "sha512-IbZq4UKM1PF76wmukcYiar6oPWGyMqFuXluGz/YySVAkBacLpFPZmJL8TpBJ7N8XwtUzcEQ59Zrb2AH0idwO7g=="
   ],
   "sdk_JLINE_TERMINAL_FFM-sources.jar": [
-    "org/jline/jline-terminal-ffm/3.28.0/jline-terminal-ffm-3.28.0-sources.jar",
-    "sha512-xlGumf4fRT2bPSKRPi+wA8Ef+cQ2Ib7ddQj6MitJ8Vw9k88UbADy4fndk588qQCaUu5Ae2P6Pz1PXJl6HvuhOQ=="
+    "org/jline/jline-terminal-ffm/4.3.1/jline-terminal-ffm-4.3.1-sources.jar",
+    "sha512-m5WOluSktNx7VpZ+RINz6IxIg0q7MabTzpKq4o8pXAv5QMjRiRnGdXrh/dP6smuVS+ro1/Ip7bFNfxKOKMxUHA=="
   ],
   "sdk_JLINE_TERMINAL_FFM.jar": [
-    "org/jline/jline-terminal-ffm/3.28.0/jline-terminal-ffm-3.28.0.jar",
-    "sha512-5YObBKL9YRmhHGvBbgUgOviFEgOdhVUbGdbofDWKMl7V63BRAioiXiZBNXyZ2cQSGBekeVxQz3mhO2udU3zulg=="
+    "org/jline/jline-terminal-ffm/4.3.1/jline-terminal-ffm-4.3.1.jar",
+    "sha512-6jJhtp3wb6jjUvnUgqEVr9WGNphJrIKQzMaqeiqwppkQJStVe5/kK53FbyqnFl18nB3ctCg79ylufs/+eF6Szw=="
   ],
   "substratevm_CAPNPROTO_RUNTIME-sources.jar": [
     "org/capnproto/runtime/0.1.16/runtime-0.1.16-sources.jar",
@@ -58,6 +58,10 @@
   "substratevm_CAPNPROTO_RUNTIME.jar": [
     "org/capnproto/runtime/0.1.16/runtime-0.1.16.jar",
     "sha512-lKd3ZRHDRNpgoazcNGwTNSKkPCOdBn0NXYbCEpHgJSoZvU+nTksdOpPnXa3UGvZVel0RihWE4500wJJIXOBlsg=="
+  ],
+  "substratevm_ZSTD_JNI.jar": [
+    "com/github/luben/zstd-jni/1.5.7-23/zstd-jni-1.5.7-23.jar",
+    "sha512-G/8ZQBnb5mPawiksq8c1yDYZqSP2QSf0tV4GboWU2MxYzru+U0dtCPBYC4I9MkhrsRFwdGHT7mL6VXojxqzycA=="
   ],
   "tools_JAVA_WEBSOCKET-sources.jar": [
     "org/java-websocket/Java-WebSocket/1.6.0/Java-WebSocket-1.6.0-sources.jar",

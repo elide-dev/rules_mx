@@ -481,6 +481,12 @@ def _module_directives(dist, members, external, archives, mappings, library_modu
                 visit(child)
 
     for dep in external:
+        if dep.isLibrary() and library_modules.get(dep.qualifiedName(), "") is None:
+            if dep.qualifiedName() not in mappings:
+                mx.abort(
+                    f"{dep.qualifiedName()}: --platform-library needs a --java-dep mapping"
+                )
+            continue
         module = getattr(dep, "moduleName", None) or library_modules.get(
             dep.qualifiedName()
         )
@@ -572,7 +578,8 @@ def _jar_archive(dist, suite, mappings, pending, release, archives, library_modu
             for d in dist.optionalDependencies
         )
         or dist.manifestEntries
-        or getattr(dist, "javaProperties", None)
+        # mx passes javaProperties on the command line of a JVM that uses the
+        # distribution; they do not change the JAR, so they do not block assembly.
         or dist.module_info_compilation_participants
     ):
         raise _UnsupportedLowering(
@@ -596,7 +603,19 @@ def _jar_archive(dist, suite, mappings, pending, release, archives, library_modu
         if dep.isJARDistribution()
         for member in dep.archived_deps()
     }
-    external = [d for d in external if not (d.isJavaProject() and d in packaged)]
+    # An unmapped native distribution of another suite, such as an LLVM toolchain that a
+    # Java property locates, is neither a classpath entry nor a module.
+    external = [
+        d
+        for d in external
+        if not (d.isJavaProject() and d in packaged)
+        and not (
+            d.isDistribution()
+            and not d.isJARDistribution()
+            and d.suite != dist.suite
+            and d.qualifiedName() not in mappings
+        )
+    ]
     base = [d for d in members if not getattr(d, "multiReleaseJarVersion", None)]
     overlays = {
         ":" + d.name: str(d.multiReleaseJarVersion) for d in members if d not in base
@@ -956,6 +975,13 @@ def bazel_buildfile(args):
         help="JPMS name of a mapped automatic module",
     )
     parser.add_argument(
+        "--platform-library",
+        action="append",
+        default=[],
+        metavar="SUITE:LIB",
+        help="mapped library whose module name mx resolves for the host: depend on it without a requires directive",
+    )
+    parser.add_argument(
         "--suite-package",
         action="append",
         default=[],
@@ -1049,6 +1075,13 @@ def bazel_buildfile(args):
         action="append",
         default=[],
         help="tag generated JUnit classes for explicit invocation",
+    )
+    parser.add_argument(
+        "--manual-test-class",
+        action="append",
+        default=[],
+        metavar="CLASS",
+        help="tag one generated JUnit class, by its fully qualified name, for explicit invocation",
     )
     parser.add_argument(
         "--project-release",
@@ -1183,6 +1216,11 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
         if name in library_modules:
             parser.error(f"duplicate --library-module mapping for {name}")
         library_modules[name] = module
+    for name in options.platform_library:
+        if ":" not in name or name in library_modules:
+            parser.error(f"expected one --platform-library SUITE:LIB for {name}")
+        # None marks a module that the generated descriptor must not name.
+        library_modules[name] = None
     test_launchers = _mappings(parser, options.test_launcher, "--test-launcher")
     test_runtimes = _mappings(parser, options.test_runtime, "--test-runtime")
     test_data = _mappings(parser, options.test_data, "--test-data")
@@ -1195,6 +1233,7 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             parser.error("expected --test-jvm-flag SUITE:PROJECT=FLAG")
         test_flags.setdefault(name, []).append(value)
     manual_tests = set(options.manual_test_project)
+    manual_classes = set(options.manual_test_class)
     labs_javac = set(options.labs_javac_project)
     if labs_javac and not options.gazelle:
         parser.error("--labs-javac-project requires --gazelle")
@@ -1211,7 +1250,12 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             parser.error("expected a unique --project-release PROJECT=RELEASE")
         project_releases[name] = int(value)
     if (
-        test_runtimes or test_launchers or test_flags or test_data or manual_tests
+        test_runtimes
+        or test_launchers
+        or test_flags
+        or manual_tests
+        or test_data
+        or manual_classes
     ) and not options.gazelle:
         parser.error("test configuration requires --gazelle")
     project_options = {}
@@ -1674,6 +1718,9 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
                     if project.name in manual_tests:
                         manual_tests.remove(project.name)
                         record["manual_tests"] = True
+                    if manual := sorted(manual_classes & set(record["tests"])):
+                        manual_classes.difference_update(manual)
+                        record["manual_test_classes"] = manual
                     if test_runtime:
                         record["test_runtime"] = test_runtime
                     if property_data:
@@ -1697,6 +1744,7 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
     if (
         unused_projects := project_releases.keys()
         | manual_tests
+        | manual_classes
         | labs_javac
         | empty_projects
     ):

@@ -7,14 +7,13 @@ module(
 bazel_dep(name = "rules_java", version = "9.9.0")
 bazel_dep(name = "rules_python", version = "1.9.2")
 bazel_dep(name = "rules_elide", version = "0.6.1")
+# rules_elide has no release with the unified JVM builder, Native Image toolchain and
+# JavaBuilder processor fixes yet, so pin its main branch by commit.
 archive_override(
     module_name = "rules_elide",
-    integrity = "sha256-vQiFTGKzDEn4lj5MinoePBom0oKLyZQKdnBRp8ExnTg=",
-    # Processor option precedence from rules_elide PR 133 atop unified builder PR 132.
-    patch_strip = 1,
-    patches = ["//mx:elide_javabuilder.patch"],
-    strip_prefix = "rules_elide-9d997fb3e0f0a5c95913db16d40d9a3869f813bf",
-    urls = ["https://github.com/elide-dev/rules_elide/archive/9d997fb3e0f0a5c95913db16d40d9a3869f813bf.tar.gz"],
+    integrity = "sha256-//E8/7JDZWKKiQg4edEJN8ye3S8VaD5EhsQe60GYhnM=",
+    strip_prefix = "rules_elide-50e0e8f8b3696a86b4294491740434db4e9d4260",
+    urls = ["https://github.com/elide-dev/rules_elide/archive/50e0e8f8b3696a86b4294491740434db4e9d4260.tar.gz"],
 )
 
 bazel_dep(name = "wabt", version = "1.0.37.bcr.1", dev_dependency = True)
@@ -95,32 +94,10 @@ bazel_dep(name = "rules_jvm_external", version = "6.10", dev_dependency = True)
 maven = use_extension("@rules_jvm_external//:extensions.bzl", "maven", dev_dependency = True)
 use_repo(maven, "contrib_rules_jvm_deps")
 
-# Real upstream sources for the incremental GraalVM migration.
-graal_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
-
-graal_archive(
-    name = "graal",
-    build_file_content = "",
-    dev_dependency = True,
-    patch_strip = 1,
-    patches = [
-        "//graal:benchmark_timer.patch",
-        "//graal:sdk.patch",
-        "//graal:compiler.patch",
-        "//graal:espresso-shared.patch",
-        "//graal:truffle.patch",
-        "//graal:substratevm.patch",
-        "//graal:vm.patch",
-        "//graal:regex.patch",
-        "//graal:tools.patch",
-        "//graal:wasm.patch",
-        "//graal:sulong.patch",
-    ],
-    sha256 = "a174bfe9204342b53d0e174c9d44a38a73eef2cdd799384cdb59caac95ab738b",
-    strip_prefix = "graal-7b7825ae92c83d91bb20d76bc64b68b344449cf3",
-    type = "tar.gz",
-    urls = ["https://codeload.github.com/oracle/graal/tar.gz/7b7825ae92c83d91bb20d76bc64b68b344449cf3"],
-)
+# Real Graal sources for the incremental migration. The root module can select
+# another archive with graal.source(); see graal/README.md.
+graal = use_extension("//graal:extensions.bzl", "graal", dev_dependency = True)
+use_repo(graal, "graal")
 
 sdk_llvm = use_extension("//graal:sdk_llvm.bzl", "sdk_llvm_inputs", dev_dependency = True)
 use_repo(
@@ -143,6 +120,20 @@ use_repo(
     "visualvm_linux_arm64",
     "visualvm_macos",
     "visualvm_windows_amd64",
+)
+
+svm_inputs = use_extension("//graal:svm_inputs.bzl", "svm_inputs", dev_dependency = True)
+use_repo(
+    svm_inputs,
+    "graal_svm_javacpp_platform_specific_shadowed_darwin_aarch64",
+    "graal_svm_javacpp_platform_specific_shadowed_linux_aarch64",
+    "graal_svm_javacpp_platform_specific_shadowed_linux_amd64",
+    "graal_svm_javacpp_shadowed",
+    "graal_svm_llvm_lld_standalone_darwin_aarch64",
+    "graal_svm_llvm_platform_specific_shadowed_darwin_aarch64",
+    "graal_svm_llvm_platform_specific_shadowed_linux_aarch64",
+    "graal_svm_llvm_platform_specific_shadowed_linux_amd64",
+    "graal_svm_llvm_wrapper_shadowed",
 )
 
 shaded_inputs = use_repo_rule("//graal:shaded_inputs.bzl", "shaded_inputs")

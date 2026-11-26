@@ -151,3 +151,8 @@ filegroup(
     name = "llvm_nm",
     srcs = ["bin/llvm-nm"],
 )
+
+filegroup(
+    name = "llvm_objdump",
+    srcs = ["bin/llvm-objdump"],
+)

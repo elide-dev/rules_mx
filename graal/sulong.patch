@@ -396,10 +396,10 @@ new file mode 100644
 +    jni_services = True,
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
-+        "Implementation-Version": "25.5.5-dev",
++        "Implementation-Version": "25.6.0-dev",
 +        "Name": "llvm-api",
 +        "Specification-Vendor": "Oracle Corporation",
-+        "Specification-Version": "25.5.5-dev",
++        "Specification-Version": "25.6.0-dev",
 +    },
 +    module_name = "org.graalvm.llvm.api",
 +    release = 21,

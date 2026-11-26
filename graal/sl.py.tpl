@@ -51,6 +51,10 @@ if __name__ == "__main__":
         if test_class:
             options.append("-Dbazel.test_suite=" + test_class)
         main = "graal.NamedModuleJUnit" if {NAMED_JUNIT} else "com.google.testing.junit.runner.BazelTestRunner"
+        if {MODULE_ACCESS}:
+            main = "com.oracle.mxtool.junit.CompilerJUnit"
+        for name, jars in {JAR_PROPERTIES}.items():
+            options.append("-D" + name + "=" + os.pathsep.join(str(root / jar) for jar in jars))
         native_test = {NATIVE_TEST}
         if native_test:
             options.append("-Dnative.test.path.panama=" + str(root / native_test))
