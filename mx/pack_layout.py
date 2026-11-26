@@ -123,6 +123,7 @@ def main():
         if (homes or prefix) and not tree:
             tree = Path(stack.enter_context(tempfile.TemporaryDirectory()))
         if tree:
+            tree.mkdir(parents=True, exist_ok=True)
             for name, source in entries:
                 destination = tree / name
                 destination.parent.mkdir(parents=True, exist_ok=True)

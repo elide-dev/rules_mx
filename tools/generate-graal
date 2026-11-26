@@ -2349,9 +2349,16 @@ def prepare_suite(suite, stage):
             platform_targets = [
                 ":" + n for n in names if kind == "projects" and n in linux_projects
             ]
+            natives = {p["name"]: p["profiles"] for p in graph.get("native_shared", [])} if kind == "projects" else {}
             srcs = json.dumps(
-                [":" + n for n in names if ":" + n not in platform_targets]
+                [":" + n for n in names if ":" + n not in platform_targets and n not in natives]
             )
+            if natives:
+                configs = {
+                    "@rules_mx//tools/cc:profile_" + profile: sorted(":" + n for n, enabled in natives.items() if profile in enabled)
+                    for profile in sorted({key for enabled in natives.values() for key in enabled})
+                }
+                srcs += " + select(" + json.dumps(configs | {"//conditions:default": []}) + ")"
             if platform_targets:
                 srcs += (
                     ' + select({"@rules_mx//tools:exec_linux_amd64": '
@@ -2705,6 +2712,11 @@ def main():
                 shutil.copytree(
                     source / suite / f"mx.{suite}", stage / suite / f"mx.{suite}"
                 )
+        if "espresso" in (*selected, *providers):
+            # The exporter and the native mx task use the same JDK archive selection.
+            patch = ROOT / "graal/espresso_static_libraries.patch"
+            if subprocess.run(["git", "apply", "--reverse", "--check", str(patch)], cwd=stage, stderr=subprocess.DEVNULL).returncode:
+                subprocess.run(["git", "apply", str(patch)], cwd=stage, check=True)
         for suite in SUITES:
             for directory in (f"mx.{suite}", "src"):
                 rel = Path(suite) / directory

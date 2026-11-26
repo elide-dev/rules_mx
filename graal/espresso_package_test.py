@@ -3,12 +3,24 @@
 import io
 from pathlib import Path
 import os
+import subprocess
 import sys
 import tarfile
 from zipfile import ZipFile
 
 
-def main(support, io_jar, launchers, benchmarks):
+def defined_symbols(tool, library):
+    output = subprocess.check_output(
+        [tool, "--defined-only", "--extern-only", str(library)], text=True
+    )
+    return {
+        line.split()[-1].removeprefix("_").partition("@")[0]
+        for line in output.splitlines()
+        if line.split()
+    }
+
+
+def main(support, io_jar, launchers, benchmarks, mokapot, platform_support, nm):
     with tarfile.open(support) as archive:
         jars = {member.name for member in archive if member.isfile()}
         assert jars == {"lib/espresso-graal.jar", "lib/espresso-graal.src.zip"}, jars
@@ -46,6 +58,20 @@ def main(support, io_jar, launchers, benchmarks):
                 assert f"{name}.class" in jar.namelist()
                 manifest = jar.read("META-INF/MANIFEST.MF").decode().splitlines()
                 assert f"Main-Class: {name}" in manifest
+
+    if sys.platform == "darwin":
+        library = Path(mokapot, "fatpot", "libjvm.dylib")
+        assert not list(Path(platform_support).iterdir())
+    else:
+        library = Path(mokapot, "libjvm.so")
+        assert "eden_RTLD_DEFAULT" in defined_symbols(
+            nm, Path(platform_support, "lib", "libeden.so")
+        )
+    symbols = defined_symbols(nm, library)
+    assert {"JNI_CreateJavaVM", "JVM_IsStaticallyLinked"} <= symbols
+    if sys.platform == "darwin":
+        # A symbol from the statically linked JDK, beyond the JVM shim itself.
+        assert "JIMAGE_Open" in symbols
 
 
 if __name__ == "__main__":

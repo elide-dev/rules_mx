@@ -2,10 +2,11 @@ diff --git a/espresso/BUILD.bazel b/espresso/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/espresso/BUILD.bazel
-@@ -0,0 +1,896 @@
+@@ -0,0 +1,1275 @@
 +load("@rules_mx//graal:layout.bzl", "mx_os_layout")
 +load("@rules_mx//mx:graph.bzl", "mx_exported_tar", "mx_jar_dist", "mx_jvmci_library", "mx_pom_dist", "mx_processed_java", "mx_processor", "mx_project", "mx_shaded_java", "mx_whole_java")
 +load("@rules_mx//mx:jvmci.bzl", "mx_patch_module")
++load("@rules_mx//mx:native_project.bzl", "mx_native_shared_project")
 +load("@rules_mx//mx:project_files.bzl", "mx_project_files")
 +load("@rules_mx//mx:thin_launcher.bzl", "mx_thin_launcher")
 +
@@ -18,7 +19,9 @@ new file mode 100644
 +        ":ESPRESSO_IO",
 +        ":ESPRESSO_JVMCI",
 +        ":ESPRESSO_JVM_STANDALONE_JAVA_LINKS",
++        ":ESPRESSO_JVM_STANDALONE_MOKAPOT_SUPPORT",
 +        ":ESPRESSO_LAUNCHER",
++        ":ESPRESSO_PD_SUPPORT",
 +        ":ESPRESSO_POLYBENCH_BENCHMARKS",
 +        ":ESPRESSO_POLYGLOT",
 +        ":ESPRESSO_PROCESSOR",
@@ -52,7 +55,24 @@ new file mode 100644
 +        ":espresso",
 +        ":espresso-license-files",
 +        ":org.graalvm.continuations",
-+    ],
++    ] + select({
++        "@rules_mx//tools/cc:profile_linux_amd64": [
++            ":com.oracle.truffle.espresso.eden",
++            ":com.oracle.truffle.espresso.mokapot",
++            ":com.oracle.truffle.espresso.native",
++        ],
++        "@rules_mx//tools/cc:profile_linux_arm64": [
++            ":com.oracle.truffle.espresso.eden",
++            ":com.oracle.truffle.espresso.mokapot",
++            ":com.oracle.truffle.espresso.native",
++        ],
++        "@rules_mx//tools/cc:profile_macos_arm64": [
++            ":com.oracle.truffle.espresso.fatpot",
++            ":com.oracle.truffle.espresso.mokapot",
++            ":com.oracle.truffle.espresso.native",
++        ],
++        "//conditions:default": [],
++    }),
 +    visibility = ["//visibility:public"],
 +)
 +
@@ -769,6 +789,298 @@ new file mode 100644
 +    ],
 +)
 +
++mx_native_shared_project(
++    name = "com.oracle.truffle.espresso.eden",
++    testonly = False,
++    srcs = ["src/com.oracle.truffle.espresso.eden/src/eden.c"],
++    headers = ["src/com.oracle.truffle.espresso.eden/include/eden.h"],
++    profiles = {
++        "linux_amd64": {
++            "copts": [
++                "-g",
++                "-O3",
++                "-fPIC",
++                "-Wall",
++                "-Werror",
++                "-D_GNU_SOURCE",
++            ],
++            "filename": "libeden.so",
++            "link_inputs": [
++            ],
++            "linkopts": [
++                "-Wl,-soname,libeden.so",
++                "-ldl",
++            ],
++            "member": "libeden.so",
++        },
++        "linux_arm64": {
++            "copts": [
++                "-g",
++                "-O3",
++                "-fPIC",
++                "-Wall",
++                "-Werror",
++                "-D_GNU_SOURCE",
++            ],
++            "filename": "libeden.so",
++            "link_inputs": [
++            ],
++            "linkopts": [
++                "-Wl,-soname,libeden.so",
++                "-ldl",
++            ],
++            "member": "libeden.so",
++        },
++    },
++    root = "src/com.oracle.truffle.espresso.eden",
++    visibility = ["//visibility:public"],
++)
++
++mx_native_shared_project(
++    name = "com.oracle.truffle.espresso.fatpot",
++    testonly = False,
++    srcs = [
++        "src/com.oracle.truffle.espresso.mokapot/src/jvmti.c",
++        "src/com.oracle.truffle.espresso.mokapot/src/management.c",
++        "src/com.oracle.truffle.espresso.mokapot/src/management1.c",
++        "src/com.oracle.truffle.espresso.mokapot/src/management2.c",
++        "src/com.oracle.truffle.espresso.mokapot/src/management3.c",
++        "src/com.oracle.truffle.espresso.mokapot/src/management4.c",
++        "src/com.oracle.truffle.espresso.mokapot/src/mokapot.c",
++        "src/com.oracle.truffle.espresso.mokapot/src/mokapot_posix.c",
++        "src/com.oracle.truffle.espresso.mokapot/src/mokapot_windows.c",
++        "src/com.oracle.truffle.espresso.mokapot/src/os_posix.c",
++        "src/com.oracle.truffle.espresso.mokapot/src/os_windows.c",
++        "src/com.oracle.truffle.espresso.mokapot/src/structs.c",
++    ],
++    headers = [
++        "src/com.oracle.truffle.espresso.mokapot/include/graal_isolate_dynamic.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/jmm1.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/jmm2.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/jmm3.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/jmm4.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/jmm_common.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/jni.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/jni_unix.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/jni_windows.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/jvm.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/jvm_posix.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/jvm_windows.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/jvmti.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/jvmti_env.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/libjavavm_dynamic.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/management.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/mokapot.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/os.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/os_posix.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/os_windows.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/probe_option_type.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/structs.h",
++    ],
++    jdk_static_libraries = [
++        "attach",
++        "extnet",
++        "freetype",
++        "j2gss",
++        "j2pcsc",
++        "j2pkcs11",
++        "jaas",
++        "java",
++        "javajpeg",
++        "jimage",
++        "management",
++        "management_agent",
++        "management_ext",
++        "mlib_image",
++        "net",
++        "nio",
++        "osxkrb5",
++        "prefs",
++        "rmi",
++        "sleef",
++        "syslookup",
++        "verify",
++        "zip",
++    ],
++    profiles = {
++        "macos_arm64": {
++            "copts": [
++                "-Wall",
++                "-Werror",
++                "-std=c11",
++                "-DESPRESSO_NFI_STATIC",
++            ],
++            "filename": "libjvm.dylib",
++            "link_inputs": [
++            ],
++            "linkopts": [
++                "-Wl,-install_name,@rpath/libjvm.dylib",
++                "-Wl,-rpath,@loader_path/.",
++                "-Wl,-rpath,@loader_path/..",
++                "-Wl,-current_version,1.0.0",
++                "-Wl,-compatibility_version,1.0.0",
++            ],
++            "member": "darwin-aarch64/default/libjvm.dylib",
++        },
++    },
++    root = "src/com.oracle.truffle.espresso.mokapot",
++    visibility = ["//visibility:public"],
++)
++
++mx_native_shared_project(
++    name = "com.oracle.truffle.espresso.mokapot",
++    testonly = False,
++    srcs = [
++        "src/com.oracle.truffle.espresso.mokapot/src/jvmti.c",
++        "src/com.oracle.truffle.espresso.mokapot/src/management.c",
++        "src/com.oracle.truffle.espresso.mokapot/src/management1.c",
++        "src/com.oracle.truffle.espresso.mokapot/src/management2.c",
++        "src/com.oracle.truffle.espresso.mokapot/src/management3.c",
++        "src/com.oracle.truffle.espresso.mokapot/src/management4.c",
++        "src/com.oracle.truffle.espresso.mokapot/src/mokapot.c",
++        "src/com.oracle.truffle.espresso.mokapot/src/mokapot_posix.c",
++        "src/com.oracle.truffle.espresso.mokapot/src/mokapot_windows.c",
++        "src/com.oracle.truffle.espresso.mokapot/src/os_posix.c",
++        "src/com.oracle.truffle.espresso.mokapot/src/os_windows.c",
++        "src/com.oracle.truffle.espresso.mokapot/src/structs.c",
++    ],
++    headers = [
++        "src/com.oracle.truffle.espresso.mokapot/include/graal_isolate_dynamic.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/jmm1.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/jmm2.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/jmm3.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/jmm4.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/jmm_common.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/jni.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/jni_unix.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/jni_windows.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/jvm.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/jvm_posix.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/jvm_windows.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/jvmti.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/jvmti_env.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/libjavavm_dynamic.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/management.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/mokapot.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/os.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/os_posix.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/os_windows.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/probe_option_type.h",
++        "src/com.oracle.truffle.espresso.mokapot/include/structs.h",
++    ],
++    profiles = {
++        "linux_amd64": {
++            "copts": [
++                "-Wall",
++                "-Werror",
++                "-g",
++                "-std=c11",
++                "-D_GNU_SOURCE",
++            ],
++            "filename": "libjvm.so",
++            "link_inputs": [
++                "src/com.oracle.truffle.espresso.mokapot/mapfile-vers",
++            ],
++            "linkopts": [
++                "-Wl,-soname,libjvm.so",
++                "-Wl,--version-script,$(location src/com.oracle.truffle.espresso.mokapot/mapfile-vers)",
++            ],
++            "member": "linux-amd64/glibc/libjvm.so",
++        },
++        "linux_arm64": {
++            "copts": [
++                "-Wall",
++                "-Werror",
++                "-g",
++                "-std=c11",
++                "-D_GNU_SOURCE",
++            ],
++            "filename": "libjvm.so",
++            "link_inputs": [
++                "src/com.oracle.truffle.espresso.mokapot/mapfile-vers",
++            ],
++            "linkopts": [
++                "-Wl,-soname,libjvm.so",
++                "-Wl,--version-script,$(location src/com.oracle.truffle.espresso.mokapot/mapfile-vers)",
++            ],
++            "member": "linux-aarch64/glibc/libjvm.so",
++        },
++        "macos_arm64": {
++            "copts": [
++                "-Wall",
++                "-Werror",
++                "-std=c11",
++            ],
++            "filename": "libjvm.dylib",
++            "link_inputs": [
++            ],
++            "linkopts": [
++                "-Wl,-install_name,@rpath/libjvm.dylib",
++                "-Wl,-rpath,@loader_path/.",
++                "-Wl,-rpath,@loader_path/..",
++                "-Wl,-current_version,1.0.0",
++                "-Wl,-compatibility_version,1.0.0",
++            ],
++            "member": "darwin-aarch64/default/libjvm.dylib",
++        },
++    },
++    root = "src/com.oracle.truffle.espresso.mokapot",
++    visibility = ["//visibility:public"],
++)
++
++mx_native_shared_project(
++    name = "com.oracle.truffle.espresso.native",
++    testonly = False,
++    srcs = ["src/com.oracle.truffle.espresso.native/src/nespresso.c"],
++    headers = [
++        "src/com.oracle.truffle.espresso.native/include/jni.h",
++        "src/com.oracle.truffle.espresso.native/include/jni_unix.h",
++        "src/com.oracle.truffle.espresso.native/include/jni_windows.h",
++        "src/com.oracle.truffle.espresso.native/include/nespresso.h",
++    ],
++    profiles = {
++        "linux_amd64": {
++            "copts": [
++                "-Wall",
++                "-Werror",
++            ],
++            "filename": "libnespresso.so",
++            "link_inputs": [
++            ],
++            "linkopts": [
++            ],
++            "member": "linux-amd64/glibc/libnespresso.so",
++        },
++        "linux_arm64": {
++            "copts": [
++                "-Wall",
++                "-Werror",
++            ],
++            "filename": "libnespresso.so",
++            "link_inputs": [
++            ],
++            "linkopts": [
++            ],
++            "member": "linux-aarch64/glibc/libnespresso.so",
++        },
++        "macos_arm64": {
++            "copts": [
++                "-Wall",
++                "-Werror",
++            ],
++            "filename": "libnespresso.dylib",
++            "link_inputs": [
++            ],
++            "linkopts": [
++            ],
++            "member": "darwin-aarch64/default/libnespresso.dylib",
++        },
++    },
++    root = "src/com.oracle.truffle.espresso.native",
++    visibility = ["//visibility:public"],
++    deps = [":com.oracle.truffle.espresso.mokapot"],
++)
++
 +mx_project_files(
 +    name = "espresso-license-files",
 +    testonly = False,
@@ -841,6 +1153,73 @@ new file mode 100644
 +            "members": {
 +                "mx.espresso/launchers/java.cmd": "bin/java.cmd",
 +                "mx.espresso/launchers/javac.cmd": "bin/javac.cmd",
++            },
++        },
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_os_layout(
++    name = "ESPRESSO_JVM_STANDALONE_MOKAPOT_SUPPORT",
++    format = "dir",
++    os_layouts = {
++        "linux": {
++            "archive_imports": {
++                ":com.oracle.truffle.espresso.mokapot": "*/glibc/libjvm.so=libjvm.so",
++            },
++            "file_list": [
++            ],
++            "members": {
++            },
++        },
++        "macos": {
++            "archive_imports": {
++                ":com.oracle.truffle.espresso.fatpot": "*/default/libjvm.dylib=fatpot/libjvm.dylib",
++            },
++            "file_list": [
++            ],
++            "members": {
++            },
++        },
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_os_layout(
++    name = "ESPRESSO_PD_SUPPORT",
++    format = "dir",
++    os_layouts = {
++        "linux": {
++            "archive_imports": {
++                ":com.oracle.truffle.espresso.eden": "libeden.so=lib/libeden.so",
++            },
++            "file_list": [
++            ],
++            "members": {
++            },
++        },
++        "linux-musl": {
++            "archive_imports": {
++            },
++            "file_list": [
++            ],
++            "members": {
++            },
++        },
++        "macos": {
++            "archive_imports": {
++            },
++            "file_list": [
++            ],
++            "members": {
++            },
++        },
++        "windows": {
++            "archive_imports": {
++            },
++            "file_list": [
++            ],
++            "members": {
 +            },
 +        },
 +    },
