@@ -105,6 +105,43 @@ class ExportTest(unittest.TestCase):
             nodes["processing:PROCESSORS"]["archive_members"], ["processing:proc"]
         )
 
+    def test_resolved_graph_preserves_packed_source_owner_and_root_order(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            suite = Path(tmp).resolve() / "example"
+            metadata = suite / "mx.example"
+            metadata.mkdir(parents=True)
+            (suite / ".mx_vcs_root").touch()
+            sources = suite.parent / "packed"
+            sources.mkdir()
+            definition = {
+                "name": "example",
+                "mxversion": "7.89.0",
+                "projects": {
+                    "demo": {
+                        "javaCompliance": "17+",
+                        "sourceDirs": ["src", str(sources / "include")],
+                        "buildDependencies": ["INPUTS"],
+                    },
+                },
+                "libraries": {
+                    "INPUTS": {
+                        "packedResource": True,
+                        "optional": True,
+                        "preExtractedPath": str(sources),
+                    },
+                },
+            }
+            (metadata / "suite.py").write_text("suite = " + repr(definition))
+            result = self.run_mx("bazel-graph", suite=suite)
+            project = json.loads(result.stdout)["suites"]["example"]["example:demo"]
+            self.assertEqual(
+                project["source_inputs"],
+                [
+                    {"suite": "example", "path": "demo/src"},
+                    {"library": "example:INPUTS", "path": "include"},
+                ],
+            )
+
     def test_whole_suite_emits_independent_projects_and_packs_nested_layouts(self):
         with tempfile.TemporaryDirectory() as directory:
             suite = Path(directory).resolve()
