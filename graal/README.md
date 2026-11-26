@@ -72,7 +72,7 @@ tools/buildbuddy test --config=buildbuddy-rbe @graal//sulong:fixture_test/Os/vec
 tools/buildbuddy test --config=buildbuddy-rbe @graal//sulong:fixture_test
 ```
 
-The Linux x86-64 CMake fixtures have labels for a single variant, every variant of one source, and the whole mx project. The planner configures the upstream CMake project once per variant with the case list and settings from mx. It asks Ninja for each case’s compiler, linker and post-processing commands. Bazel caches those recipes and builds each installed output independently. The compiler comes from the pinned Graal LLVM SDK. The target headers, libraries and linker come from the Elide native toolchain.
+The Linux x86-64 CMake fixtures have labels for a single variant, every variant of one source, and the whole mx project. The planner configures the upstream CMake project with the case list and settings from mx. Packed sources use batches of up to 64 cases per variant. GCC parser cases expose their included C sources as individual action inputs. It asks Ninja for each case’s compiler, linker and post-processing commands. Bazel caches those recipes and builds each installed output independently. The compiler comes from the pinned Graal LLVM SDK. The target headers, libraries and linker come from the Elide native toolchain.
 
 The qualification test builds the three `sulong.Os.native` reference executables with the standard `rules_foreign_cc` CMake rule. It compares their output with the generated reference programs and with execution of the generated bitcode under the SDK’s `lli`. Running the upstream Sulong guest harness still requires its native runtime and distribution layouts. [BCR CMake and Ninja toolchains](https://registry.bazel.build/modules/rules_foreign_cc/0.17.0)
 

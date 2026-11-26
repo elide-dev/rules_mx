@@ -88,7 +88,7 @@ _case = rule(
     }),
 )
 
-def mx_sulong_cmake_suite(name, root, cases, variants, sdk, modules, languages, config = {}, source_package = None, testonly = True, visibility = None):
+def mx_sulong_cmake_suite(name, root, cases, variants, sdk, modules, languages, config = {}, source_package = None, case_inputs = {}, testonly = True, visibility = None):
     """Configure once per variant. Each installed fixture has its own Bazel action."""
     compatible = ["@platforms//os:linux", "@platforms//cpu:x86_64"]
     prefix = source_package or root + "/"
@@ -101,30 +101,33 @@ def mx_sulong_cmake_suite(name, root, cases, variants, sdk, modules, languages, 
         filename = variant if variant == "ref.out" else variant + ".bc"
         planner = name + ".cmake/" + variant
         plans = [planner + "/" + case + ".json" for case in cases]
-        _plan(
-            name = planner,
-            project = name,
-            variant = variant,
-            cases = cases,
-            plans = plans,
-            sdk = sdk,
-            cmakelists = root + "/CMakeLists.txt",
-            suite_module = modules + "/SulongTestSuite.cmake",
-            sources = srcs + companions + headers + recipes,
-            source_marker = source_package + "BUILD.bazel" if source_package else None,
-            config = config,
-            languages = languages,
-            exec_compatible_with = compatible,
-            target_compatible_with = compatible,
-            testonly = testonly,
-        )
+        batch_size = min(64, len(cases)) if source_package else len(cases)
+        for start in range(0, len(cases), batch_size):
+            batch = cases[start:start + batch_size]
+            _plan(
+                name = planner + ".part" + str(start) if batch_size < len(cases) else planner,
+                project = name,
+                variant = variant,
+                cases = batch,
+                plans = plans[start:start + batch_size],
+                sdk = sdk,
+                cmakelists = root + "/CMakeLists.txt",
+                suite_module = modules + "/SulongTestSuite.cmake",
+                sources = [prefix + case for case in batch] + companions + headers + recipes,
+                source_marker = source_package + "BUILD.bazel" if source_package else None,
+                config = config,
+                languages = languages,
+                exec_compatible_with = compatible,
+                target_compatible_with = compatible,
+                testonly = testonly,
+            )
         for case, plan in zip(cases, plans):
             target = name + "/" + case
             output = target + ".dir/" + filename
             _case(
                 name = target + "." + variant,
                 out = output,
-                srcs = [prefix + case] + companions,
+                srcs = [prefix + case] + [prefix + extra for extra in case_inputs.get(case, [])] + companions,
                 headers = headers,
                 plan = plan,
                 sdk = sdk,

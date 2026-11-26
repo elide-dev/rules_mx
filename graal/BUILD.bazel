@@ -313,6 +313,24 @@ java_test(
 )
 
 py_test(
+    name = "sulong_parser_fixture_test",
+    size = "small",
+    srcs = ["sulong_parser_fixture_test.py"],
+    args = [
+        "$(rootpath @graal//sulong:SULONG_PARSER_TORTURE)",
+        "$(rootpath :sulong_fixture_sdk)",
+        "$(rootpath @graal//sulong:parserTorture/gcc-5.2.0/gcc/testsuite/gcc.c-torture/compile/20031023-2.c.bitcode-O0)",
+    ],
+    data = [
+        ":sulong_fixture_sdk",
+        "@graal//sulong:SULONG_PARSER_TORTURE",
+        "@graal//sulong:parserTorture/gcc-5.2.0/gcc/testsuite/gcc.c-torture/compile/20031023-2.c.bitcode-O0",
+    ],
+    tags = ["manual"],
+    target_compatible_with = ["@platforms//os:linux", "@platforms//cpu:x86_64"],
+)
+
+py_test(
     name = "sulong_external_fixture_test",
     size = "small",
     srcs = ["sulong_external_fixture_test.py"],

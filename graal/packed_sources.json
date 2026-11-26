@@ -41,6 +41,27 @@
       "https://lafo.ssw.uni-linz.ac.at/pub/sulong-deps/gcc-5.2.0.tar.gz"
     ]
   },
+  "graal_sulong_gcc_source_gcc_c": {
+    "integrity": "sha512-0s8IjAh1SvDwbNNs74NUSgW/dcL6XZSG7sS6vs6LMiWESfBLy2UGvz6maBlIV0ulaBK8mIFJe6D1Rg+DWOj85Q==",
+    "subtree": "gcc-5.2.0/gcc/testsuite",
+    "urls": [
+      "https://lafo.ssw.uni-linz.ac.at/pub/sulong-deps/gcc-5.2.0.tar.gz"
+    ]
+  },
+  "graal_sulong_gcc_source_gcc_cpp": {
+    "integrity": "sha512-0s8IjAh1SvDwbNNs74NUSgW/dcL6XZSG7sS6vs6LMiWESfBLy2UGvz6maBlIV0ulaBK8mIFJe6D1Rg+DWOj85Q==",
+    "subtree": "gcc-5.2.0/gcc/testsuite",
+    "urls": [
+      "https://lafo.ssw.uni-linz.ac.at/pub/sulong-deps/gcc-5.2.0.tar.gz"
+    ]
+  },
+  "graal_sulong_gcc_source_parsertorture": {
+    "integrity": "sha512-0s8IjAh1SvDwbNNs74NUSgW/dcL6XZSG7sS6vs6LMiWESfBLy2UGvz6maBlIV0ulaBK8mIFJe6D1Rg+DWOj85Q==",
+    "subtree": "gcc-5.2.0/gcc/testsuite/gcc.c-torture/compile",
+    "urls": [
+      "https://lafo.ssw.uni-linz.ac.at/pub/sulong-deps/gcc-5.2.0.tar.gz"
+    ]
+  },
   "graal_sulong_llvm_test_suite": {
     "integrity": "sha512-jMm0/JfYehal9bC9kevIpOeGWlDb/ZjxRW9YMPoSGGAUW2uaqr9iTZ/V61Fk4qkJ58yyE3Xa9U3CTpkNt9cWug==",
     "urls": [

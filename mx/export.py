@@ -239,6 +239,7 @@ def _cmake_fixture_suite(project, sdk, packed_sources=None):
     packed = None
     cases = None
     source_label = None
+    case_inputs = {}
     if _external_sulong_tests(project):
         libraries = [d for d in project.buildDependencies if d.isPackedResourceLibrary() and d.suite.name != "mx"]
         if len(libraries) != 1 or libraries[0].qualifiedName() not in (packed_sources or {}):
@@ -248,6 +249,26 @@ def _cmake_fixture_suite(project, sdk, packed_sources=None):
         if not hasattr(project, "tests_from_source"):
             raise _UnsupportedLowering(f"{project.name}: Sulong needs target-aware external case discovery")
         cases = project.tests_from_source(source_dir, "linux", "amd64")
+        source_root = Path(source_dir).resolve()
+        for case in cases:
+            # Some torture tests include another translation unit by filename.
+            # Headers already come from the packed repository's header filegroup.
+            seen = {case}
+            todo = [case]
+            while todo:
+                file = source_root / todo.pop()
+                for include in re.findall(r'^\s*#\s*include\s*"([^"]+)"', file.read_text(errors="replace"), re.MULTILINE):
+                    path = (file.parent / include).resolve()
+                    if not path.is_relative_to(source_root):
+                        raise _UnsupportedLowering(f"{project.name}: include outside the packed source: {include}")
+                    if path.is_file():
+                        relative = path.relative_to(source_root).as_posix()
+                        if relative not in seen:
+                            seen.add(relative)
+                            todo.append(relative)
+            extra = sorted(name for name in seen - {case} if Path(name).suffix not in (".h", ".hpp", ".inc", ".def"))
+            if extra:
+                case_inputs[case] = extra
     matrix = _cmake_cases(project, cases)
     if (
         matrix["shared_object"]
@@ -273,7 +294,7 @@ def _cmake_fixture_suite(project, sdk, packed_sources=None):
     deps = set(declaration.get("buildDependencies", []))
     if packed:
         deps -= {packed.name, packed.qualifiedName()}
-    if deps - {"SULONG_HOME", "LINUX_AMD64_SUPPORT"}:
+    if deps - {"SULONG_HOME", "LINUX_AMD64_SUPPORT", "ALIAS_SUPPORT"}:
         raise _UnsupportedLowering("Sulong fixture needs another build-time dependency")
     settings.update(linux.get("cmakeConfig", {}))
     settings.update(target.get("cmakeConfig", {}))
@@ -293,6 +314,7 @@ def _cmake_fixture_suite(project, sdk, packed_sources=None):
         "name": project.name,
         "root": root.as_posix(),
         **({"source_package": source_label} if source_label else {}),
+        **({"case_inputs": case_inputs} if case_inputs else {}),
         "sdk": sdk,
         "config": settings,
         "modules": Path(modules.dir).relative_to(project.suite.dir).as_posix(),

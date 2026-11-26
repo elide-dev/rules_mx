@@ -186,7 +186,7 @@ use_repo(
 )
 
 packed_sources = use_extension("//graal:packed_sources.bzl", "packed_sources", dev_dependency = True)
-use_repo(packed_sources, "graal_sulong_nwcc_suite")
+use_repo(packed_sources, "graal_sulong_gcc_source_parsertorture", "graal_sulong_nwcc_suite")
 
 shaded_inputs = use_extension("//graal:shaded_inputs.bzl", "shaded_inputs", dev_dependency = True)
 use_repo(shaded_inputs, "graal_shaded_inputs")
