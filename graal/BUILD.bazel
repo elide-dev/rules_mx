@@ -479,11 +479,13 @@ py_test(
     srcs = ["sulong_standalone_install_test.py"],
     args = [
         "$(rootpath :sulong_runtime_fixture)",
+        "$(rootpath //tools/cc:llvm_objdump)",
         "$(rootpath @graal//sulong:SULONG_JVM_STANDALONE_RELEASE_ARCHIVE)",
         "$(rootpath @graal//sulong:SULONG_NATIVE_STANDALONE_RELEASE_ARCHIVE)",
     ],
     data = [
         ":sulong_runtime_fixture",
+        "//tools/cc:llvm_objdump",
         "@graal//sulong:SULONG_JVM_STANDALONE_RELEASE_ARCHIVE",
         "@graal//sulong:SULONG_NATIVE_STANDALONE_RELEASE_ARCHIVE",
     ],
