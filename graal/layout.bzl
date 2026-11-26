@@ -2,6 +2,7 @@
 
 load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
 load("@rules_java//java/common:java_info.bzl", "JavaInfo")
+load(":layout_info.bzl", _MxArchiveLayoutInfo = "MxArchiveLayoutInfo")
 
 def _static_archive_impl(ctx):
     libraries = [
@@ -22,10 +23,7 @@ static_archive = rule(
     attrs = {"library": attr.label(mandatory = True, providers = [CcInfo])},
 )
 
-MxArchiveLayoutInfo = provider(
-    doc = "Mapping of packaged archive paths to their declared Bazel files.",
-    fields = ["archive", "entries", "links", "jdk_homes", "primary", "resource_jar", "modes", "tar_trees", "image_groups"],
-)
+MxArchiveLayoutInfo = _MxArchiveLayoutInfo
 
 def _add_entry(entries, path, file):
     if path in entries:
@@ -268,9 +266,85 @@ _jdk_resource = rule(
     },
 )
 
+def _overlay_impl(ctx):
+    inputs = []
+    steps = []
+    for item in json.decode(ctx.attr.recipe):
+        if "link" in item:
+            steps.append(item)
+            continue
+        dependency = ctx.attr.deps[item.pop("input")]
+        layout = dependency[MxArchiveLayoutInfo]
+        item["label"] = str(dependency.label)
+        if layout.archive:
+            inputs.append(layout.archive)
+            item["archive"] = layout.archive.path
+        else:
+            modes = getattr(layout, "modes", {})
+            item["files"] = [[n, f.path, modes.get(n, "644")] for n, f in sorted(layout.entries.items())]
+            inputs.extend(layout.entries.values())
+        steps.append(item)
+    recipe = ctx.actions.declare_file(ctx.label.name + ".layout.json")
+    if ctx.attr.file_list_entry:
+        tree = ctx.actions.declare_directory(ctx.label.name + ".files")
+        jar = ctx.actions.declare_file(ctx.label.name + ".resources.jar")
+        manifest = ctx.actions.declare_file(ctx.label.name + ".metadata/files")
+        digest = ctx.actions.declare_file(ctx.label.name + ".metadata/sha256")
+        ctx.actions.write(recipe, json.encode({"steps": steps, "file_list_entry": ctx.attr.file_list_entry, "hash_entry": ctx.attr.hash_entry}))
+        ctx.actions.run(
+            executable = ctx.executable._pack,
+            inputs = inputs + [recipe],
+            outputs = [tree, jar, manifest, digest],
+            arguments = [recipe.path, tree.path, jar.path, manifest.path, digest.path],
+            mnemonic = "MxArchiveResources",
+        )
+        return [
+            DefaultInfo(files = depset([tree])),
+            JavaInfo(output_jar = jar, compile_jar = None),
+            MxArchiveLayoutInfo(archive = None, resource_jar = jar, entries = {ctx.attr.file_list_entry: manifest, ctx.attr.hash_entry: digest}),
+        ]
+    ctx.actions.write(recipe, json.encode(steps))
+    archive = ctx.actions.declare_file(ctx.label.name.lower().replace("_", "-") + ".tar")
+    manifest = ctx.actions.declare_file(archive.basename + ".filelist")
+    ctx.actions.run(
+        executable = ctx.executable._pack,
+        inputs = inputs + [recipe],
+        outputs = [archive, manifest],
+        arguments = [recipe.path, archive.path, manifest.path],
+        mnemonic = "MxInstallOverlay",
+    )
+    return [
+        DefaultInfo(files = depset([archive, manifest])),
+        OutputGroupInfo(archive = depset([archive]), file_list = depset([manifest])),
+        MxArchiveLayoutInfo(archive = archive, entries = {}, tar_trees = [(archive, "")]),
+    ]
+
+_overlay = rule(
+    implementation = _overlay_impl,
+    attrs = {
+        "deps": attr.label_list(providers = [MxArchiveLayoutInfo]),
+        "recipe": attr.string(mandatory = True),
+        "file_list_entry": attr.string(),
+        "hash_entry": attr.string(),
+        "_pack": attr.label(default = Label("//mx:install_overlay"), executable = True, cfg = "exec"),
+    },
+)
+
 def mx_os_layout(name, os_layouts, **kwargs):
     """Select the mx layout using the target operating system."""
     branches = {Label("//tools/cc:profile_" + os) if "_" in os else Label("//tools/cc:linux_musl") if os == "linux-musl" else "@platforms//os:" + os: recipe for os, recipe in os_layouts.items()}
+    if all(["overlay" in recipe for recipe in branches.values()]):
+        kwargs.pop("format")
+        _overlay(
+            name = name,
+            file_list_entry = select({os: recipe.get("file_list_entry", "") for os, recipe in branches.items()} | {"//conditions:default": ""}),
+            hash_entry = select({os: recipe.get("hash_entry", "") for os, recipe in branches.items()} | {"//conditions:default": ""}),
+            deps = select({os: recipe["deps"] for os, recipe in branches.items()} | {"//conditions:default": []}),
+            recipe = select({os: json.encode(recipe["overlay"]) for os, recipe in branches.items()} | {"//conditions:default": "[]"}),
+            target_compatible_with = select({os: [] for os in branches} | {"//conditions:default": ["@platforms//:incompatible"]}),
+            **kwargs
+        )
+        return
     if all(["jdk" in recipe for recipe in branches.values()]):
         kwargs.pop("format")
         _jdk_resource(

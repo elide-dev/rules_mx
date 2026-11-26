@@ -1,7 +1,8 @@
 """Build mx CMake/Ninja projects with their declared compiler drivers and inputs."""
 
 load("@rules_foreign_cc//foreign_cc:defs.bzl", "cmake")
-load("//graal:layout.bzl", "mx_archive_layout")
+load("@rules_python//python:py_binary.bzl", "py_binary")
+load("//graal:layout.bzl", "MxArchiveLayoutInfo", "mx_archive_layout")
 load("//mx:project_files.bzl", "mx_project_files")
 
 def _installed_impl(ctx):
@@ -9,19 +10,46 @@ def _installed_impl(ctx):
     files = [f for f in ctx.attr.project.files.to_list() if f.path.endswith(suffix)]
     if len(files) != 1:
         fail("Expected one installed CMake output " + ctx.attr.member)
-    return [DefaultInfo(files = depset(files))]
+    result = [DefaultInfo(files = depset(files))]
+    if ctx.attr.with_archive:
+        [archive] = [f for f in ctx.attr.project.files.to_list() if f.path.endswith(suffix + ".tar")]
+        result.append(MxArchiveLayoutInfo(archive = archive, entries = {}, tar_trees = [(archive, "")]))
+    return result
 
 _installed = rule(
     implementation = _installed_impl,
-    attrs = {"project": attr.label(mandatory = True), "member": attr.string(mandatory = True)},
+    attrs = {"project": attr.label(mandatory = True), "member": attr.string(mandatory = True), "with_archive": attr.bool()},
 )
 
-def mx_cmake_project(name, srcs, compiler, config, include_dirs, profiles, testonly = False, visibility = None):
+def mx_cmake_project(name, srcs, compiler, config, include_dirs, profiles, testonly = False, visibility = None, source_subdir = "", wrapper = None, max_jobs = 0, directories = {}):
     """Apply the selected mx CMake configuration, build targets, and installed results."""
     src_group = name + ".cmake_sources"
     native.filegroup(name = src_group, srcs = srcs, testonly = testonly)
     data = [compiler, Label("//tools/cc:target_config"), Label("//tools/cc:all_files")]
+    if source_subdir:
+        data.append(Label("//mx:pack_layout"))
+    if wrapper:
+        py_binary(name = name + ".compiler_wrapper", main = wrapper, srcs = [wrapper], testonly = testonly)
+        data.append(":" + name + ".compiler_wrapper")
     cache = dict(config)
+    installations = {}
+    for key, item in directories.items():
+        if "source" in item:
+            data.append(item["source"])
+            cache[key] = "$$EXT_BUILD_ROOT$$/" + native.package_relative_label(item["source"]).workspace_root + "/src"
+        elif "files" in item:
+            group = name + ".headers/" + key
+            mx_archive_layout(name = group, format = "dir", members = item["files"], testonly = testonly)
+            data.append(":" + group)
+            cache[key] = "$(execpath :%s)" % group
+        else:
+            archive = item["archive"]
+            if archive not in installations:
+                group = name + ".installed/" + key
+                mx_archive_layout(name = group, format = "dir", members = {}, archive_imports = {archive: "="}, testonly = testonly)
+                installations[archive] = ":" + group
+                data.append(":" + group)
+            cache[key] = "$(execpath %s)/%s" % (installations[archive], item["directory"])
     for key, spec in include_dirs.items():
         inc = name + ".include/" + key
         mx_archive_layout(name = inc, format = "dir", members = {}, archive_imports = {spec[0]: spec[1] + "/*="}, testonly = testonly)
@@ -34,11 +62,12 @@ def mx_cmake_project(name, srcs, compiler, config, include_dirs, profiles, testo
         "CMAKE_CXX_COMPILER": "$(execpath %s)/bin/c++" % compiler,
         "CMAKE_AR": "$(execpath %s)/bin/ar" % compiler,
         "CMAKE_RANLIB": "$(execpath %s)/bin/ranlib" % compiler,
-        "CMAKE_C_FLAGS": cc_flags + config_file,
-        "CMAKE_CXX_FLAGS": cc_flags + config_file,
+        "CMAKE_C_FLAGS": cc_flags + "$$EXT_BUILD_ROOT$$/" + config_file,
+        "CMAKE_CXX_FLAGS": cc_flags + "$$EXT_BUILD_ROOT$$/" + config_file,
     })
     variants = {}
     modes = {}
+    installed = {}
     for profile, recipe in profiles.items():
         condition = Label("//tools/cc:profile_" + profile)
         rule_name = name + ".cmake/" + profile
@@ -50,11 +79,13 @@ def mx_cmake_project(name, srcs, compiler, config, include_dirs, profiles, testo
             members[":" + label] = member
             if (member.endswith(".so") or member.endswith(".dylib")) or ".so." in member.rpartition("/")[2]:
                 install_modes[member] = "755" if profile == "macos_arm64" else "644"
+
         # Native CMake otherwise asks xcrun for the executor's default SDK.
         if profile == "macos_arm64":
             sdk = Label("@elide_toolchain_darwin_arm64//:all_files")
             sysroot = "$$EXT_BUILD_ROOT$$/" + sdk.workspace_root + "/apple-sdk"
             platform_config = {"CMAKE_OSX_SYSROOT": sysroot}
+
             # The Sulong driver delegates to xcrun. CMake's compiler probes may
             # omit CMAKE_OSX_SYSROOT until they have identified the compiler.
             for key in ("CMAKE_C_FLAGS", "CMAKE_CXX_FLAGS"):
@@ -62,12 +93,43 @@ def mx_cmake_project(name, srcs, compiler, config, include_dirs, profiles, testo
         else:
             # CMake otherwise reads /etc/debian_version to choose shared library permissions.
             platform_config = {"CMAKE_INSTALL_SO_NO_EXE": "ON"}
+        directories = recipe.get("directories", [])
+        platform_config = cache | platform_config
+        for key, value in recipe["config"].items():
+            if value == "@SOURCE_PREFIX_MAP@":
+                source = "$$EXT_BUILD_ROOT$$/" + native.package_relative_label(srcs[0]).workspace_root + "/src"
+                flags = "-ffile-prefix-map=" + source + "=llvm-project/src -ffile-prefix-map=$${BUILD_TMPDIR}=llvm-project"
+                platform_config[key] = platform_config.get(key, "") + " " + flags
+            elif key == "CMAKE_INSTALL_RPATH":
+                # The dynamic loader expands $ORIGIN when the installed library is loaded.
+                platform_config[key] = value.replace("$ORIGIN", r"\$$ORIGIN")
+            else:
+                platform_config[key] = value.replace("@COMPILER@", "$(execpath %s)" % compiler).replace("@WRAPPER@", "$(execpath :%s.compiler_wrapper)" % name)
+        if directories:
+            directory = directories[0]
+            _installed(name = rule_name + ".installed", project = ":" + rule_name, member = directory, with_archive = True, testonly = testonly)
+            installed[condition] = ":" + rule_name + ".installed"
+            platform_config["Python3_EXECUTABLE"] = "$$EXT_BUILD_ROOT$$/$(PYTHON3)"
+
+            # rules_foreign_cc owns CMAKE_INSTALL_PREFIX. Preserve the directory
+            # name under which mx publishes that complete installation.
+            stage = 'mv "$$INSTALLDIR" "$$BUILD_TMPDIR/mx-install" && mkdir -p "$$INSTALLDIR" && mv "$$BUILD_TMPDIR/mx-install" "$$INSTALLDIR/%s"' % directories[0]
+            stage += '\n"$$EXT_BUILD_ROOT$$/$(execpath %s)" --materialize-install-links "$$INSTALLDIR/%s" "$$EXT_BUILD_ROOT$$/%s/src" "$$BUILD_TMPDIR"' % (Label("//mx:pack_layout"), directory, native.package_relative_label(srcs[0]).workspace_root)
+            stage += '\n"$$EXT_BUILD_ROOT$$/$(execpath %s)" --archive-install-tree "$$INSTALLDIR/%s.tar" "%s" "$$INSTALLDIR/%s"' % (Label("//mx:pack_layout"), directory, directory, directory)
+        else:
+            stage = "\n".join(['mkdir -p "$$INSTALLDIR/%s" && cp -L "%s" "$$INSTALLDIR/%s"' % (m.rpartition("/")[0] or ".", m, m) for m in recipe["members"]])
         cmake(
             name = rule_name,
             lib_name = name + "-" + profile,
             lib_source = ":" + src_group,
-            cache_entries = cache | platform_config | recipe["config"],
+            cache_entries = platform_config,
+            working_directory = "src/" + source_subdir if source_subdir else "",
             build_data = data,
+            toolchains = [Label("@rules_python//python:current_py_toolchain")] if source_subdir else [],
+            env = {"CMAKE_BUILD_PARALLEL_LEVEL": str(max_jobs)} if max_jobs else {},
+            # CMake selects the mx C or C++ driver per target. Each driver supplies
+            # its language runtime when linking.
+            features = ["-default_link_libs"],
             generate_args = ["-G Ninja"],
             generate_crosstool_file = False,
             exec_compatible_with = [
@@ -76,14 +138,20 @@ def mx_cmake_project(name, srcs, compiler, config, include_dirs, profiles, testo
             ],
             targets = recipe["targets"],
             install = False,
-            postfix_script = "\n".join(['mkdir -p "$$INSTALLDIR/%s" && cp -L "%s" "$$INSTALLDIR/%s"' % (m.rpartition("/")[0] or ".", m, m) for m in recipe["members"]]),
+            postfix_script = stage,
             out_include_dir = "",
-            out_data_files = recipe["members"],
+            out_data_files = recipe["members"] + [d + ".tar" for d in directories],
+            out_data_dirs = directories,
+            # The libraries are inside the declared install tree.
+            out_headers_only = bool(directories),
             testonly = testonly,
             target_compatible_with = select({condition: [], "//conditions:default": ["@platforms//:incompatible"]}),
         )
         variants[condition] = members
         modes[condition] = install_modes
+    if installed:
+        native.alias(name = name, actual = select(installed), visibility = visibility, testonly = testonly)
+        return
     mx_project_files(
         name = name,
         members = select(variants | {"//conditions:default": {}}),

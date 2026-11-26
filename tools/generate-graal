@@ -2238,6 +2238,8 @@ def prepare_suite(suite, stage):
             [
                 "--whole-project",
                 "com.oracle.truffle.llvm.toolchain.launchers",
+                "--layout-dep", "sdk:LLVM_TOOLCHAIN=//sdk:LLVM_TOOLCHAIN",
+                "--cmake-source", "sdk:LLVM_ORG_SRC=@graal_sdk_llvm_org_src//:runtimes_sources",
                 "--sulong-bootstrap-ninja", str(stage / "gcc.ninja_template"),
                 "--sulong-packed-source", "sulong:NWCC_SUITE", "@graal_sulong_nwcc_suite//:",
                 str(bazel_source("@graal_sulong_nwcc_suite//:BUILD.bazel").parent),

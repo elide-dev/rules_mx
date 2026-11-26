@@ -1445,8 +1445,70 @@ def _cmake_native_project(project):
     )
 
 
-def _cmake_project_recipe(project, pending, layout_bindings):
+def _external_cmake_recipe(project, source_name, bindings, pending):
     attrs = project._orig_attrs
+    unsupported = attrs.keys() - {
+        "subDir", "vpath", "sourceDir", "cmakeSubdir", "symlinkSource", "class", "toolchain",
+        "max_jobs", "cmakeConfig", "ninja_targets", "ninja_install_targets", "os", "buildDependencies",
+        "clangFormat", "license", "testProject",
+    }
+    if unsupported or not str(attrs.get("max_jobs", 1)).isdecimal():
+        raise _UnsupportedLowering(f"{project.name}: unsupported external CMake settings {sorted(unsupported)}")
+    compiler = mx.dependency(attrs["toolchain"], context=project)
+    launchers = [dep for dep in compiler.buildDependencies if _bootstrap_launcher(dep)]
+    source = mx.dependency(source_name, context=project)
+    labels = bindings.get(source.qualifiedName(), [])
+    if len(labels) != 1 or len(launchers) != 1 or not _resource_path(attrs["cmakeSubdir"]):
+        raise _UnsupportedLowering(f"{project.name}: bind the external CMake source and compiler")
+    accounted = {compiler.qualifiedName(), source.qualifiedName(), "sdk:LLVM_TOOLCHAIN", "mx:NINJA_SYNTAX"}
+    pending.append(compiler)
+    profiles = {}
+    wrapper = None
+    for os_name, profile in (("linux", "linux_amd64"), ("linux", "linux_arm64"), ("darwin", "macos_arm64")):
+        branches = attrs.get("os", {})
+        branch = branches.get(os_name, branches.get("<others>", {}))
+        config = dict(attrs["cmakeConfig"]) | branch.get("cmakeConfig", {})
+        prefix = config.pop("CMAKE_INSTALL_PREFIX")
+        if branch.get("results") != [prefix] or not _resource_path(prefix):
+            raise _UnsupportedLowering(f"{project.name}: expected an installed CMake directory")
+        for key, value in list(config.items()):
+            expression = f"<sulong_prefix:{project.name}>"
+            if expression in value:
+                if value != "-ffile-prefix-map=" + expression + "=llvm-project":
+                    raise _UnsupportedLowering(f"{project.name}: unsupported compiler path mapping {value}")
+                config[key] = "@SOURCE_PREFIX_MAP@"
+            elif key == "CMAKE_CXX_COMPILER_LAUNCHER":
+                match = re.fullmatch(r"<path:([^>]+)>/([^/]+[.]py)", value)
+                if not match:
+                    raise _UnsupportedLowering(f"{project.name}: unsupported CMake launcher {value}")
+                distribution = mx.dependency(match[1], context=project)
+                files = [entry.get("path") for dest, entry in distribution._walk_layout()
+                         if dest == "./" and entry["source_type"] == "file" and Path(entry["path"]).name == match[2]]
+                if len(files) != 1 or not _resource_path(files[0]) or wrapper not in (None, files[0]):
+                    raise _UnsupportedLowering(f"{project.name}: expected a single Python compiler wrapper")
+                wrapper = files[0]
+                accounted.add(distribution.qualifiedName())
+                config[key] = "@WRAPPER@"
+            elif value == "<path:LLVM_TOOLCHAIN>/bin/llvm-libtool-darwin":
+                config[key] = "@COMPILER@/.bootstrap/llvm/bin/llvm-libtool-darwin"
+            elif "<" in value:
+                raise _UnsupportedLowering(f"{project.name}: unresolved CMake setting {key}={value}")
+        targets = [t for k in ("ninja_targets", "ninja_install_targets")
+                   for t in attrs.get(k, []) + branch.get(k, [])]
+        profiles[profile] = {"config": config, "directories": [prefix], "members": [], "targets": targets}
+    remaining = {dep.qualifiedName() for dep in project.buildDependencies} - accounted
+    if remaining:
+        raise _UnsupportedLowering(f"{project.name}: unbound CMake build inputs {sorted(remaining)}")
+    return {"name": project.name, "compiler": ":" + launchers[0].name, "srcs": labels,
+            "source_subdir": attrs["cmakeSubdir"], "wrapper": wrapper, "profiles": profiles, "max_jobs": int(attrs.get("max_jobs", 1)),
+            "config": {}, "include_dirs": {}, "testonly": project.is_test_project()}
+
+
+def _cmake_project_recipe(project, pending, layout_bindings, source_bindings):
+    attrs = project._orig_attrs
+    external = re.fullmatch(r"<path:([^>]+)>", attrs.get("sourceDir", ""))
+    if external and attrs.get("symlinkSource") and attrs.get("cmakeSubdir"):
+        return _external_cmake_recipe(project, external[1], source_bindings, pending)
     if attrs.keys() - {
         "class",
         "subDir",
@@ -1459,6 +1521,7 @@ def _cmake_project_recipe(project, pending, layout_bindings):
         "ninja_install_targets",
         "results",
         "os",
+        "os_arch",
         "cmakeConfig",
         "testProject",
     }:
@@ -1491,13 +1554,37 @@ def _cmake_project_recipe(project, pending, layout_bindings):
     srcs = sorted(
         f.relative_to(root).as_posix() for f in directory.rglob("*") if f.is_file()
     )
-    config, includes = {}, {}
+    config, includes, directories, substitutions = {}, {}, {}, {}
     accounted = {compiler.qualifiedName()}
     for key, value in attrs.get("cmakeConfig", {}).items():
-        ref = re.fullmatch(r"<path:([^>]+)>/([\w./-]+)", value)
+        if value in ("<os>", "<arch>"):
+            substitutions[key] = value
+            continue
+        ref = re.fullmatch(r"<path:([^>]+)>(?:/([\w.+/-]+))?", value)
         if ref:
             dep = mx.dependency(ref[1], context=project)
-            if dep.suite == project.suite and _source_project(dep):
+            if not ref[2] and dep.qualifiedName() in source_bindings:
+                (source,) = source_bindings[dep.qualifiedName()]
+                directories[key] = {"source": source}
+                accounted.add(dep.qualifiedName())
+                continue
+            if ref[2] and not _resource_path(ref[2]):
+                raise _UnsupportedLowering(f"{project.name}: invalid CMake input path {ref[2]}")
+            if dep.suite == project.suite and _cmake_native_project(dep) and ref[2]:
+                include = Path(dep.dir) / ref[2]
+                files = {f.relative_to(root).as_posix(): f.relative_to(include).as_posix()
+                         for f in sorted(include.rglob("*")) if f.is_file()}
+                if not files:
+                    raise _UnsupportedLowering(f"{project.name}: missing CMake source directory {include}")
+                directories[key] = {"files": files}
+                accounted.add(dep.qualifiedName())
+                continue
+            if dep.suite == project.suite and type(dep).__name__ == "LayoutTARDistribution" and ref[2]:
+                pending.append(dep)
+                directories[key] = {"archive": ":" + dep.name, "directory": ref[2]}
+                accounted.add(dep.qualifiedName())
+                continue
+            if ref[2] and dep.suite == project.suite and _source_project(dep):
                 pending.append(dep)
                 label = ":" + dep.name
             elif dep.qualifiedName() in layout_bindings:
@@ -1531,6 +1618,11 @@ def _cmake_project_recipe(project, pending, layout_bindings):
         ("linux", "linux_arm64"),
         ("darwin", "macos_arm64"),
     ):
+        arch = "amd64" if profile == "linux_amd64" else "aarch64"
+        os_arch = attrs.get("os_arch", {})
+        architecture = os_arch.get(os_name, os_arch.get("<others>", {}))
+        if architecture.get(arch, architecture.get("<others>", {})):
+            raise _UnsupportedLowering(f"{project.name}: unbound CMake settings for {os_name}/{arch}")
         branches = attrs.get("os", {})
         branch = branches.get(os_name, branches.get("<others>", {}))
         if branch.keys() - {"cmakeConfig", "ninja_targets", "results"}:
@@ -1560,18 +1652,15 @@ def _cmake_project_recipe(project, pending, layout_bindings):
         targets = list(
             map(member, branch.get("ninja_targets", attrs.get("ninja_targets", [])))
         )
-        if (
-            not members
-            or not targets
-            or attrs.get("ninja_install_targets") != ["install"]
-        ):
+        install_targets = attrs.get("ninja_install_targets", [])
+        if not members or not targets or install_targets not in ([], ["install"]):
             raise _UnsupportedLowering(
-                f"{project.name}: CMake needs an explicit install plan"
+                f"{project.name}: CMake requires declared build targets and result paths"
             )
         profiles[profile] = {
-            "config": branch.get("cmakeConfig", {}),
+            "config": branch.get("cmakeConfig", {}) | {k: (os_name if v == "<os>" else arch) for k, v in substitutions.items()},
             "members": members,
-            "targets": targets + ["install"],
+            "targets": targets + install_targets,
         }
     return {
         "name": project.name,
@@ -1579,6 +1668,7 @@ def _cmake_project_recipe(project, pending, layout_bindings):
         "compiler": ":" + launchers[0].name,
         "config": config,
         "include_dirs": includes,
+        "directories": directories,
         "profiles": profiles,
         "testonly": project.is_test_project(),
     }
@@ -2120,9 +2210,60 @@ def _source_layout_branch(dist, layout, os_name):
     }, projects
 
 
+def _platform_install_overlay(dist, pending):
+    attrs = dist._orig_attrs
+    if (not dist.fileListPurpose or type(dist).__name__ != "LayoutTARDistribution"
+            or dist.fileListEntry or dist.hashEntry or dist.excludedLibs or dist.compress
+            or attrs.keys() & {"arch", "os_arch", "buildDependencies", "dependencies"}):
+        raise _UnsupportedLowering(f"{dist.name}: unsupported mixed platform layout")
+    recipes = {}
+    for system, target in (("linux", "linux"), ("darwin", "macos")):
+        branches = attrs.get("os", {})
+        branch = branches.get(system, branches.get("<others>", {"layout": {}}))
+        if branch.keys() != {"layout"}:
+            raise _UnsupportedLowering(f"{dist.name}: unsupported layout for {system}")
+        dependencies, steps = [], []
+        def substitute(path):
+            extension = ".dylib" if system == "darwin" else ".so"
+            path = re.sub(r"<lib:([\w.+-]+)>", lambda m: "lib" + m[1] + extension, path)
+            return re.sub(r"<libv:([\w+-]+)\.([0-9.]+)>",
+                          lambda m: "lib" + m[1] + ("." + m[2] + extension if system == "darwin" else extension + "." + m[2]), path)
+        for layout in (attrs["layout"], branch["layout"]):
+            for dest, source in mx.LayoutDistribution._walk_static_layout(layout, dist.name, distribution_object=dist, context=dist):
+                dest = substitute(dest.removeprefix("./"))
+                if dest and not _resource_path(dest.rstrip("/")):
+                    raise _UnsupportedLowering(f"{dist.name}: unsupported overlay destination {dest}")
+                kind = source["source_type"]
+                if kind == "link":
+                    link = substitute(source["path"])
+                    if not _resource_path(link):
+                        raise _UnsupportedLowering(f"{dist.name}: unsupported overlay link {link}")
+                    steps.append({"destination": dest, "link": link})
+                    continue
+                if kind not in ("dependency", "extracted-dependency") or source.get("optional") or source.keys() - {"dependency", "source_type", "path", "exclude", "optional", "_str_"}:
+                    raise _UnsupportedLowering(f"{dist.name}: unsupported overlay source {source['_str_']}")
+                dep = mx.dependency(source["dependency"], context=dist)
+                if dep.suite != dist.suite or not (_cmake_native_project(dep) or type(dep).__name__ == "LayoutTARDistribution"):
+                    raise _UnsupportedLowering(f"{dist.name}: bind overlay input {dep.qualifiedName()}")
+                pattern = substitute(source.get("path") or "*")
+                if not _resource_path(pattern.replace("*", "file")):
+                    raise _UnsupportedLowering(f"{dist.name}: unsupported overlay selector {pattern}")
+                exclude = source.get("exclude", [])
+                label = ":" + dep.name
+                if label not in dependencies:
+                    dependencies.append(label)
+                    pending.append(dep)
+                steps.append({"destination": dest, "input": dependencies.index(label), "pattern": pattern,
+                              "exclude": [exclude] if isinstance(exclude, str) else exclude})
+        recipes[target] = {"deps": dependencies, "overlay": steps}
+    return {"name": dist.name, "format": "tar", "os_layouts": recipes, "testonly": dist.is_test_distribution()}
+
+
 def _os_layout(dist, pending):
     """Lower OS-specific source layouts without expanding them for the Gazelle host."""
     attrs = dist._orig_attrs
+    if "layout" in attrs and "os" in attrs:
+        return _platform_install_overlay(dist, pending)
     if (
         attrs.keys()
         & {"arch", "layout", "buildDependencies", "dependencies"}
@@ -2227,12 +2368,19 @@ def _tar_layout(dist, pending, mappings, archives):
         ):
             dep = mx.dependency(source["dependency"], context=dist)
             inputs.add(dep)
+            if kind == "dependency" and not path and _default_native(dep) and dep.suite == dist.suite:
+                if destination and not _resource_path(destination.rstrip("/")):
+                    raise _UnsupportedLowering(f"{dist.name}: invalid native result destination {destination!r}")
+                pending.append(dep)
+                member = destination + "{basename}" if directory else destination
+                imports.setdefault(":" + dep.name, []).append("{primary}=" + member)
+                continue
             if (
                 kind == "dependency"
                 and path == "*"
                 and directory
                 and dep.suite == dist.suite
-                and (_wat_project(dep) or _source_project(dep) or _external_sulong_tests(dep) or _in_tree_sulong_tests(dep))
+                and (_cmake_native_project(dep) or _wat_project(dep) or _source_project(dep) or _external_sulong_tests(dep) or _in_tree_sulong_tests(dep))
             ):
                 if destination and not _resource_path(destination.rstrip("/")):
                     raise _UnsupportedLowering(
@@ -2393,6 +2541,32 @@ def _platform_native_layout(dist, pending):
             if not _resource_path(result.rstrip("/")):
                 raise _UnsupportedLowering(f"{dist.name}: invalid resource path {path}")
             return result
+
+        sources = list(mx.LayoutDistribution._walk_static_layout(
+            attrs["layout"], dist.name, distribution_object=dist, context=dist))
+        if metadata and sources and all(source["source_type"] == "extracted-dependency" for _, source in sources):
+            if attrs.get("defaultDereference") != "always":
+                raise _UnsupportedLowering(f"{dist.name}: resource archives require an explicit dereference policy")
+            deps, overlay = [], []
+            for destination, source in sources:
+                dep = mx.dependency(source["dependency"], context=dist)
+                if (dep.suite != dist.suite or type(dep).__name__ != "LayoutTARDistribution"
+                        or source.get("optional") or not destination.endswith("/")
+                        or source.keys() - {"source_type", "_str_", "path", "dependency", "optional"}):
+                    raise _UnsupportedLowering(f"{dist.name}: unsupported extracted resource {source['_str_']}")
+                pattern = re.sub(r"<libv:([*\w+-]+)\.([0-9.]+)>",
+                                 lambda m: "lib" + m[1] + ("." + m[2] + ".dylib" if os_name == "darwin" else ".so." + m[2]), source["path"])
+                if not _resource_path(pattern.replace("*", "file")):
+                    raise _UnsupportedLowering(f"{dist.name}: unsupported resource selector {pattern}")
+                pending.append(dep)
+                label = ":" + dep.name
+                if label not in deps:
+                    deps.append(label)
+                overlay.append({"destination": resolve(destination), "input": deps.index(label), "pattern": pattern,
+                                "exclude": [], "dereference": True})
+            profiles[profile] = {"file_list_entry": resolve(dist.fileListEntry), "hash_entry": resolve(dist.hashEntry),
+                                 "deps": deps, "overlay": overlay}
+            continue
 
         imports, members = {}, {}
         for destination, source in mx.LayoutDistribution._walk_static_layout(
@@ -2576,6 +2750,9 @@ def _install_layout(dist, pending, mappings, options, bindings):
                 raise _UnsupportedLowering(f"{dist.name}: duplicate JDK home {dest}")
             homes.append({"directory": dest, "exclude": source.get("exclude", [])})
             continue
+        if (source.get("dereference") == "never" and directory
+                and ((kind == "extracted-dependency" and path is None) or (kind == "dependency" and path == "*"))):
+            allowed.add("dereference")
         if source.keys() - allowed:
             raise _UnsupportedLowering(
                 f"{dist.name}: unsupported install attributes for {source['_str_']}"
@@ -2684,8 +2861,7 @@ def _install_layout(dist, pending, mappings, options, bindings):
             if (
                 _thin_launcher(dep)
                 and kind == "dependency"
-                and path
-                == ("<os>-<arch>/<multitarget_libc_selection>/<exe:" + dep.name + ">")
+                and path in (None, "<os>-<arch>/<multitarget_libc_selection>/<exe:" + dep.name + ">")
             ):
                 # Linux and macOS use the unadorned executable name.
                 dest = re.sub(r"<exe:([A-Za-z0-9_.+-]+)>", r"\1", dest)
@@ -2939,6 +3115,7 @@ def bazel_buildfile(args):
         action="store_true",
         help="expose same-suite source JAR distributions as Java classpaths in Gazelle",
     )
+    parser.add_argument("--cmake-source", action="append", default=[], metavar="SUITE:NAME=LABEL", help="bind an external CMake source archive to its Bazel source filegroup")
     parser.add_argument("--sulong-bootstrap-ninja", metavar="FILE", help="mx GCC Ninja rule template for the bootstrap launchers")
     parser.add_argument(
         "--standalone-source-provenance", metavar="LABEL",
@@ -3296,6 +3473,7 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
         parser.error("--classpath-dists requires --gazelle")
     mappings = _mappings(parser, options.processor_plugin, "--processor-plugin")
     java_deps = _mappings(parser, options.java_dep, "--java-dep")
+    cmake_sources = _mappings(parser, options.cmake_source, "--cmake-source")
     layout_deps = _mappings(parser, options.layout_dep, "--layout-dep")
     if options.suite_package and not options.classpath_dists:
         parser.error("--suite-package requires --classpath-dists or --all")
@@ -3464,6 +3642,10 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             if type(project).__name__ == "LayoutTARDistribution" and any(_bootstrap_launcher(dep) for dep in project.buildDependencies):
                 tar_layouts[project.name] = _bootstrap_distribution(project, pending)
                 continue
+            if (type(project).__name__ == "LayoutTARDistribution" and project.fileListPurpose
+                    and any(_cmake_native_project(dep) for dep in project.buildDependencies)):
+                tar_layouts[project.name] = _platform_install_overlay(project, pending)
+                continue
             if type(project).__name__ == "LayoutTARDistribution":
                 tar_layouts[project.name] = _tar_layout(project, pending, java_deps, archives)
                 continue
@@ -3517,7 +3699,7 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             thin_launchers[project.name] = _thin_launcher_recipe(project)
             continue
         if options.gazelle and project.suite == suite and _cmake_native_project(project):
-            cmake_suites[project.name] = _cmake_project_recipe(project, pending, layout_deps)
+            cmake_suites[project.name] = _cmake_project_recipe(project, pending, layout_deps, cmake_sources)
             continue
         if options.gazelle and project.suite == suite and _bootstrap_launcher(project):
             bash_launchers[project.name] = _bootstrap_recipe(project, options, pending, java_deps)

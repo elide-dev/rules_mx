@@ -121,9 +121,9 @@ register_toolchains(
 bazel_dep(name = "rules_graalvm", version = "0.12.0")
 archive_override(
     module_name = "rules_graalvm",
-    integrity = "sha256-Ixpnwahukt2/1i87vAH88b4lMHJr18NCnlRx75mQsyo=",
-    strip_prefix = "rules_graalvm-93d1511e7d5406d2e399537b397073d3baa430f2",
-    urls = ["https://github.com/sgammon/rules_graalvm/archive/93d1511e7d5406d2e399537b397073d3baa430f2.tar.gz"],
+    integrity = "sha256-zdlAyBG8yZYCTdsez8tM1qC7T6+9MKgOw2/JMrMtQ70=",
+    strip_prefix = "rules_graalvm-b987a21ef0d5dc3a282f60f6f6e3572e4b7407c5",
+    urls = ["https://github.com/sgammon/rules_graalvm/archive/b987a21ef0d5dc3a282f60f6f6e3572e4b7407c5.tar.gz"],
 )
 
 inject_repo(elide, "rules_graalvm")
@@ -190,7 +190,7 @@ netbeans = use_extension("//graal:netbeans_maven.bzl", "netbeans_maven", dev_dep
 use_repo(netbeans, "netbeans_maven_distribution", "netbeans_maven_repository")
 
 packed_sources = use_extension("//graal:packed_sources.bzl", "packed_sources", dev_dependency = True)
-use_repo(packed_sources, "graal_sulong_gcc_source_parsertorture", "graal_sulong_nwcc_suite")
+use_repo(packed_sources, "graal_sdk_llvm_org_src", "graal_sulong_gcc_source_parsertorture", "graal_sulong_nwcc_suite")
 
 shaded_inputs = use_extension("//graal:shaded_inputs.bzl", "shaded_inputs", dev_dependency = True)
 use_repo(shaded_inputs, "graal_shaded_inputs")

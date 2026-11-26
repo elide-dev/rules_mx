@@ -4,6 +4,7 @@ load("@rules_java//java:java_library.bzl", "java_library")
 load("@rules_java//java:java_test.bzl", "java_test")
 load("@rules_python//python:py_binary.bzl", "py_binary")
 load("@rules_python//python:py_test.bzl", "py_test")
+load("//mx:bitcode.bzl", "mx_bitcode_suite")
 load("//mx:netbeans.bzl", "netbeans_test_java")
 load(":automatic_module.bzl", "automatic_module")
 load(":layout.bzl", "mx_archive_layout")
@@ -14,6 +15,7 @@ exports_files([
     "netbeans_maven.json",
     "benchmark_timer.patch",
     "jfr_allocation_samples.patch",
+    "profiler_sample_timeout.patch",
     "wasm_exports_test.patch",
     "compiler.patch",
     "espresso-shared.patch",
@@ -26,6 +28,7 @@ exports_files([
     "sdk_musl.json",
     "packed_sources.json",
     "sulong_external_tests.patch",
+    "sulong_setjmp.patch",
     "sl.py.tpl",
     "sl_fixture_test.py",
     "shaded_inputs.json",
@@ -375,6 +378,52 @@ py_test(
     ],
 )
 
+filegroup(
+    name = "sulong_home_archive",
+    srcs = ["@graal//sulong:SULONG_NATIVE_HOME"],
+    output_group = "archive",
+    tags = ["manual"],
+)
+
+filegroup(
+    name = "sulong_home_list",
+    srcs = ["@graal//sulong:SULONG_NATIVE_HOME"],
+    output_group = "file_list",
+    tags = ["manual"],
+)
+
+py_test(
+    name = "sulong_native_home_test",
+    size = "small",
+    srcs = ["sulong_native_home_test.py"],
+    args = [
+        "$(rootpath :sulong_home_archive)",
+        "$(rootpath :sulong_home_list)",
+    ],
+    data = [
+        ":sulong_home_archive",
+        ":sulong_home_list",
+    ],
+    tags = ["manual"],
+)
+
+py_test(
+    name = "sulong_cxx_runtime_test",
+    size = "small",
+    srcs = ["sulong_cxx_runtime_test.py"],
+    args = [
+        "$(rootpath @graal//sulong:com.oracle.truffle.llvm.libraries.bitcode.libcxx)",
+        "$(rootpath //tools/cc:llvm_nm)",
+        "$(rootpath //tools/cc:llvm_objdump)",
+    ],
+    data = [
+        "//tools/cc:llvm_nm",
+        "//tools/cc:llvm_objdump",
+        "@graal//sulong:com.oracle.truffle.llvm.libraries.bitcode.libcxx",
+    ],
+    tags = ["manual"],
+)
+
 py_test(
     name = "sulong_cmake_libraries_test",
     size = "small",
@@ -405,6 +454,15 @@ py_test(
     tags = ["manual"],
 )
 
+py_test(
+    name = "sulong_test_native_archive_test",
+    size = "small",
+    srcs = ["sulong_test_native_archive_test.py"],
+    args = ["$(rootpath @graal//sulong:SULONG_TEST_NATIVE)"],
+    data = ["@graal//sulong:SULONG_TEST_NATIVE"],
+    tags = ["manual"],
+)
+
 java_test(
     name = "sulong_pipe_test",
     size = "small",
@@ -415,6 +473,48 @@ java_test(
     deps = [
         "@contrib_rules_jvm_deps//:junit_junit",
         "@graal//sulong:com.oracle.truffle.llvm.tests.pipe",
+    ],
+)
+
+mx_bitcode_suite(
+    name = "sulong_runtime_fixture",
+    testonly = True,
+    cases = ["answer.ll"],
+    llvm_link = ":sdk_llvm_link",
+    root = "fixtures/sulong",
+)
+
+py_test(
+    name = "sulong_standalone_install_test",
+    size = "large",
+    srcs = ["sulong_standalone_install_test.py"],
+    args = [
+        "$(rootpath :sulong_runtime_fixture)",
+        "$(rootpath @graal//sulong:SULONG_JVM_STANDALONE_RELEASE_ARCHIVE)",
+        "$(rootpath @graal//sulong:SULONG_NATIVE_STANDALONE_RELEASE_ARCHIVE)",
+    ],
+    data = [
+        ":sulong_runtime_fixture",
+        "@graal//sulong:SULONG_JVM_STANDALONE_RELEASE_ARCHIVE",
+        "@graal//sulong:SULONG_NATIVE_STANDALONE_RELEASE_ARCHIVE",
+    ],
+    tags = ["manual"],
+)
+
+java_test(
+    name = "sulong_runtime_test",
+    srcs = ["SulongRuntimeTest.java"],
+    data = [":sulong_runtime_fixture"],
+    jvm_flags = [
+        "--enable-native-access=ALL-UNNAMED",
+        "-Dsulong.fixture=$${TEST_SRCDIR}/$(rlocationpath :sulong_runtime_fixture)",
+    ],
+    tags = ["manual"],
+    test_class = "graal.SulongRuntimeTest",
+    runtime_deps = ["@graal//espresso:JAVA_POM"],
+    deps = [
+        "@contrib_rules_jvm_deps//:junit_junit",
+        "@graal//sdk:POLYGLOT",
     ],
 )
 

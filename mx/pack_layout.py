@@ -134,12 +134,17 @@ def _jdk_resource(bundle, recipe, directory, jar, manifest, digest):
     tree = Path(directory)
     prefix = _relative(spec["directory"])
     _install_jdk(tree, {"directory": str(prefix), "exclude": spec["exclude"], "bundle": bundle}, set())
+    _package_resources(tree, spec, jar, manifest, digest)
+
+
+def _package_resources(tree, spec, jar, manifest, digest):
+    prefix = spec.get("directory", "")
     members = []
     for file in sorted((tree / prefix).rglob("*")):
         if file.is_symlink():
             target = file.resolve(strict=True)
             if not target.is_relative_to((tree / prefix).resolve()) or not target.is_file():
-                raise ValueError(f"Unexpected JDK resource link {file}")
+                raise ValueError(f"Unexpected resource link {file}")
             file.unlink()
             shutil.copy2(target, file)
         if file.is_file():
@@ -178,9 +183,27 @@ def _install_image_group(tree, image, kinds, mount):
 
 
 def main():
-    if sys.argv[1] == "--archive-file-tree":
+    if sys.argv[1] == "--materialize-install-links":
+        tree, sources, build = [Path(arg).resolve() for arg in sys.argv[2:]]
+        source_files = None
+        for link in tree.rglob("*"):
+            if not link.is_symlink():
+                continue
+            target = link.resolve(strict=True)
+            if not link.readlink().is_absolute() and target.is_relative_to(tree):
+                continue
+            # Darwin CMake can install a sandbox input symlink as a header. Check
+            # the resolved file against the declared source tree before copying it.
+            if source_files is None:
+                source_files = {file.resolve() for file in sources.rglob("*") if file.is_file()}
+            if not target.is_file() or (target not in source_files and not target.is_relative_to(build) and not target.is_relative_to(tree)):
+                raise ValueError(f"Unexpected CMake install link {link} -> {target}")
+            link.unlink()
+            shutil.copy2(target, link)
+        return
+    if sys.argv[1] in ("--archive-file-tree", "--archive-install-tree"):
         output, prefix, tree = sys.argv[2:]
-        _write_tree_archive(Path(tree), Path(output), _relative(prefix), dereference=True)
+        _write_tree_archive(Path(tree), Path(output), _relative(prefix), dereference=sys.argv[1] == "--archive-file-tree")
         return
     if sys.argv[1] == "--image-primary":
         image, out = map(Path, sys.argv[2:])
@@ -250,12 +273,18 @@ def main():
             for image, kinds, mount in image_groups:
                 _install_image_group(tree, image, kinds, mount)
             for filename, mount in tar_trees:
-                destination = tree / _relative(mount.rstrip("/"))
-                if destination.exists():
-                    raise ValueError(f"Archive mount already populated: {mount}")
-                destination.mkdir(parents=True)
+                destination = tree / _relative(mount.rstrip("/")) if mount else tree
+                destination.mkdir(parents=True, exist_ok=True)
+
+                def install_member(member, path):
+                    safe = tarfile.data_filter(member, path)
+                    target = destination / _relative(safe.name)
+                    if (target.exists() or target.is_symlink()) and not (safe.isdir() and target.is_dir()):
+                        raise ValueError(f"Duplicate archive member at {target.relative_to(tree)}")
+                    return safe
+
                 with tarfile.open(filename) as archive:
-                    archive.extractall(destination, filter="data")
+                    archive.extractall(destination, filter=install_member)
             for home in homes:
                 _install_jdk(tree, home, {name for name, _ in entries})
             if directory:
