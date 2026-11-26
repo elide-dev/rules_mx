@@ -164,9 +164,16 @@ def _in_tree_sulong_tests(dep):
     )
 
 
-def _cmake_cases(project):
+def _external_sulong_tests(dep):
+    return (type(dep).__module__, type(dep).__name__) == (
+        "mx_sulong_suite_constituents",
+        "ExternalCMakeTestSuite",
+    )
+
+
+def _cmake_cases(project, cases=None):
     return {
-        "cases": sorted(Path(case).as_posix() for case in project.getTests()),
+        "cases": sorted(Path(case).as_posix() for case in (project.getTests() if cases is None else cases)),
         "variants": list(project.getVariants()),
         "build_reference": project.buildRef,
         "shared_object": project.buildSharedObject,
@@ -227,9 +234,21 @@ def _bitcode_suite(project, linker):
     }
 
 
-def _cmake_fixture_suite(project, sdk):
-    matrix = _cmake_cases(project)
+def _cmake_fixture_suite(project, sdk, packed_sources=None):
     declaration = project._orig_attrs
+    packed = None
+    cases = None
+    source_label = None
+    if _external_sulong_tests(project):
+        libraries = [d for d in project.buildDependencies if d.isPackedResourceLibrary() and d.suite.name != "mx"]
+        if len(libraries) != 1 or libraries[0].qualifiedName() not in (packed_sources or {}):
+            raise _UnsupportedLowering(f"{project.name}: bind the packed test source")
+        packed = libraries[0]
+        source_label, source_dir = packed_sources[packed.qualifiedName()]
+        if not hasattr(project, "tests_from_source"):
+            raise _UnsupportedLowering(f"{project.name}: Sulong needs target-aware external case discovery")
+        cases = project.tests_from_source(source_dir, "linux", "amd64")
+    matrix = _cmake_cases(project, cases)
     if (
         matrix["shared_object"]
         or matrix["variant_config"]
@@ -246,16 +265,18 @@ def _cmake_fixture_suite(project, sdk):
     settings = dict(declaration.get("cmakeConfig", {}))
     os_config = declaration.get("os", {})
     linux = os_config.get("linux", os_config.get("<others>", {}))
-    if (
-        set(linux) - {"cmakeConfig"}
-        or "arch" in declaration
-        or "os_arch" in declaration
-    ):
+    branches = declaration.get("os_arch", {})
+    arches = branches.get("linux", branches.get("<others>", {}))
+    target = arches.get("amd64", arches.get("<others>", {}))
+    if (set(linux) | set(target)) - {"cmakeConfig"} or "arch" in declaration:
         raise _UnsupportedLowering("Sulong fixture needs platform-dependent inputs")
     deps = set(declaration.get("buildDependencies", []))
+    if packed:
+        deps -= {packed.name, packed.qualifiedName()}
     if deps - {"SULONG_HOME", "LINUX_AMD64_SUPPORT"}:
         raise _UnsupportedLowering("Sulong fixture needs another build-time dependency")
     settings.update(linux.get("cmakeConfig", {}))
+    settings.update(target.get("cmakeConfig", {}))
     if settings.keys() - {
         "CMAKE_C_FLAGS",
         "CMAKE_CXX_FLAGS",
@@ -263,7 +284,7 @@ def _cmake_fixture_suite(project, sdk):
         "CMAKE_EXE_LINKER_FLAGS",
     } or any("<" in v for v in settings.values()):
         raise _UnsupportedLowering("Sulong CMake flags require unresolved mx inputs")
-    languages = sorted(project._get_languages())
+    languages = sorted(project._get_languages() if cases is None else project._get_languages(cases))
     if set(languages) - {"C", "CXX", "LL"}:
         raise _UnsupportedLowering("Sulong CMake needs another input language")
     root = Path(project.source_dirs()[0]).relative_to(project.suite.dir)
@@ -271,6 +292,7 @@ def _cmake_fixture_suite(project, sdk):
     return {
         "name": project.name,
         "root": root.as_posix(),
+        **({"source_package": source_label} if source_label else {}),
         "sdk": sdk,
         "config": settings,
         "modules": Path(modules.dir).relative_to(project.suite.dir).as_posix(),
@@ -1830,6 +1852,7 @@ def _can_lower_root(dep):
         or _wat_project(dep)
         or _emscripten_project(dep)
         or _in_tree_sulong_tests(dep)
+        or _external_sulong_tests(dep)
         or _is_shaded_project(dep)
         or dep.isJARDistribution()
         or dep.isPOMDistribution()
@@ -2099,7 +2122,7 @@ def _tar_layout(dist, pending, mappings, archives):
                 and path == "*"
                 and directory
                 and dep.suite == dist.suite
-                and (_wat_project(dep) or _source_project(dep))
+                and (_wat_project(dep) or _source_project(dep) or _external_sulong_tests(dep) or _in_tree_sulong_tests(dep))
             ):
                 if destination and not _resource_path(destination.rstrip("/")):
                     raise _UnsupportedLowering(
@@ -2923,6 +2946,11 @@ def bazel_buildfile(args):
         help="execution-platform Graal LLVM SDK for Sulong CMake test fixtures",
     )
     parser.add_argument(
+        "--sulong-packed-source",
+        action="append", nargs=3, default=[], metavar=("SUITE:LIBRARY", "@REPO//:", "DIRECTORY"),
+        help="bind an extracted source package for target-aware Sulong case discovery",
+    )
+    parser.add_argument(
         "--sulong-llvm-link",
         metavar="LABEL",
         help="execution-platform llvm-link for Sulong bitcode fixtures",
@@ -3200,6 +3228,11 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
     wasm_programs = {}
     wat_projects = {}
     cmake_suites = {}
+    packed_sources = {}
+    for name, package, directory in options.sulong_packed_source:
+        if name in packed_sources or not re.fullmatch(r"@[a-zA-Z0-9_.+-]+//:", package) or not Path(directory).is_dir():
+            parser.error(f"Invalid or duplicate --sulong-packed-source {name} {package} {directory}")
+        packed_sources[name] = package, directory
     javac_only_processors = set(options.javac_only_processor)
     used_javac_only = set()
     processed = False
@@ -3282,6 +3315,11 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
                         project, pending, java_deps
                     )
                 continue
+        if options.gazelle and project.suite == suite and _external_sulong_tests(project):
+            if not options.sulong_fixture_sdk:
+                raise _UnsupportedLowering("External Sulong fixtures need --sulong-fixture-sdk")
+            cmake_suites[project.name] = _cmake_fixture_suite(project, options.sulong_fixture_sdk, packed_sources)
+            continue
         if (
             options.gazelle
             and _in_tree_sulong_tests(project)

@@ -2,6 +2,8 @@
 
 load("@rules_foreign_cc//toolchains/native_tools:tool_access.bzl", "get_cmake_data", "get_ninja_data")
 
+load("//mx:project_files.bzl", "mx_project_files")
+
 def _plan_impl(ctx):
     cmake = get_cmake_data(ctx)
     ninja = get_ninja_data(ctx)
@@ -13,6 +15,7 @@ def _plan_impl(ctx):
         "tool_env": cmake.env | ninja.env,
         "plans": plans,
         "source": ctx.file.cmakelists.dirname,
+        "source_dir": ctx.file.source_marker.dirname if ctx.file.source_marker else "",
         "modules": ctx.file.suite_module.dirname,
         "variant": ctx.attr.variant,
         "project": ctx.attr.project,
@@ -26,7 +29,7 @@ def _plan_impl(ctx):
     ctx.actions.run(
         executable = ctx.executable._runner,
         arguments = ["configure", spec.path],
-        inputs = depset([spec, ctx.file.cmakelists, ctx.file.suite_module, ctx.file.sdk, ctx.file._target_config] + ctx.files.sources, transitive = [ctx.attr._sysroot[DefaultInfo].files] + [t[DefaultInfo].files for t in cmake.tools + ninja.tools]),
+        inputs = depset([spec, ctx.file.cmakelists, ctx.file.suite_module, ctx.file.sdk, ctx.file._target_config] + ctx.files.sources + ctx.files.source_marker, transitive = [ctx.attr._sysroot[DefaultInfo].files] + [t[DefaultInfo].files for t in cmake.tools + ninja.tools]),
         outputs = ctx.outputs.plans,
         mnemonic = "SulongCMakeConfigure",
     )
@@ -48,6 +51,7 @@ _plan = rule(
         "cmakelists": attr.label(allow_single_file = True),
         "suite_module": attr.label(allow_single_file = True),
         "sources": attr.label_list(allow_files = True),
+        "source_marker": attr.label(allow_single_file = True),
         "languages": attr.string_list(),
         "config": attr.string_dict(),
     }),
@@ -84,12 +88,13 @@ _case = rule(
     }),
 )
 
-def mx_sulong_cmake_suite(name, root, cases, variants, sdk, modules, languages, config = {}, testonly = True, visibility = None):
+def mx_sulong_cmake_suite(name, root, cases, variants, sdk, modules, languages, config = {}, source_package = None, testonly = True, visibility = None):
     """Configure once per variant. Each installed fixture has its own Bazel action."""
     compatible = ["@platforms//os:linux", "@platforms//cpu:x86_64"]
-    srcs = [root + "/" + case for case in cases]
-    companions = native.glob([root + "/**/*.c", root + "/**/*.cpp"], exclude = srcs, allow_empty = True)
-    headers = native.glob([root + "/**/*.h", root + "/**/*.hpp", root + "/**/*.inc"], allow_empty = True)
+    prefix = source_package or root + "/"
+    srcs = [prefix + case for case in cases]
+    companions = [] if source_package else native.glob([root + "/**/*.c", root + "/**/*.cpp"], exclude = srcs, allow_empty = True)
+    headers = [source_package + "headers"] if source_package else native.glob([root + "/**/*.h", root + "/**/*.hpp", root + "/**/*.inc"], allow_empty = True)
     recipes = native.glob([modules + "/*"], allow_empty = False) + native.glob([root + "/**/TestOptions.cmake"], allow_empty = True)
     outputs = {case: [] for case in cases}
     for variant in variants:
@@ -106,6 +111,7 @@ def mx_sulong_cmake_suite(name, root, cases, variants, sdk, modules, languages, 
             cmakelists = root + "/CMakeLists.txt",
             suite_module = modules + "/SulongTestSuite.cmake",
             sources = srcs + companions + headers + recipes,
+            source_marker = source_package + "BUILD.bazel" if source_package else None,
             config = config,
             languages = languages,
             exec_compatible_with = compatible,
@@ -118,7 +124,7 @@ def mx_sulong_cmake_suite(name, root, cases, variants, sdk, modules, languages, 
             _case(
                 name = target + "." + variant,
                 out = output,
-                srcs = [root + "/" + case] + companions,
+                srcs = [prefix + case] + companions,
                 headers = headers,
                 plan = plan,
                 sdk = sdk,
@@ -130,4 +136,10 @@ def mx_sulong_cmake_suite(name, root, cases, variants, sdk, modules, languages, 
             outputs[case].append(":" + output)
     for case, results in outputs.items():
         native.filegroup(name = name + "/" + case, srcs = results, target_compatible_with = compatible, testonly = testonly, visibility = visibility)
-    native.filegroup(name = name, srcs = [":" + name + "/" + c for c in cases], target_compatible_with = compatible, testonly = testonly, visibility = visibility)
+    mx_project_files(
+        name = name,
+        members = {out: out.removeprefix(":" + name + "/") for results in outputs.values() for out in results},
+        target_compatible_with = compatible,
+        testonly = testonly,
+        visibility = visibility,
+    )
