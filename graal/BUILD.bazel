@@ -22,6 +22,8 @@ exports_files([
     "vm.patch",
     "regex.patch",
     "tools.patch",
+    "wasm.patch",
+    "sulong.patch",
     "visualvm.json",
     "toolchain_test.py",
 ])

@@ -577,6 +577,23 @@ SUITES = {
 }
 
 
+# These suites publish every closure that the exporter can lower.
+PARTIAL_SUITES = ("sulong", "wasm")
+
+# These targets remain individually runnable. New classes join CI on regeneration.
+WASM_OPEN_TESTS = {
+    "org.graalvm.wasm.test.WasmTestSuite",  # Aggregates several classes below.
+    "org.graalvm.wasm.test.suites.arithmetic.WideArithmeticSuite",  # Optimizing runtime.
+    "org.graalvm.wasm.test.suites.bytecode.WasmLegacyCatchOSRSuite",
+    "org.graalvm.wasm.test.suites.bytecode.WasmOSRSuite",
+    "org.graalvm.wasm.test.suites.control.TailCallSuite",  # WABT return_call_ref.
+    "org.graalvm.wasm.test.suites.bytecode.MultiInstantiationSuite",  # Invalid value type.
+    "org.graalvm.wasm.test.WasmStackTraceTest",  # Bytecode index differs.
+    "org.graalvm.wasm.test.regress.GR54505Test",  # Calls execute on the exports object.
+    "org.graalvm.wasm.test.suites.wasi.WasiOptionsSuite",  # Preopened directory lookup.
+}
+
+
 SHADED_PROJECTS = {
     "tools": ("com.oracle.truffle.tools.utils.java_websocket",),
     "substratevm": ("com.oracle.svm.shaded.org.capnproto",),
@@ -1482,7 +1499,55 @@ def prepare_suite(suite, stage):
             support_layout_rules(directory, ("VM_GRAALVM_SUPPORT",))
         )
         return
-    export_options = SUITES[suite]
+    if suite in PARTIAL_SUITES:
+        export_options = [
+            "--all",
+            "--declared-only",
+            "--partial",
+            "--bindings",
+            f"//sdk={stage / 'sdk-bindings.json'}",
+            "--bindings",
+            f"//truffle={stage / 'truffle-bindings.json'}",
+            "--java-dep",
+            "mx:JUNIT=@contrib_rules_jvm_deps//:junit_junit",
+            "--java-dep",
+            "mx:JUNIT=@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
+            "--java-dep",
+            "mx:HAMCREST=@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
+            "--javac-only-processor",
+            "truffle:TRUFFLE_DSL_PROCESSOR",
+        ]
+    else:
+        export_options = SUITES[suite]
+    if suite == "wasm":
+        wat2wasm = "@wabt//src/tools:wat2wasm"
+        project = "wasm:org.graalvm.wasm.test"
+        export_options.extend(
+            [
+                "--test-data",
+                f"{project}={wat2wasm}",
+                "--test-runtime",
+                f"{project}=:org.graalvm.wasm.test",
+                "--test-runtime",
+                f"{project}=//truffle:TRUFFLE_RUNTIME",
+                *(
+                    arg
+                    for flag in (
+                        f"-Dwasmtest.watToWasmExecutable=$(rootpath {wat2wasm})",
+                        "-Dpolyglot.engine.AllowExperimentalOptions=true",
+                        "-Dpolyglot.engine.WarnInterpreterOnly=false",
+                        "--enable-native-access=ALL-UNNAMED",
+                    )
+                    for arg in ("--test-jvm-flag", f"{project}={flag}")
+                ),
+            ]
+        )
+    if suite in ("sdk", "truffle"):
+        export_options = [
+            *export_options,
+            "--bindings-out",
+            str(stage / f"{suite}-bindings.json"),
+        ]
     if suite == "truffle":
         metadata = runpy.run_path(str(directory / "mx.truffle/suite.py"))["suite"]
         export_options = [
@@ -1525,7 +1590,37 @@ def prepare_suite(suite, stage):
         )
     # An implicit Bazel test_suite includes the generated JUnit targets in
     # this package, so new test classes join the CI qualification on regeneration.
-    if suite == "sdk":
+    if suite in PARTIAL_SUITES:
+        graph = json.loads((directory / "mx-graph.json").read_text())
+        inventory = graph["suite_targets"]
+        rules = [
+            f'filegroup(name = "all_{kind}", srcs = {json.dumps([":" + name for name in names])}, testonly = True, visibility = ["//visibility:public"])'
+            for kind, names in inventory.items()
+        ]
+        if suite == "wasm":
+            tests = {
+                cls: ":" + project["name"] + "." + cls
+                for project in graph["projects"]
+                for cls in project.get("tests", [])
+            }
+            if stale := WASM_OPEN_TESTS - tests.keys():
+                raise ValueError(
+                    f"Review resolved Wasm test exclusions: {sorted(stale)}"
+                )
+            qualified = sorted(
+                target for cls, target in tests.items() if cls not in WASM_OPEN_TESTS
+            )
+            rules.append(
+                f'test_suite(name = "qualified_tests", tests = {json.dumps(qualified)}, visibility = ["//visibility:public"])'
+            )
+        (directory / "BUILD.bazel").write_text("\n".join(rules) + "\n")
+        print(
+            f"{suite}: {len(inventory['projects'])} projects, {len(inventory['distributions'])} distributions exported",
+            file=sys.stderr,
+        )
+        for reason, names in sorted(graph["blocked_roots"].items()):
+            print(f"  {reason}: {', '.join(names)}", file=sys.stderr)
+    elif suite == "sdk":
         (directory / "BUILD.bazel").write_text(
             sdk_native_projects(directory)
             + sdk_llvm_rules(directory)
@@ -1650,7 +1745,7 @@ def main():
     parser.add_argument(
         "--suite",
         action="append",
-        choices=[*SUITES, "vm"],
+        choices=[*SUITES, *PARTIAL_SUITES, "vm"],
         help="only regenerate the named BUILD overlays",
     )
     args = parser.parse_args()
@@ -1671,6 +1766,16 @@ def main():
         (stage / "BUILD.bazel").write_text(
             "# gazelle:map_kind java_library elide_java_library @rules_mx//mx:java.bzl\n"
         )
+        selected = list(dict.fromkeys(args.suite or [*SUITES, *PARTIAL_SUITES, "vm"]))
+        for suite in PARTIAL_SUITES:
+            if suite in selected:
+                shutil.copytree(
+                    source / suite,
+                    stage / suite,
+                    ignore=shutil.ignore_patterns(
+                        "BUILD", "BUILD.bazel", "mxbuild", "__pycache__"
+                    ),
+                )
         for suite in SUITES:
             for directory in (f"mx.{suite}", "src"):
                 rel = Path(suite) / directory
@@ -1771,8 +1876,10 @@ def main():
                 )
         else:
             lock.write_text(lock_text)
-        selected = list(dict.fromkeys(args.suite or [*SUITES, "vm"]))
-        for suite in selected:
+        providers = (
+            ["sdk", "truffle"] if any(s in PARTIAL_SUITES for s in selected) else []
+        )
+        for suite in dict.fromkeys([*providers, *selected]):
             prepare_suite(suite, stage)
         generate_build_files(selected, stage)
         for suite in selected:

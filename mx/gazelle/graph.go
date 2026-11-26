@@ -25,6 +25,7 @@ import (
 
 type project struct {
 	suite                                string
+	Resolve                              map[string]string
 	Name                                 string
 	Release                              int
 	Options, Dirs, Packages, Tests, Deps []string
@@ -535,8 +536,20 @@ func (g *importer) Resolve(c *config.Config, ix *resolve.RuleIndex, rc *repo.Rem
 	if graphKind(r.Kind()) {
 		return
 	}
-	g.javaLanguage.Resolve(c, ix, rc, r, imports, from)
 	p := g.owners[from.Pkg]
+	if p != nil && len(p.Resolve) > 0 {
+		// Use only bindings on this project's mx classpath. BUILD directives take precedence.
+		var file rule.File
+		for pkg, target := range p.Resolve {
+			imp := resolve.ImportSpec{Lang: g.Name(), Imp: pkg}
+			if _, found := resolve.FindRuleWithOverride(c, imp, g.Name()); !found {
+				file.Directives = append(file.Directives, rule.Directive{Key: "resolve", Value: g.Name() + " " + pkg + " " + target})
+			}
+		}
+		c = c.Clone()
+		new(resolve.Configurer).Configure(c, from.Pkg, &file)
+	}
+	g.javaLanguage.Resolve(c, ix, rc, r, imports, from)
 	if p == nil || len(p.Sources) != 0 || r.Kind() != "java_library" {
 		return
 	}

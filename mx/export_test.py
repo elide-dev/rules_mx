@@ -1,6 +1,7 @@
 """Check the checked-in project graph against the pinned mx checkout."""
 
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -177,6 +178,10 @@ class ExportTest(unittest.TestCase):
                                 },
                             },
                             "CUSTOM": {"native": True, "layout": {"link": "link:info"}},
+                            "WRAPPER": {
+                                "native": True,
+                                "layout": {"inner.tar": "dependency:CUSTOM"},
+                            },
                         },
                     }
                 )
@@ -195,6 +200,22 @@ class ExportTest(unittest.TestCase):
             self.assertIn(
                 "CUSTOM: unsupported TAR input", failed.stderr + failed.stdout
             )
+            partial = json.loads(
+                self.run_mx(
+                    "bazel-buildfile",
+                    "--gazelle",
+                    "--all",
+                    "--partial",
+                    suite=suite,
+                ).stdout
+            )
+            self.assertEqual(
+                partial["suite_targets"]["distributions"], ["APP", "BASE", "LAYER"]
+            )
+            self.assertEqual(
+                list(partial["blocked_roots"].values()),
+                [["inventory:CUSTOM", "inventory:WRAPPER"]],
+            )
             result = self.run_mx(
                 "bazel-buildfile",
                 "--gazelle",
@@ -207,18 +228,82 @@ class ExportTest(unittest.TestCase):
             self.assertEqual(graph["suite_targets"]["projects"], ["first", "second"])
             self.assertEqual(
                 graph["suite_targets"]["distributions"],
-                ["APP", "BASE", "CUSTOM", "LAYER"],
+                ["APP", "BASE", "CUSTOM", "LAYER", "WRAPPER"],
             )
             self.assertEqual(
                 [p["name"] for p in graph["projects"]], ["first", "second"]
             )
             self.assertEqual(graph["distributions"][0]["contents"], [":first"])
             self.assertEqual(graph["distributions"][0]["release"], 17)
-            base, layer = graph["tar_layouts"]
+            base, layer, wrapper = graph["tar_layouts"]
+            self.assertEqual(wrapper["members"], {":CUSTOM": "inner.tar"})
             self.assertEqual(base["members"], {"info": "docs/info"})
             self.assertEqual(layer["members"], {":BASE": "archives/original.tar"})
             self.assertEqual(
                 layer["archive_imports"], {":BASE": "docs/info=share/info"}
+            )
+
+    def test_import_generated_processor_bindings(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            (root / ".mx_vcs_root").touch()
+            provider = root / "processing"
+            shutil.copytree(self.processor_suite, provider)
+            index = root / "bindings.json"
+            self.run_mx(
+                "bazel-buildfile",
+                "--all",
+                "--gazelle",
+                "--bindings-out",
+                str(index),
+                suite=provider,
+            )
+            bindings = json.loads(index.read_text())
+            self.assertIn("PROCESSORS", bindings["artifacts"])
+            expected = bindings["processors"]["PROCESSORS"]
+            self.assertEqual(len(expected), 2)
+            consumer = root / "consumer"
+            metadata = consumer / "mx.consumer"
+            metadata.mkdir(parents=True)
+            definition = {
+                "name": "consumer",
+                "mxversion": "7.89.0",
+                "imports": {"suites": [{"name": "processing", "subdir": True}]},
+                "projects": {
+                    "client": {
+                        "testProject": True,
+                        "javaProperties": {
+                            "processor.jar": "<path:processing:PROCESSORS>"
+                        },
+                        "sourceDirs": ["src"],
+                        "javaCompliance": "17+",
+                        "annotationProcessors": ["processing:PROCESSORS"],
+                    }
+                },
+            }
+            (metadata / "suite.py").write_text("suite = " + repr(definition))
+            source = consumer / "client/src/example"
+            source.mkdir(parents=True)
+            (source / "Client.java").write_text(
+                "package example; public class Client {}"
+            )
+            result = self.run_mx(
+                "bazel-buildfile",
+                "--all",
+                "--gazelle",
+                "--partial",
+                "--bindings",
+                f"//upstream={index}",
+                suite=consumer,
+            )
+            graph = json.loads(result.stdout)
+            self.assertEqual(graph["blocked_roots"], {})
+            self.assertEqual(
+                graph["projects"][0]["test_data"], ["//upstream:PROCESSORS"]
+            )
+            self.assertEqual(
+                graph["projects"][0]["processors"],
+                ["//upstream:" + p for p in expected],
             )
 
     def test_packaged_test_discovery(self):

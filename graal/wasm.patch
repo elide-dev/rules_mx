@@ -1,0 +1,3319 @@
+diff --git a/wasm/BUILD.bazel b/wasm/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/BUILD.bazel
+@@ -0,0 +1,1164 @@
++load("@rules_mx//mx:graph.bzl", "mx_exported_tar", "mx_jar_dist", "mx_jvmci_library", "mx_pom_dist", "mx_processed_java", "mx_project", "mx_test_class")
++
++filegroup(
++    name = "all_distributions",
++    testonly = True,
++    srcs = [
++        ":WASM",
++        ":WASM_GRAALVM_LICENSES",
++        ":WASM_GRAALVM_SUPPORT",
++        ":WASM_LAUNCHER",
++        ":WASM_POM",
++    ],
++    visibility = ["//visibility:public"],
++)
++
++filegroup(
++    name = "all_projects",
++    testonly = True,
++    srcs = [
++        ":org.graalvm.wasm",
++        ":org.graalvm.wasm.jdk25",
++        ":org.graalvm.wasm.launcher",
++        ":org.graalvm.wasm.test",
++        ":org.graalvm.wasm.utils",
++    ],
++    visibility = ["//visibility:public"],
++)
++
++test_suite(
++    name = "qualified_tests",
++    tests = [
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.TypeRepresentationSuite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.WasmJsApiSuite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.WasmLateLinkingSuite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.WasmMemoryLeakSuite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.WasmPolyglotTestSuite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.gc.GCSuite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.regress.WasiRegressionTests",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.WasmImplementationLimitationsSuite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.arithmetic.Float32Suite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.arithmetic.Float64Suite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.arithmetic.Integer32Suite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.arithmetic.Integer64Suite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.arithmetic.ReferenceTypeSuite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.bytecode.BranchHintSuite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.bytecode.BytecodeSuite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.control.BlockWithLocalsSuite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.control.BranchBlockSuite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.control.ExceptionSuite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.control.IfThenElseSuite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.control.LoopBlockSuite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.control.MultiValueSuite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.control.MultipleFunctionsSuite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.control.SimpleBlockSuite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.debugging.DebugObjectFactorySuite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.debugging.DebugSourceLoadSuite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.debugging.DebugValidationSuite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.linker.LinkerSuite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.memory.Memory64Suite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.memory.MemoryFillSuite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.memory.MemorySuite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.memory.MultiMemorySuite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.memory.ThreadsSuite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.table.Table64Suite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.table.TableSuite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.validation.MultiValueValidationSuite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.validation.ReferenceTypesValidationSuite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.validation.ValidationSuite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.wasi.WasiSuite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.webassembly.EmscriptenSuite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.webassembly.IssueSuite",
++    ],
++    visibility = ["//visibility:public"],
++)
++
++mx_processed_java(
++    name = "org.graalvm.wasm",
++    srcs = [
++        "//wasm/src/org.graalvm.wasm/src/org/graalvm/wasm:org.graalvm.wasm.srcs",
++        "//wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/api:org.graalvm.wasm.srcs",
++        "//wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/array:org.graalvm.wasm.srcs",
++        "//wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/collection:org.graalvm.wasm.srcs",
++        "//wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/constants:org.graalvm.wasm.srcs",
++        "//wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging:org.graalvm.wasm.srcs",
++        "//wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/data:org.graalvm.wasm.srcs",
++        "//wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/data/objects:org.graalvm.wasm.srcs",
++        "//wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/data/types:org.graalvm.wasm.srcs",
++        "//wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/encoding:org.graalvm.wasm.srcs",
++        "//wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/languages:org.graalvm.wasm.srcs",
++        "//wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/languages/c:org.graalvm.wasm.srcs",
++        "//wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/languages/cpp:org.graalvm.wasm.srcs",
++        "//wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/languages/rust:org.graalvm.wasm.srcs",
++        "//wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/parser:org.graalvm.wasm.srcs",
++        "//wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/representation:org.graalvm.wasm.srcs",
++        "//wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/exception:org.graalvm.wasm.srcs",
++        "//wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/globals:org.graalvm.wasm.srcs",
++        "//wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/memory:org.graalvm.wasm.srcs",
++        "//wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/nodes:org.graalvm.wasm.srcs",
++        "//wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/parser/bytecode:org.graalvm.wasm.srcs",
++        "//wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/parser/ir:org.graalvm.wasm.srcs",
++        "//wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/parser/validation:org.graalvm.wasm.srcs",
++        "//wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/predefined:org.graalvm.wasm.srcs",
++        "//wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/predefined/emscripten:org.graalvm.wasm.srcs",
++        "//wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/predefined/go:org.graalvm.wasm.srcs",
++        "//wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/predefined/spectest:org.graalvm.wasm.srcs",
++        "//wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/predefined/testutil:org.graalvm.wasm.srcs",
++        "//wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/predefined/wasi:org.graalvm.wasm.srcs",
++        "//wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/predefined/wasi/fd:org.graalvm.wasm.srcs",
++        "//wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/predefined/wasi/types:org.graalvm.wasm.srcs",
++        "//wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/struct:org.graalvm.wasm.srcs",
++        "//wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/types:org.graalvm.wasm.srcs",
++        "//wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/util:org.graalvm.wasm.srcs",
++        "//wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/vector:org.graalvm.wasm.srcs",
++    ],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++        "--add-modules",
++        "jdk.unsupported",
++    ],
++    mx_resource_root = "src/org.graalvm.wasm/src",
++    plugins = [
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    resources = ["//wasm/src/org.graalvm.wasm/src/META-INF/native-image/org.graalvm.wasm/wasm-language:org.graalvm.wasm.resources"],
++    visibility = ["//visibility:public"],
++    deps = [
++        "//sdk:COLLECTIONS",
++        "//sdk:NATIVEIMAGE",
++        "//sdk:POLYGLOT",
++        "//truffle:TRUFFLE_API",
++    ],
++)
++
++mx_jvmci_library(
++    name = "org.graalvm.wasm.jdk25",
++    srcs = [
++        "//wasm/src/org.graalvm.wasm.jdk25/src/org/graalvm/wasm/memory:org.graalvm.wasm.jdk25.srcs",
++        "//wasm/src/org.graalvm.wasm.jdk25/src/org/graalvm/wasm/vector:org.graalvm.wasm.jdk25.srcs",
++    ],
++    javacopts = [
++        "--release",
++        "25",
++        "-parameters",
++        "--add-modules",
++        "jdk.incubator.vector",
++        "-Xlint:-incubating",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":org.graalvm.wasm",
++        "//truffle:TRUFFLE_API",
++    ],
++)
++
++mx_project(
++    name = "org.graalvm.wasm.launcher",
++    packages = ["//wasm/src/org.graalvm.wasm.launcher/src/org/graalvm/wasm/launcher"],
++    visibility = ["//visibility:public"],
++    deps = [
++        "//sdk:LAUNCHER_COMMON",
++        "//sdk:POLYGLOT",
++    ],
++)
++
++mx_processed_java(
++    name = "org.graalvm.wasm.test",
++    testonly = True,
++    srcs = [
++        "//wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test:org.graalvm.wasm.test.srcs",
++        "//wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/gc:org.graalvm.wasm.test.srcs",
++        "//wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/options:org.graalvm.wasm.test.srcs",
++        "//wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/regress:org.graalvm.wasm.test.srcs",
++        "//wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites:org.graalvm.wasm.test.srcs",
++        "//wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/arithmetic:org.graalvm.wasm.test.srcs",
++        "//wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/bytecode:org.graalvm.wasm.test.srcs",
++        "//wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/control:org.graalvm.wasm.test.srcs",
++        "//wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/debugging:org.graalvm.wasm.test.srcs",
++        "//wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/linker:org.graalvm.wasm.test.srcs",
++        "//wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/memory:org.graalvm.wasm.test.srcs",
++        "//wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/table:org.graalvm.wasm.test.srcs",
++        "//wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/validation:org.graalvm.wasm.test.srcs",
++        "//wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/wasi:org.graalvm.wasm.test.srcs",
++        "//wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/webassembly:org.graalvm.wasm.test.srcs",
++    ],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++        "--add-modules",
++        "java.logging",
++    ],
++    mx_resource_root = "src/org.graalvm.wasm.test/src",
++    plugins = [
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    resources = [
++        "//wasm/src/org.graalvm.wasm.test/src/test/block-with-locals:org.graalvm.wasm.test.resources",
++        "//wasm/src/org.graalvm.wasm.test/src/test/branch-block:org.graalvm.wasm.test.resources",
++        "//wasm/src/org.graalvm.wasm.test/src/test/emcc:org.graalvm.wasm.test.resources",
++        "//wasm/src/org.graalvm.wasm.test/src/test/exceptions:org.graalvm.wasm.test.resources",
++        "//wasm/src/org.graalvm.wasm.test/src/test/gc:org.graalvm.wasm.test.resources",
++        "//wasm/src/org.graalvm.wasm.test/src/test/gc/canonical_super_access:org.graalvm.wasm.test.resources",
++        "//wasm/src/org.graalvm.wasm.test/src/test/gc/cross_module_struct_access:org.graalvm.wasm.test.resources",
++        "//wasm/src/org.graalvm.wasm.test/src/test/if-then-else:org.graalvm.wasm.test.resources",
++        "//wasm/src/org.graalvm.wasm.test/src/test/issue:org.graalvm.wasm.test.resources",
++        "//wasm/src/org.graalvm.wasm.test/src/test/linker:org.graalvm.wasm.test.resources",
++        "//wasm/src/org.graalvm.wasm.test/src/test/linker/dynamic_data_offset:org.graalvm.wasm.test.resources",
++        "//wasm/src/org.graalvm.wasm.test/src/test/linker/dynamic_elem_offset:org.graalvm.wasm.test.resources",
++        "//wasm/src/org.graalvm.wasm.test/src/test/linker/global_const_expressions:org.graalvm.wasm.test.resources",
++        "//wasm/src/org.graalvm.wasm.test/src/test/linker/global_initialization:org.graalvm.wasm.test.resources",
++        "//wasm/src/org.graalvm.wasm.test/src/test/linker/import_export_exceptions:org.graalvm.wasm.test.resources",
++        "//wasm/src/org.graalvm.wasm.test/src/test/linker/import_export_functions:org.graalvm.wasm.test.resources",
++        "//wasm/src/org.graalvm.wasm.test/src/test/linker/import_export_globals:org.graalvm.wasm.test.resources",
++        "//wasm/src/org.graalvm.wasm.test/src/test/linker/import_export_legacy_exceptions:org.graalvm.wasm.test.resources",
++        "//wasm/src/org.graalvm.wasm.test/src/test/linker/import_export_memory:org.graalvm.wasm.test.resources",
++        "//wasm/src/org.graalvm.wasm.test/src/test/linker/import_export_mutable_globals:org.graalvm.wasm.test.resources",
++        "//wasm/src/org.graalvm.wasm.test/src/test/linker/import_export_table:org.graalvm.wasm.test.resources",
++        "//wasm/src/org.graalvm.wasm.test/src/test/linker/import_func_twice:org.graalvm.wasm.test.resources",
++        "//wasm/src/org.graalvm.wasm.test/src/test/linker/memory_import_requires_maximum:org.graalvm.wasm.test.resources",
++        "//wasm/src/org.graalvm.wasm.test/src/test/linker/relative_data_section:org.graalvm.wasm.test.resources",
++        "//wasm/src/org.graalvm.wasm.test/src/test/linker/relative_elem_section:org.graalvm.wasm.test.resources",
++        "//wasm/src/org.graalvm.wasm.test/src/test/loop-block:org.graalvm.wasm.test.resources",
++        "//wasm/src/org.graalvm.wasm.test/src/test/memory:org.graalvm.wasm.test.resources",
++        "//wasm/src/org.graalvm.wasm.test/src/test/multi-memory:org.graalvm.wasm.test.resources",
++        "//wasm/src/org.graalvm.wasm.test/src/test/multi-memory/multi_import_export:org.graalvm.wasm.test.resources",
++        "//wasm/src/org.graalvm.wasm.test/src/test/multi-value:org.graalvm.wasm.test.resources",
++        "//wasm/src/org.graalvm.wasm.test/src/test/multiple-functions:org.graalvm.wasm.test.resources",
++        "//wasm/src/org.graalvm.wasm.test/src/test/references:org.graalvm.wasm.test.resources",
++        "//wasm/src/org.graalvm.wasm.test/src/test/simple-block:org.graalvm.wasm.test.resources",
++        "//wasm/src/org.graalvm.wasm.test/src/test/table:org.graalvm.wasm.test.resources",
++        "//wasm/src/org.graalvm.wasm.test/src/test/tail-call:org.graalvm.wasm.test.resources",
++        "//wasm/src/org.graalvm.wasm.test/src/test/tail-call/tail_call_import_export:org.graalvm.wasm.test.resources",
++        "//wasm/src/org.graalvm.wasm.test/src/test/threads:org.graalvm.wasm.test.resources",
++        "//wasm/src/org.graalvm.wasm.test/src/test/wasi:org.graalvm.wasm.test.resources",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":org.graalvm.wasm",
++        ":org.graalvm.wasm.utils",
++        "//sdk:COLLECTIONS",
++        "//sdk:POLYGLOT",
++        "//truffle:TRUFFLE_API",
++        "//truffle:TRUFFLE_TCK",
++        "@contrib_rules_jvm_deps//:junit_junit",
++        "@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.TypeRepresentationSuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.TypeRepresentationSuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.WasmJsApiSuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.WasmJsApiSuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.WasmLateLinkingSuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.WasmLateLinkingSuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.WasmMemoryLeakSuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.WasmMemoryLeakSuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.WasmPolyglotTestSuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.WasmPolyglotTestSuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.WasmStackTraceTest",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.WasmStackTraceTest",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.WasmTestSuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.WasmTestSuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.gc.GCSuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.gc.GCSuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.regress.GR54505Test",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.regress.GR54505Test",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.regress.WasiRegressionTests",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.regress.WasiRegressionTests",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.WasmImplementationLimitationsSuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.suites.WasmImplementationLimitationsSuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.arithmetic.Float32Suite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.suites.arithmetic.Float32Suite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.arithmetic.Float64Suite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.suites.arithmetic.Float64Suite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.arithmetic.Integer32Suite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.suites.arithmetic.Integer32Suite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.arithmetic.Integer64Suite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.suites.arithmetic.Integer64Suite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.arithmetic.ReferenceTypeSuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.suites.arithmetic.ReferenceTypeSuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.arithmetic.WideArithmeticSuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.suites.arithmetic.WideArithmeticSuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.bytecode.BranchHintSuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.suites.bytecode.BranchHintSuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.bytecode.BytecodeSuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.suites.bytecode.BytecodeSuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.bytecode.MultiInstantiationSuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.suites.bytecode.MultiInstantiationSuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.bytecode.WasmLegacyCatchOSRSuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.suites.bytecode.WasmLegacyCatchOSRSuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.bytecode.WasmOSRSuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.suites.bytecode.WasmOSRSuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.control.BlockWithLocalsSuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.suites.control.BlockWithLocalsSuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.control.BranchBlockSuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.suites.control.BranchBlockSuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.control.ExceptionSuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.suites.control.ExceptionSuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.control.IfThenElseSuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.suites.control.IfThenElseSuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.control.LoopBlockSuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.suites.control.LoopBlockSuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.control.MultiValueSuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.suites.control.MultiValueSuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.control.MultipleFunctionsSuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.suites.control.MultipleFunctionsSuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.control.SimpleBlockSuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.suites.control.SimpleBlockSuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.control.TailCallSuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.suites.control.TailCallSuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.debugging.DebugObjectFactorySuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.suites.debugging.DebugObjectFactorySuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.debugging.DebugSourceLoadSuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.suites.debugging.DebugSourceLoadSuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.debugging.DebugValidationSuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.suites.debugging.DebugValidationSuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.linker.LinkerSuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.suites.linker.LinkerSuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.memory.Memory64Suite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.suites.memory.Memory64Suite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.memory.MemoryFillSuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.suites.memory.MemoryFillSuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.memory.MemorySuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.suites.memory.MemorySuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.memory.MultiMemorySuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.suites.memory.MultiMemorySuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.memory.ThreadsSuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.suites.memory.ThreadsSuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.table.Table64Suite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.suites.table.Table64Suite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.table.TableSuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.suites.table.TableSuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.validation.MultiValueValidationSuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.suites.validation.MultiValueValidationSuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.validation.ReferenceTypesValidationSuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.suites.validation.ReferenceTypesValidationSuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.validation.ValidationSuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.suites.validation.ValidationSuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.wasi.WasiOptionsSuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.suites.wasi.WasiOptionsSuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.wasi.WasiSuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.suites.wasi.WasiSuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.webassembly.EmscriptenSuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.suites.webassembly.EmscriptenSuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_test_class(
++    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.webassembly.IssueSuite",
++    data = ["@wabt//src/tools:wat2wasm"],
++    jvm_flags = [
++        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
++        "-Dpolyglot.engine.AllowExperimentalOptions=true",
++        "-Dpolyglot.engine.WarnInterpreterOnly=false",
++        "--enable-native-access=ALL-UNNAMED",
++    ],
++    test_class = "org.graalvm.wasm.test.suites.webassembly.IssueSuite",
++    runtime_deps = [
++        ":org.graalvm.wasm.test",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_processed_java(
++    name = "org.graalvm.wasm.utils",
++    testonly = True,
++    srcs = [
++        "//wasm/src/org.graalvm.wasm.utils/src/org/graalvm/wasm/utils:org.graalvm.wasm.utils.srcs",
++        "//wasm/src/org.graalvm.wasm.utils/src/org/graalvm/wasm/utils/cases:org.graalvm.wasm.utils.srcs",
++    ],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++    ],
++    plugins = [
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":org.graalvm.wasm",
++        "//sdk:COLLECTIONS",
++        "//sdk:POLYGLOT",
++        "//truffle:TRUFFLE_API",
++        "@contrib_rules_jvm_deps//:junit_junit",
++        "@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
++    ],
++)
++
++mx_jar_dist(
++    name = "WASM",
++    contents = [":org.graalvm.wasm"],
++    directives = [
++        "exports org.graalvm.wasm.struct",
++        "requires jdk.unsupported",
++        "requires org.graalvm.collections",
++        "requires org.graalvm.nativeimage",
++        "requires org.graalvm.polyglot",
++        "requires org.graalvm.truffle",
++        "requires static jdk.incubator.vector",
++        "requires transitive org.graalvm.word",
++    ],
++    jni_services = True,
++    manifest = {
++        "Implementation-Vendor": "Oracle Corporation",
++        "Implementation-Version": "25.5.5-dev",
++        "Name": "wasm-language",
++        "Specification-Vendor": "Oracle Corporation",
++        "Specification-Version": "25.5.5-dev",
++    },
++    module_name = "org.graalvm.wasm",
++    overlays = {
++        ":org.graalvm.wasm.jdk25": "25",
++    },
++    release = 21,
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [
++        "//sdk:POLYGLOT",
++        "//truffle:TRUFFLE_API",
++    ],
++)
++
++mx_jar_dist(
++    name = "WASM_LAUNCHER",
++    contents = [":org.graalvm.wasm.launcher"],
++    directives = [
++        "exports org.graalvm.wasm.launcher to org.graalvm.launcher",
++        "requires org.graalvm.launcher",
++        "requires org.graalvm.polyglot",
++        "requires transitive org.graalvm.word",
++    ],
++    manifest = {
++        "Main-Class": "org.graalvm.wasm.launcher.WasmLauncher",
++    },
++    module_name = "org.graalvm.wasm.launcher",
++    release = 21,
++    visibility = ["//visibility:public"],
++    deps = ["//sdk:LAUNCHER_COMMON"],
++)
++
++mx_pom_dist(
++    name = "WASM_POM",
++    out = "wasm.pom",
++    content = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project xmlns=\"http://maven.apache.org/POM/4.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\">\n  <modelVersion>4.0.0</modelVersion>\n  <groupId>org.graalvm.wasm</groupId>\n  <artifactId>wasm</artifactId>\n  <version>25.5.5-dev</version>\n  <packaging>pom</packaging>\n  <url>http://graalvm.org/webassembly</url>\n  <name>Wasm Pom</name>\n  <description>GraalWasm, a high-performance embeddable WebAssembly runtime for Java. This POM dependency includes GraalWasm dependencies and Truffle.</description>\n  <developers>\n    <developer>\n      <name>GraalVM Development</name>\n      <email>graalvm-dev@oss.oracle.com</email>\n      <organization>Oracle Corporation</organization>\n      <organizationUrl>http://www.graalvm.org/</organizationUrl>\n    </developer>\n  </developers>\n  <licenses>\n    <license>\n      <name>Universal Permissive License, Version 1.0</name>\n      <url>http://opensource.org/licenses/UPL</url>\n    </license>\n  </licenses>\n  <dependencies>\n    <dependency>\n      <groupId>org.graalvm.wasm</groupId>\n      <artifactId>wasm-language</artifactId>\n      <version>25.5.5-dev</version>\n      <scope>runtime</scope>\n    </dependency>\n    <dependency>\n      <groupId>org.graalvm.truffle</groupId>\n      <artifactId>truffle-runtime</artifactId>\n      <version>25.5.5-dev</version>\n      <scope>runtime</scope>\n    </dependency>\n  </dependencies>\n</project>\n",
++    visibility = ["//visibility:public"],
++    deps = [
++        ":WASM",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_exported_tar(
++    name = "WASM_GRAALVM_LICENSES",
++    format = "tar",
++    members = {
++        "LICENSE": "LICENSE_WASM.txt",
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_exported_tar(
++    name = "WASM_GRAALVM_SUPPORT",
++    format = "tar",
++    members = {
++        "mx.wasm/native-image.properties": "native-image.properties",
++    },
++    visibility = ["//visibility:public"],
++)
+diff --git a/wasm/src/org.graalvm.wasm/src/META-INF/native-image/org.graalvm.wasm/wasm-language/BUILD.bazel b/wasm/src/org.graalvm.wasm/src/META-INF/native-image/org.graalvm.wasm/wasm-language/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm/src/META-INF/native-image/org.graalvm.wasm/wasm-language/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.resources",
++    srcs = ["native-image.properties"],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/BUILD.bazel b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/BUILD.bazel
+@@ -0,0 +1,45 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.srcs",
++    srcs = [
++        "Assert.java",
++        "BinaryParser.java",
++        "BinaryStreamParser.java",
++        "EmbedderDataHolder.java",
++        "GlobalRegistry.java",
++        "ImportDescriptor.java",
++        "ImportValueSupplier.java",
++        "LinkAction.java",
++        "Linker.java",
++        "MemoryContext.java",
++        "ModuleLimits.java",
++        "RuntimeState.java",
++        "SymbolTable.java",
++        "WasmArguments.java",
++        "WasmCodeEntry.java",
++        "WasmConstant.java",
++        "WasmContext.java",
++        "WasmContextOptions.java",
++        "WasmCustomSection.java",
++        "WasmFileDetector.java",
++        "WasmFunction.java",
++        "WasmFunctionInstance.java",
++        "WasmInstance.java",
++        "WasmInstanceExports.java",
++        "WasmInstantiator.java",
++        "WasmLanguage.java",
++        "WasmMath.java",
++        "WasmModule.java",
++        "WasmNamesObject.java",
++        "WasmOptions.java",
++        "WasmScope.java",
++        "WasmStore.java",
++        "WasmTable.java",
++        "WasmTag.java",
++        "WasmType.java",
++        "WasmTypedHeapObject.java",
++        "WasmUtil.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/api/BUILD.bazel b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/api/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/api/BUILD.bazel
+@@ -0,0 +1,21 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.srcs",
++    srcs = [
++        "ByteArrayBuffer.java",
++        "Dictionary.java",
++        "Executable.java",
++        "ExecuteHostFunctionNode.java",
++        "ImportExportKind.java",
++        "InteropArray.java",
++        "InteropCallAdapterNode.java",
++        "JsConstants.java",
++        "ModuleExportDescriptor.java",
++        "ModuleImportDescriptor.java",
++        "Sequence.java",
++        "WasmModuleWithSource.java",
++        "WebAssembly.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/array/BUILD.bazel b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/array/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/array/BUILD.bazel
+@@ -0,0 +1,17 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.srcs",
++    srcs = [
++        "WasmArray.java",
++        "WasmFloat32Array.java",
++        "WasmFloat64Array.java",
++        "WasmInt16Array.java",
++        "WasmInt32Array.java",
++        "WasmInt64Array.java",
++        "WasmInt8Array.java",
++        "WasmRefArray.java",
++        "WasmVec128Array.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/collection/BUILD.bazel b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/collection/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/collection/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.srcs",
++    srcs = [
++        "BooleanArrayList.java",
++        "ByteArrayList.java",
++        "IntArrayList.java",
++        "LongArrayList.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/constants/BUILD.bazel b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/constants/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/constants/BUILD.bazel
+@@ -0,0 +1,23 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.srcs",
++    srcs = [
++        "Bytecode.java",
++        "BytecodeBitEncoding.java",
++        "CallIndirect.java",
++        "Debug.java",
++        "ExceptionHandlerType.java",
++        "ExportIdentifier.java",
++        "ImportIdentifier.java",
++        "Instructions.java",
++        "LimitsPrefix.java",
++        "Mutability.java",
++        "NameSection.java",
++        "Section.java",
++        "SegmentMode.java",
++        "Sizes.java",
++        "StackEffects.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/BUILD.bazel b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.srcs",
++    srcs = [
++        "DebugLineMap.java",
++        "DebugLineSection.java",
++        "DebugLocation.java",
++        "WasmDebugException.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/data/BUILD.bazel b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/data/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/data/BUILD.bazel
+@@ -0,0 +1,17 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.srcs",
++    srcs = [
++        "DebugAddressSize.java",
++        "DebugConstants.java",
++        "DebugContext.java",
++        "DebugDataUtil.java",
++        "DebugFunction.java",
++        "DebugObject.java",
++        "DebugObjectFactory.java",
++        "DebugType.java",
++        "DebugTypeRef.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/data/objects/BUILD.bazel b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/data/objects/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/data/objects/BUILD.bazel
+@@ -0,0 +1,17 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.srcs",
++    srcs = [
++        "DebugBinding.java",
++        "DebugConstantObject.java",
++        "DebugLink.java",
++        "DebugMember.java",
++        "DebugParameter.java",
++        "DebugRelocatedMember.java",
++        "DebugScopeValue.java",
++        "DebugValue.java",
++        "DebugVariable.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/data/types/BUILD.bazel b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/data/types/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/data/types/BUILD.bazel
+@@ -0,0 +1,18 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.srcs",
++    srcs = [
++        "DebugArrayType.java",
++        "DebugBaseType.java",
++        "DebugEnumType.java",
++        "DebugInheritance.java",
++        "DebugPointerToMemberType.java",
++        "DebugPointerType.java",
++        "DebugStructType.java",
++        "DebugSubroutineType.java",
++        "DebugTypeDef.java",
++        "DebugVariantType.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/encoding/BUILD.bazel b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/encoding/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/encoding/BUILD.bazel
+@@ -0,0 +1,14 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.srcs",
++    srcs = [
++        "AttributeEncodings.java",
++        "Attributes.java",
++        "DataEncoding.java",
++        "Languages.java",
++        "Opcodes.java",
++        "Tags.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/languages/BUILD.bazel b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/languages/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/languages/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.srcs",
++    srcs = ["DebugLanguageSupport.java"],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/languages/c/BUILD.bazel b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/languages/c/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/languages/c/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.srcs",
++    srcs = [
++        "CConstants.java",
++        "CObjectFactory.java",
++        "CPointer.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/languages/cpp/BUILD.bazel b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/languages/cpp/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/languages/cpp/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.srcs",
++    srcs = [
++        "CppConstants.java",
++        "CppObjectFactory.java",
++        "CppString.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/languages/rust/BUILD.bazel b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/languages/rust/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/languages/rust/BUILD.bazel
+@@ -0,0 +1,14 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.srcs",
++    srcs = [
++        "RustArrayType.java",
++        "RustConstants.java",
++        "RustFunctionType.java",
++        "RustObjectFactory.java",
++        "RustPointer.java",
++        "RustString.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/parser/BUILD.bazel b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/parser/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/parser/BUILD.bazel
+@@ -0,0 +1,18 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.srcs",
++    srcs = [
++        "AbbreviationDeclaration.java",
++        "DebugData.java",
++        "DebugParseUnit.java",
++        "DebugParser.java",
++        "DebugParserContext.java",
++        "DebugParserScope.java",
++        "DebugSourceLoader.java",
++        "DebugState.java",
++        "DebugTranslator.java",
++        "DebugUtil.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/representation/BUILD.bazel b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/representation/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/debugging/representation/BUILD.bazel
+@@ -0,0 +1,15 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.srcs",
++    srcs = [
++        "DebugArrayDisplayValue.java",
++        "DebugConstantDisplayValue.java",
++        "DebugDisplayValue.java",
++        "DebugObjectDisplayValue.java",
++        "DebugPrimitiveValue.java",
++        "DebugScopeDisplayValue.java",
++        "WasmVariableNamesObject.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/exception/BUILD.bazel b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/exception/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/exception/BUILD.bazel
+@@ -0,0 +1,14 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.srcs",
++    srcs = [
++        "ExceptionProvider.java",
++        "ExceptionProviders.java",
++        "Failure.java",
++        "WasmException.java",
++        "WasmJsApiException.java",
++        "WasmRuntimeException.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/globals/BUILD.bazel b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/globals/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/globals/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.srcs",
++    srcs = ["WasmGlobal.java"],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/memory/BUILD.bazel b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/memory/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/memory/BUILD.bazel
+@@ -0,0 +1,16 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.srcs",
++    srcs = [
++        "ByteArrayMemorySupport.java",
++        "ByteArrayWasmMemory.java",
++        "NativeWasmMemory.java",
++        "UnsafeUtilities.java",
++        "UnsafeWasmMemory.java",
++        "WasmMemory.java",
++        "WasmMemoryFactory.java",
++        "WasmMemoryLibrary.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/nodes/BUILD.bazel b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/nodes/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/nodes/BUILD.bazel
+@@ -0,0 +1,26 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.srcs",
++    srcs = [
++        "WasmBaseStatementNode.java",
++        "WasmCallNode.java",
++        "WasmCallStubNode.java",
++        "WasmDataAccess.java",
++        "WasmDirectCallNode.java",
++        "WasmFixedMemoryImplFunctionNode.java",
++        "WasmFrame.java",
++        "WasmFunctionBaseNode.java",
++        "WasmFunctionNode.java",
++        "WasmFunctionRootNode.java",
++        "WasmIndirectCallNode.java",
++        "WasmInstrumentableFunctionNode.java",
++        "WasmInstrumentationSupportNode.java",
++        "WasmMemoryOverheadModeFunctionRootNode.java",
++        "WasmNotifyFunction.java",
++        "WasmReturnCallNode.java",
++        "WasmRootNode.java",
++        "WasmStatementNode.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/parser/bytecode/BUILD.bazel b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/parser/bytecode/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/parser/bytecode/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.srcs",
++    srcs = [
++        "BytecodeFixup.java",
++        "BytecodeGen.java",
++        "BytecodeParser.java",
++        "RuntimeBytecodeGen.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/parser/ir/BUILD.bazel b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/parser/ir/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/parser/ir/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.srcs",
++    srcs = [
++        "CallNode.java",
++        "CodeEntry.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/parser/validation/BUILD.bazel b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/parser/validation/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/parser/validation/BUILD.bazel
+@@ -0,0 +1,19 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.srcs",
++    srcs = [
++        "BlockFrame.java",
++        "ControlFrame.java",
++        "ControlStack.java",
++        "ExceptionHandler.java",
++        "ExceptionTable.java",
++        "IfFrame.java",
++        "LegacyTryFrame.java",
++        "LoopFrame.java",
++        "ParserState.java",
++        "TryTableFrame.java",
++        "ValidationErrors.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/predefined/BUILD.bazel b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/predefined/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/predefined/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.srcs",
++    srcs = [
++        "BuiltinModule.java",
++        "WasmBuiltinRootNode.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/predefined/emscripten/BUILD.bazel b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/predefined/emscripten/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/predefined/emscripten/BUILD.bazel
+@@ -0,0 +1,23 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.srcs",
++    srcs = [
++        "AbortNode.java",
++        "AbortOnCannotGrowMemoryNode.java",
++        "AlignfaultNode.java",
++        "EmscriptenGetHeapSizeNode.java",
++        "EmscriptenMemcpyBigNode.java",
++        "EmscriptenModule.java",
++        "EmscriptenNotifyMemoryGrowthNode.java",
++        "EmscriptenResizeHeapNode.java",
++        "GetTimeOfDayNode.java",
++        "LLVMExp2F64Node.java",
++        "LockNode.java",
++        "SegfaultNode.java",
++        "SetErrNoNode.java",
++        "UnimplementedNode.java",
++        "UnlockNode.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/predefined/go/BUILD.bazel b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/predefined/go/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/predefined/go/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.srcs",
++    srcs = [
++        "GoFunctionNode.java",
++        "GoModule.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/predefined/spectest/BUILD.bazel b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/predefined/spectest/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/predefined/spectest/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.srcs",
++    srcs = [
++        "PrintNode.java",
++        "SpectestModule.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/predefined/testutil/BUILD.bazel b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/predefined/testutil/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/predefined/testutil/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.srcs",
++    srcs = [
++        "RunCustomInitializationNode.java",
++        "TestutilModule.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/predefined/wasi/BUILD.bazel b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/predefined/wasi/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/predefined/wasi/BUILD.bazel
+@@ -0,0 +1,52 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.srcs",
++    srcs = [
++        "FlagUtils.java",
++        "SuppressFBWarnings.java",
++        "WasiArgsGetNode.java",
++        "WasiArgsSizesGetNode.java",
++        "WasiClockResGetNode.java",
++        "WasiClockTimeGetNode.java",
++        "WasiConstantRandomGetNode.java",
++        "WasiEnvironGetNode.java",
++        "WasiEnvironSizesGetNode.java",
++        "WasiFdAdviseNode.java",
++        "WasiFdCloseNode.java",
++        "WasiFdDatasyncNode.java",
++        "WasiFdFdstatGetNode.java",
++        "WasiFdFdstatSetFlagsNode.java",
++        "WasiFdFdstatSetRightsNode.java",
++        "WasiFdFilestatGetNode.java",
++        "WasiFdFilestatSetSizeNode.java",
++        "WasiFdFilestatSetTimesNode.java",
++        "WasiFdPreadNode.java",
++        "WasiFdPrestatDirNameNode.java",
++        "WasiFdPrestatGetNode.java",
++        "WasiFdPwriteNode.java",
++        "WasiFdReadNode.java",
++        "WasiFdReaddirNode.java",
++        "WasiFdRenumberNode.java",
++        "WasiFdSeekNode.java",
++        "WasiFdSyncNode.java",
++        "WasiFdTellNode.java",
++        "WasiFdWriteNode.java",
++        "WasiModule.java",
++        "WasiPathCreateDirectoryNode.java",
++        "WasiPathFileStatGetNode.java",
++        "WasiPathFilestatSetTimesNode.java",
++        "WasiPathLinkNode.java",
++        "WasiPathOpenNode.java",
++        "WasiPathReadLinkNode.java",
++        "WasiPathRemoveDirectoryNode.java",
++        "WasiPathRenameNode.java",
++        "WasiPathSymlinkNode.java",
++        "WasiPathUnlinkFileNode.java",
++        "WasiProcExitNode.java",
++        "WasiRandomGetNode.java",
++        "WasiSchedYieldNode.java",
++        "WasiUnsupportedFunctionNode.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/predefined/wasi/fd/BUILD.bazel b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/predefined/wasi/fd/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/predefined/wasi/fd/BUILD.bazel
+@@ -0,0 +1,18 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.srcs",
++    srcs = [
++        "DirectoryFd.java",
++        "Fd.java",
++        "FdManager.java",
++        "FdUtils.java",
++        "FileFd.java",
++        "InputStreamFd.java",
++        "OutputStreamFd.java",
++        "PreopenedDirectory.java",
++        "PreopenedDirectoryFd.java",
++        "SeekableByteChannelFd.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/predefined/wasi/types/BUILD.bazel b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/predefined/wasi/types/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/predefined/wasi/types/BUILD.bazel
+@@ -0,0 +1,38 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.srcs",
++    srcs = [
++        "Advice.java",
++        "Clockid.java",
++        "Dirent.java",
++        "Errno.java",
++        "Event.java",
++        "EventFdReadwrite.java",
++        "Eventrwflags.java",
++        "Eventtype.java",
++        "Fdflags.java",
++        "Fdstat.java",
++        "Filestat.java",
++        "Filetype.java",
++        "Fstflags.java",
++        "Iovec.java",
++        "Lookupflags.java",
++        "Oflags.java",
++        "Preopentype.java",
++        "Prestat.java",
++        "PrestatDir.java",
++        "Riflags.java",
++        "Rights.java",
++        "Roflags.java",
++        "Sdflags.java",
++        "Signal.java",
++        "Subclockflags.java",
++        "Subscription.java",
++        "SubscriptionClock.java",
++        "SubscriptionFdReadwrite.java",
++        "SubscriptionU.java",
++        "Whence.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/struct/BUILD.bazel b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/struct/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/struct/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.srcs",
++    srcs = [
++        "WasmStruct.java",
++        "WasmStructAccess.java",
++        "WasmStructFactory.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/types/BUILD.bazel b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/types/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/types/BUILD.bazel
+@@ -0,0 +1,24 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.srcs",
++    srcs = [
++        "AbstractHeapType.java",
++        "ArrayType.java",
++        "CompositeType.java",
++        "DefinedType.java",
++        "FieldType.java",
++        "FunctionType.java",
++        "HeapType.java",
++        "NumberType.java",
++        "PackedType.java",
++        "RecursiveTypes.java",
++        "ReferenceType.java",
++        "StorageType.java",
++        "StructType.java",
++        "SubType.java",
++        "ValueType.java",
++        "VectorType.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/util/BUILD.bazel b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/util/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/util/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.srcs",
++    srcs = [
++        "ExtraDataAccessor.java",
++        "ExtraDataUtil.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/vector/BUILD.bazel b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/vector/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm/src/org/graalvm/wasm/vector/BUILD.bazel
+@@ -0,0 +1,13 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.srcs",
++    srcs = [
++        "Vector128.java",
++        "Vector128Ops.java",
++        "Vector128OpsFallback.java",
++        "Vector128OpsVectorAPI.java",
++        "Vector128Shape.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.jdk25/src/org/graalvm/wasm/memory/BUILD.bazel b/wasm/src/org.graalvm.wasm.jdk25/src/org/graalvm/wasm/memory/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.jdk25/src/org/graalvm/wasm/memory/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.jdk25.srcs",
++    srcs = ["ByteArrayMemorySupport.java"],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.jdk25/src/org/graalvm/wasm/vector/BUILD.bazel b/wasm/src/org.graalvm.wasm.jdk25/src/org/graalvm/wasm/vector/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.jdk25/src/org/graalvm/wasm/vector/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.jdk25.srcs",
++    srcs = ["Vector128OpsVectorAPI.java"],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.launcher/src/org/graalvm/wasm/launcher/BUILD.bazel b/wasm/src/org.graalvm.wasm.launcher/src/org/graalvm/wasm/launcher/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.launcher/src/org/graalvm/wasm/launcher/BUILD.bazel
+@@ -0,0 +1,26 @@
++load("@rules_java//java:defs.bzl", "java_binary")
++load("@rules_mx//mx:java.bzl", "elide_java_library")
++
++elide_java_library(
++    name = "launcher",
++    srcs = ["WasmLauncher.java"],
++    javac_opts = [
++        "--release",
++        "21",
++        "-parameters",
++    ],
++    unified_release = 21,
++    visibility = ["//:__subpackages__"],
++    exports = ["//sdk:POLYGLOT"],
++    deps = [
++        "//sdk:LAUNCHER_COMMON",
++        "//sdk:POLYGLOT",
++    ],
++)
++
++java_binary(
++    name = "WasmLauncher",
++    main_class = "org.graalvm.wasm.launcher.WasmLauncher",
++    visibility = ["//visibility:public"],
++    runtime_deps = [":launcher"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/BUILD.bazel
+@@ -0,0 +1,20 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.srcs",
++    srcs = [
++        "AbstractBinarySuite.java",
++        "AbstractWasmSuite.java",
++        "TypeRepresentationSuite.java",
++        "WasmFileSuite.java",
++        "WasmJsApiSuite.java",
++        "WasmLateLinkingSuite.java",
++        "WasmMemoryLeakSuite.java",
++        "WasmPolyglotTestSuite.java",
++        "WasmStackTraceTest.java",
++        "WasmTestCaseData.java",
++        "WasmTestSuite.java",
++        "WasmTestUtils.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/gc/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/gc/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/gc/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.srcs",
++    srcs = ["GCSuite.java"],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/options/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/options/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/options/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.srcs",
++    srcs = ["WasmTestOptions.java"],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/regress/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/regress/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/regress/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.srcs",
++    srcs = [
++        "GR54505Test.java",
++        "WasiRegressionTests.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.srcs",
++    srcs = ["WasmImplementationLimitationsSuite.java"],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/arithmetic/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/arithmetic/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/arithmetic/BUILD.bazel
+@@ -0,0 +1,14 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.srcs",
++    srcs = [
++        "Float32Suite.java",
++        "Float64Suite.java",
++        "Integer32Suite.java",
++        "Integer64Suite.java",
++        "ReferenceTypeSuite.java",
++        "WideArithmeticSuite.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/bytecode/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/bytecode/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/bytecode/BUILD.bazel
+@@ -0,0 +1,13 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.srcs",
++    srcs = [
++        "BranchHintSuite.java",
++        "BytecodeSuite.java",
++        "MultiInstantiationSuite.java",
++        "WasmLegacyCatchOSRSuite.java",
++        "WasmOSRSuite.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/control/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/control/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/control/BUILD.bazel
+@@ -0,0 +1,17 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.srcs",
++    srcs = [
++        "BlockWithLocalsSuite.java",
++        "BranchBlockSuite.java",
++        "ExceptionSuite.java",
++        "IfThenElseSuite.java",
++        "LoopBlockSuite.java",
++        "MultiValueSuite.java",
++        "MultipleFunctionsSuite.java",
++        "SimpleBlockSuite.java",
++        "TailCallSuite.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/debugging/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/debugging/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/debugging/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.srcs",
++    srcs = [
++        "DebugObjectFactorySuite.java",
++        "DebugSourceLoadSuite.java",
++        "DebugValidationSuite.java",
++        "TestObjectFactory.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/linker/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/linker/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/linker/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.srcs",
++    srcs = ["LinkerSuite.java"],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/memory/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/memory/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/memory/BUILD.bazel
+@@ -0,0 +1,13 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.srcs",
++    srcs = [
++        "Memory64Suite.java",
++        "MemoryFillSuite.java",
++        "MemorySuite.java",
++        "MultiMemorySuite.java",
++        "ThreadsSuite.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/table/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/table/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/table/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.srcs",
++    srcs = [
++        "Table64Suite.java",
++        "TableSuite.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/validation/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/validation/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/validation/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.srcs",
++    srcs = [
++        "MultiValueValidationSuite.java",
++        "ReferenceTypesValidationSuite.java",
++        "ValidationSuite.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/wasi/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/wasi/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/wasi/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.srcs",
++    srcs = [
++        "WasiOptionsSuite.java",
++        "WasiSuite.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/webassembly/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/webassembly/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/suites/webassembly/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.srcs",
++    srcs = [
++        "EmscriptenSuite.java",
++        "IssueSuite.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/test/block-with-locals/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/test/block-with-locals/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/test/block-with-locals/BUILD.bazel
+@@ -0,0 +1,15 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.resources",
++    srcs = [
++        "block_one_local.result",
++        "block_one_local.wat",
++        "block_with_many_locals.result",
++        "block_with_many_locals.wat",
++        "primitive_and_ref.result",
++        "primitive_and_ref.wat",
++        "wasm_test_index",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/test/branch-block/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/test/branch-block/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/test/branch-block/BUILD.bazel
+@@ -0,0 +1,50 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.resources",
++    srcs = [
++        "br_if-return.result",
++        "br_if-return.wat",
++        "dynamic_br_table.opts",
++        "dynamic_br_table.result",
++        "dynamic_br_table.wat",
++        "multiple_br_if_in_loop.result",
++        "multiple_br_if_in_loop.wat",
++        "multiple_br_if_in_loop_with_block.result",
++        "multiple_br_if_in_loop_with_block.wat",
++        "simple_br_before_add.result",
++        "simple_br_before_add.wat",
++        "simple_br_before_add_twice.result",
++        "simple_br_before_add_twice.wat",
++        "simple_br_if_false.result",
++        "simple_br_if_false.wat",
++        "simple_br_if_in_loop.result",
++        "simple_br_if_in_loop.wat",
++        "simple_br_if_top_level.result",
++        "simple_br_if_top_level.wat",
++        "simple_br_if_true.result",
++        "simple_br_if_true.wat",
++        "simple_br_in_loop.result",
++        "simple_br_in_loop.wat",
++        "simple_br_table_in_loop.result",
++        "simple_br_table_in_loop.wat",
++        "simple_branch_table-0.result",
++        "simple_branch_table-0.wat",
++        "simple_branch_table-1.result",
++        "simple_branch_table-1.wat",
++        "simple_branch_table-2.result",
++        "simple_branch_table-2.wat",
++        "simple_branch_table-default.result",
++        "simple_branch_table-default.wat",
++        "simple_return-0.result",
++        "simple_return-0.wat",
++        "simple_return-1.result",
++        "simple_return-1.wat",
++        "simple_return-2.result",
++        "simple_return-2.wat",
++        "simple_skip_one_level.result",
++        "simple_skip_one_level.wat",
++        "wasm_test_index",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/test/emcc/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/test/emcc/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/test/emcc/BUILD.bazel
+@@ -0,0 +1,25 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.resources",
++    srcs = [
++        "doublesum.result",
++        "doublesum.wat",
++        "fact-global.result",
++        "fact-global.wat",
++        "fact-rec.result",
++        "fact-rec.wat",
++        "fib.result",
++        "fib.wat",
++        "issue-18450-full.result",
++        "issue-18450-full.wat",
++        "sum.result",
++        "sum.wat",
++        "sum-table.result",
++        "sum-table.wat",
++        "superperfect.result",
++        "superperfect.wat",
++        "wasm_test_index",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/test/exceptions/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/test/exceptions/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/test/exceptions/BUILD.bazel
+@@ -0,0 +1,78 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.resources",
++    srcs = [
++        "empty_catch.opts",
++        "empty_catch.result",
++        "empty_catch.wat",
++        "empty_catch_all.opts",
++        "empty_catch_all.result",
++        "empty_catch_all.wat",
++        "exceptions_global_unwind.opts",
++        "exceptions_global_unwind.result",
++        "exceptions_global_unwind.wat",
++        "exceptions_indirect_call.opts",
++        "exceptions_indirect_call.result",
++        "exceptions_indirect_call.wat",
++        "exceptions_local_unwind.opts",
++        "exceptions_local_unwind.result",
++        "exceptions_local_unwind.wat",
++        "exceptions_single_func.opts",
++        "exceptions_single_func.result",
++        "exceptions_single_func.wat",
++        "exceptions_with_params.opts",
++        "exceptions_with_params.result",
++        "exceptions_with_params.wat",
++        "exceptions_with_params_catch_all.opts",
++        "exceptions_with_params_catch_all.result",
++        "exceptions_with_params_catch_all.wat",
++        "exceptions_with_params_catch_ref.opts",
++        "exceptions_with_params_catch_ref.result",
++        "exceptions_with_params_catch_ref.wat",
++        "legacy_catch_drop_cleanup.opts",
++        "legacy_catch_drop_cleanup.result",
++        "legacy_catch_drop_cleanup.wat",
++        "legacy_delegate_1.opts",
++        "legacy_delegate_1.result",
++        "legacy_delegate_1.wat",
++        "legacy_delegate_if.opts",
++        "legacy_delegate_if.result",
++        "legacy_delegate_if.wat",
++        "legacy_delegate_no_throw.opts",
++        "legacy_delegate_no_throw.result",
++        "legacy_delegate_no_throw.wat",
++        "legacy_delegate_same_range.opts",
++        "legacy_delegate_same_range.result",
++        "legacy_delegate_same_range.wat",
++        "legacy_delegate_search_continuation.opts",
++        "legacy_delegate_search_continuation.result",
++        "legacy_delegate_search_continuation.wat",
++        "legacy_delegate_throw.opts",
++        "legacy_delegate_throw.result",
++        "legacy_delegate_throw.wat",
++        "legacy_disabled.opts",
++        "legacy_disabled.result",
++        "legacy_disabled.wat",
++        "legacy_rethrow_recatch.opts",
++        "legacy_rethrow_recatch.result",
++        "legacy_rethrow_recatch.wat",
++        "legacy_simple_catch.opts",
++        "legacy_simple_catch.result",
++        "legacy_simple_catch.wat",
++        "mixed_eh_invalid.opts",
++        "mixed_eh_invalid.result",
++        "mixed_eh_invalid.wat",
++        "multi_exception_types.opts",
++        "multi_exception_types.result",
++        "multi_exception_types.wat",
++        "throw_ref.opts",
++        "throw_ref.result",
++        "throw_ref.wat",
++        "try_table_catch_with_outer_block_param.opts",
++        "try_table_catch_with_outer_block_param.result",
++        "try_table_catch_with_outer_block_param.wat",
++        "wasm_test_index",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/test/gc/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/test/gc/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/test/gc/BUILD.bazel
+@@ -0,0 +1,58 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.resources",
++    srcs = [
++        "GR-76615-negative.result",
++        "GR-76615-negative.wasm",
++        "GR-76615-negative.wat",
++        "GR-76615-positive.result",
++        "GR-76615-positive.wasm",
++        "GR-76615-positive.wat",
++        "GR-79472-struct_new_default_v128.result",
++        "GR-79472-struct_new_default_v128.wasm",
++        "GR-79472-struct_new_default_v128.wat",
++        "array_new_default_nonnullable_i31_invalid.opts",
++        "array_new_default_nonnullable_i31_invalid.result",
++        "array_new_default_nonnullable_i31_invalid.wasm",
++        "array_new_default_nonnullable_i31_invalid.wat",
++        "canonical_super_access.opts",
++        "canonical_super_access.result",
++        "cross_module_struct_access.opts",
++        "cross_module_struct_access.result",
++        "i31_constexpr_sign_corruption.opts",
++        "i31_constexpr_sign_corruption.result",
++        "i31_constexpr_sign_corruption.wasm",
++        "i31_constexpr_sign_corruption.wat",
++        "i31_negative_ref_test_eq.opts",
++        "i31_negative_ref_test_eq.result",
++        "i31_negative_ref_test_eq.wasm",
++        "i31_negative_ref_test_eq.wat",
++        "i31_normalization_edges.opts",
++        "i31_normalization_edges.result",
++        "i31_normalization_edges.wasm",
++        "i31_normalization_edges.wat",
++        "i32_array_new_negative_length_traps.opts",
++        "i32_array_new_negative_length_traps.result",
++        "i32_array_new_negative_length_traps.wasm",
++        "i32_array_new_negative_length_traps.wat",
++        "v128_array_len_is_element_count.opts",
++        "v128_array_len_is_element_count.result",
++        "v128_array_len_is_element_count.wasm",
++        "v128_array_len_is_element_count.wat",
++        "v128_array_new_data_huge_length_traps.opts",
++        "v128_array_new_data_huge_length_traps.result",
++        "v128_array_new_data_huge_length_traps.wasm",
++        "v128_array_new_data_huge_length_traps.wat",
++        "v128_array_new_huge_length_traps.opts",
++        "v128_array_new_huge_length_traps.result",
++        "v128_array_new_huge_length_traps.wasm",
++        "v128_array_new_huge_length_traps.wat",
++        "v128_constexpr_array_new_fixed_preserves_vector.opts",
++        "v128_constexpr_array_new_fixed_preserves_vector.result",
++        "v128_constexpr_array_new_fixed_preserves_vector.wasm",
++        "v128_constexpr_array_new_fixed_preserves_vector.wat",
++        "wasm_test_index",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/test/gc/canonical_super_access/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/test/gc/canonical_super_access/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/test/gc/canonical_super_access/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.resources",
++    srcs = [
++        "sub.wasm",
++        "sub.wat",
++        "super.wasm",
++        "super.wat",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/test/gc/cross_module_struct_access/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/test/gc/cross_module_struct_access/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/test/gc/cross_module_struct_access/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.resources",
++    srcs = [
++        "access.wasm",
++        "access.wat",
++        "create.wasm",
++        "create.wat",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/test/if-then-else/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/test/if-then-else/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/test/if-then-else/BUILD.bazel
+@@ -0,0 +1,17 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.resources",
++    srcs = [
++        "if_else_with_result_false.result",
++        "if_else_with_result_false.wat",
++        "if_else_with_result_true.result",
++        "if_else_with_result_true.wat",
++        "if_else_without_result.result",
++        "if_else_without_result.wat",
++        "if_without_result.result",
++        "if_without_result.wat",
++        "wasm_test_index",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/test/issue/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/test/issue/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/test/issue/BUILD.bazel
+@@ -0,0 +1,24 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.resources",
++    srcs = [
++        "GR-54851-control-stack-empty.result",
++        "GR-54851-control-stack-empty.wasm",
++        "GR-54851-typeindex-oob.result",
++        "GR-54851-typeindex-oob.wasm",
++        "GR-67557.result",
++        "GR-67557.wat",
++        "issue-18450.result",
++        "issue-18450.wat",
++        "issue-35969.opts",
++        "issue-35969.result",
++        "issue-35969.wat",
++        "issue-36944-blocks.result",
++        "issue-36944-blocks.wat",
++        "issue-36944-loops.result",
++        "issue-36944-loops.wat",
++        "wasm_test_index",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/test/linker/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/test/linker/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/test/linker/BUILD.bazel
+@@ -0,0 +1,44 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.resources",
++    srcs = [
++        "dynamic_data_offset.opts",
++        "dynamic_data_offset.result",
++        "dynamic_elem_offset.opts",
++        "dynamic_elem_offset.result",
++        "global_const_expressions.opts",
++        "global_const_expressions.result",
++        "global_initialization.opts",
++        "global_initialization.result",
++        "import_export_exceptions.opts",
++        "import_export_exceptions.result",
++        "import_export_functions.opts",
++        "import_export_functions.result",
++        "import_export_globals.opts",
++        "import_export_globals.result",
++        "import_export_legacy_exceptions.opts",
++        "import_export_legacy_exceptions.result",
++        "import_export_memory.opts",
++        "import_export_memory.result",
++        "import_export_mutable_globals.opts",
++        "import_export_mutable_globals.result",
++        "import_export_table.opts",
++        "import_export_table.result",
++        "import_func_twice.opts",
++        "import_func_twice.result",
++        "memory_import_requires_maximum.result",
++        "relative_data_section.opts",
++        "relative_data_section.result",
++        "relative_elem_section.opts",
++        "relative_elem_section.result",
++        "tail_call_in_start.opts",
++        "tail_call_in_start.result",
++        "tail_call_in_start.wat",
++        "unsafe_passive_data_segment.opts",
++        "unsafe_passive_data_segment.result",
++        "unsafe_passive_data_segment.wat",
++        "wasm_test_index",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/test/linker/dynamic_data_offset/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/test/linker/dynamic_data_offset/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/test/linker/dynamic_data_offset/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.resources",
++    srcs = [
++        "constant-pools.wat",
++        "constant-pools-globals.wat",
++        "main.wat",
++        "runtime.wat",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/test/linker/dynamic_elem_offset/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/test/linker/dynamic_elem_offset/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/test/linker/dynamic_elem_offset/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.resources",
++    srcs = [
++        "main.wat",
++        "runtime.wat",
++        "runtime-globals.wat",
++        "virtual-tables.wat",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/test/linker/global_const_expressions/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/test/linker/global_const_expressions/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/test/linker/global_const_expressions/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.resources",
++    srcs = [
++        "main.wat",
++        "mediator.wat",
++        "runtime.wat",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/test/linker/global_initialization/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/test/linker/global_initialization/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/test/linker/global_initialization/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.resources",
++    srcs = [
++        "main.wat",
++        "mediator.wat",
++        "runtime.wat",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/test/linker/import_export_exceptions/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/test/linker/import_export_exceptions/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/test/linker/import_export_exceptions/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.resources",
++    srcs = [
++        "friend.wat",
++        "main.wat",
++        "man-in-the-middle.wat",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/test/linker/import_export_functions/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/test/linker/import_export_functions/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/test/linker/import_export_functions/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.resources",
++    srcs = [
++        "friend.wat",
++        "main.wat",
++        "man-in-the-middle.wat",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/test/linker/import_export_globals/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/test/linker/import_export_globals/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/test/linker/import_export_globals/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.resources",
++    srcs = [
++        "main.wat",
++        "man-in-the-middle.wat",
++        "runtime.wat",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/test/linker/import_export_legacy_exceptions/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/test/linker/import_export_legacy_exceptions/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/test/linker/import_export_legacy_exceptions/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.resources",
++    srcs = [
++        "friend.wat",
++        "main.wat",
++        "man-in-the-middle.wat",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/test/linker/import_export_memory/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/test/linker/import_export_memory/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/test/linker/import_export_memory/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.resources",
++    srcs = [
++        "main.wat",
++        "man-in-the-middle.wat",
++        "memory.wat",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/test/linker/import_export_mutable_globals/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/test/linker/import_export_mutable_globals/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/test/linker/import_export_mutable_globals/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.resources",
++    srcs = [
++        "main.wat",
++        "man-in-the-middle.wat",
++        "runtime.wat",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/test/linker/import_export_table/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/test/linker/import_export_table/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/test/linker/import_export_table/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.resources",
++    srcs = [
++        "main.wat",
++        "man-in-the-middle.wat",
++        "table-registry.wat",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/test/linker/import_func_twice/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/test/linker/import_func_twice/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/test/linker/import_func_twice/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.resources",
++    srcs = [
++        "lib.wat",
++        "main.wat",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/test/linker/memory_import_requires_maximum/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/test/linker/memory_import_requires_maximum/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/test/linker/memory_import_requires_maximum/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.resources",
++    srcs = [
++        "main.wat",
++        "memory.wat",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/test/linker/relative_data_section/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/test/linker/relative_data_section/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/test/linker/relative_data_section/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.resources",
++    srcs = [
++        "constant-pools.wat",
++        "main.wat",
++        "runtime.wat",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/test/linker/relative_elem_section/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/test/linker/relative_elem_section/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/test/linker/relative_elem_section/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.resources",
++    srcs = [
++        "main.wat",
++        "runtime.wat",
++        "virtual-tables.wat",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/test/loop-block/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/test/loop-block/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/test/loop-block/BUILD.bazel
+@@ -0,0 +1,17 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.resources",
++    srcs = [
++        "simple_result_loop.result",
++        "simple_result_loop.wat",
++        "simple_sum.result",
++        "simple_sum.wat",
++        "simple_sum_even_steps.result",
++        "simple_sum_even_steps.wat",
++        "simple_two_loops.result",
++        "simple_two_loops.wat",
++        "wasm_test_index",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/test/memory/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/test/memory/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/test/memory/BUILD.bazel
+@@ -0,0 +1,26 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.resources",
++    srcs = [
++        "data_drop.opts",
++        "data_drop.result",
++        "data_drop.wat",
++        "dynamic_load.opts",
++        "dynamic_load.result",
++        "dynamic_load.wat",
++        "memory_copy.result",
++        "memory_copy.wat",
++        "memory_fill.result",
++        "memory_fill.wat",
++        "passive_init.opts",
++        "passive_init.result",
++        "passive_init.wat",
++        "simple-global.result",
++        "simple-global.wat",
++        "store-load.result",
++        "store-load.wat",
++        "wasm_test_index",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/test/multi-memory/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/test/multi-memory/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/test/multi-memory/BUILD.bazel
+@@ -0,0 +1,23 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.resources",
++    srcs = [
++        "multi_active_data.opts",
++        "multi_active_data.result",
++        "multi_active_data.wat",
++        "multi_bulk_instructions.opts",
++        "multi_bulk_instructions.result",
++        "multi_bulk_instructions.wat",
++        "multi_import_export.opts",
++        "multi_import_export.result",
++        "multi_size_grow.opts",
++        "multi_size_grow.result",
++        "multi_size_grow.wat",
++        "multi_store_load.opts",
++        "multi_store_load.result",
++        "multi_store_load.wat",
++        "wasm_test_index",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/test/multi-memory/multi_import_export/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/test/multi-memory/multi_import_export/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/test/multi-memory/multi_import_export/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.resources",
++    srcs = [
++        "main.wat",
++        "man-in-the-middle.wat",
++        "memory.wat",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/test/multi-value/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/test/multi-value/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/test/multi-value/BUILD.bazel
+@@ -0,0 +1,28 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.resources",
++    srcs = [
++        "block_params.result",
++        "block_params.wat",
++        "block_return.result",
++        "block_return.wat",
++        "br_block_params.result",
++        "br_block_params.wat",
++        "discount.opts",
++        "discount.result",
++        "discount.wat",
++        "function_return.result",
++        "function_return.wat",
++        "if_without_else.result",
++        "if_without_else.wat",
++        "loop_params.result",
++        "loop_params.wat",
++        "multi_functions.result",
++        "multi_functions.wat",
++        "multi_type.result",
++        "multi_type.wat",
++        "wasm_test_index",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/test/multiple-functions/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/test/multiple-functions/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/test/multiple-functions/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.resources",
++    srcs = [
++        "multiple_functions.result",
++        "multiple_functions.wat",
++        "wasm_test_index",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/test/references/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/test/references/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/test/references/BUILD.bazel
+@@ -0,0 +1,15 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.resources",
++    srcs = [
++        "extern_null.result",
++        "extern_null.wat",
++        "func.result",
++        "func.wat",
++        "func_null.result",
++        "func_null.wat",
++        "wasm_test_index",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/test/simple-block/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/test/simple-block/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/test/simple-block/BUILD.bazel
+@@ -0,0 +1,25 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.resources",
++    srcs = [
++        "block_empty_typeuse.result",
++        "block_empty_typeuse.wat",
++        "block_produce_const_int.result",
++        "block_produce_const_int.wat",
++        "block_produce_const_long.result",
++        "block_produce_const_long.wat",
++        "nested_produce_const_values.result",
++        "nested_produce_const_values.wat",
++        "nested_produce_result.result",
++        "nested_produce_result.wat",
++        "nested_three_blocks.result",
++        "nested_three_blocks.wat",
++        "nested_useless_block.result",
++        "nested_useless_block.wat",
++        "unreachable_with_locals.result",
++        "unreachable_with_locals.wat",
++        "wasm_test_index",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/test/table/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/test/table/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/test/table/BUILD.bazel
+@@ -0,0 +1,18 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.resources",
++    srcs = [
++        "active_init.result",
++        "active_init.wat",
++        "elem_drop.opts",
++        "elem_drop.result",
++        "elem_drop.wat",
++        "passive_init.result",
++        "passive_init.wat",
++        "table_copy.result",
++        "table_copy.wat",
++        "wasm_test_index",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/test/tail-call/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/test/tail-call/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/test/tail-call/BUILD.bazel
+@@ -0,0 +1,38 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.resources",
++    srcs = [
++        "count_loop_tail_call.opts",
++        "count_loop_tail_call.result",
++        "count_loop_tail_call.wat",
++        "direct_tail_call.opts",
++        "direct_tail_call.result",
++        "direct_tail_call.wat",
++        "even_odd_tail_call.opts",
++        "even_odd_tail_call.result",
++        "even_odd_tail_call.wat",
++        "exceptions_tail_call.opts",
++        "exceptions_tail_call.result",
++        "exceptions_tail_call.wat",
++        "fact_loop_tail_call.opts",
++        "fact_loop_tail_call.result",
++        "fact_loop_tail_call.wat",
++        "fib_tail_call.opts",
++        "fib_tail_call.result",
++        "fib_tail_call.wat",
++        "indirect_tail_call.opts",
++        "indirect_tail_call.result",
++        "indirect_tail_call.wat",
++        "interpreter_tail_call.opts",
++        "interpreter_tail_call.result",
++        "interpreter_tail_call.wat",
++        "ref_tail_call.opts",
++        "ref_tail_call.result",
++        "ref_tail_call.wat",
++        "tail_call_import_export.opts",
++        "tail_call_import_export.result",
++        "wasm_test_index",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/test/tail-call/tail_call_import_export/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/test/tail-call/tail_call_import_export/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/test/tail-call/tail_call_import_export/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.resources",
++    srcs = [
++        "lib.wat",
++        "main.wat",
++        "man-in-the-middle.wat",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/test/threads/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/test/threads/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/test/threads/BUILD.bazel
+@@ -0,0 +1,18 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.resources",
++    srcs = [
++        "atomic_multi_memory.opts",
++        "atomic_multi_memory.result",
++        "atomic_multi_memory.wat",
++        "atomic_rmw.opts",
++        "atomic_rmw.result",
++        "atomic_rmw.wat",
++        "atomic_store_load.opts",
++        "atomic_store_load.result",
++        "atomic_store_load.wat",
++        "wasm_test_index",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.test/src/test/wasi/BUILD.bazel b/wasm/src/org.graalvm.wasm.test/src/test/wasi/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.test/src/test/wasi/BUILD.bazel
+@@ -0,0 +1,95 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.test.resources",
++    srcs = [
++        "args-get.opts",
++        "args-get.result",
++        "args-get.wat",
++        "args-sizes-get.opts",
++        "args-sizes-get.result",
++        "args-sizes-get.wat",
++        "environ-get.opts",
++        "environ-get.result",
++        "environ-get.wat",
++        "environ-sizes-get.opts",
++        "environ-sizes-get.result",
++        "environ-sizes-get.wat",
++        "fd_advise-file.opts",
++        "fd_advise-file.result",
++        "fd_advise-file.wat",
++        "fd_fdstat_get-file.opts",
++        "fd_fdstat_get-file.result",
++        "fd_fdstat_get-file.wat",
++        "fd_fdstat_set_flags-file.opts",
++        "fd_fdstat_set_flags-file.result",
++        "fd_fdstat_set_flags-file.wat",
++        "fd_filestat_get-file.opts",
++        "fd_filestat_get-file.result",
++        "fd_filestat_get-file.wat",
++        "fd_pread_pwrite-negative-offset.opts",
++        "fd_pread_pwrite-negative-offset.result",
++        "fd_pread_pwrite-negative-offset.wat",
++        "fd_prestat_dir_name.opts",
++        "fd_prestat_dir_name.result",
++        "fd_prestat_dir_name.wat",
++        "fd_prestat_get.opts",
++        "fd_prestat_get.result",
++        "fd_prestat_get.wat",
++        "fd_read-stdin.opts",
++        "fd_read-stdin.result",
++        "fd_read-stdin.wat",
++        "fd_read-stdin-eof.opts",
++        "fd_read-stdin-eof.result",
++        "fd_read-stdin-eof.wat",
++        "fd_read-stdin-multi.opts",
++        "fd_read-stdin-multi.result",
++        "fd_read-stdin-multi.wat",
++        "fd_seek-file.opts",
++        "fd_seek-file.result",
++        "fd_seek-file.wat",
++        "iovec-memory-range-validation.opts",
++        "iovec-memory-range-validation.result",
++        "iovec-memory-range-validation.wat",
++        "path-memory-range-validation.opts",
++        "path-memory-range-validation.result",
++        "path-memory-range-validation.wat",
++        "path_create_directory.opts",
++        "path_create_directory.result",
++        "path_create_directory.wat",
++        "path_filestat_get-file.opts",
++        "path_filestat_get-file.result",
++        "path_filestat_get-file.wat",
++        "path_filestat_get-negative-path-length.opts",
++        "path_filestat_get-negative-path-length.result",
++        "path_filestat_get-negative-path-length.wat",
++        "path_filestat_set_times-file.opts",
++        "path_filestat_set_times-file.result",
++        "path_filestat_set_times-file.wat",
++        "path_link-file.opts",
++        "path_link-file.result",
++        "path_link-file.wat",
++        "path_open-existing-file.opts",
++        "path_open-existing-file.result",
++        "path_open-existing-file.wat",
++        "path_remove_directory.opts",
++        "path_remove_directory.result",
++        "path_remove_directory.wat",
++        "path_rename-file.opts",
++        "path_rename-file.result",
++        "path_rename-file.wat",
++        "path_symlink-file.opts",
++        "path_symlink-file.result",
++        "path_symlink-file.wat",
++        "proc-exit.opts",
++        "proc-exit.result",
++        "proc-exit.wat",
++        "random_get.result",
++        "random_get.wat",
++        "sched_yield.opts",
++        "sched_yield.result",
++        "sched_yield.wat",
++        "wasm_test_index",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.utils/src/org/graalvm/wasm/utils/BUILD.bazel b/wasm/src/org.graalvm.wasm.utils/src/org/graalvm/wasm/utils/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.utils/src/org/graalvm/wasm/utils/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.utils.srcs",
++    srcs = [
++        "SystemProperties.java",
++        "WasmBinaryTools.java",
++        "WasmResource.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)
+diff --git a/wasm/src/org.graalvm.wasm.utils/src/org/graalvm/wasm/utils/cases/BUILD.bazel b/wasm/src/org.graalvm.wasm.utils/src/org/graalvm/wasm/utils/cases/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/wasm/src/org.graalvm.wasm.utils/src/org/graalvm/wasm/utils/cases/BUILD.bazel
+@@ -0,0 +1,13 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "org.graalvm.wasm.utils.srcs",
++    srcs = [
++        "WasmBinaryCase.java",
++        "WasmCase.java",
++        "WasmCaseData.java",
++        "WasmMultiCase.java",
++        "WasmStringCase.java",
++    ],
++    visibility = ["//wasm:__pkg__"],
++)

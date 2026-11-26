@@ -17,6 +17,8 @@ archive_override(
     urls = ["https://github.com/elide-dev/rules_elide/archive/9d997fb3e0f0a5c95913db16d40d9a3869f813bf.tar.gz"],
 )
 
+bazel_dep(name = "wabt", version = "1.0.37.bcr.1", dev_dependency = True)
+
 bazel_dep(name = "gazelle", version = "0.54.0")
 bazel_dep(name = "contrib_rules_jvm", version = "0.35.0")
 
@@ -111,6 +113,8 @@ graal_archive(
         "//graal:vm.patch",
         "//graal:regex.patch",
         "//graal:tools.patch",
+        "//graal:wasm.patch",
+        "//graal:sulong.patch",
     ],
     sha256 = "a174bfe9204342b53d0e174c9d44a38a73eef2cdd799384cdb59caac95ab738b",
     strip_prefix = "graal-7b7825ae92c83d91bb20d76bc64b68b344449cf3",
