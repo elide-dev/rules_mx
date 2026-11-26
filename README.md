@@ -20,12 +20,13 @@ The default Python is managed CPython 3.13. The alternate configuration selects 
 
 ## Build GraalVM
 
-The pinned Graal source tree, the Elide fork `elide-dev/graal` at an `elide-25.6.x` commit, has native Bazel targets for all projects and distributions in the Truffle, compiler, Regex, Tools and Espresso Shared suites, and for all SDK projects and distributions. Run individual upstream tests by Bazel label. Use `tools/graal-coverage --missing` to list the pinned projects and distributions that still need Bazel targets.
+The pinned Elide Graal fork exposes 281 of 371 declared mx projects and 222 of 315 distributions through Bazel. The SDK, Truffle, compiler, Regex, Tools, SubstrateVM, Espresso Shared, Espresso Compiler Stub, Web Image and VM suites have labels for every declared project and distribution. Run individual upstream tests by label. Use `tools/graal-coverage --missing` to see which roots still need a Bazel implementation. [Build and test coverage by suite](graal/README.md#current-coverage)
 
 ```sh
 bazelisk build --config=elide-processors @graal//truffle:all_projects @graal//compiler:all_distributions @graal//regex:all_distributions
 bazelisk test --config=elide-processors @graal//truffle:harness_tests @graal//compiler:harness_tests
 bazelisk query 'tests(//graal:sdk_tests)'
+bazelisk test --config=labsjdk --config=elide-processors @graal//web-image:unit_tests //graal:espresso_package_test
 bazelisk test @graal//truffle:sl.test.Fibonacci
 bazelisk test --config=elide-processors @graal//compiler:sl_compilation_test
 bazelisk test --config=elide-processors @graal//truffle:sl_jit.tck.IdentityFunctionTest @graal//compiler:GR42688Test
@@ -179,7 +180,7 @@ The initial Linux x86_64 REAPI smoke build compiled and packaged the real Graal 
 
 Ordinary Java builds use Elide persistent workers and emit the ABI alongside the class jar for eligible targets. For local builds with explicitly modeled processors, `bazelisk build --config=elide-workers //tests/gazelle/... //:webserver` also enables multiplex workers and digest-keyed classpath reuse. The classpath cache disables implicit processor discovery. Use the separate RBE profile for remote execution.
 
-rules_elide has not released these changes yet, so the module pins its `main` branch at `50e0e8f` with an archive override. That commit includes the unified JVM builder (rules_elide PR #132), the JavaBuilder processor fix (PR #133) and the Native Image toolchain (PR #134). With a registered Elide runtime advertising unified JVM request version 1, `--config=elide-unified` enables fused compilation for eligible Elide Java targets. The default Elide 1.6.2 distribution uses the legacy path. Processor consumers use the JavaBuilder adapter via `--config=elide-processors`.
+The archive override pins rules_elide at `0882394`. It includes the unified JVM builder, the JavaBuilder processor adapter, the Native Image toolchain and direct invocation of the Python overlay from execution toolchains. The workspace pins the Elide 1.6.3 SDK. Processor consumers use `--config=elide-processors`. Select `--config=elide-unified` with an SDK advertising unified JVM request version 1 to enable fused compilation for eligible targets. [Python launcher changes](https://github.com/elide-dev/rules_elide/pull/138)
 
 ## Labs JDK
 

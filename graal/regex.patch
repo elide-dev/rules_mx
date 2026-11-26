@@ -2,7 +2,7 @@ diff --git a/regex/BUILD.bazel b/regex/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/regex/BUILD.bazel
-@@ -0,0 +1,421 @@
+@@ -0,0 +1,427 @@
 +load("@rules_java//java:java_import.bzl", "java_import")
 +load("@rules_java//java:java_plugin.bzl", "java_plugin")
 +load("@rules_mx//mx:graph.bzl", "mx_exported_tar", "mx_jar_dist", "mx_processed_java", "mx_test_class")
@@ -386,6 +386,12 @@ new file mode 100644
 +mx_jar_dist(
 +    name = "TREGEX_UNIT_TESTS",
 +    testonly = True,
++    archived_libraries = [
++        ":JOPTSIMPLE_4_6",
++        ":JMH_GENERATOR_ANNPROCESS_1_21",
++        ":COMMONS_MATH3_3_2",
++        ":JMH_1_21",
++    ],
 +    contents = [
 +        ":JOPTSIMPLE_4_6",
 +        ":JMH_GENERATOR_ANNPROCESS_1_21",

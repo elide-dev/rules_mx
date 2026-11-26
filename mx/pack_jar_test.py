@@ -49,6 +49,25 @@ class PackJarTest(unittest.TestCase):
                     jar.read("META-INF/services/p.Service"), b"p.Bridge\np.Guest\n"
                 )
 
+    def test_archived_libraries_keep_first_resource_and_drop_module_descriptors(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            command = [PACKER, "--output", root / "merged.jar"]
+            for name in ("first", "second"):
+                jar = root / (name + ".jar")
+                with ZipFile(jar, "w") as src:
+                    src.writestr("module-info.class", name)
+                    src.writestr("META-INF/LICENSE", name)
+                    src.writestr(name + ".class", name)
+                command.extend(["--input", jar, "--archived-library", jar])
+            subprocess.run(command, check=True)
+            with ZipFile(root / "merged.jar") as jar:
+                self.assertEqual(
+                    set(jar.namelist()),
+                    {"META-INF/LICENSE", "first.class", "second.class"},
+                )
+                self.assertEqual(jar.read("META-INF/LICENSE"), b"first")
+
     def test_mxkeep_becomes_a_directory_entry(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

@@ -1,6 +1,7 @@
 """mx extension for inspecting the resolved graph of a loaded suite."""
 
 import argparse
+import fnmatch
 from functools import cache
 import json
 import os
@@ -109,11 +110,13 @@ def bazel_graph(args):
                 if kind == "project":
                     owners = [
                         (
-                            Path(lib.get_path(resolve=False)).resolve(),
+                            root,
                             {"library": lib.qualifiedName()},
                         )
                         for lib in getattr(dep, "buildDependencies", []) + dep.deps
                         if lib.isPackedResourceLibrary() and lib.extract_path
+                        for path in [Path(lib.get_path(resolve=False))]
+                        for root in {path, path.resolve()}
                     ] + suite_roots
                     owners.sort(key=lambda item: len(item[0].parts), reverse=True)
                     directory = _graph_path(dep.dir, suite, owners)
@@ -562,13 +565,13 @@ def _classpath_distribution(dist, suite, mappings, pending):
     if (
         type(dist).__name__ != "JARDistribution"
         or not dist.deps
+        or dist.overlaps
         or dist.archiveparticipants
         or dist.is_stripped()
         or dist.use_module_path()
         or dist.excludedLibs
         or dist.optionalDependencies
         or dist.buildDependencies
-        or dist.overlaps
         or dist.manifestEntries
         or getattr(dist, "javaProperties", None)
         or getattr(dist, "requiresConcealed", None)
@@ -598,14 +601,15 @@ def _module_directives(dist, members, external, archives, mappings, library_modu
     # from their declared module descriptors. Explicit requires take precedence.
     requires = {}
     seen = set()
+    visited = set()
 
     def visit(dep):
-        if dep in seen:
+        if dep in visited:
             return
-        seen.add(dep)
-        if (dep.suite == dist.suite and dep.name not in archives) or not _module_info(
-            dep
-        ):
+        visited.add(dep)
+        if _module_info(dep):
+            seen.add(dep)
+        if dep.suite == dist.suite and dep.name not in archives:
             raise _UnsupportedLowering(
                 f"{dist.name}: module path needs an explicit --archive-dist {dep.name}"
             )
@@ -627,8 +631,10 @@ def _module_directives(dist, members, external, archives, mappings, library_modu
             requires[module] = module
         else:
             visit(dep)
-            module = _module_info(dep)["name"]
-            requires[module] = module
+            # mx traverses unnamed distributions for their dependencies but
+            # only emits a requires edge for distributions declaring a module.
+            if info_dep := _module_info(dep):
+                requires[info_dep["name"]] = info_dep["name"]
     observable = {_module_info(d)["name"] for d in seen}
     for dep in seen:
         for req in _module_info(dep).get("requires", []):
@@ -661,24 +667,30 @@ def _module_directives(dist, members, external, archives, mappings, library_modu
         packages = {}
         for entry in entries:
             subject, to, names = " ".join(entry.split()).partition(" to ")
-            matches = [subject]
-            # Shaded package names are known after source relocation and compilation.
-            if subject.endswith("*") and not any(
-                getattr(p, "shadedDependencies", None) for p in members
-            ):
-                matches = sorted(
-                    {
-                        pkg
-                        for p in members
-                        if p.isJavaProject()
-                        for pkg in _source_packages(p)
-                        if pkg.startswith(subject[:-1])
-                    }
-                )
-                if not matches:
-                    raise _UnsupportedLowering(
-                        f"{dist.name}: no packages match {subject}"
+            matches = []
+            for pattern in (name.strip() for name in subject.split(",")):
+                # Query source packages directly when possible. Binary libraries and
+                # shaded sources must expand wildcards against the final JAR entries.
+                if pattern.endswith("*") and not any(
+                    p.isLibrary() or getattr(p, "shadedDependencies", None)
+                    for p in members
+                ):
+                    found = sorted(
+                        {
+                            pkg
+                            for p in members
+                            if p.isJavaProject()
+                            for pkg in _source_packages(p)
+                            if pkg.startswith(pattern[:-1])
+                        }
                     )
+                    if not found:
+                        raise _UnsupportedLowering(
+                            f"{dist.name}: no packages match {pattern}"
+                        )
+                    matches.extend(found)
+                else:
+                    matches.append(pattern)
             for package in matches:
                 if not to:
                     packages[package] = None
@@ -700,8 +712,11 @@ def _jar_archive(dist, suite, mappings, pending, release, archives, library_modu
     jmh = ("mx._impl.mx", "JMHArchiveParticipant")
     if (
         participants - {bridge, truffle, graal, jmh}
-        or type(dist).__name__ != "JARDistribution"
-        or dist.overlaps
+        or (
+            type(dist).__name__ != "JARDistribution"
+            and (type(dist).__module__, type(dist).__name__)
+            != ("mx_espresso", "EspressoIODistribution")
+        )
         or dist.is_stripped()
         or dist.buildDependencies
         or any(
@@ -774,11 +789,13 @@ def _jar_archive(dist, suite, mappings, pending, release, archives, library_modu
         for p in dist.archiveparticipants
     ):
         result["graal_test_services"] = True
+    libraries = _dependency_labels(
+        [d for d in base if d.isLibrary()], suite, mappings, pending, True
+    )
+    if libraries:
+        result["archived_libraries"] = libraries
     if pattern := getattr(suite, "snippetsPattern", None):
         result["snippets_pattern"] = pattern
-        result["archived_libraries"] = _dependency_labels(
-            [d for d in base if d.isLibrary()], suite, mappings, pending, True
-        )
     concealed = getattr(dist, "requiresConcealed", {})
     concealed = {
         **concealed,
@@ -833,10 +850,128 @@ def _is_shaded_project(dep):
     )
 
 
+def _source_project(dep):
+    kind = (type(dep).__module__, type(dep).__name__)
+    return kind in {
+        ("mx_sdk_vm_ng", "StandaloneLicenses"),
+        ("mx_sulong_suite_constituents", "HeaderProject"),
+        ("mx_sulong_suite_constituents", "DocumentationProject"),
+    }
+
+
+def _wat_project(dep):
+    return (type(dep).__module__, type(dep).__name__) == (
+        "mx_wasm",
+        "GraalVmWatProject",
+    )
+
+
+def _emscripten_project(dep):
+    return (type(dep).__module__, type(dep).__name__) == (
+        "mx_wasm",
+        "EmscriptenProject",
+    )
+
+
+def _wasm_programs(project, options):
+    if not options.wat2wasm or not options.wasm2wat:
+        raise _UnsupportedLowering(f"{project.name}: bind --wat2wasm and --wasm2wat")
+    source = Path(project.getSourceDir())
+    programs = sorted(
+        (Path(d) / file).relative_to(source).as_posix()
+        for d, file in project.getProgramSources()
+        if not file.startswith("_")
+    )
+    task = project.getBuildTask(mx.get_opts())
+    benchmark = project.isBenchmarkProject()
+    copts, exports, native = {}, {}, []
+    for case in programs:
+        if case.endswith(".c"):
+            content = (source / case).read_text()
+            flags = [
+                flag
+                for line in re.findall(r"//\s*CFLAGS\s*=\s*(.*)", content)
+                for flag in line.split()
+            ]
+            if flags:
+                copts[case] = flags
+            exports[case] = (
+                task.benchmark_methods()
+                if benchmark
+                else task.test_methods(str((source / case).with_suffix(".opts")))
+            )
+            choice = re.search(r"//\s*NATIVE_BENCH\s*=\s*(.*)", content)
+            if benchmark and (not choice or choice[1].strip().lower() == "true"):
+                native.append(case)
+    return {
+        "name": project.name,
+        "root": source.relative_to(project.suite.dir).as_posix(),
+        "cases": programs,
+        "copts": copts,
+        "exports": exports,
+        "native": native,
+        "includes": "includes/" + project.includeset
+        if hasattr(project, "includeset")
+        else "",
+        "sidecars": sorted(
+            (Path(d) / file).relative_to(source).as_posix()
+            for d, file in project.getSources()
+            if file.endswith((".opts", ".result"))
+        ),
+        "wat2wasm": options.wat2wasm,
+        "wasm2wat": options.wasm2wat,
+        "testonly": project.is_test_project(),
+    }
+
+
+def _project_files(project):
+    members = {}
+    if type(project).__name__ == "StandaloneLicenses" or project.results is not None:
+        results = project.getArchivableResults()
+    else:
+        # These source-only projects expose their directory to build consumers.
+        # mx declares no archive members when there is no results list.
+        results = []
+    root = Path(project.suite.dir)
+    for source, member in results:
+        file = Path(source)
+        if (
+            not file.is_relative_to(root)
+            or not file.is_file()
+            or not _resource_path(member)
+        ):
+            raise _UnsupportedLowering(
+                f"{project.name}: missing or external project result {member}"
+            )
+        members[file.relative_to(root).as_posix()] = member
+    files = []
+    if not members and type(project).__name__ != "StandaloneLicenses":
+        for directory in project.source_dirs():
+            files.extend(
+                p.relative_to(root).as_posix()
+                for p in Path(directory).rglob("*")
+                if p.is_file() and p.name not in {"BUILD", "BUILD.bazel"}
+            )
+    return {
+        "name": project.name,
+        "srcs": sorted(files),
+        "members": members,
+        "testonly": project.is_test_project(),
+    }
+
+
 def _can_lower_root(dep):
     return (
         type(dep).__name__
-        in ("JavaProject", "LayoutDirDistribution", "LayoutTARDistribution")
+        in (
+            "JavaProject",
+            "LayoutDirDistribution",
+            "LayoutTARDistribution",
+            "LayoutJARDistribution",
+        )
+        or _source_project(dep)
+        or _wat_project(dep)
+        or _emscripten_project(dep)
         or _in_tree_sulong_tests(dep)
         or _is_shaded_project(dep)
         or dep.isJARDistribution()
@@ -844,14 +979,94 @@ def _can_lower_root(dep):
     )
 
 
+def _source_archive_groups(dist):
+    """mx stages .java files relative to each project's source root."""
+    groups = {}
+    for project in dist.archived_deps():
+        if (
+            type(project).__name__ != "JavaProject"
+            or project.annotation_processors()
+            or getattr(project, "multiReleaseJarVersion", None)
+            or project.suite != dist.suite
+        ):
+            raise _UnsupportedLowering(
+                f"{dist.name}: source archive requires generated or external sources"
+            )
+        for directory in map(Path, project.source_dirs()):
+            for file in sorted(directory.rglob("*.java")):
+                rel = file.relative_to(dist.suite.dir).as_posix()
+                groups[rel] = file.relative_to(directory).as_posix()
+    if not groups:
+        raise _UnsupportedLowering(f"{dist.name}: empty source archive")
+    return groups
+
+
+def _web_image_macro_layout(dist, pending, mappings):
+    import mx_sdk_vm_impl
+
+    (project,) = dist.deps
+    filename = "native-image.properties"
+    if dist.layout != {filename: "dependency:" + project.name + "/" + filename}:
+        raise _UnsupportedLowering(f"{dist.name}: unsupported macro layout")
+    task = project.getBuildTask(mx.get_opts())
+    lines = [
+        "# This file is auto-generated",
+        "ExcludeFromAll = true",
+        "ProvidedHostedOptions = " + " ".join(project.provided_hosted_options),
+    ]
+    for key, dists in (
+        ("ImageBuilderModulePath", project.builder_dists),
+        ("ImageProvidedJars", project.image_provided_jars),
+    ):
+        if dists:
+            lines.append(
+                key
+                + " = "
+                + task._escaped_macro_paths(task._macro_relative_paths(dists))
+            )
+    builders = _dependency_labels(
+        [mx.dependency(n) for n in project.builder_dists],
+        dist.suite,
+        mappings,
+        pending,
+        True,
+    )
+    name = project.name
+    return {
+        "name": dist.name,
+        "members": {":" + name: filename},
+        "archive_imports": {},
+        "testonly": dist.is_test_distribution(),
+        "macro": {
+            "name": name,
+            "lines": lines,
+            "java_args": [
+                mx_sdk_vm_impl.java_properties_escape(arg) for arg in project.java_args
+            ],
+            "builders": builders,
+        },
+    }
+
+
 def _tar_layout(dist, pending, mappings):
+    if len(dist.deps) == 1 and (
+        type(dist.deps[0]).__module__,
+        type(dist.deps[0]).__name__,
+    ) == ("mx_web_image", "WebImageMacroBuilder"):
+        return _web_image_macro_layout(dist, pending, mappings)
+    declaration = dist._orig_attrs
+    # mx also uses platformDependent to choose the staging directory. A fixed
+    # layout still produces the same member paths regardless of the Gazelle host.
+    platform_layout = declaration.keys() & {"os", "arch", "os_arch", "platforms"}
     if (
-        dist.isPlatformDependent()
+        (
+            dist.isPlatformDependent()
+            and (platform_layout or "<" in str(declaration.get("layout", {})))
+        )
         or dist.compress
         or dist.deps
         or dist.excludedLibs
         or dist.fileListEntry
-        or dist.fileListPurpose
         or dist.hashEntry
         or dist._removed_deps
     ):
@@ -859,8 +1074,9 @@ def _tar_layout(dist, pending, mappings):
             f"{dist.name}: TAR layout needs a Bazel implementation bound with --provided-target"
         )
     members = {}
+    source_archives = {}
     imports = {}
-    destinations = set()
+    destinations = {}
     inputs = set()
     for destination, source in dist._walk_layout():
         path = source.get("path")
@@ -881,6 +1097,49 @@ def _tar_layout(dist, pending, mappings):
         ):
             dep = mx.dependency(source["dependency"], context=dist)
             inputs.add(dep)
+            if (
+                kind == "dependency"
+                and path == "*"
+                and directory
+                and dep.suite == dist.suite
+                and (_wat_project(dep) or _source_project(dep))
+            ):
+                if destination and not _resource_path(destination.rstrip("/")):
+                    raise _UnsupportedLowering(
+                        f"{dist.name}: invalid project result destination {destination!r}"
+                    )
+                pending.append(dep)
+                imports.setdefault(":" + dep.name, []).append("=" + destination)
+                continue
+            if (
+                kind == "dependency"
+                and directory
+                and path in ("*", "*.jar")
+                and dep.suite == dist.suite
+                and type(dep).__name__ == "JARDistribution"
+            ):
+                pending.append(dep)
+                for _, filename in dep.getArchivableResults():
+                    if not fnmatch.fnmatchcase(filename, path):
+                        continue
+                    member = destination + filename
+                    if not _resource_path(member) or member in destinations:
+                        raise _UnsupportedLowering(
+                            f"{dist.name}: duplicate or invalid archive path {member}"
+                        )
+                    destinations[member] = None
+                    if filename == dep.default_filename():
+                        label = ":" + dep.name
+                    elif filename == dep.default_source_filename():
+                        name = dist.name + ".sources." + dep.name
+                        source_archives[name] = _source_archive_groups(dep)
+                        label = ":" + name
+                    else:
+                        raise _UnsupportedLowering(
+                            f"{dist.name}: unsupported JAR result {filename}"
+                        )
+                    members.setdefault(label, []).append(member)
+                continue
             labels = mappings.get(dep.qualifiedName())
             if labels is None and dep.suite == dist.suite and dep.isDistribution():
                 pending.append(dep)
@@ -908,7 +1167,7 @@ def _tar_layout(dist, pending, mappings):
                     raise _UnsupportedLowering(
                         f"{dist.name}: expected a unique TAR member path: {destination!r}"
                     )
-                destinations.add(destination)
+                destinations[destination] = None
                 imports.setdefault(target, []).append(path + "=" + destination)
                 continue
             if kind != "dependency" or path or directory:
@@ -923,14 +1182,21 @@ def _tar_layout(dist, pending, mappings):
             raise _UnsupportedLowering(
                 f"{dist.name}: expected a unique TAR member path: {destination!r}"
             )
-        destinations.add(destination)
+        destinations[destination] = None
         members.setdefault(target, []).append(destination)
     if not (members or imports) or inputs != set(dist.buildDependencies):
         raise _UnsupportedLowering(
             f"{dist.name}: expected a nonempty TAR layout with explicit inputs"
         )
+    if dist.fileListPurpose and imports:
+        raise _UnsupportedLowering(
+            f"{dist.name}: file list requires resolved imported member order"
+        )
     return {
         "name": dist.name,
+        **({"source_archives": source_archives} if source_archives else {}),
+        **({"file_list": list(destinations)} if dist.fileListPurpose else {}),
+        **({"format": "jar"} if type(dist).__name__ == "LayoutJARDistribution" else {}),
         "members": {target: "\n".join(entries) for target, entries in members.items()},
         "archive_imports": {
             target: "\n".join(entries) for target, entries in imports.items()
@@ -1218,6 +1484,13 @@ def bazel_buildfile(args):
         help="tag one generated JUnit class, by its fully qualified name, for explicit invocation",
     )
     parser.add_argument(
+        "--patch-module-runtime",
+        action="append",
+        default=[],
+        metavar="RELEASE=LABEL",
+        help="JDK exposing the private APIs required by a Java module patch",
+    )
+    parser.add_argument(
         "--project-release",
         action="append",
         default=[],
@@ -1259,6 +1532,12 @@ def bazel_buildfile(args):
         "--partial",
         action="store_true",
         help="export supported closures and report blocked suite roots",
+    )
+    parser.add_argument(
+        "--wasm2wat", metavar="LABEL", help="WABT disassembler for compiled C fixtures"
+    )
+    parser.add_argument(
+        "--wat2wasm", metavar="LABEL", help="WABT compiler for Wasm text projects"
     )
     parser.add_argument(
         "--sulong-fixture-sdk",
@@ -1381,6 +1660,17 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
     labs_javac = set(options.labs_javac_project)
     if labs_javac and not options.gazelle:
         parser.error("--labs-javac-project requires --gazelle")
+    patch_runtimes = {}
+    for spec in options.patch_module_runtime:
+        version, sep, label = spec.partition("=")
+        if (
+            not sep
+            or not version.isdecimal()
+            or not label.startswith(("@", "//"))
+            or int(version) in patch_runtimes
+        ):
+            parser.error("expected a unique --patch-module-runtime RELEASE=LABEL")
+        patch_runtimes[int(version)] = label
     project_releases = {}
     for spec in options.project_release:
         name, sep, value = spec.partition("=")
@@ -1495,6 +1785,9 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
     layouts = {}
     tar_layouts = {}
     bitcode_suites = {}
+    source_projects = {}
+    wasm_programs = {}
+    wat_projects = {}
     cmake_suites = {}
     javac_only_processors = set(options.javac_only_processor)
     used_javac_only = set()
@@ -1508,10 +1801,16 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             or project.name in layouts
             or project.name in tar_layouts
             or project.name in bitcode_suites
+            or project.name in source_projects
+            or project.name in wasm_programs
+            or project.name in wat_projects
             or project.name in cmake_suites
         ):
             continue
         if options.classpath_dists and project.suite == suite:
+            if type(project).__name__ == "LayoutJARDistribution":
+                tar_layouts[project.name] = _tar_layout(project, pending, java_deps)
+                continue
             if project.isJARDistribution():
                 if project.name in archives:
                     distributions[project.name] = _jar_archive(
@@ -1562,6 +1861,29 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
                     project, options.sulong_fixture_sdk
                 )
             continue
+        if options.gazelle and project.suite == suite and _source_project(project):
+            source_projects[project.name] = _project_files(project)
+            continue
+        if options.gazelle and project.suite == suite and _emscripten_project(project):
+            wasm_programs[project.name] = _wasm_programs(project, options)
+            continue
+        if options.gazelle and project.suite == suite and _wat_project(project):
+            if not options.wat2wasm:
+                raise _UnsupportedLowering(
+                    f"{project.name}: bind --wat2wasm to the WABT executable"
+                )
+            root = Path(project.getSourceDir())
+            wat_projects[project.name] = {
+                "name": project.name,
+                "tool": options.wat2wasm,
+                "root": root.relative_to(suite.dir).as_posix(),
+                "cases": sorted(
+                    (Path(d) / f).relative_to(root).as_posix()
+                    for d, f in project.getProgramSources()
+                ),
+                "testonly": project.is_test_project(),
+            }
+            continue
         shaded = options.gazelle and _is_shaded_project(project)
         if (
             not shaded and type(project).__name__ != "JavaProject"
@@ -1575,6 +1897,8 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
         if options.gazelle:
             # SpotBugs is a separate mx analysis pass.
             allowed = allowed | {"spotbugs", "spotbugsIgnoresGenerated", "javadocType"}
+            if getattr(project, "patchModule", None):
+                allowed = allowed | {"patchModule"}
             if getattr(project, "multiReleaseJarVersion", None):
                 allowed = allowed | {"multiReleaseJarVersion", "overlayTarget"}
         if options.gazelle and excluded_from_jacoco:
@@ -1636,9 +1960,16 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
                 property_data.append(labels[0])
                 property_flags.append(f"-D{key}=$(rootpath {labels[0]})")
             allowed = allowed | {"javaProperties"}
+        elif options.gazelle and not project.is_test_project():
+            # mx applies these when assembling a runtime command line. javac and
+            # JAR assembly do not substitute paths or consume the referenced files.
+            allowed = allowed | {"javaProperties"}
+        if options.gazelle:
+            allowed = allowed | {"defaultBuild"}
         if shaded:
             allowed = allowed | {
                 "class",
+                "graalCompilerSourceEdition",
                 "spotbugsIgnoresGenerated",
                 "forceJavac",
                 "shadedDependencies",
@@ -1728,6 +2059,8 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
         )
         if shaded or getattr(project, "multiReleaseJarVersion", None):
             release = project.javaCompliance.value
+        if options.partial and release not in project.javaCompliance:
+            release = project.javaCompliance.value
         release = project_releases.pop(project.name, release)
         if release not in project.javaCompliance:
             raise _UnsupportedLowering(
@@ -1783,6 +2116,7 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             coarse = bool(
                 jvmci
                 or shaded
+                or getattr(project, "patchModule", None)
                 or concealed
                 or jni_headers
                 or force_javac
@@ -1802,6 +2136,26 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
                 "packages": [] if shaded else sorted(_source_packages(project)),
                 "dirs": sorted({str(Path(src).parent) for src in sources}),
             }
+            if module := getattr(project, "patchModule", None):
+                if (
+                    release not in (17, 21, 25)
+                    or resources
+                    or processors
+                    or concealed
+                    or jni_headers
+                    or any(
+                        getattr(d, "patchModule", None) != module for d in project.deps
+                    )
+                ):
+                    raise _UnsupportedLowering(
+                        f"{project.name}: unsupported toolchain or dependency for patching {module}"
+                    )
+                record["patch_module"] = module
+                record["patch_runtime"] = patch_runtimes.get(
+                    release, f"@rules_java//toolchains:remotejdk_{release}"
+                )
+            if props := project._orig_attrs.get("javaProperties"):
+                record["runtime_property_templates"] = dict(props)
             if shaded and not record["dirs"]:
                 record["dirs"] = record["roots"]
             if jvmci:
@@ -1814,7 +2168,7 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
                 record["add_exports"] = [
                     f"{mod}/{pkg}" for mod, pkgs in concealed.items() for pkg in pkgs
                 ]
-            if concealed or jvmci:
+            if concealed or jvmci or "patch_module" in record:
                 record["options"] = [
                     "-source",
                     str(release),
@@ -1903,6 +2257,9 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             | rules.keys()
             | layouts.keys()
             | distributions.keys()
+            | source_projects.keys()
+            | wasm_programs.keys()
+            | wat_projects.keys()
             | cmake_suites.keys()
             | bitcode_suites.keys()
             | tar_layouts.keys()
@@ -1967,6 +2324,14 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             result["distributions"] = [distributions[n] for n in sorted(distributions)]
         if layouts:
             result["layouts"] = [layouts[n] for n in sorted(layouts)]
+        if source_projects:
+            result["source_projects"] = [
+                source_projects[n] for n in sorted(source_projects)
+            ]
+        if wasm_programs:
+            result["wasm_programs"] = [wasm_programs[n] for n in sorted(wasm_programs)]
+        if wat_projects:
+            result["wat_projects"] = [wat_projects[n] for n in sorted(wat_projects)]
         if cmake_suites:
             result["cmake_suites"] = [cmake_suites[n] for n in sorted(cmake_suites)]
         if bitcode_suites:

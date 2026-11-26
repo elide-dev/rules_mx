@@ -2,8 +2,9 @@
 
 load("@rules_java//java/common:java_common.bzl", "java_common")
 load("@rules_java//java/common:java_info.bzl", "JavaInfo")
+load("//graal:automatic_module.bzl", "RenamedModuleInfo")
 
-MxJarInfo = provider(fields = ["uses_jvmci", "required_exports"])
+MxJarInfo = provider(fields = ["uses_jvmci", "required_exports", "renamed_originals", "direct_exports"])
 
 _TOOLCHAIN = "@bazel_tools//tools/jdk:toolchain_type"
 
@@ -26,8 +27,8 @@ def _jar_impl(ctx):
         args.add("--manifest-entry", key + "=" + value)
     if ctx.attr.snippets_pattern:
         args.add("--snippets-pattern", ctx.attr.snippets_pattern)
-        for lib in ctx.attr.archived_libraries:
-            args.add_all(lib.files, before_each = "--archived-library")
+    for lib in ctx.attr.archived_libraries:
+        args.add_all(lib.files, before_each = "--archived-library")
     if ctx.attr.graal_services:
         args.add("--graal-test-services" if ctx.attr.graal_test_services else "--graal-services")
     if ctx.attr.truffle_services:
@@ -41,6 +42,11 @@ def _jar_impl(ctx):
         for dep in ctx.attr.deps
         if MxJarInfo in dep
     ])
+    originals = depset(transitive = [
+        dep[RenamedModuleInfo].originals
+        for dep in ctx.attr.deps
+        if RenamedModuleInfo in dep
+    ] + [dep[MxJarInfo].renamed_originals for dep in ctx.attr.deps if MxJarInfo in dep])
     tools = []
     if ctx.attr.module_name:
         if uses_jvmci:
@@ -53,6 +59,9 @@ def _jar_impl(ctx):
         args.add("--module", ctx.attr.module_name)
         args.add_all(ctx.attr.directives, before_each = "--directive")
         module_path = depset(transitive = [dep.transitive_runtime_jars for dep in dependencies])
+        replaced = {file: True for file in originals.to_list()}
+        if replaced:
+            module_path = depset([file for file in module_path.to_list() if file not in replaced])
         args.add_all(module_path, before_each = "--module-jar")
         tools.append(module_path)
     ctx.actions.run(
@@ -64,12 +73,15 @@ def _jar_impl(ctx):
         toolchain = _TOOLCHAIN,
     )
     abi = java_common.run_ijar(ctx.actions, jar, target_label = ctx.label, java_toolchain = toolchain)
+    direct_exports = ["--add-exports=" + package + "=" + ctx.attr.module_name for package in sorted({p: True for p in ctx.attr.add_exports + ctx.attr.module_exports})] if ctx.attr.module_name else []
     return [
         DefaultInfo(files = depset([jar])),
         MxJarInfo(
             uses_jvmci = uses_jvmci,
+            renamed_originals = originals,
+            direct_exports = direct_exports,
             required_exports = depset(
-                ["--add-exports=" + package + "=" + ctx.attr.module_name for package in sorted({p: True for p in ctx.attr.add_exports + ctx.attr.module_exports})] if ctx.attr.module_name else [],
+                direct_exports,
                 transitive = [dep[MxJarInfo].required_exports for dep in ctx.attr.deps if MxJarInfo in dep],
             ),
         ),
@@ -121,3 +133,30 @@ def mx_jar_dist(name, directives = [], platform_directives = [], **kwargs):
         requires_jvmci = jvmci,
         **kwargs
     )
+
+def _native_image_properties_impl(ctx):
+    exports = {}
+    for builder in ctx.attr.builders:
+        for flag in builder[MxJarInfo].direct_exports:
+            package, _, module = flag.rpartition("=")
+            exports.setdefault(package, {})[module] = True
+    arguments = list(ctx.attr.java_args)
+    for package in sorted(exports):
+        flag = package + "=" + ",".join(sorted(exports[package]))
+        arguments.append(flag.replace("=", "\\="))
+    lines = list(ctx.attr.lines)
+    if arguments:
+        lines.append("JavaArgs = " + "\\")
+        lines.extend(["  " + flag + " " + "\\" for flag in arguments])
+    output = ctx.actions.declare_file(ctx.label.name + "/native-image.properties")
+    ctx.actions.write(output, "\n".join(lines))
+    return [DefaultInfo(files = depset([output]))]
+
+mx_native_image_properties = rule(
+    implementation = _native_image_properties_impl,
+    attrs = {
+        "lines": attr.string_list(mandatory = True),
+        "java_args": attr.string_list(),
+        "builders": attr.label_list(providers = [MxJarInfo]),
+    },
+)

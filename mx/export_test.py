@@ -114,13 +114,15 @@ class ExportTest(unittest.TestCase):
             (suite / ".mx_vcs_root").touch()
             sources = suite.parent / "packed"
             sources.mkdir()
+            cache = suite / ".mx-cache"
+            cache.symlink_to(sources, target_is_directory=True)
             definition = {
                 "name": "example",
                 "mxversion": "7.89.0",
                 "projects": {
                     "demo": {
                         "javaCompliance": "17+",
-                        "sourceDirs": ["src", str(sources / "include")],
+                        "sourceDirs": ["src", str(cache / "include")],
                         "buildDependencies": ["INPUTS"],
                     },
                 },
@@ -128,7 +130,7 @@ class ExportTest(unittest.TestCase):
                     "INPUTS": {
                         "packedResource": True,
                         "optional": True,
-                        "preExtractedPath": str(sources),
+                        "preExtractedPath": str(cache),
                     },
                 },
             }
@@ -170,6 +172,8 @@ class ExportTest(unittest.TestCase):
                             },
                             "BASE": {
                                 "native": True,
+                                "platformDependent": True,
+                                "fileListPurpose": "support",
                                 "layout": {"docs/info": "file:info"},
                             },
                             "LAYER": {
@@ -240,6 +244,7 @@ class ExportTest(unittest.TestCase):
             base, layer, wrapper = graph["tar_layouts"]
             self.assertEqual(wrapper["members"], {":CUSTOM": "inner.tar"})
             self.assertEqual(base["members"], {"info": "docs/info"})
+            self.assertEqual(base["file_list"], ["docs/info"])
             self.assertEqual(layer["members"], {":BASE": "archives/original.tar"})
             self.assertEqual(
                 layer["archive_imports"], {":BASE": "docs/info=share/info"}

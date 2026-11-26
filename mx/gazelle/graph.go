@@ -30,6 +30,9 @@ type project struct {
 	Release                              int
 	Options, Dirs, Packages, Tests, Deps []string
 	Sources, Resources, Processors       []string
+	PatchModule                          string `json:"patch_module"`
+	PatchRuntime                         string `json:"patch_runtime"`
+	Roots                                []string
 	JVMCI                                bool
 	ForceJavac                           bool `json:"force_javac"`
 	JNIHeaders                           bool `json:"jni_headers"`
@@ -124,6 +127,23 @@ func (g *importer) loadGraph(root, filename string, seen map[label.Label]bool) e
 			Literals, Copies map[string]string
 			Testonly         bool
 		}
+		SourceProjects []struct {
+			Name     string
+			Members  map[string]string
+			Srcs     []string
+			Testonly bool
+		} `json:"source_projects"`
+		WasmPrograms []struct {
+			Name, Root, Wat2wasm, Wasm2wat, Includes string
+			Cases, Native, Sidecars                  []string
+			Copts, Exports                           map[string][]string
+			Testonly                                 bool
+		} `json:"wasm_programs"`
+		WatProjects []struct {
+			Name, Root, Tool string
+			Cases            []string
+			Testonly         bool
+		} `json:"wat_projects"`
 		CMakeSuites []struct {
 			Name, Root, SDK, Modules   string
 			Cases, Languages, Variants []string
@@ -136,10 +156,18 @@ func (g *importer) loadGraph(root, filename string, seen map[label.Label]bool) e
 			Testonly           bool
 		} `json:"bitcode_suites"`
 		TarLayouts []struct {
+			Format         string
 			Name           string
 			Members        map[string]string
-			ArchiveImports map[string]string `json:"archive_imports"`
-			Testonly       bool
+			ArchiveImports map[string]string            `json:"archive_imports"`
+			FileList       []string                     `json:"file_list"`
+			SourceArchives map[string]map[string]string `json:"source_archives"`
+			Macro          *struct {
+				Name            string
+				Lines, Builders []string
+				JavaArgs        []string `json:"java_args"`
+			}
+			Testonly bool
 		} `json:"tar_layouts"`
 		Plugins []struct {
 			Name           string
@@ -217,7 +245,9 @@ func (g *importer) loadGraph(root, filename string, seen map[label.Label]bool) e
 		var r *rule.Rule
 		if len(p.Sources) != 0 || p.Shade != "" {
 			kind, opts := "mx_whole_java", "javac_opts"
-			if p.Shade != "" {
+			if p.PatchModule != "" {
+				kind, opts = "mx_patch_module", "javacopts"
+			} else if p.Shade != "" {
 				kind, opts = "mx_shaded_java", "javacopts"
 			} else if p.JVMCI || p.ForceJavac {
 				kind, opts = "mx_jvmci_library", "javacopts"
@@ -225,6 +255,11 @@ func (g *importer) loadGraph(root, filename string, seen map[label.Label]bool) e
 				kind, opts = "mx_processed_java", "javacopts"
 			}
 			r = rule.NewRule(kind, p.Name)
+			if p.PatchModule != "" {
+				r.SetAttr("module_name", p.PatchModule)
+				r.SetAttr("roots", p.Roots)
+				r.SetAttr("runtime", p.PatchRuntime)
+			}
 			r.SetAttr(opts, p.Options)
 			if p.JNIHeaders {
 				r.SetAttr("jni_headers", true)
@@ -375,6 +410,54 @@ func (g *importer) loadGraph(root, filename string, seen map[label.Label]bool) e
 			return err
 		}
 	}
+	for _, p := range graph.SourceProjects {
+		r := rule.NewRule("mx_project_files", p.Name)
+		if len(p.Members) > 0 {
+			r.SetAttr("members", p.Members)
+		}
+		if len(p.Srcs) > 0 {
+			r.SetAttr("srcs", p.Srcs)
+		}
+		r.SetAttr("testonly", p.Testonly)
+		r.SetAttr("visibility", []string{"//visibility:public"})
+		if err := add(suite, r); err != nil {
+			return err
+		}
+	}
+	for _, p := range graph.WasmPrograms {
+		r := rule.NewRule("mx_wasm_programs", p.Name)
+		r.SetAttr("root", p.Root)
+		r.SetAttr("cases", p.Cases)
+		r.SetAttr("exports", p.Exports)
+		if len(p.Native) > 0 {
+			r.SetAttr("native_cases", p.Native)
+		}
+		if len(p.Copts) > 0 {
+			r.SetAttr("copts", p.Copts)
+		}
+		if p.Includes != "" {
+			r.SetAttr("includes", p.Includes)
+		}
+		r.SetAttr("sidecars", p.Sidecars)
+		r.SetAttr("wat2wasm", p.Wat2wasm)
+		r.SetAttr("wasm2wat", p.Wasm2wat)
+		r.SetAttr("testonly", p.Testonly)
+		r.SetAttr("visibility", []string{"//visibility:public"})
+		if err := add(suite, r); err != nil {
+			return err
+		}
+	}
+	for _, p := range graph.WatProjects {
+		r := rule.NewRule("mx_wat_project", p.Name)
+		r.SetAttr("root", p.Root)
+		r.SetAttr("cases", p.Cases)
+		r.SetAttr("tool", p.Tool)
+		r.SetAttr("testonly", p.Testonly)
+		r.SetAttr("visibility", []string{"//visibility:public"})
+		if err := add(suite, r); err != nil {
+			return err
+		}
+	}
 	for _, project := range graph.CMakeSuites {
 		r := rule.NewRule("mx_sulong_cmake_suite", project.Name)
 		r.SetAttr("root", project.Root)
@@ -404,9 +487,52 @@ func (g *importer) loadGraph(root, filename string, seen map[label.Label]bool) e
 		}
 	}
 	for _, layout := range graph.TarLayouts {
+		if macro := layout.Macro; macro != nil {
+			r := rule.NewRule("mx_native_image_properties", macro.Name)
+			r.SetAttr("lines", macro.Lines)
+			r.SetAttr("builders", macro.Builders)
+			r.SetAttr("java_args", macro.JavaArgs)
+			if err := add(suite, r); err != nil {
+				return err
+			}
+		}
+		for name, files := range layout.SourceArchives {
+			byDir := map[string][]string{}
+			for src, dest := range files {
+				if !filepath.IsLocal(src) || !filepath.IsLocal(dest) || path.Base(src) != path.Base(dest) {
+					return fmt.Errorf("invalid source archive member %s -> %s", src, dest)
+				}
+				dir := path.Dir(dest)
+				byDir[dir] = append(byDir[dir], src)
+			}
+			groups := map[string]string{}
+			for dir, srcs := range byDir {
+				sort.Strings(srcs)
+				labels, err := groupFiles(&project{Name: name}, "files", srcs)
+				if err != nil {
+					return err
+				}
+				for _, label := range labels {
+					groups[label] = dir
+				}
+			}
+			archive := rule.NewRule("mx_source_archive", name)
+			archive.SetAttr("groups", groups)
+			archive.SetAttr("testonly", layout.Testonly)
+			if err := add(suite, archive); err != nil {
+				return err
+			}
+		}
 		r := rule.NewRule("mx_exported_tar", layout.Name)
-		r.SetAttr("format", "tar")
+		format := layout.Format
+		if format == "" {
+			format = "tar"
+		}
+		r.SetAttr("format", format)
 		r.SetAttr("members", layout.Members)
+		if len(layout.FileList) > 0 {
+			r.SetAttr("file_list", layout.FileList)
+		}
 		if len(layout.ArchiveImports) > 0 {
 			r.SetAttr("archive_imports", layout.ArchiveImports)
 		}
@@ -433,7 +559,7 @@ func (g *importer) loadGraph(root, filename string, seen map[label.Label]bool) e
 
 func graphKind(k string) bool {
 	switch k {
-	case "mx_sulong_cmake_suite", "mx_bitcode_suite", "mx_exported_tar", "mx_jvmci_library", "mx_shaded_java", "mx_jar_dist", "mx_pom_dist", "mx_resource_layout", "mx_classpath_dist", "mx_files", "mx_project", "mx_whole_java", "mx_processed_java", "mx_processor", "mx_test_class":
+	case "mx_patch_module", "mx_native_image_properties", "mx_source_archive", "mx_wasm_programs", "mx_project_files", "mx_wat_project", "mx_sulong_cmake_suite", "mx_bitcode_suite", "mx_exported_tar", "mx_jvmci_library", "mx_shaded_java", "mx_jar_dist", "mx_pom_dist", "mx_resource_layout", "mx_classpath_dist", "mx_files", "mx_project", "mx_whole_java", "mx_processed_java", "mx_processor", "mx_test_class":
 		return true
 	}
 	return false
@@ -442,12 +568,17 @@ func graphKind(k string) bool {
 func (g *importer) Kinds() map[string]rule.KindInfo {
 	kinds := g.javaLanguage.Kinds()
 	managed := map[string]bool{}
-	for _, a := range strings.Fields("sdk modules languages variants config root cases llvm_link format members archive_imports overlays shade shade_inputs manifest out content contents directives release snippets_pattern archived_libraries jmh_metadata jni_services truffle_services graal_services graal_test_services module_name add_exports module_exports jni_headers abi_after_javac copies literals srcs deps packages launcher tags data runtime_deps jvm_flags test_class project processor_class generates_api plugins resources mx_resource_root mx_resource_roots unified_release javac_opts javacopts testonly visibility") {
+	for _, a := range strings.Fields("runtime roots builders lines java_args groups exports native_cases copts includes sidecars wat2wasm wasm2wat tool sdk modules languages variants config root cases llvm_link format members file_list archive_imports overlays shade shade_inputs manifest out content contents directives release snippets_pattern archived_libraries jmh_metadata jni_services truffle_services graal_services graal_test_services module_name add_exports module_exports jni_headers abi_after_javac copies literals srcs deps packages launcher tags data runtime_deps jvm_flags test_class project processor_class generates_api plugins resources mx_resource_root mx_resource_roots unified_release javac_opts javacopts testonly visibility") {
 		managed[a] = true
 	}
-	for _, k := range strings.Fields("mx_jvmci_library mx_shaded_java mx_files mx_project mx_whole_java mx_processed_java mx_processor mx_test_class") {
+	for _, k := range strings.Fields("mx_patch_module mx_jvmci_library mx_shaded_java mx_files mx_project mx_whole_java mx_processed_java mx_processor mx_test_class") {
 		kinds[k] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"srcs": true, "packages": true, "project": true, "test_class": true, "processor_class": true}, MergeableAttrs: managed}
 	}
+	kinds["mx_native_image_properties"] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"lines": true}, MergeableAttrs: managed}
+	kinds["mx_source_archive"] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"groups": true}, MergeableAttrs: managed}
+	kinds["mx_project_files"] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"members": true, "srcs": true}, MergeableAttrs: managed}
+	kinds["mx_wasm_programs"] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"cases": true}, MergeableAttrs: managed}
+	kinds["mx_wat_project"] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"cases": true}, MergeableAttrs: managed}
 	kinds["mx_sulong_cmake_suite"] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"cases": true}, MergeableAttrs: managed}
 	kinds["mx_bitcode_suite"] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"cases": true}, MergeableAttrs: managed}
 	kinds["mx_exported_tar"] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"members": true, "archive_imports": true}, MergeableAttrs: managed}
@@ -468,6 +599,10 @@ func (g *importer) Kinds() map[string]rule.KindInfo {
 }
 func (g *importer) Loads() []rule.LoadInfo {
 	return append(g.javaLanguage.Loads(),
+		rule.LoadInfo{Name: "@rules_mx//mx:wasm_programs.bzl", Symbols: []string{"mx_wasm_programs"}},
+		rule.LoadInfo{Name: "@rules_mx//mx:jvmci.bzl", Symbols: []string{"mx_patch_module"}},
+		rule.LoadInfo{Name: "@rules_mx//mx:jar.bzl", Symbols: []string{"mx_native_image_properties"}},
+		rule.LoadInfo{Name: "@rules_mx//mx:project_files.bzl", Symbols: []string{"mx_project_files", "mx_source_archive", "mx_wat_project"}},
 		rule.LoadInfo{Name: "@rules_mx//mx:sulong_cmake.bzl", Symbols: []string{"mx_sulong_cmake_suite"}},
 		rule.LoadInfo{Name: "@rules_mx//mx:bitcode.bzl", Symbols: []string{"mx_bitcode_suite"}},
 		rule.LoadInfo{Name: "@rules_mx//mx:graph.bzl", Symbols: strings.Fields("mx_exported_tar mx_jvmci_library mx_shaded_java mx_jar_dist mx_classpath_dist mx_pom_dist mx_resource_layout mx_files mx_processed_java mx_processor mx_project mx_test_class mx_whole_java")},

@@ -1,0 +1,298 @@
+diff --git a/espresso-compiler-stub/BUILD.bazel b/espresso-compiler-stub/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/espresso-compiler-stub/BUILD.bazel
+@@ -0,0 +1,203 @@
++load("@rules_mx//mx:graph.bzl", "mx_exported_tar", "mx_jar_dist", "mx_jvmci_library")
++load("@rules_mx//mx:project_files.bzl", "mx_source_archive")
++
++filegroup(
++    name = "all_distributions",
++    testonly = True,
++    srcs = [
++        ":ESPRESSO_COMPILER_SUPPORT",
++        ":ESPRESSO_GRAAL",
++        ":ESPRESSO_VMACCESS",
++    ],
++    visibility = ["//visibility:public"],
++)
++
++filegroup(
++    name = "all_projects",
++    testonly = True,
++    srcs = [
++        ":com.oracle.truffle.espresso.graal",
++        ":com.oracle.truffle.espresso.vmaccess",
++    ],
++    visibility = ["//visibility:public"],
++)
++
++mx_jvmci_library(
++    name = "com.oracle.truffle.espresso.graal",
++    srcs = ["//espresso-compiler-stub/src/com.oracle.truffle.espresso.graal/src/com/oracle/truffle/espresso/graal:com.oracle.truffle.espresso.graal.srcs"],
++    add_exports = [
++        "jdk.internal.vm.ci/jdk.vm.ci.code",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta.annotation",
++        "jdk.internal.vm.ci/jdk.vm.ci.runtime",
++    ],
++    javacopts = [
++        "-source",
++        "21",
++        "-target",
++        "21",
++        "-parameters",
++        "--add-modules",
++        "jdk.internal.vm.ci",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        "//compiler:GRAAL",
++        "//compiler:GRAAL_OPTIONS",
++        "//espresso:ESPRESSO_JVMCI",
++    ],
++)
++
++mx_jvmci_library(
++    name = "com.oracle.truffle.espresso.vmaccess",
++    srcs = ["//espresso-compiler-stub/src/com.oracle.truffle.espresso.vmaccess/src/com/oracle/truffle/espresso/vmaccess:com.oracle.truffle.espresso.vmaccess.srcs"],
++    add_exports = [
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta.annotation",
++        "jdk.internal.vm.ci/jdk.vm.ci.code",
++        "jdk.internal.vm.ci/jdk.vm.ci.code.site",
++        "jdk.internal.vm.ci/jdk.vm.ci.code.stack",
++        "jdk.internal.vm.ci/jdk.vm.ci.common",
++        "jdk.internal.vm.ci/jdk.vm.ci.amd64",
++        "jdk.internal.vm.ci/jdk.vm.ci.aarch64",
++        "jdk.internal.vm.ci/jdk.vm.ci.services",
++        "jdk.internal.vm.ci/jdk.vm.ci.runtime",
++    ],
++    javacopts = [
++        "-source",
++        "21",
++        "-target",
++        "21",
++        "-parameters",
++        "--add-modules",
++        "jdk.internal.vm.ci,java.logging",
++    ],
++    mx_resource_root = "src/com.oracle.truffle.espresso.vmaccess/src",
++    resources = ["//espresso-compiler-stub/src/com.oracle.truffle.espresso.vmaccess/src/META-INF/services:com.oracle.truffle.espresso.vmaccess.resources"],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":com.oracle.truffle.espresso.graal",
++        "//compiler:GRAAL",
++        "//compiler:VMACCESS",
++        "//espresso:ESPRESSO_JVMCI",
++        "//sdk:POLYGLOT",
++    ],
++)
++
++mx_jar_dist(
++    name = "ESPRESSO_GRAAL",
++    add_exports = [
++        "jdk.graal.compiler/jdk.graal.compiler.api.replacements",
++        "jdk.graal.compiler/jdk.graal.compiler.api.runtime",
++        "jdk.graal.compiler/jdk.graal.compiler.bytecode",
++        "jdk.graal.compiler/jdk.graal.compiler.code",
++        "jdk.graal.compiler/jdk.graal.compiler.core.common",
++        "jdk.graal.compiler/jdk.graal.compiler.core.common.alloc",
++        "jdk.graal.compiler/jdk.graal.compiler.core.common.memory",
++        "jdk.graal.compiler/jdk.graal.compiler.core.common.spi",
++        "jdk.graal.compiler/jdk.graal.compiler.core.common.type",
++        "jdk.graal.compiler/jdk.graal.compiler.core.target",
++        "jdk.graal.compiler/jdk.graal.compiler.debug",
++        "jdk.graal.compiler/jdk.graal.compiler.graph",
++        "jdk.graal.compiler/jdk.graal.compiler.nodes",
++        "jdk.graal.compiler/jdk.graal.compiler.nodes.gc",
++        "jdk.graal.compiler/jdk.graal.compiler.nodes.graphbuilderconf",
++        "jdk.graal.compiler/jdk.graal.compiler.nodes.loop",
++        "jdk.graal.compiler/jdk.graal.compiler.nodes.memory",
++        "jdk.graal.compiler/jdk.graal.compiler.nodes.memory.address",
++        "jdk.graal.compiler/jdk.graal.compiler.nodes.spi",
++        "jdk.graal.compiler/jdk.graal.compiler.phases.tiers",
++        "jdk.graal.compiler/jdk.graal.compiler.phases.util",
++        "jdk.graal.compiler/jdk.graal.compiler.replacements",
++        "jdk.graal.compiler/jdk.graal.compiler.runtime",
++        "jdk.graal.compiler/jdk.graal.compiler.word",
++    ],
++    contents = [":com.oracle.truffle.espresso.graal"],
++    directives = [
++        "exports com.oracle.truffle.espresso.graal to jdk.graal.compiler.espresso.vmaccess",
++        "requires jdk.graal.compiler",
++        "requires jdk.internal.vm.ci",
++        "requires jdk.internal.vm.ci.espresso",
++        "requires transitive jdk.graal.compiler.options",
++    ],
++    module_exports = [
++        "jdk.internal.vm.ci/jdk.vm.ci.code",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta.annotation",
++        "jdk.internal.vm.ci/jdk.vm.ci.runtime",
++    ],
++    module_name = "jdk.graal.compiler.espresso",
++    release = 21,
++    visibility = ["//visibility:public"],
++    deps = [
++        "//compiler:GRAAL",
++        "//espresso:ESPRESSO_JVMCI",
++    ],
++)
++
++mx_jar_dist(
++    name = "ESPRESSO_VMACCESS",
++    add_exports = [
++        "jdk.graal.compiler/jdk.graal.compiler.annotation",
++        "jdk.graal.compiler/jdk.graal.compiler.api.replacements",
++        "jdk.graal.compiler/jdk.graal.compiler.core.common.spi",
++        "jdk.graal.compiler/jdk.graal.compiler.debug",
++        "jdk.graal.compiler/jdk.graal.compiler.nodes.loop",
++        "jdk.graal.compiler/jdk.graal.compiler.nodes.spi",
++        "jdk.graal.compiler/jdk.graal.compiler.phases.util",
++        "jdk.graal.compiler/jdk.graal.compiler.word",
++    ],
++    contents = [":com.oracle.truffle.espresso.vmaccess"],
++    directives = [
++        "exports com.oracle.truffle.espresso.vmaccess",
++        "requires java.logging",
++        "requires jdk.graal.compiler",
++        "requires jdk.graal.compiler.espresso",
++        "requires jdk.graal.compiler.vmaccess",
++        "requires jdk.internal.vm.ci",
++        "requires jdk.internal.vm.ci.espresso",
++        "requires transitive jdk.graal.compiler.options",
++        "requires transitive org.graalvm.polyglot",
++        "requires transitive org.graalvm.word",
++    ],
++    module_exports = [
++        "jdk.internal.vm.ci/jdk.vm.ci.aarch64",
++        "jdk.internal.vm.ci/jdk.vm.ci.amd64",
++        "jdk.internal.vm.ci/jdk.vm.ci.code",
++        "jdk.internal.vm.ci/jdk.vm.ci.code.site",
++        "jdk.internal.vm.ci/jdk.vm.ci.code.stack",
++        "jdk.internal.vm.ci/jdk.vm.ci.common",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta.annotation",
++        "jdk.internal.vm.ci/jdk.vm.ci.runtime",
++        "jdk.internal.vm.ci/jdk.vm.ci.services",
++    ],
++    module_name = "jdk.graal.compiler.espresso.vmaccess",
++    release = 21,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":ESPRESSO_GRAAL",
++        "//compiler:GRAAL",
++        "//compiler:VMACCESS",
++        "//espresso:ESPRESSO_JVMCI",
++        "//sdk:POLYGLOT",
++    ],
++)
++
++mx_source_archive(
++    name = "ESPRESSO_COMPILER_SUPPORT.sources.ESPRESSO_GRAAL",
++    testonly = False,
++    groups = {
++        "//espresso-compiler-stub/src/com.oracle.truffle.espresso.graal/src/com/oracle/truffle/espresso/graal:ESPRESSO_COMPILER_SUPPORT.sources.ESPRESSO_GRAAL.files": "com/oracle/truffle/espresso/graal",
++    },
++)
++
++mx_exported_tar(
++    name = "ESPRESSO_COMPILER_SUPPORT",
++    format = "tar",
++    members = {
++        ":ESPRESSO_COMPILER_SUPPORT.sources.ESPRESSO_GRAAL": "lib/espresso-graal.src.zip",
++        ":ESPRESSO_GRAAL": "lib/espresso-graal.jar",
++    },
++    visibility = ["//visibility:public"],
++)
+diff --git a/espresso-compiler-stub/src/com.oracle.truffle.espresso.graal/src/com/oracle/truffle/espresso/graal/BUILD.bazel b/espresso-compiler-stub/src/com.oracle.truffle.espresso.graal/src/com/oracle/truffle/espresso/graal/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/espresso-compiler-stub/src/com.oracle.truffle.espresso.graal/src/com/oracle/truffle/espresso/graal/BUILD.bazel
+@@ -0,0 +1,41 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.espresso.graal.srcs",
++    srcs = [
++        "DummyEspressoBackend.java",
++        "DummyEspressoGraalJVMCICompiler.java",
++        "DummyForeignCallsProvider.java",
++        "DummyLoweringProvider.java",
++        "DummyPlatformConfigurationProvider.java",
++        "DummyReplacements.java",
++        "DummyStampProvider.java",
++        "EspressoConstantFieldProvider.java",
++        "EspressoGraalRuntime.java",
++        "EspressoMetaAccessExtensionProvider.java",
++        "EspressoSnippetReflectionProvider.java",
++        "KlassStamp.java",
++        "SuspiciousHostAccessCollector.java",
++    ],
++    visibility = ["//espresso-compiler-stub:__pkg__"],
++)
++
++mx_files(
++    name = "ESPRESSO_COMPILER_SUPPORT.sources.ESPRESSO_GRAAL.files",
++    srcs = [
++        "DummyEspressoBackend.java",
++        "DummyEspressoGraalJVMCICompiler.java",
++        "DummyForeignCallsProvider.java",
++        "DummyLoweringProvider.java",
++        "DummyPlatformConfigurationProvider.java",
++        "DummyReplacements.java",
++        "DummyStampProvider.java",
++        "EspressoConstantFieldProvider.java",
++        "EspressoGraalRuntime.java",
++        "EspressoMetaAccessExtensionProvider.java",
++        "EspressoSnippetReflectionProvider.java",
++        "KlassStamp.java",
++        "SuspiciousHostAccessCollector.java",
++    ],
++    visibility = ["//espresso-compiler-stub:__pkg__"],
++)
+diff --git a/espresso-compiler-stub/src/com.oracle.truffle.espresso.vmaccess/src/META-INF/services/BUILD.bazel b/espresso-compiler-stub/src/com.oracle.truffle.espresso.vmaccess/src/META-INF/services/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/espresso-compiler-stub/src/com.oracle.truffle.espresso.vmaccess/src/META-INF/services/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.espresso.vmaccess.resources",
++    srcs = ["jdk.graal.compiler.vmaccess.VMAccess$Builder"],
++    visibility = ["//espresso-compiler-stub:__pkg__"],
++)
+diff --git a/espresso-compiler-stub/src/com.oracle.truffle.espresso.vmaccess/src/com/oracle/truffle/espresso/vmaccess/BUILD.bazel b/espresso-compiler-stub/src/com.oracle.truffle.espresso.vmaccess/src/com/oracle/truffle/espresso/vmaccess/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/espresso-compiler-stub/src/com.oracle.truffle.espresso.vmaccess/src/com/oracle/truffle/espresso/vmaccess/BUILD.bazel
+@@ -0,0 +1,27 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.espresso.vmaccess.srcs",
++    srcs = [
++        "EspressoExternalConstantPool.java",
++        "EspressoExternalConstantReflectionProvider.java",
++        "EspressoExternalHostProxies.java",
++        "EspressoExternalMetaAccessProvider.java",
++        "EspressoExternalMethodHandleAccessProvider.java",
++        "EspressoExternalObjectConstant.java",
++        "EspressoExternalResolvedArrayType.java",
++        "EspressoExternalResolvedInstanceType.java",
++        "EspressoExternalResolvedJavaField.java",
++        "EspressoExternalResolvedJavaMethod.java",
++        "EspressoExternalResolvedJavaModule.java",
++        "EspressoExternalResolvedJavaModuleLayer.java",
++        "EspressoExternalResolvedJavaPackage.java",
++        "EspressoExternalResolvedJavaRecordComponent.java",
++        "EspressoExternalResolvedPrimitiveType.java",
++        "EspressoExternalSignature.java",
++        "EspressoExternalSnippetReflectionProvider.java",
++        "EspressoExternalVMAccess.java",
++        "EspressoExternalVMAccessBuilder.java",
++    ],
++    visibility = ["//espresso-compiler-stub:__pkg__"],
++)

@@ -2,7 +2,7 @@ diff --git a/substratevm/BUILD.bazel b/substratevm/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/substratevm/BUILD.bazel
-@@ -0,0 +1,7187 @@
+@@ -0,0 +1,7188 @@
 +load("@rules_java//java:java_import.bzl", "java_import")
 +load("@rules_mx//graal:layout.bzl", "mx_archive_layout")
 +load("@rules_mx//graal:simplelanguage.bzl", "svm_driver_test_runner", "svm_test_runner")
@@ -6988,6 +6988,7 @@ new file mode 100644
 +mx_jar_dist(
 +    name = "SVM_TESTS",
 +    testonly = True,
++    archived_libraries = [":SVM_TEST_RESOURCE_WITH_SPACE"],
 +    contents = [
 +        ":com.oracle.svm.test",
 +        ":com.oracle.svm.configure.test",

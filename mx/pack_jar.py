@@ -14,10 +14,13 @@ def read_members(inputs, args):
     snippets = re.compile(args.snippets_pattern) if args.snippets_pattern else None
     entries = {}
     services = defaultdict(lambda: defaultdict(set))
+    library_members = set()
     for jar in inputs:
         with ZipFile(jar) as src:
             for name in src.namelist():
                 if name.endswith("/") or name.upper() == "META-INF/MANIFEST.MF":
+                    continue
+                if jar in args.archived_library and name == "module-info.class":
                     continue
                 if name == ".mxkeep" or name.endswith("/.mxkeep"):
                     # mx archives a directory that contains .mxkeep as a directory entry,
@@ -60,9 +63,14 @@ def read_members(inputs, args):
                 }:
                     entries[name] = entries.get(name, b"") + data
                 elif name in entries and entries[name] != data:
+                    # mx keeps the first entry when binary libraries have conflicting resources.
+                    if jar in args.archived_library and name in library_members:
+                        continue
                     raise ValueError(f"Conflicting archive member {name} in {jar}")
                 else:
                     entries[name] = data
+                    if jar in args.archived_library:
+                        library_members.add(name)
                     if args.graal_services and name.endswith(
                         "_OptionDescriptors.class"
                     ):
@@ -117,7 +125,7 @@ def module_descriptor(args, tmp, entries, services, release):
         if name.endswith(".class") and "/" in name and not name.startswith("META-INF/")
     }
     for directive in args.directive:
-        wildcard = re.fullmatch(r"(opens|exports) ([\w.]+)\*(.*)", directive)
+        wildcard = re.fullmatch(r"(opens|exports) ([\w.]*)\*(.*)", directive)
         if wildcard:
             kind, prefix, targets = wildcard.groups()
             matches = [p for p in packages if p.startswith(prefix)]

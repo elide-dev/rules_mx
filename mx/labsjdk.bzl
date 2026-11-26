@@ -8,9 +8,7 @@ _PLATFORMS = {
     "linux-amd64": ("x86_64", "linux"),
 }
 
-def _labsjdk_impl(ctx):
-    # tools/generate-graal keeps this pin equal to labsjdk-ce-latest in the selected Graal common.json.
-    pin = json.decode(ctx.read(Label("//mx:labsjdk.json")))
+def _register(pin, prefix, repository):
     version = pin["version"]
     jdk, jvmci = version.split("-jvmci-")
     release = "jvmci-" + jvmci
@@ -18,14 +16,18 @@ def _labsjdk_impl(ctx):
     for platform, digest in pin["platforms"].items():
         cpu, os = _PLATFORMS[platform]
         remote_java_repository(
-            name = "labsjdk_" + platform.replace("-", "_"),
-            version = "25",
-            prefix = "labsjdk",
+            name = prefix + "_" + platform.replace("-", "_"),
+            version = jdk.removeprefix("ce-").split(".")[0],
+            prefix = prefix,
             sha256 = digest,
             strip_prefix = home + ("/Contents/Home" if os == "macos" else ""),
-            urls = ["https://github.com/graalvm/labs-openjdk/releases/download/%s/labsjdk-%s-%s.tar.gz" % (release, version.replace("+", "%2B"), platform)],
+            urls = ["https://github.com/graalvm/%s/releases/download/%s/labsjdk-%s-%s.tar.gz" % (repository, release, version.replace("+", "%2B"), platform)],
             target_compatible_with = ["@platforms//cpu:" + cpu, "@platforms//os:" + os],
         )
+
+def _labsjdk_impl(ctx):
+    _register(json.decode(ctx.read(Label("//mx:labsjdk.json"))), "labsjdk", "labs-openjdk")
+    _register(json.decode(ctx.read(Label("//mx:labsjdk21.json"))), "espresso_jdk21", "labs-openjdk-21")
     return ctx.extension_metadata(reproducible = True)
 
 labsjdk = module_extension(implementation = _labsjdk_impl)

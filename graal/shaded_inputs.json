@@ -3,6 +3,10 @@
     "com/google/code/java-allocation-instrumenter/java-allocation-instrumenter/3.1.0/java-allocation-instrumenter-3.1.0.jar",
     "sha512-Jf5XzW0+yrtS9BHIhPgBEJ7ON1cKLdGfoeW4PMIDntAqkHh2AOuTA+qnMKq/DccLUG+5/kDKbDQXQou4nCyJQA=="
   ],
+  "mx_APIGUARDIAN-API.jar": [
+    "org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar",
+    "sha512-18zQ5wGfGpl9451m3ArU7+FQQo/df0x0PJOITxYCo+kBNa00uuqW1bbZJa1sDISHyOeDBPCgiaEjg9SmLiyaYQ=="
+  ],
   "mx_COMMONS_MATH3_3_2.jar": [
     "org/apache/commons/commons-math3/3.2/commons-math3-3.2.jar",
     "sha512-gPtmpRaIxCR7lX+Xh5IeWsuRRNcaSrCwOyww9GQn5QxT5uMcpd2wTass9efA7trhaBA8cZ+AdL5GSRirLk1ubQ=="
@@ -18,6 +22,18 @@
   "mx_JOPTSIMPLE_4_6.jar": [
     "net/sf/jopt-simple/jopt-simple/4.6/jopt-simple-4.6.jar",
     "sha512-GL9ZGR16RW52dchB34QR6+Ql2kBTLhA9uVSDvl0qdVENijitl1XN1OC+J6/nz9CzWFmTiKhPzsHuJ+icqjf1rw=="
+  ],
+  "mx_JUNIT-JUPITER-API.jar": [
+    "org/junit/jupiter/junit-jupiter-api/5.10.2/junit-jupiter-api-5.10.2.jar",
+    "sha512-fft0QFzAEb8LkXbyCTaGaAIl7zJljsgrVbrZhX6ziZm4rCXCP5IBJ7QmEgv8IJOPLZ3I3xEaUJ2YWNNQ5f92hQ=="
+  ],
+  "mx_JUNIT-PLATFORM-COMMONS.jar": [
+    "org/junit/platform/junit-platform-commons/1.10.2/junit-platform-commons-1.10.2.jar",
+    "sha512-qnOe4huR/UR2ql+a2XX4PNRAtvusccjMFYFuOSRxDA1wg4Rl7iKhtzkMK65C7xgJho+nrgFpt19DfNlbqsU50Q=="
+  ],
+  "mx_OPENTEST4J.jar": [
+    "org/opentest4j/opentest4j/1.3.0/opentest4j-1.3.0.jar",
+    "sha512-ePxpinhxu1AwXjZXiTwQUAWV8EM0jYdfV7w5ykpqUe2jlnt8jIp+w+j4XyFxvKSqmII+kS5BbofoHGultwo3ww=="
   ],
   "sdk_JLINE_BUILTINS-sources.jar": [
     "org/jline/jline-builtins/4.3.1/jline-builtins-4.3.1-sources.jar",
@@ -154,5 +170,41 @@
   "truffle_XZ-1.12.jar": [
     "org/tukaani/xz/1.12/xz-1.12.jar",
     "sha512-qFTcZd9aB/uwJvYk0rEJAfb12VogCRxSv7ZPiMFFZe8btlczQ2/9WyqdFjKeUjtlAIX9TDahuzhNQHiOcnweYA=="
+  ],
+  "wasm_JOL.jar": [
+    "org/openjdk/jol/jol-core/0.16/jol-core-0.16.jar",
+    "sha512-it+1YcgvmxmNHYt76mBfyPRBjT4ZnQ1iYgFNx1zuWxov9Z7IOLYyL17pgecJTbw8n6Ye5ei/53k6qSfiqQDG7A=="
+  ],
+  "web-image_GOOGLE_CLOSURE.jar": [
+    "com/google/javascript/closure-compiler/v20210907/closure-compiler-v20210907.jar",
+    "sha512-twUXBO3MvyIQVEce02kLYX2eMrPUuiXXAvA7ZktfSl4tvsBXQYMeECfdpZP6Sowo3cgs6pJslG9lnbd7PzJ5cw=="
+  ],
+  "web-image_GUAVA_BFS.jar": [
+    [
+      "https://lafo.ssw.uni-linz.ac.at/pub/graal-external-deps/web-image/guava-33.4.8-jre-shaded.jar"
+    ],
+    "sha512-RkuoXqqH+9UzBSLnHa0e7gnYoyCz677pAI5SknnqxlU0YLGVqm/INMBMbsy817z+VvdjWmpu2uQ1fpFcm0Jwnw=="
+  ],
+  "web-image_JIMFS_BFS.jar": [
+    [
+      "https://lafo.ssw.uni-linz.ac.at/pub/graal-external-deps/web-image/jimfs-1.3.0-c7a51a6e2109ff7e391815ba34ad404ac8a375c6-shaded.jar"
+    ],
+    "sha512-6rq1f3U6qQTyc09SKO2P4+DuIpCqTomOX8sZOu1JYlhHfUPIDvtfwco8zrtDt8Z/NIi00Rir5fxvM3pomnofhw=="
+  ],
+  "web-image_NET_JAVA_HTML.jar": [
+    "org/netbeans/html/net.java.html/1.7/net.java.html-1.7.jar",
+    "sha512-k/JyrDzLidQLlYZvPfp4VsSQDX+n9O/n7QjyeH2W+Kl3zqLtdQ4xVnm48/c1ICKdvbGPBLiPhMq6oLuklwMStQ=="
+  ],
+  "web-image_NET_JAVA_HTML_BOOT.jar": [
+    "org/netbeans/html/net.java.html.boot/1.7/net.java.html.boot-1.7.jar",
+    "sha512-bWzAHsVs6F5yjlYpauFUp/5KOMOnvoWuGgRnG1rAxgCw1nlA4MTYULnVPph6ciJZjNDzPP8hcncxlNp2vRdrUA=="
+  ],
+  "web-image_NET_JAVA_HTML_JSON.jar": [
+    "org/netbeans/html/net.java.html.json/1.7/net.java.html.json-1.7.jar",
+    "sha512-CzpOzYhf/+RpV1i/dxJlXssHau68O7WIi+AxsDOuEzo+hUAwhU+IIeY0SuDSkbhy1R50DnsLDRUP4UgAsWrzVg=="
+  ],
+  "web-image_NET_JAVA_HTML_JSON_TCK.jar": [
+    "org/netbeans/html/net.java.html.json.tck/1.7/net.java.html.json.tck-1.7.jar",
+    "sha512-5CAkfxT5NNGwq961CrfqG4g34+SqXEadr27hmWR1qu6IPvRxVldtC620QyPkooAUY6qvCFO3viIINiM9bQpD+A=="
   ]
 }

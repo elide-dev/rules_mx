@@ -696,7 +696,7 @@ SUITES = {
 
 
 # These suites publish every closure that the exporter can lower.
-PARTIAL_SUITES = ("sulong", "wasm")
+PARTIAL_SUITES = ("sulong", "wasm", "espresso", "espresso-compiler-stub", "web-image")
 
 # These targets remain individually runnable. New classes join CI on regeneration.
 WASM_OPEN_TESTS = {
@@ -717,6 +717,7 @@ SHADED_PROJECTS = {
     "tools": ("com.oracle.truffle.tools.utils.java_websocket",),
     "substratevm": ("com.oracle.svm.shaded.org.capnproto",),
     "sdk": ("org.graalvm.shadowed.org.jline", "org.graalvm.shadowed.org.jline.jdk22"),
+    "espresso": ("com.oracle.truffle.espresso.shadowed.asm",),
     "truffle": (
         "com.oracle.truffle.api.impl.asm",
         "org.graalvm.shadowed.org.jcodings",
@@ -729,6 +730,16 @@ SHADED_PROJECTS = {
 
 
 JAVA_LIBRARIES = {
+    "wasm": ["JOL"],
+    "web-image": [
+        "GOOGLE_CLOSURE",
+        "NET_JAVA_HTML",
+        "NET_JAVA_HTML_BOOT",
+        "NET_JAVA_HTML_JSON",
+        "NET_JAVA_HTML_JSON_TCK",
+        "JIMFS_BFS",
+        "GUAVA_BFS",
+    ],
     "truffle": ["GUAVA", "JIMFS", "VISUALVM-LIB-JFLUID-HEAP"],
     "compiler": ["JAVA_ALLOCATION_INSTRUMENTER"],
     "substratevm": ["ZSTD_JNI"],
@@ -782,20 +793,36 @@ def maven_pin(lib, suffix="", key="digest"):
     return [path, algorithm + "-" + base64.b64encode(bytes.fromhex(digest)).decode()]
 
 
-def jmh_rules(directory):
-    suite = runpy.run_path(str(directory.parent / "mx-suite.py"))["suite"]
-    libraries = suite["libraries"]
-    names = ["JMH_1_21", *libraries["JMH_1_21"]["dependencies"]]
-    pins = {}
-    rules = ['load("@rules_java//java:java_plugin.bzl", "java_plugin")']
-    for name in names:
-        lib = libraries[name]
+def mx_library_rules(directory, roots):
+    libraries = runpy.run_path(str(directory.parent / "mx-suite.py"))["suite"][
+        "libraries"
+    ]
+    pins, flags, rules = {}, [], []
+
+    def add(name):
         filename = f"mx_{name}.jar"
+        if filename in pins:
+            return
+        lib = libraries[name]
         pins[filename] = maven_pin(lib)
-        deps = [":" + dep for dep in lib.get("dependencies", [])]
+        dependencies = lib.get("dependencies", [])
+        deps = [":" + dep for dep in dependencies]
+        flags.extend(["--java-dep", f"mx:{name}=:{name}"])
         rules.append(
             f'java_import(name = "{name}", jars = ["@graal_shaded_inputs//:{filename}"], deps = {json.dumps(deps)})'
         )
+
+        for dep in dependencies:
+            add(dep)
+
+    for name in roots:
+        add(name)
+    return pins, flags, rules
+
+
+def jmh_rules(directory):
+    pins, _, rules = mx_library_rules(directory, ["JMH_1_21"])
+    rules.insert(0, 'load("@rules_java//java:java_plugin.bzl", "java_plugin")')
     rules.append(
         'java_plugin(name = "jmh_processor", processor_class = "org.openjdk.jmh.generators.BenchmarkProcessor", deps = [":JMH_1_21"])'
     )
@@ -807,8 +834,15 @@ def library_rules(directory):
     names = present(directory, JAVA_LIBRARIES[suite])
     if not names:
         return ""
+    metadata = runpy.run_path(str(directory / f"mx.{suite}/suite.py"))["suite"][
+        "libraries"
+    ]
+    deps = {
+        n: [":" + d for d in metadata[n].get("dependencies", []) if d in names]
+        for n in names
+    }
     return 'load("@rules_java//java:java_import.bzl", "java_import")\n' + "".join(
-        f'java_import(name = "{name}", jars = ["@graal_shaded_inputs//:{suite}_{name}.jar"], visibility = ["//visibility:public"])\n'
+        f'java_import(name = "{name}", jars = ["@graal_shaded_inputs//:{suite}_{name}.jar"]{", deps = " + json.dumps(deps[name]) if deps[name] else ""}, visibility = ["//visibility:public"])\n'
         for name in names
     )
 
@@ -934,14 +968,23 @@ def shading_inputs(directory):
     flags = []
     if directory.name == "truffle":
         inputs.update(jmh_rules(directory)[0])
+    if directory.name == "web-image":
+        pins, bindings, _ = mx_library_rules(directory, ["JUNIT-JUPITER-API"])
+        inputs.update(pins)
+        flags.extend(bindings)
     for project in SHADED_PROJECTS.get(directory.name, ()):
         for qualified in suite["projects"][project]["shadedDependencies"]:
             owner, _, name = qualified.rpartition(":")
             owner = owner or directory.name
             qualified = f"{owner}:{name}"
-            if owner != directory.name:
-                raise ValueError(f"Unmapped external shaded library {qualified}")
-            lib = suite["libraries"][name]
+            owner_suite = (
+                suite
+                if owner == directory.name
+                else runpy.run_path(
+                    str(directory.parent / owner / f"mx.{owner}/suite.py")
+                )["suite"]
+            )
+            lib = owner_suite["libraries"][name]
             for suffix, key in [("", "digest"), ("-sources", "sourceDigest")]:
                 filename = qualified.replace(":", "_") + suffix + ".jar"
                 inputs[filename] = maven_pin(lib, suffix, key)
@@ -950,7 +993,15 @@ def shading_inputs(directory):
                 )
     for name in present(directory, JAVA_LIBRARIES.get(directory.name, ())):
         lib = suite["libraries"][name]
-        inputs[f"{directory.name}_{name}.jar"] = maven_pin(lib)
+        if "maven" in lib:
+            pin = maven_pin(lib)
+        else:
+            algorithm, digest = lib["digest"].split(":")
+            pin = [
+                [url.format(**lib) for url in lib["urls"]],
+                algorithm + "-" + base64.b64encode(bytes.fromhex(digest)).decode(),
+            ]
+        inputs[f"{directory.name}_{name}.jar"] = pin
         flags.extend(["--java-dep", f"{directory.name}:{name}=:{name}"])
     if directory.name == "substratevm":
         flags.extend(svm_url_library_rules(directory)[1])
@@ -2006,6 +2057,26 @@ def svm_support_layouts(directory):
     )
 
 
+def binding_providers(suite, source):
+    """Find known providers in mx import order, including transitive suite imports."""
+    found = []
+
+    def visit(name):
+        metadata = runpy.run_path(str(source / name / f"mx.{name}/suite.py"))["suite"]
+        for dep in metadata.get("imports", {}).get("suites", []):
+            owner = dep["name"]
+            if (
+                not dep.get("dynamic")
+                and owner in (*SUITES, *PARTIAL_SUITES)
+                and owner not in found
+            ):
+                visit(owner)
+                found.append(owner)
+
+    visit(suite)
+    return found
+
+
 def prepare_suite(suite, stage):
     directory = stage / suite
     if suite == "vm":
@@ -2018,24 +2089,78 @@ def prepare_suite(suite, stage):
             "--all",
             "--declared-only",
             "--partial",
-            "--bindings",
-            f"//sdk={stage / 'sdk-bindings.json'}",
-            "--bindings",
-            f"//truffle={stage / 'truffle-bindings.json'}",
+            *(
+                arg
+                for owner in binding_providers(suite, stage)
+                for arg in (
+                    "--bindings",
+                    f"//{owner}={stage / (owner + '-bindings.json')}",
+                )
+            ),
             "--java-dep",
             "mx:JUNIT=@contrib_rules_jvm_deps//:junit_junit",
             "--java-dep",
             "mx:JUNIT=@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
             "--java-dep",
             "mx:HAMCREST=@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
-            "--javac-only-processor",
-            "truffle:TRUFFLE_DSL_PROCESSOR",
+            *(
+                ["--javac-only-processor", "truffle:TRUFFLE_DSL_PROCESSOR"]
+                if suite in ("sulong", "wasm", "espresso")
+                else []
+            ),
         ]
     else:
         export_options = suite_args(directory)
+    if suite == "espresso":
+        export_options.extend(
+            [
+                "--whole-project",
+                "com.oracle.truffle.espresso.libjavavm",
+                "--project-release",
+                "com.oracle.truffle.espresso=25",
+                "--patch-module-runtime",
+                "21=@rules_mx//tools:espresso_jdk21_runtime",
+                "--patch-module-runtime",
+                "25=@rules_mx//tools:labs_runtime",
+            ]
+        )
+    if suite == "web-image":
+        metadata = runpy.run_path(str(directory / "mx.web-image/suite.py"))["suite"]
+        concealed = sorted(
+            {
+                (module, pkg)
+                for project in metadata["projects"].values()
+                for module, packages in project.get("requiresConcealed", {}).items()
+                if module.startswith(("java.", "jdk."))
+                for pkg in packages
+            }
+        )
+        for flag in [
+            "--add-modules=jdk.internal.vm.ci",
+            *(f"--add-exports={module}/{pkg}=ALL-UNNAMED" for module, pkg in concealed),
+        ]:
+            export_options.extend(
+                [
+                    "--test-jvm-flag",
+                    f"web-image:com.oracle.svm.hosted.webimage.test={flag}",
+                ]
+            )
+        export_options.extend(
+            [
+                "--javac-opt",
+                "com.oracle.svm.hosted.webimage=-Xep:DoubleBraceInitialization:WARN",
+                # These fixtures compile pathological JVM bytecodes on purpose.
+                "--javac-opt",
+                "com.oracle.svm.webimage.jtt=-XepDisableAllChecks",
+                "--generated-dep",
+                "web-image:com.oracle.svm.hosted.webimage.test=:NET_JAVA_HTML_JSON_TCK",
+            ]
+        )
     if suite == "sulong":
         export_options.extend(
             [
+                "--whole-project",
+                "com.oracle.truffle.llvm.toolchain.launchers",
                 "--sulong-llvm-link",
                 "@rules_mx//graal:sdk_llvm_link",
                 "--sulong-fixture-sdk",
@@ -2043,7 +2168,49 @@ def prepare_suite(suite, stage):
             ]
         )
     if suite == "wasm":
+        export_options.extend(mx_library_rules(directory, ["JMH_1_21"])[1])
+        export_options.extend(["--processor-plugin", "mx:JMH_1_21=:jmh_processor"])
+        for project in ("testcases", "benchcases"):
+            export_options += [
+                "--java-dep",
+                f"wasm:org.graalvm.wasm.{project}=:{project}_resources",
+            ]
+        export_options += [
+            "--library-module",
+            "mx:JUNIT=junit",
+            "--library-module",
+            "mx:HAMCREST=hamcrest",
+        ]
+        for i, arg in enumerate(export_options):
+            if arg.startswith("mx:JUNIT=") and "junit_junit" in arg:
+                export_options[i] = "mx:JUNIT=@rules_mx//graal:junit"
+            elif (
+                arg.startswith(("mx:JUNIT=", "mx:HAMCREST=")) and "hamcrest_core" in arg
+            ):
+                export_options[i] = arg.split("=")[0] + "=@rules_mx//graal:hamcrest"
         wat2wasm = "@wabt//src/tools:wat2wasm"
+        export_options.extend(
+            [
+                "--wat2wasm",
+                wat2wasm,
+                "--wasm2wat",
+                "@wabt//src/tools:wasm2wat",
+                "--test-runtime",
+                "wasm:org.graalvm.wasm.testcases.test=:org.graalvm.wasm.testcases.test",
+                "--test-runtime",
+                "wasm:org.graalvm.wasm.testcases.test=:testcases_resources",
+                "--test-runtime",
+                "wasm:org.graalvm.wasm.testcases.test=//truffle:TRUFFLE_RUNTIME",
+                "--test-data",
+                f"wasm:org.graalvm.wasm.testcases.test={wat2wasm}",
+                "--test-jvm-flag",
+                f"wasm:org.graalvm.wasm.testcases.test=-Dwasmtest.watToWasmExecutable=$(rootpath {wat2wasm})",
+                "--test-jvm-flag",
+                "wasm:org.graalvm.wasm.testcases.test=-Dpolyglot.engine.AllowExperimentalOptions=true",
+                "--test-jvm-flag",
+                "wasm:org.graalvm.wasm.testcases.test=--enable-native-access=ALL-UNNAMED",
+            ]
+        )
         project = "wasm:org.graalvm.wasm.test"
         export_options.extend(
             [
@@ -2065,7 +2232,7 @@ def prepare_suite(suite, stage):
                 ),
             ]
         )
-    if suite in ("sdk", "truffle"):
+    if suite != "vm":
         export_options = [
             *export_options,
             "--bindings-out",
@@ -2116,7 +2283,18 @@ def prepare_suite(suite, stage):
     if suite in PARTIAL_SUITES:
         graph = json.loads((directory / "mx-graph.json").read_text())
         inventory = graph["suite_targets"]
-        rules = []
+        rules = [library_rules(directory)] if suite in JAVA_LIBRARIES else []
+        if suite == "web-image":
+            rules.extend(mx_library_rules(directory, ["JUNIT-JUPITER-API"])[2])
+            units = sorted(
+                ":" + project["name"] + "." + cls
+                for project in graph["projects"]
+                for cls in project.get("tests", [])
+                if ".test.unit." in cls
+            )
+            rules.append(
+                f'test_suite(name = "unit_tests", tests = {json.dumps(units)}, visibility = ["//visibility:public"])'
+            )
         linux_projects = {p["name"] for p in graph.get("cmake_suites", [])}
         for kind, names in inventory.items():
             platform_targets = [
@@ -2145,6 +2323,14 @@ def prepare_suite(suite, stage):
                     ),
                 ]
         if suite == "wasm":
+            rules += [
+                "# gazelle:resolve java org.openjdk.jol.info //wasm:JOL",
+                jmh_rules(directory)[1],
+                *(
+                    f'java_import(name="{project}_resources", jars=[":org.graalvm.wasm.{project}.resources"], testonly=True)'
+                    for project in ("testcases", "benchcases")
+                ),
+            ]
             tests = {
                 cls: ":" + project["name"] + "." + cls
                 for project in graph["projects"]
@@ -2309,16 +2495,16 @@ def fetch_source(pin, stage):
     return root / pin["strip_prefix"], digest.hexdigest()
 
 
-def labsjdk_pin(source, current):
+def labsjdk_pin(source, current, selector, repository):
     """Pin labsjdk-ce-latest from the selected source's common.json."""
-    version = json.loads((source / "common.json").read_text())["jdks"][
-        "labsjdk-ce-latest"
-    ]["version"]
+    version = json.loads((source / "common.json").read_text())["jdks"][selector][
+        "version"
+    ]
     if current.get("version") == version:
         return current
     jdk, jvmci = version.split("-jvmci-")
     request = urllib.request.Request(
-        f"https://api.github.com/repos/graalvm/labs-openjdk/releases/tags/jvmci-{jvmci}",
+        f"https://api.github.com/repos/graalvm/{repository}/releases/tags/jvmci-{jvmci}",
         headers={"User-Agent": "rules_mx-generate-graal"},
     )
     with urllib.request.urlopen(request) as response:
@@ -2326,6 +2512,19 @@ def labsjdk_pin(source, current):
     platforms = {}
     for platform in current["platforms"]:
         asset = assets[f"labsjdk-{version}-{platform}.tar.gz"]
+        if not asset.get("digest"):
+            url = asset["browser_download_url"]
+            with urllib.request.urlopen(url + ".sha1") as response:
+                expected = response.read().decode().split()[0]
+            sha1, sha256 = hashlib.sha1(), hashlib.sha256()
+            with urllib.request.urlopen(url) as response:
+                while chunk := response.read(1024 * 1024):
+                    sha1.update(chunk)
+                    sha256.update(chunk)
+            if sha1.hexdigest() != expected:
+                raise ValueError(f"Checksum mismatch for {asset['name']}")
+            platforms[platform] = sha256.hexdigest()
+            continue
         algorithm, digest = asset["digest"].split(":")
         if algorithm != "sha256":
             raise ValueError(f"Unexpected digest for {asset['name']}")
@@ -2394,14 +2593,23 @@ def main():
             if args.pin:
                 pin["sha256"] = digest
                 pin_path.write_text(json.dumps(pin, indent=2, sort_keys=True) + "\n")
-        labsjdk = ROOT / "mx/labsjdk.json"
-        current = json.loads(labsjdk.read_text())
-        emit(
-            labsjdk if output == ROOT / "graal" else output / "labsjdk.json",
-            json.dumps(labsjdk_pin(source, current), indent=2, sort_keys=True) + "\n",
-            args.check,
-            "Regenerate the Labs JDK pin with tools/generate-graal",
-        )
+        for filename, selector, repository in (
+            ("labsjdk.json", "labsjdk-ce-latest", "labs-openjdk"),
+            ("labsjdk21.json", "labsjdk-ce-21", "labs-openjdk-21"),
+        ):
+            labsjdk = ROOT / "mx" / filename
+            current = json.loads(labsjdk.read_text())
+            emit(
+                labsjdk if output == ROOT / "graal" else output / filename,
+                json.dumps(
+                    labsjdk_pin(source, current, selector, repository),
+                    indent=2,
+                    sort_keys=True,
+                )
+                + "\n",
+                args.check,
+                "Regenerate the Labs JDK pin with tools/generate-graal",
+            )
         mx_suite = bazel_source("@graal_mx//:mx.mx/suite.py")
         shutil.copyfile(mx_suite, stage / "mx-suite.py")
         for family in ("gcc", "msvc"):
@@ -2415,14 +2623,26 @@ def main():
             "# gazelle:map_kind java_library elide_java_library @rules_mx//mx:java.bzl\n"
         )
         selected = list(dict.fromkeys(args.suite or [*SUITES, *PARTIAL_SUITES, "vm"]))
+        providers = list(
+            dict.fromkeys(
+                owner
+                for suite in selected
+                if suite in PARTIAL_SUITES
+                for owner in binding_providers(suite, source)
+            )
+        )
         for suite in PARTIAL_SUITES:
-            if suite in selected:
+            if suite in selected or suite in providers:
                 shutil.copytree(
                     source / suite,
                     stage / suite,
                     ignore=shutil.ignore_patterns(
                         "BUILD", "BUILD.bazel", "mxbuild", "__pycache__"
                     ),
+                )
+            else:
+                shutil.copytree(
+                    source / suite / f"mx.{suite}", stage / suite / f"mx.{suite}"
                 )
         for suite in SUITES:
             for directory in (f"mx.{suite}", "src"):
@@ -2525,7 +2745,7 @@ def main():
             json.dumps(
                 {
                     k: v
-                    for suite in SUITES
+                    for suite in (*SUITES, *PARTIAL_SUITES)
                     for k, v in shading_inputs(stage / suite)[0].items()
                 },
                 indent=2,
@@ -2538,9 +2758,6 @@ def main():
             lock_text,
             args.check,
             "Shaded dependency pins differ. Regenerate with tools/generate-graal.",
-        )
-        providers = (
-            ["sdk", "truffle"] if any(s in PARTIAL_SUITES for s in selected) else []
         )
         for suite in dict.fromkeys([*providers, *selected]):
             prepare_suite(suite, stage)

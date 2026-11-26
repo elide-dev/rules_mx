@@ -35,6 +35,11 @@ config_setting(
 )
 
 py_binary(
+    name = "patch_module",
+    srcs = ["patch_module.py"],
+)
+
+py_binary(
     name = "pack_layout",
     srcs = ["pack_layout.py"],
     visibility = ["//visibility:public"],

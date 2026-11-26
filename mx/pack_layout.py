@@ -31,7 +31,7 @@ def main():
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(source, destination)
 
-    if output.suffix == ".jar":
+    if output.suffix in (".jar", ".zip"):
         with zipfile.ZipFile(output, "w") as archive:
             for name, source in entries:
                 entry = zipfile.ZipInfo(name)
