@@ -341,12 +341,14 @@ py_test(
         "$(rootpath //tools/cc:llvm_objdump)",
         "$(rootpath @graal//sulong:com.oracle.truffle.llvm.libraries.graalvm.llvm.libs)",
         "$(rootpath @graal//sulong:com.oracle.truffle.llvm.libraries.native)",
+        "$(rootpath @graal//sulong:SULONG_NATIVE_LIB_RESOURCES)",
     ],
     data = [
         "//tools/cc:llvm_nm",
         "//tools/cc:llvm_objdump",
         "@graal//sulong:com.oracle.truffle.llvm.libraries.graalvm.llvm.libs",
         "@graal//sulong:com.oracle.truffle.llvm.libraries.native",
+        "@graal//sulong:SULONG_NATIVE_LIB_RESOURCES",
     ],
     tags = ["manual"],
 )
