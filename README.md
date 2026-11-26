@@ -75,6 +75,21 @@ bazelisk run //:gazelle -- -mx_graph=tests/processing/mx-graph.json tests/proces
 
 Repeat `-mx_graph` to generate several suite roots in one Gazelle invocation. Use `--suite-package SUITE=//PACKAGE` to resolve Java edges to imported suites whose Bazel targets are already available. Individual `--java-dep` bindings take precedence. Use `--provided-target NAME` for a suite constituent implemented by an existing Bazel rule at the same label. Suite-wide export fails when a root needs an unsupported lowering. Use `--declared-only` to select roots declared in `suite.py` when the suite also registers product configurations dynamically. The exporter still follows the resolved dependencies of those roots.
 
+Add `--partial` to generate every supported closure in a mixed suite. The JSON lists the emitted and explicitly provided roots in `suite_targets` and groups the remaining roots by reason in `blocked_roots`. The strict default makes a useful completeness check once the suite has migrated.
+
+A provider suite can publish its Java targets, JAR artifacts, Java packages and generated processor plugins for downstream Gazelle runs. Import the index at the Bazel package that owns the provider. Source imports resolve against the consuming project's mx classpath. Explicit dependency and processor mappings take precedence.
+
+```sh
+bazelisk run //:mx -- -p "$provider" bazel-buildfile --gazelle --all \
+    --bindings-out /tmp/provider.json > "$provider/mx-graph.json"
+bazelisk run //:mx -- -p "$consumer" bazel-buildfile --gazelle --all --partial \
+    --bindings //provider=/tmp/provider.json > "$consumer/mx-graph.json"
+```
+
+For Sulong, `bazel-graph --cmake-tests` includes source cases, variants, reference-build and shared-library settings for each in-tree CMake test project. This lets a generator inspect the test matrix without unpacking external test suites. Supply `--sulong-llvm-link LABEL` to lower the single-source LLVM IR recipe. Gazelle emits one independently buildable target per case and a project aggregate. The tool label is resolved for the execution platform.
+
+An exact mx test property such as `<path:PROVIDER_JAR>` resolves through the imported JAR index. Use `--test-data SUITE:PROJECT=LABEL` to give a discovered JUnit target a runtime tool or fixture. A matching `--test-jvm-flag` can refer to that input with Bazel's `$(rootpath LABEL)`.
+
 ## Annotation processors
 
 For each mx-declared processor distribution, the exporter uses mx's resolved service-provider list and emits one native `java_plugin` per processor class. A processed project becomes a rules_java `java_library` with explicit plugins. Bazel runs the processors on its execution platform and exposes generated API to downstream Java compilations. Processor implementation projects and ordinary consumers still use `elide_java_library`.

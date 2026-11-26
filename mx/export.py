@@ -67,6 +67,11 @@ def bazel_graph(args):
     parser.add_argument(
         "--imports", action="store_true", help="include loaded imported suites"
     )
+    parser.add_argument(
+        "--cmake-tests",
+        action="store_true",
+        help="include source cases and variants for in-tree Sulong CMake test projects",
+    )
     options = parser.parse_args(args)
     primary = mx.primary_suite() or mx.suite("mx")
     loaded = mx.suites(include_mx=True)
@@ -121,6 +126,8 @@ def bazel_graph(args):
                         node["source_roots"] = [p["path"] for p in inputs]
                     else:
                         node["source_inputs"] = inputs
+                if options.cmake_tests and _in_tree_sulong_tests(dep):
+                    node["cmake_tests"] = _cmake_cases(dep)
                 if dep.isJavaProject():
                     node["compliance"] = repr(dep.javaCompliance)
                     node["testonly"] = dep.is_test_project()
@@ -141,6 +148,77 @@ def bazel_graph(args):
             sort_keys=True,
         )
     )
+
+
+def _in_tree_sulong_tests(dep):
+    # ExternalCMakeTestSuite.getTests() materializes packed libraries.
+    return (type(dep).__module__, type(dep).__name__) == (
+        "mx_sulong_suite_constituents",
+        "SulongCMakeTestSuite",
+    )
+
+
+def _cmake_cases(project):
+    return {
+        "cases": sorted(Path(case).as_posix() for case in project.getTests()),
+        "variants": list(project.getVariants()),
+        "build_reference": project.buildRef,
+        "shared_object": project.buildSharedObject,
+        "variant_config": project.cmake_config_variant,
+    }
+
+
+def _bitcode_suite(project, linker):
+    if not linker:
+        raise _UnsupportedLowering("Sulong CMake bitcode requires --sulong-llvm-link")
+    matrix = _cmake_cases(project)
+    declaration = project.suite.suiteDict["projects"][project.name]
+    if (
+        matrix["variants"] != ["bitcode-O0"]
+        or matrix["build_reference"]
+        or matrix["shared_object"]
+        or matrix["variant_config"]
+        or not matrix["cases"]
+        or any(not case.endswith(".ll") for case in matrix["cases"])
+        or declaration.keys()
+        - {
+            "subDir",
+            "class",
+            "variants",
+            "fileExts",
+            "buildRef",
+            "buildSharedObject",
+            "bundledLLVMOnly",
+            "dependencies",
+            "buildDependencies",
+            "testProject",
+            "defaultBuild",
+        }
+    ):
+        raise _UnsupportedLowering(
+            "Sulong CMake requires additional compile, reference or link steps"
+        )
+    root = Path(project.source_dirs()[0])
+    recipe = [
+        line.strip()
+        for line in (root / "CMakeLists.txt").read_text().splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+    if recipe != [
+        "cmake_minimum_required(VERSION 3.15)",
+        "project(${SULONG_PROJECT_NAME} LANGUAGES NONE)",
+        "include(SulongTestSuite)",
+    ] or any(root.rglob("TestOptions.cmake")):
+        raise _UnsupportedLowering(
+            "Sulong CMake suite has custom build steps or per-case options"
+        )
+    return {
+        "name": project.name,
+        "root": root.relative_to(project.suite.dir).as_posix(),
+        "cases": matrix["cases"],
+        "linker": linker,
+        "testonly": project.is_test_project(),
+    }
 
 
 def _starlark_value(value):
@@ -187,6 +265,78 @@ def _rule(kind, attrs, extra=""):
     )
 
 
+def _write_bindings(path, graph):
+    projects = {p["name"]: p.get("packages", []) for p in graph["projects"]}
+    java = dict(projects)
+    artifacts = []
+    processors = {}
+    emitted = {p["name"] for p in graph["plugins"]}
+    suite = mx.primary_suite() or mx.suite("mx")
+    for record in graph.get("distributions", []):
+        dist = mx.dependency(f"{suite.name}:{record['name']}")
+        if not dist.isJARDistribution():
+            continue
+        artifacts.append(dist.name)
+        java[dist.name] = sorted(
+            {
+                pkg
+                for member in dist.archived_deps()
+                if type(member).__name__ == "JavaProject"
+                for pkg in _source_packages(member)
+            }
+        )
+    for dist in suite.dists:
+        labels = [
+            f"mx_plugin.{dist.name}.{cls}"
+            for cls in getattr(dist, "definedAnnotationProcessors", [])
+        ]
+        if labels and emitted.issuperset(labels):
+            processors[dist.name] = labels
+    path.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "suite": suite.name,
+                "java": java,
+                "processors": processors,
+                "artifacts": sorted(artifacts),
+            },
+            sort_keys=True,
+            indent=2,
+        )
+        + "\n"
+    )
+
+
+def _read_bindings(parser, options):
+    result = {"java": {}, "plugins": {}, "packages": {}, "artifacts": {}}
+    suites = set()
+    for spec in options.bindings:
+        package, sep, filename = spec.partition("=")
+        if not sep or not re.fullmatch(
+            r"(?:@[A-Za-z0-9_.+-]+)?//[A-Za-z0-9_./+-]*", package
+        ):
+            parser.error("expected --bindings //PACKAGE=FILE")
+        index = json.loads(Path(filename).read_text())
+        suite = index["suite"]
+        if index["version"] != 1 or suite in suites:
+            parser.error(f"unsupported or duplicate bindings for {suite}")
+        suites.add(suite)
+        for name, packages in index["java"].items():
+            qualified = f"{suite}:{name}"
+            result["java"][qualified] = f"{package}:{name}"
+            result["packages"][qualified] = packages
+        for name in index.get("artifacts", []):
+            result["artifacts"][f"{suite}:{name}"] = [f"{package}:{name}"]
+        for name, plugins in index["processors"].items():
+            result["plugins"][f"{suite}:{name}"] = [f"{package}:{p}" for p in plugins]
+    return result
+
+
+class _UnsupportedLowering(Exception):
+    """A resolved mx feature needs a Bazel implementation or binding."""
+
+
 def _dependency_labels(deps, suite, mappings, pending, classpath_dists=False):
     labels = []
     for dep in deps:
@@ -206,7 +356,9 @@ def _dependency_labels(deps, suite, mappings, pending, classpath_dists=False):
             pending.append(dep)
             labels.append(":" + dep.name)
         else:
-            mx.abort(f"{name}: supply --java-dep {name}=LABEL for this dependency")
+            raise _UnsupportedLowering(
+                f"{name}: supply --java-dep {name}=LABEL for this dependency"
+            )
     return list(dict.fromkeys(labels))
 
 
@@ -221,7 +373,7 @@ def _source_packages(project):
     return frozenset(packages)
 
 
-def _source_dependencies(graph, suite, mappings, distributions):
+def _source_dependencies(graph, suite, mappings, distributions, imported):
     """Promote imported types from the resolved mx classpath to direct Bazel deps."""
     imports = re.compile(r"^\s*import\s+(?:static\s+)?([\w.$*]+)\s*;", re.MULTILINE)
     packages = {}
@@ -245,7 +397,7 @@ def _source_dependencies(graph, suite, mappings, distributions):
         return packages[dep]
 
     for name, record in graph.items():
-        if not record.get("sources"):
+        if not record.get("sources") and not imported:
             continue
         owners = {}
         todo = list(mx.project(name).deps)
@@ -265,10 +417,22 @@ def _source_dependencies(graph, suite, mappings, distributions):
             if dep.suite == suite and (dep.name in graph or dep.name in distributions):
                 labels = [":" + dep.name]
             if labels:
-                for pkg in provided(dep):
+                for pkg in (
+                    imported[dep.qualifiedName()]
+                    if dep.qualifiedName() in imported
+                    else provided(dep)
+                ):
                     owners.setdefault(pkg, set()).update(labels)
         direct = set(record["deps"])
-        for src in record["sources"]:
+        source_files = record.get("sources")
+        if source_files is None:
+            source_files = [
+                p.relative_to(suite.dir)
+                for d in record.get("dirs", [])
+                for p in (Path(suite.dir) / d).glob("*.java")
+            ]
+        resolve = {}
+        for src in source_files:
             for qualified in imports.findall(
                 (Path(suite.dir) / src).read_text(encoding="utf-8")
             ):
@@ -277,9 +441,15 @@ def _source_dependencies(graph, suite, mappings, distributions):
                     pkg = ".".join(parts)
                     if pkg in owners:
                         direct.update(owners[pkg])
+                        if imported and len(owners[pkg]) == 1:
+                            target = next(iter(owners[pkg]))
+                            if target.startswith(("//", "@")):
+                                resolve[pkg] = target
                         break
                     parts.pop()
         record["deps"] += sorted(direct.difference(record["deps"]))
+        if resolve and not record.get("sources"):
+            record["resolve"] = resolve
 
 
 def _module_info(dist):
@@ -348,7 +518,9 @@ def _classpath_distribution(dist, suite, mappings, pending):
         or getattr(dist, "javaProperties", None)
         or getattr(dist, "requiresConcealed", None)
     ):
-        mx.abort(f"{dist.name}: distribution requires an explicit --java-dep mapping")
+        raise _UnsupportedLowering(
+            f"{dist.name}: distribution requires an explicit --java-dep mapping"
+        )
     return {
         "name": dist.name,
         "deps": _dependency_labels(dist.deps, suite, mappings, pending, True),
@@ -366,7 +538,7 @@ def _module_directives(dist, members, external, archives, mappings, library_modu
         "uses",
         "requiresConcealed",
     }:
-        mx.abort(f"{dist.name}: unsupported moduleInfo fields")
+        raise _UnsupportedLowering(f"{dist.name}: unsupported moduleInfo fields")
     # mx adds observable distribution modules and preserves transitive reads
     # from their declared module descriptors. Explicit requires take precedence.
     requires = {}
@@ -379,7 +551,7 @@ def _module_directives(dist, members, external, archives, mappings, library_modu
         if (dep.suite == dist.suite and dep.name not in archives) or not _module_info(
             dep
         ):
-            mx.abort(
+            raise _UnsupportedLowering(
                 f"{dist.name}: module path needs an explicit --archive-dist {dep.name}"
             )
         for child in dep.deps:
@@ -389,7 +561,9 @@ def _module_directives(dist, members, external, archives, mappings, library_modu
     for dep in external:
         if dep.isLibrary() and library_modules.get(dep.qualifiedName(), "") is None:
             if dep.qualifiedName() not in mappings:
-                mx.abort(f"{dep.qualifiedName()}: --platform-library needs a --java-dep mapping")
+                mx.abort(
+                    f"{dep.qualifiedName()}: --platform-library needs a --java-dep mapping"
+                )
             continue
         module = getattr(dep, "moduleName", None) or library_modules.get(
             dep.qualifiedName()
@@ -447,7 +621,9 @@ def _module_directives(dist, members, external, archives, mappings, library_modu
                     }
                 )
                 if not matches:
-                    mx.abort(f"{dist.name}: no packages match {subject}")
+                    raise _UnsupportedLowering(
+                        f"{dist.name}: no packages match {subject}"
+                    )
             for package in matches:
                 if not to:
                     packages[package] = None
@@ -484,7 +660,9 @@ def _jar_archive(dist, suite, mappings, pending, release, archives, library_modu
         # distribution; they do not change the JAR, so they do not block assembly.
         or dist.module_info_compilation_participants
     ):
-        mx.abort(f"{dist.name}: unsupported JAR archive configuration: {participants}")
+        raise _UnsupportedLowering(
+            f"{dist.name}: unsupported JAR archive configuration: {sorted(participants)}"
+        )
     members = dist.archived_deps()
     if any(
         not (
@@ -495,7 +673,7 @@ def _jar_archive(dist, suite, mappings, pending, release, archives, library_modu
         )
         for d in members
     ):
-        mx.abort(f"{dist.name}: unsupported archive member")
+        raise _UnsupportedLowering(f"{dist.name}: unsupported archive member")
     external = [d for d in dist.deps if d not in members] + dist.excludedLibs
     packaged = {
         member
@@ -604,6 +782,7 @@ def _can_lower_root(dep):
     return (
         type(dep).__name__
         in ("JavaProject", "LayoutDirDistribution", "LayoutTARDistribution")
+        or _in_tree_sulong_tests(dep)
         or _is_shaded_project(dep)
         or dep.isJARDistribution()
         or dep.isPOMDistribution()
@@ -621,7 +800,7 @@ def _tar_layout(dist, pending, mappings):
         or dist.hashEntry
         or dist._removed_deps
     ):
-        mx.abort(
+        raise _UnsupportedLowering(
             f"{dist.name}: TAR layout needs a Bazel implementation bound with --provided-target"
         )
     members = {}
@@ -636,7 +815,7 @@ def _tar_layout(dist, pending, mappings):
         destination = destination.removeprefix("./")
         if kind == "file" and keys == {"path"} and _resource_path(path):
             if not (Path(dist.suite.dir) / path).is_file():
-                mx.abort(f"{dist.name}: missing TAR input {path}")
+                raise _UnsupportedLowering(f"{dist.name}: missing TAR input {path}")
             target = path
             if directory:
                 destination += Path(path).name
@@ -652,7 +831,7 @@ def _tar_layout(dist, pending, mappings):
                 pending.append(dep)
                 labels = [":" + dep.name]
             if not labels or len(labels) != 1:
-                mx.abort(
+                raise _UnsupportedLowering(
                     f"{dist.name}: bind {dep.qualifiedName()} to one Bazel artifact"
                 )
             target = labels[0]
@@ -661,32 +840,40 @@ def _tar_layout(dist, pending, mappings):
                     destination += Path(path).name
                 elif directory and not path:
                     if destination and not _resource_path(destination.rstrip("/")):
-                        mx.abort(
+                        raise _UnsupportedLowering(
                             f"{dist.name}: invalid TAR import destination {destination!r}"
                         )
                     imports.setdefault(target, []).append("=" + destination)
                     continue
                 elif not path:
-                    mx.abort(
+                    raise _UnsupportedLowering(
                         f"{dist.name}: extracting a full archive needs a destination directory"
                     )
                 if not _resource_path(destination) or destination in destinations:
-                    mx.abort(
+                    raise _UnsupportedLowering(
                         f"{dist.name}: expected a unique TAR member path: {destination!r}"
                     )
                 destinations.add(destination)
                 imports.setdefault(target, []).append(path + "=" + destination)
                 continue
             if kind != "dependency" or path or directory:
-                mx.abort(f"{dist.name}: unsupported TAR input {source['_str_']}")
+                raise _UnsupportedLowering(
+                    f"{dist.name}: unsupported TAR input {source['_str_']}"
+                )
         else:
-            mx.abort(f"{dist.name}: unsupported TAR input {source['_str_']}")
+            raise _UnsupportedLowering(
+                f"{dist.name}: unsupported TAR input {source['_str_']}"
+            )
         if not _resource_path(destination) or destination in destinations:
-            mx.abort(f"{dist.name}: expected a unique TAR member path: {destination!r}")
+            raise _UnsupportedLowering(
+                f"{dist.name}: expected a unique TAR member path: {destination!r}"
+            )
         destinations.add(destination)
         members.setdefault(target, []).append(destination)
     if not (members or imports) or inputs != set(dist.buildDependencies):
-        mx.abort(f"{dist.name}: expected a nonempty TAR layout with explicit inputs")
+        raise _UnsupportedLowering(
+            f"{dist.name}: expected a nonempty TAR layout with explicit inputs"
+        )
     return {
         "name": dist.name,
         "members": {target: "\n".join(entries) for target, entries in members.items()},
@@ -707,13 +894,15 @@ def _resource_layout(dist, pending, mappings):
         or dist.fileListPurpose
         or dist._removed_deps
     ):
-        mx.abort(f"{dist.name}: unsupported resource layout")
+        raise _UnsupportedLowering(f"{dist.name}: unsupported resource layout")
     literals = {}
     copies = {}
     inputs = set()
     for dest, source in dist._walk_layout():
         if not _resource_path(dest) or dest in copies or dest in literals:
-            mx.abort(f"{dist.name}: expected a unique resource file path: {dest!r}")
+            raise _UnsupportedLowering(
+                f"{dist.name}: expected a unique resource file path: {dest!r}"
+            )
         kind = source["source_type"]
         keys = set(source) - {"_str_", "source_type"}
         if kind == "string" and keys <= {"value", "ignore_value_subst"}:
@@ -726,7 +915,9 @@ def _resource_layout(dist, pending, mappings):
         ):
             dep = mx.dependency(source["dependency"], context=dist)
             if type(dep).__name__ != "LayoutDirDistribution":
-                mx.abort(f"{dist.name}: expected a file from a resource layout")
+                raise _UnsupportedLowering(
+                    f"{dist.name}: expected a file from a resource layout"
+                )
             inputs.add(dep)
             if dep.suite == dist.suite:
                 target = ":" + dep.name
@@ -734,17 +925,19 @@ def _resource_layout(dist, pending, mappings):
             else:
                 labels = mappings.get(dep.qualifiedName(), [])
                 if len(labels) != 1:
-                    mx.abort(
+                    raise _UnsupportedLowering(
                         f"{dist.name}: bind {dep.qualifiedName()} to a migrated resource layout"
                     )
                 target = labels[0]
             copies[dest] = f"{target}.files/{source['path']}"
         else:
-            mx.abort(
+            raise _UnsupportedLowering(
                 f"{dist.name}: unsupported resource layout source {source['_str_']}"
             )
     if not (literals or copies) or inputs != set(dist.buildDependencies):
-        mx.abort(f"{dist.name}: expected a nonempty file layout with explicit inputs")
+        raise _UnsupportedLowering(
+            f"{dist.name}: expected a nonempty file layout with explicit inputs"
+        )
     return {
         "name": dist.name,
         "literals": literals,
@@ -802,7 +995,7 @@ def _processor_plugins(
             or (dist.archiveparticipants and dist.name not in archives)
             or dist.is_stripped()
         ):
-            mx.abort(
+            raise _UnsupportedLowering(
                 f"{project.name}: supply --processor-plugin {name}=LABEL for this processor path"
             )
         if dist.archiveparticipants and dist.name in archives:
@@ -930,6 +1123,13 @@ def bazel_buildfile(args):
         help="discover JUnit classes and run them against these packaged runtime dependencies",
     )
     parser.add_argument(
+        "--test-data",
+        action="append",
+        default=[],
+        metavar="SUITE:PROJECT=LABEL",
+        help="declare a runtime file used by generated test classes",
+    )
+    parser.add_argument(
         "--test-path",
         action="append",
         default=[],
@@ -1000,6 +1200,28 @@ def bazel_buildfile(args):
         metavar="NAME",
         help="existing Bazel target implementing a project or distribution in --all mode",
     )
+    parser.add_argument(
+        "--partial",
+        action="store_true",
+        help="export supported closures and report blocked suite roots",
+    )
+    parser.add_argument(
+        "--sulong-llvm-link",
+        metavar="LABEL",
+        help="execution-platform llvm-link for Sulong bitcode fixtures",
+    )
+    parser.add_argument(
+        "--bindings-out",
+        type=Path,
+        help="write reusable Java bindings for emitted targets",
+    )
+    parser.add_argument(
+        "--bindings",
+        action="append",
+        default=[],
+        metavar="//PACKAGE=FILE",
+        help="import the Java bindings published by another suite",
+    )
     parser.add_argument("projects", nargs="*")
     options = parser.parse_args(args)
     if options.all:
@@ -1008,6 +1230,61 @@ def bazel_buildfile(args):
         options.classpath_dists = True
     elif not options.projects or options.provided_target or options.declared_only:
         parser.error("select projects or use --all")
+    if options.partial and not options.all:
+        parser.error("--partial requires --all")
+    if (options.bindings_out or options.bindings) and not options.gazelle:
+        parser.error("Java bindings require --gazelle")
+    bindings = _read_bindings(parser, options)
+    try:
+        selected = None
+        blocked = {}
+        if options.partial:
+            suite = mx.primary_suite() or mx.suite("mx")
+            selected = set()
+            for root in _suite_candidates(options, suite):
+                if root.name in selected:
+                    continue
+                if (
+                    not _can_lower_root(root)
+                    and root.name not in options.provided_target
+                ):
+                    reason = f"missing Bazel implementation for {type(root).__name__}"
+                    blocked.setdefault(reason, []).append(root.qualifiedName())
+                    continue
+                if root.name in options.provided_target:
+                    selected.add(root.name)
+                    continue
+                try:
+                    closure = _lower_buildfile(
+                        parser, options, bindings, {root.name}, probe=True
+                    )
+                except _UnsupportedLowering as error:
+                    blocked.setdefault(str(error), []).append(root.qualifiedName())
+                else:
+                    selected.update(closure)
+        result = _lower_buildfile(parser, options, bindings, selected)
+        if options.gazelle:
+            if options.partial:
+                result["blocked_roots"] = {k: sorted(v) for k, v in blocked.items()}
+            if options.bindings_out:
+                _write_bindings(options.bindings_out, result)
+            print(json.dumps(result, indent=2, sort_keys=True))
+    except _UnsupportedLowering as error:
+        mx.abort(str(error))
+
+
+def _suite_candidates(options, suite):
+    candidates = suite.projects + suite.dists
+    if options.declared_only:
+        declarations = (
+            suite.suiteDict.get("projects", {}).keys()
+            | suite.suiteDict.get("distributions", {}).keys()
+        )
+        candidates = [dep for dep in candidates if dep.name in declarations]
+    return candidates
+
+
+def _lower_buildfile(parser, options, bindings, selected, probe=False):
     empty_projects = set(options.empty_java_project)
     if empty_projects and not options.gazelle:
         parser.error("--empty-java-project requires --gazelle")
@@ -1030,6 +1307,7 @@ def bazel_buildfile(args):
         library_modules[name] = None
     test_launchers = _mappings(parser, options.test_launcher, "--test-launcher")
     test_runtimes = _mappings(parser, options.test_runtime, "--test-runtime")
+    test_data = _mappings(parser, options.test_data, "--test-data")
     test_paths = _mappings(parser, options.test_path, "--test-path")
     used_test_paths = set()
     test_flags = {}
@@ -1056,7 +1334,12 @@ def bazel_buildfile(args):
             parser.error("expected a unique --project-release PROJECT=RELEASE")
         project_releases[name] = int(value)
     if (
-        test_runtimes or test_launchers or test_flags or manual_tests or manual_classes
+        test_runtimes
+        or test_launchers
+        or test_flags
+        or manual_tests
+        or test_data
+        or manual_classes
     ) and not options.gazelle:
         parser.error("test configuration requires --gazelle")
     project_options = {}
@@ -1096,35 +1379,35 @@ def bazel_buildfile(args):
                 or type(dep).__name__ == "LayoutDirDistribution"
             ):
                 java_deps.setdefault(dep.qualifiedName(), [f"{package}:{dep.name}"])
+    for name, label in bindings["java"].items():
+        java_deps.setdefault(name, [label])
+    for name, labels in bindings["plugins"].items():
+        mappings.setdefault(name, labels)
     provided = set()
     auto_test_runtimes = {}
     if options.all:
         suite = mx.primary_suite() or mx.suite("mx")
         provided = set(options.provided_target)
-        candidates = suite.projects + suite.dists
-        if options.declared_only:
-            declarations = (
-                suite.suiteDict.get("projects", {}).keys()
-                | suite.suiteDict.get("distributions", {}).keys()
-            )
-            candidates = [dep for dep in candidates if dep.name in declarations]
+        candidates = _suite_candidates(options, suite)
         if unknown := provided - {dep.name for dep in candidates}:
             parser.error(f"unknown --provided-target names: {sorted(unknown)}")
         for name in provided:
             java_deps.setdefault(f"{suite.name}:{name}", [":" + name])
         roots = [dep for dep in candidates if dep.name not in provided]
+        if selected is not None:
+            roots = [dep for dep in roots if dep.name in selected]
         unsupported = sorted(
             f"{dep.qualifiedName()} ({type(dep).__name__})"
             for dep in roots
             if not _can_lower_root(dep)
         )
         if unsupported:
-            mx.abort(
+            raise _UnsupportedLowering(
                 "Bazel lowerings required for these suite roots (bind existing rules with --provided-target):\n"
                 + "\n".join(unsupported)
             )
         archives.update(dep.name for dep in candidates if dep.isJARDistribution())
-        for dist in roots:
+        for dist in [] if probe else roots:
             if not (dist.isJARDistribution() and dist.is_test_distribution()):
                 continue
             for project in dist.archived_deps():
@@ -1151,6 +1434,7 @@ def bazel_buildfile(args):
     distributions = {}
     layouts = {}
     tar_layouts = {}
+    bitcode_suites = {}
     javac_only_processors = set(options.javac_only_processor)
     used_javac_only = set()
     processed = False
@@ -1162,6 +1446,7 @@ def bazel_buildfile(args):
             or project.name in distributions
             or project.name in layouts
             or project.name in tar_layouts
+            or project.name in bitcode_suites
         ):
             continue
         if options.classpath_dists and project.suite == suite:
@@ -1199,11 +1484,22 @@ def bazel_buildfile(args):
             if type(project).__name__ == "LayoutDirDistribution":
                 layouts[project.name] = _resource_layout(project, pending, java_deps)
                 continue
+        if (
+            options.gazelle
+            and _in_tree_sulong_tests(project)
+            and project.suite == suite
+        ):
+            bitcode_suites[project.name] = _bitcode_suite(
+                project, options.sulong_llvm_link
+            )
+            continue
         shaded = options.gazelle and _is_shaded_project(project)
         if (
             not shaded and type(project).__name__ != "JavaProject"
         ) or project.suite != suite:
-            mx.abort(f"{project.name}: requires a separate Bazel dependency mapping")
+            raise _UnsupportedLowering(
+                f"{project.name}: requires a separate Bazel dependency mapping"
+            )
         allowed = _PLAIN_JAVA
         # Preserve mx coverage exclusions as graph metadata.
         excluded_from_jacoco = project._orig_attrs.get("jacoco") == "exclude"
@@ -1242,7 +1538,11 @@ def bazel_buildfile(args):
         }:
             allowed = allowed | {"os_arch"}
         property_flags = []
-        property_data = []
+        property_data = (
+            test_data.pop(project.qualifiedName(), [])
+            if project.is_test_project()
+            else []
+        )
         if (
             options.gazelle
             and project.is_test_project()
@@ -1251,9 +1551,18 @@ def bazel_buildfile(args):
             for key, value in project._orig_attrs["javaProperties"].items():
                 match = re.fullmatch(r"<path:([^>]+)>", value)
                 dep = mx.dependency(match[1], context=project) if match else None
-                labels = test_paths.get(dep.qualifiedName(), []) if dep else []
+                labels = (
+                    test_paths.get(
+                        dep.qualifiedName(),
+                        bindings["artifacts"].get(dep.qualifiedName(), []),
+                    )
+                    if dep
+                    else []
+                )
                 if len(labels) != 1:
-                    mx.abort(f"{project.name}: bind {key}={value} using --test-path")
+                    raise _UnsupportedLowering(
+                        f"{project.name}: bind {key}={value} using --test-path"
+                    )
                 used_test_paths.add(dep.qualifiedName())
                 property_data.append(labels[0])
                 property_flags.append(f"-D{key}=$(rootpath {labels[0]})")
@@ -1279,11 +1588,14 @@ def bazel_buildfile(args):
         if project.name in labs_javac:
             labs_javac.remove(project.name)
             force_javac = True
-        if project._orig_attrs.get("javac.lint.overrides") == "-incubating":
+        if project._orig_attrs.get("javac.lint.overrides") in (
+            "-incubating",
+            "-deprecation",
+        ):
             allowed = allowed | {"javac.lint.overrides"}
         unsupported = sorted(set(project._orig_attrs) - allowed)
         if unsupported:
-            mx.abort(
+            raise _UnsupportedLowering(
                 f"{project.name}: unsupported mx attributes: {', '.join(unsupported)}"
             )
         processors = _processor_plugins(
@@ -1304,10 +1616,16 @@ def bazel_buildfile(args):
             if not shaded or s != project.source_gen_dir()
         ]
         for directory in map(Path, source_dirs):
+            if not directory.is_relative_to(suite.dir):
+                raise _UnsupportedLowering(
+                    f"{project.name}: source root belongs to another suite or packed resource"
+                )
             if shaded and not directory.exists():
                 continue  # The suite may contain only generated sources.
             if not directory.is_dir():
-                mx.abort(f"{project.name}: missing source root {directory}")
+                raise _UnsupportedLowering(
+                    f"{project.name}: missing source root {directory}"
+                )
             for source in sorted(directory.rglob("*")):
                 if source.is_file() and source.name not in {"BUILD", "BUILD.bazel"}:
                     path = source.relative_to(suite.dir).as_posix()
@@ -1331,7 +1649,7 @@ def bazel_buildfile(args):
             }
             continue
         if not sources and not shaded:
-            mx.abort(f"{project.name}: no Java sources")
+            raise _UnsupportedLowering(f"{project.name}: no Java sources")
         deps = _dependency_labels(
             project.deps, suite, java_deps, pending, options.classpath_dists
         )
@@ -1343,7 +1661,7 @@ def bazel_buildfile(args):
             release = project.javaCompliance.value
         release = project_releases.pop(project.name, release)
         if release not in project.javaCompliance:
-            mx.abort(
+            raise _UnsupportedLowering(
                 f"{project.name}: release {release} is outside {project.javaCompliance!r}"
             )
         attrs = {
@@ -1358,7 +1676,7 @@ def bazel_buildfile(args):
                 ["--add-modules", ",".join(project._orig_attrs["requires"])]
             )
         if lint := project._orig_attrs.get("javac.lint.overrides"):
-            if lint in ("none", "-incubating"):
+            if lint in ("none", "-incubating", "-deprecation"):
                 attrs["javac_opts"].append("-Xlint:" + lint)
         attrs["javac_opts"].extend(project_options.pop(project.name, []))
         if processors:
@@ -1368,7 +1686,7 @@ def bazel_buildfile(args):
         else:
             attrs["unified_release"] = release
         if len(resource_roots) > 1 and (not options.gazelle or shaded):
-            mx.abort(
+            raise _UnsupportedLowering(
                 f"{project.name}: resources under multiple roots require separate packaging"
             )
         resource_attr = ""
@@ -1441,7 +1759,7 @@ def bazel_buildfile(args):
                 for lib in project.shaded_deps():
                     labels = shaded_inputs.get(lib.qualifiedName(), [])
                     if len(labels) != 2:
-                        mx.abort(
+                        raise _UnsupportedLowering(
                             f"{project.name}: bind the binary and sources of {lib.qualifiedName()} with --shaded-input"
                         )
                     inputs.extend(labels)
@@ -1488,7 +1806,7 @@ def bazel_buildfile(args):
                             or property_data
                             or project.qualifiedName() in test_flags
                         ):
-                            mx.abort(
+                            raise _UnsupportedLowering(
                                 f"{project.name}: --test-launcher supplies the entire test runtime"
                             )
                         record["test_launcher"] = launchers[0]
@@ -1510,6 +1828,15 @@ def bazel_buildfile(args):
         rules[project.name] = _rule(
             "java_library" if processors else "elide_java_library", attrs, resource_attr
         )
+    if probe:
+        return (
+            graph.keys()
+            | rules.keys()
+            | layouts.keys()
+            | distributions.keys()
+            | bitcode_suites.keys()
+            | tar_layouts.keys()
+        )
     if (
         unused_projects := project_releases.keys()
         | manual_tests
@@ -1520,9 +1847,9 @@ def bazel_buildfile(args):
         mx.abort(f"Unused project configuration: {sorted(unused_projects)}")
     if unused_paths := test_paths.keys() - used_test_paths:
         mx.abort(f"Unused test path mappings: {sorted(unused_paths)}")
-    if test_launchers or test_runtimes or test_flags:
+    if test_launchers or test_runtimes or test_flags or test_data:
         mx.abort(
-            f"Unused test configuration: {sorted(test_runtimes.keys() | test_flags.keys() | test_launchers.keys())}"
+            f"Unused test configuration: {sorted(test_runtimes.keys() | test_flags.keys() | test_launchers.keys() | test_data.keys())}"
         )
     if generated_deps:
         mx.abort(f"Unknown generated dependency project: {sorted(generated_deps)}")
@@ -1531,7 +1858,13 @@ def bazel_buildfile(args):
     if rules.keys() & plugins.keys():
         mx.abort("A generated plugin target conflicts with a project name")
     if options.gazelle:
-        if missing_archives := archives - distributions.keys() - provided:
+        if (
+            missing_archives := (
+                set(options.archive_dist) if options.partial else archives
+            )
+            - distributions.keys()
+            - provided
+        ):
             mx.abort(f"Unknown archive in selected closure: {sorted(missing_archives)}")
         unmatched = javac_only_processors - used_javac_only
         if unmatched:
@@ -1541,8 +1874,10 @@ def bazel_buildfile(args):
         missing = set(options.whole_project) - graph.keys()
         if missing:
             mx.abort(f"Unknown whole project in selected closure: {sorted(missing)}")
-        if options.infer_source_deps:
-            _source_dependencies(graph, suite, java_deps, distributions)
+        if options.infer_source_deps or options.bindings:
+            _source_dependencies(
+                graph, suite, java_deps, distributions, bindings["packages"]
+            )
             _module_reads_from_projects(graph, suite, java_deps, distributions)
         result = {
             "version": 1,
@@ -1550,6 +1885,8 @@ def bazel_buildfile(args):
             "plugins": [plugins[n] for n in sorted(plugins)],
         }
         if options.all:
+            if selected is not None:
+                candidates = [dep for dep in candidates if dep.name in selected]
             result["suite_targets"] = {
                 "projects": sorted(dep.name for dep in candidates if dep.isProject()),
                 "distributions": sorted(
@@ -1560,10 +1897,13 @@ def bazel_buildfile(args):
             result["distributions"] = [distributions[n] for n in sorted(distributions)]
         if layouts:
             result["layouts"] = [layouts[n] for n in sorted(layouts)]
+        if bitcode_suites:
+            result["bitcode_suites"] = [
+                bitcode_suites[n] for n in sorted(bitcode_suites)
+            ]
         if tar_layouts:
             result["tar_layouts"] = [tar_layouts[n] for n in sorted(tar_layouts)]
-        print(json.dumps(result, indent=2, sort_keys=True))
-        return
+        return result
     rules.update({name: _rule("java_plugin", attrs) for name, attrs in plugins.items()})
     print('load("@rules_mx//mx:java.bzl", "elide_java_library")')
     if processed:

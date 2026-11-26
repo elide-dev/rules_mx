@@ -16,6 +16,8 @@ archive_override(
     urls = ["https://github.com/elide-dev/rules_elide/archive/50e0e8f8b3696a86b4294491740434db4e9d4260.tar.gz"],
 )
 
+bazel_dep(name = "wabt", version = "1.0.37.bcr.1", dev_dependency = True)
+
 bazel_dep(name = "gazelle", version = "0.54.0")
 bazel_dep(name = "contrib_rules_jvm", version = "0.35.0")
 

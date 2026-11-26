@@ -1,0 +1,2970 @@
+diff --git a/sulong/BUILD.bazel b/sulong/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/BUILD.bazel
+@@ -0,0 +1,473 @@
++load("@rules_mx//mx:bitcode.bzl", "mx_bitcode_suite")
++load("@rules_mx//mx:graph.bzl", "mx_exported_tar", "mx_jar_dist", "mx_processed_java", "mx_project")
++
++filegroup(
++    name = "all_distributions",
++    testonly = True,
++    srcs = [
++        ":SULONG_API",
++        ":SULONG_LAUNCHER",
++        ":SULONG_LEGACY",
++        ":SULONG_LIBCXX_COMPILER_WRAPPER",
++    ],
++    visibility = ["//visibility:public"],
++)
++
++filegroup(
++    name = "all_projects",
++    testonly = True,
++    srcs = [
++        ":com.oracle.truffle.llvm.api",
++        ":com.oracle.truffle.llvm.asm.amd64",
++        ":com.oracle.truffle.llvm.launcher",
++        ":com.oracle.truffle.llvm.nativemode.resources",
++        ":com.oracle.truffle.llvm.nfi",
++        ":com.oracle.truffle.llvm.parser",
++        ":com.oracle.truffle.llvm.parser.factories",
++        ":com.oracle.truffle.llvm.runtime",
++        ":com.oracle.truffle.llvm.spi",
++        ":com.oracle.truffle.llvm.tests.bitcode.other.native",
++        ":com.oracle.truffle.llvm.tests.irdebug.native",
++        ":com.oracle.truffle.llvm.tools",
++    ],
++    visibility = ["//visibility:public"],
++)
++
++mx_project(
++    name = "com.oracle.truffle.llvm.api",
++    packages = ["//sulong/projects/com.oracle.truffle.llvm.api/src/com/oracle/truffle/llvm/api"],
++    visibility = ["//visibility:public"],
++    deps = ["//truffle:TRUFFLE_API"],
++)
++
++mx_processed_java(
++    name = "com.oracle.truffle.llvm.asm.amd64",
++    srcs = ["//sulong/projects/com.oracle.truffle.llvm.asm.amd64/src/com/oracle/truffle/llvm/asm/amd64:com.oracle.truffle.llvm.asm.amd64.srcs"],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++        "-Xlint:none",
++    ],
++    mx_resource_root = "projects/com.oracle.truffle.llvm.asm.amd64/src",
++    plugins = [
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    resources = ["//sulong/projects/com.oracle.truffle.llvm.asm.amd64/src/com/oracle/truffle/llvm/asm/amd64:com.oracle.truffle.llvm.asm.amd64.resources"],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":com.oracle.truffle.llvm.runtime",
++        "//truffle:TRUFFLE_ANTLR4",
++        "//truffle:TRUFFLE_API",
++    ],
++)
++
++mx_project(
++    name = "com.oracle.truffle.llvm.launcher",
++    packages = ["//sulong/projects/com.oracle.truffle.llvm.launcher/src/com/oracle/truffle/llvm/launcher"],
++    visibility = ["//visibility:public"],
++    deps = [
++        "//sdk:LAUNCHER_COMMON",
++        "//sdk:POLYGLOT",
++    ],
++)
++
++mx_processed_java(
++    name = "com.oracle.truffle.llvm.nativemode.resources",
++    srcs = ["//sulong/projects/com.oracle.truffle.llvm.nativemode.resources/src/com/oracle/truffle/llvm/nativemode/resources:com.oracle.truffle.llvm.nativemode.resources.srcs"],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++    ],
++    mx_resource_root = "projects/com.oracle.truffle.llvm.nativemode.resources/src",
++    plugins = [
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    resources = [
++        "//sulong/projects/com.oracle.truffle.llvm.nativemode.resources/src/META-INF/native-image/org.graalvm.llvm/llvm-language-native-resources:com.oracle.truffle.llvm.nativemode.resources.resources",
++        "//sulong/projects/com.oracle.truffle.llvm.nativemode.resources/src/META-INF/services:com.oracle.truffle.llvm.nativemode.resources.resources",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":SULONG_API",
++        "//sdk:NATIVEIMAGE",
++        "//truffle:TRUFFLE_API",
++    ],
++)
++
++mx_processed_java(
++    name = "com.oracle.truffle.llvm.nfi",
++    srcs = ["//sulong/projects/com.oracle.truffle.llvm.nfi/src/com/oracle/truffle/llvm/nfi:com.oracle.truffle.llvm.nfi.srcs"],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++    ],
++    plugins = [
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        "//truffle:TRUFFLE_API",
++        "//truffle:TRUFFLE_NFI",
++    ],
++)
++
++mx_processed_java(
++    name = "com.oracle.truffle.llvm.parser",
++    srcs = [
++        "//sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser:com.oracle.truffle.llvm.parser.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/binary:com.oracle.truffle.llvm.parser.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/coff:com.oracle.truffle.llvm.parser.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/elf:com.oracle.truffle.llvm.parser.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/filereader:com.oracle.truffle.llvm.parser.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/instructions:com.oracle.truffle.llvm.parser.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/listeners:com.oracle.truffle.llvm.parser.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/macho:com.oracle.truffle.llvm.parser.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/metadata:com.oracle.truffle.llvm.parser.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/metadata/debuginfo:com.oracle.truffle.llvm.parser.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model:com.oracle.truffle.llvm.parser.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/attributes:com.oracle.truffle.llvm.parser.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/blocks:com.oracle.truffle.llvm.parser.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/enums:com.oracle.truffle.llvm.parser.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/functions:com.oracle.truffle.llvm.parser.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/symbols/constants:com.oracle.truffle.llvm.parser.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/symbols/constants/aggregate:com.oracle.truffle.llvm.parser.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/symbols/constants/floatingpoint:com.oracle.truffle.llvm.parser.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/symbols/constants/integer:com.oracle.truffle.llvm.parser.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/symbols/globals:com.oracle.truffle.llvm.parser.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/symbols/instructions:com.oracle.truffle.llvm.parser.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/target:com.oracle.truffle.llvm.parser.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/visitors:com.oracle.truffle.llvm.parser.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/nodes:com.oracle.truffle.llvm.parser.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/records:com.oracle.truffle.llvm.parser.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/scanner:com.oracle.truffle.llvm.parser.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/text:com.oracle.truffle.llvm.parser.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/util:com.oracle.truffle.llvm.parser.srcs",
++    ],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++        "--add-modules",
++        "java.logging,java.xml",
++    ],
++    plugins = [
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":com.oracle.truffle.llvm.runtime",
++        "//sdk:COLLECTIONS",
++        "//sdk:POLYGLOT",
++        "//truffle:TRUFFLE_API",
++    ],
++)
++
++mx_processed_java(
++    name = "com.oracle.truffle.llvm.parser.factories",
++    srcs = [
++        "//sulong/projects/com.oracle.truffle.llvm.parser.factories/src/com/oracle/truffle/llvm/parser/factories:com.oracle.truffle.llvm.parser.factories.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.parser.factories/src/com/oracle/truffle/llvm/parser/factories/inlineasm:com.oracle.truffle.llvm.parser.factories.srcs",
++    ],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++    ],
++    plugins = [
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":com.oracle.truffle.llvm.asm.amd64",
++        ":com.oracle.truffle.llvm.parser",
++        ":com.oracle.truffle.llvm.runtime",
++        "//truffle:TRUFFLE_API",
++    ],
++)
++
++mx_processed_java(
++    name = "com.oracle.truffle.llvm.runtime",
++    srcs = [
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/config:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/datalayout:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/debug:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/debug/debugexpr/nodes:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/debug/debugexpr/parser:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/debug/debugexpr/parser/antlr:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/debug/scope:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/debug/type:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/debug/value:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/except:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/floating:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/global:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/inlineasm:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/instruments/trace:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/interop:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/interop/access:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/interop/convert:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/interop/export:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/interop/nfi:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/interop/values:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/library/internal:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/memory:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/api:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/asm:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/asm/base:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/asm/support:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/asm/syscall:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/asm/syscall/darwin:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/asm/syscall/linux/aarch64:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/asm/syscall/linux/amd64:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/asm/syscall/posix:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/base:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/cast:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/control:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/func:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/c:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/handles:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/interop:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/interop/typed:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/llvm:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/llvm/aarch64:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/llvm/aarch64/darwin:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/llvm/aarch64/linux:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/llvm/arith:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/llvm/bit:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/llvm/debug:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/llvm/va:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/llvm/x86:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/llvm/x86_win:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/multithreading:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/rust:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/sulong:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/literals:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/memory:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/memory/literal:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/memory/load:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/memory/move:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/memory/rmw:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/memory/store:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/op:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/others:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/util:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/vars:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/vector:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/options:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/pointer:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/profiling:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/pthread:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/target:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/types:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/types/symbols:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/types/visitors:com.oracle.truffle.llvm.runtime.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/vector:com.oracle.truffle.llvm.runtime.srcs",
++    ],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++        "--add-modules",
++        "java.logging,jdk.unsupported",
++        "-Xlint:-deprecation",
++    ],
++    mx_resource_root = "projects/com.oracle.truffle.llvm.runtime/src",
++    plugins = [
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    resources = [
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/META-INF/native-image/org.graalvm.llvm/llvm-language:com.oracle.truffle.llvm.runtime.resources",
++        "//sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/debug/debugexpr/parser/antlr:com.oracle.truffle.llvm.runtime.resources",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":com.oracle.truffle.llvm.api",
++        ":com.oracle.truffle.llvm.spi",
++        "//sdk:COLLECTIONS",
++        "//sdk:POLYGLOT",
++        "//truffle:TRUFFLE_ANTLR4",
++        "//truffle:TRUFFLE_API",
++        "//truffle:TRUFFLE_NFI",
++    ],
++)
++
++mx_processed_java(
++    name = "com.oracle.truffle.llvm.spi",
++    srcs = [
++        "//sulong/projects/com.oracle.truffle.llvm.spi/src/com/oracle/truffle/llvm/spi:com.oracle.truffle.llvm.spi.srcs",
++        "//sulong/projects/com.oracle.truffle.llvm.spi/src/com/oracle/truffle/llvm/spi/internal:com.oracle.truffle.llvm.spi.srcs",
++    ],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++    ],
++    plugins = [
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    visibility = ["//visibility:public"],
++    deps = ["//truffle:TRUFFLE_API"],
++)
++
++mx_project(
++    name = "com.oracle.truffle.llvm.tools",
++    packages = ["//sulong/projects/com.oracle.truffle.llvm.tools/src/com/oracle/truffle/llvm/tools"],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":com.oracle.truffle.llvm.parser",
++        "//sdk:POLYGLOT",
++    ],
++)
++
++mx_jar_dist(
++    name = "SULONG_API",
++    contents = [
++        ":com.oracle.truffle.llvm.api",
++        ":com.oracle.truffle.llvm.spi",
++    ],
++    directives = [
++        "exports com.oracle.truffle.llvm.api",
++        "exports com.oracle.truffle.llvm.spi",
++        "exports com.oracle.truffle.llvm.spi.internal to org.graalvm.llvm_community, org.graalvm.llvm.nativemode.resources, org.graalvm.llvm.managed.resources",
++        "requires org.graalvm.truffle",
++        "requires transitive org.graalvm.word",
++    ],
++    jni_services = True,
++    manifest = {
++        "Implementation-Vendor": "Oracle Corporation",
++        "Implementation-Version": "25.6.0-dev",
++        "Name": "llvm-api",
++        "Specification-Vendor": "Oracle Corporation",
++        "Specification-Version": "25.6.0-dev",
++    },
++    module_name = "org.graalvm.llvm.api",
++    release = 21,
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = ["//truffle:TRUFFLE_API"],
++)
++
++mx_jar_dist(
++    name = "SULONG_LAUNCHER",
++    contents = [":com.oracle.truffle.llvm.launcher"],
++    directives = [
++        "exports com.oracle.truffle.llvm.launcher to org.graalvm.launcher",
++        "requires org.graalvm.launcher",
++        "requires org.graalvm.polyglot",
++        "requires transitive org.graalvm.word",
++    ],
++    manifest = {
++        "Main-Class": "com.oracle.truffle.llvm.launcher.LLVMLauncher",
++    },
++    module_name = "org.graalvm.llvm.launcher",
++    release = 21,
++    visibility = ["//visibility:public"],
++    deps = ["//sdk:LAUNCHER_COMMON"],
++)
++
++mx_bitcode_suite(
++    name = "com.oracle.truffle.llvm.tests.bitcode.other.native",
++    testonly = True,
++    cases = [
++        "other/allocation_limits.ll",
++        "other/big_endian.ll",
++        "other/unsupported_inline_asm.ll",
++    ],
++    llvm_link = "@rules_mx//graal:sdk_llvm_link",
++    root = "tests/com.oracle.truffle.llvm.tests.bitcode.other.native",
++    visibility = ["//visibility:public"],
++)
++
++mx_bitcode_suite(
++    name = "com.oracle.truffle.llvm.tests.irdebug.native",
++    testonly = True,
++    cases = [
++        "irdebug/controlFlow.ll",
++        "irdebug/globals.ll",
++        "irdebug/primitives-mem2reg.ll",
++        "irdebug/primitives.ll",
++        "irdebug/vectorKinds-mem2reg.ll",
++        "irdebug/vectors-mem2reg.ll",
++        "irdebug/vectors.ll",
++    ],
++    llvm_link = "@rules_mx//graal:sdk_llvm_link",
++    root = "tests/com.oracle.truffle.llvm.tests.irdebug.native",
++    visibility = ["//visibility:public"],
++)
++
++mx_exported_tar(
++    name = "SULONG_LEGACY",
++    format = "tar",
++    members = {
++        "include/truffle.h": "include/truffle.h",
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_exported_tar(
++    name = "SULONG_LIBCXX_COMPILER_WRAPPER",
++    format = "tar",
++    members = {
++        "projects/com.oracle.truffle.llvm.libraries.bitcode.libcxx.compiler-wrapper/compiler-wrapper.py": "compiler-wrapper.py",
++    },
++    visibility = ["//visibility:public"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.api/src/com/oracle/truffle/llvm/api/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.api/src/com/oracle/truffle/llvm/api/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.api/src/com/oracle/truffle/llvm/api/BUILD.bazel
+@@ -0,0 +1,18 @@
++load("@rules_mx//mx:java.bzl", "elide_java_library")
++
++elide_java_library(
++    name = "api",
++    srcs = [
++        "Toolchain.java",
++        "package-info.java",
++    ],
++    javac_opts = [
++        "--release",
++        "21",
++        "-parameters",
++    ],
++    unified_release = 21,
++    visibility = ["//:__subpackages__"],
++    exports = ["//truffle:TRUFFLE_API"],
++    deps = ["//truffle:TRUFFLE_API"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.asm.amd64/src/com/oracle/truffle/llvm/asm/amd64/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.asm.amd64/src/com/oracle/truffle/llvm/asm/amd64/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.asm.amd64/src/com/oracle/truffle/llvm/asm/amd64/BUILD.bazel
+@@ -0,0 +1,27 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.asm.amd64.srcs",
++    srcs = [
++        "Argument.java",
++        "AsmArgumentOperand.java",
++        "AsmFactory.java",
++        "AsmImmediateOperand.java",
++        "AsmMemoryOperand.java",
++        "AsmOperand.java",
++        "AsmParseException.java",
++        "AsmRegisterOperand.java",
++        "InlineAssemblyLexer.java",
++        "InlineAssemblyParser.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
++
++mx_files(
++    name = "com.oracle.truffle.llvm.asm.amd64.resources",
++    srcs = [
++        ".gitignore",
++        "InlineAssembly.g4",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.launcher/src/com/oracle/truffle/llvm/launcher/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.launcher/src/com/oracle/truffle/llvm/launcher/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.launcher/src/com/oracle/truffle/llvm/launcher/BUILD.bazel
+@@ -0,0 +1,35 @@
++load("@rules_java//java:defs.bzl", "java_binary")
++load("@rules_mx//mx:java.bzl", "elide_java_library")
++
++elide_java_library(
++    name = "launcher",
++    srcs = [
++        "LLVMLauncher.java",
++        "LLVMMultiContextLauncher.java",
++    ],
++    javac_opts = [
++        "--release",
++        "21",
++        "-parameters",
++    ],
++    unified_release = 21,
++    visibility = ["//:__subpackages__"],
++    deps = [
++        "//sdk:LAUNCHER_COMMON",
++        "//sdk:POLYGLOT",
++    ],
++)
++
++java_binary(
++    name = "LLVMLauncher",
++    main_class = "com.oracle.truffle.llvm.launcher.LLVMLauncher",
++    visibility = ["//visibility:public"],
++    runtime_deps = [":launcher"],
++)
++
++java_binary(
++    name = "LLVMMultiContextLauncher",
++    main_class = "com.oracle.truffle.llvm.launcher.LLVMMultiContextLauncher",
++    visibility = ["//visibility:public"],
++    runtime_deps = [":launcher"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.nativemode.resources/src/META-INF/native-image/org.graalvm.llvm/llvm-language-native-resources/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.nativemode.resources/src/META-INF/native-image/org.graalvm.llvm/llvm-language-native-resources/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.nativemode.resources/src/META-INF/native-image/org.graalvm.llvm/llvm-language-native-resources/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.nativemode.resources.resources",
++    srcs = ["native-image.properties"],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.nativemode.resources/src/META-INF/services/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.nativemode.resources/src/META-INF/services/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.nativemode.resources/src/META-INF/services/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.nativemode.resources.resources",
++    srcs = ["com.oracle.truffle.llvm.spi.internal.LLVMResourceProvider"],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.nativemode.resources/src/com/oracle/truffle/llvm/nativemode/resources/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.nativemode.resources/src/com/oracle/truffle/llvm/nativemode/resources/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.nativemode.resources/src/com/oracle/truffle/llvm/nativemode/resources/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.nativemode.resources.srcs",
++    srcs = [
++        "NativeResourceFeature.java",
++        "NativeResourceProvider.java",
++        "SulongNativeLibResource.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.nfi/src/com/oracle/truffle/llvm/nfi/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.nfi/src/com/oracle/truffle/llvm/nfi/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.nfi/src/com/oracle/truffle/llvm/nfi/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.nfi.srcs",
++    srcs = [
++        "SulongNFI.java",
++        "SulongNFIException.java",
++        "SulongNFIRootNode.java",
++        "SulongNFISignature.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/BUILD.bazel
+@@ -0,0 +1,15 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.parser.srcs",
++    srcs = [
++        "LLVMLivenessAnalysis.java",
++        "LLVMParser.java",
++        "LLVMParserResult.java",
++        "LLVMParserRuntime.java",
++        "LLVMPhiManager.java",
++        "LazyToTruffleConverterImpl.java",
++        "ValueList.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/binary/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/binary/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/binary/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.parser.srcs",
++    srcs = [
++        "BinaryParser.java",
++        "BinaryParserResult.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/coff/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/coff/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/coff/BUILD.bazel
+@@ -0,0 +1,14 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.parser.srcs",
++    srcs = [
++        "CoffFile.java",
++        "ExportTable.java",
++        "ImageImportData.java",
++        "PEExportSymbolsMapper.java",
++        "PEFile.java",
++        "WindowsLibraryLocator.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/elf/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/elf/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/elf/BUILD.bazel
+@@ -0,0 +1,14 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.parser.srcs",
++    srcs = [
++        "ElfDynamicSection.java",
++        "ElfFile.java",
++        "ElfHeader.java",
++        "ElfLibraryLocator.java",
++        "ElfReader.java",
++        "ElfSectionHeaderTable.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/filereader/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/filereader/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/filereader/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.parser.srcs",
++    srcs = ["ObjectFileReader.java"],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/instructions/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/instructions/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/instructions/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.parser.srcs",
++    srcs = [
++        "LLVMArithmeticInstructionType.java",
++        "LLVMConversionType.java",
++        "LLVMLogicalInstructionKind.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/listeners/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/listeners/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/listeners/BUILD.bazel
+@@ -0,0 +1,22 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.parser.srcs",
++    srcs = [
++        "BCFileRoot.java",
++        "Constants.java",
++        "Function.java",
++        "FunctionMDOnly.java",
++        "Metadata.java",
++        "MetadataSubprogramOnly.java",
++        "Module.java",
++        "OperandBundleTags.java",
++        "OperandBundleTagsListener.java",
++        "ParameterAttributes.java",
++        "ParserListener.java",
++        "StringTable.java",
++        "Types.java",
++        "ValueSymbolTable.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/macho/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/macho/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/macho/BUILD.bazel
+@@ -0,0 +1,18 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.parser.srcs",
++    srcs = [
++        "MachODylibCommand.java",
++        "MachOFile.java",
++        "MachOHeader.java",
++        "MachOLibraryLocator.java",
++        "MachOLoadCommand.java",
++        "MachOLoadCommandTable.java",
++        "MachORPathCommand.java",
++        "MachOReader.java",
++        "MachOSegmentCommand.java",
++        "Xar.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/metadata/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/metadata/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/metadata/BUILD.bazel
+@@ -0,0 +1,58 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.parser.srcs",
++    srcs = [
++        "DwarfOpcode.java",
++        "Flags.java",
++        "MDAggregateNode.java",
++        "MDArgList.java",
++        "MDAssignID.java",
++        "MDAttachment.java",
++        "MDBaseNode.java",
++        "MDBasicType.java",
++        "MDCommonBlock.java",
++        "MDCompileUnit.java",
++        "MDCompositeType.java",
++        "MDDerivedType.java",
++        "MDEnumerator.java",
++        "MDExpression.java",
++        "MDFile.java",
++        "MDGenericDebug.java",
++        "MDGlobalVariable.java",
++        "MDGlobalVariableExpression.java",
++        "MDImportedEntity.java",
++        "MDKind.java",
++        "MDLabel.java",
++        "MDLexicalBlock.java",
++        "MDLexicalBlockFile.java",
++        "MDLocalVariable.java",
++        "MDLocation.java",
++        "MDMacro.java",
++        "MDMacroFile.java",
++        "MDModule.java",
++        "MDName.java",
++        "MDNamedLocation.java",
++        "MDNamedNode.java",
++        "MDNamespace.java",
++        "MDNode.java",
++        "MDObjCProperty.java",
++        "MDString.java",
++        "MDSubprogram.java",
++        "MDSubrange.java",
++        "MDSubroutine.java",
++        "MDTemplateType.java",
++        "MDTemplateTypeParameter.java",
++        "MDTemplateValue.java",
++        "MDType.java",
++        "MDValue.java",
++        "MDVariable.java",
++        "MDVoidNode.java",
++        "MetadataAttachmentHolder.java",
++        "MetadataSymbol.java",
++        "MetadataValueList.java",
++        "MetadataVisitor.java",
++        "ParseUtil.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/metadata/debuginfo/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/metadata/debuginfo/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/metadata/debuginfo/BUILD.bazel
+@@ -0,0 +1,20 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.parser.srcs",
++    srcs = [
++        "DIScopeBuilder.java",
++        "DITypeExtractor.java",
++        "DebugInfoCache.java",
++        "DebugInfoFunctionProcessor.java",
++        "DebugInfoModuleProcessor.java",
++        "ImportsProcessor.java",
++        "MDNameExtractor.java",
++        "MDSymbolExtractor.java",
++        "MDUpgrade.java",
++        "SourceFunction.java",
++        "SourceVariable.java",
++        "ValueFragment.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/BUILD.bazel
+@@ -0,0 +1,14 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.parser.srcs",
++    srcs = [
++        "GlobalSymbol.java",
++        "IRScope.java",
++        "ModelModule.java",
++        "SymbolImpl.java",
++        "SymbolTable.java",
++        "ValueSymbol.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/attributes/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/attributes/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/attributes/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.parser.srcs",
++    srcs = [
++        "Attribute.java",
++        "AttributesCodeEntry.java",
++        "AttributesGroup.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/blocks/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/blocks/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/blocks/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.parser.srcs",
++    srcs = ["InstructionBlock.java"],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/enums/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/enums/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/enums/BUILD.bazel
+@@ -0,0 +1,18 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.parser.srcs",
++    srcs = [
++        "AsmDialect.java",
++        "AtomicOrdering.java",
++        "BinaryOperator.java",
++        "CastOperator.java",
++        "Flag.java",
++        "Linkage.java",
++        "ReadModifyWriteOperator.java",
++        "SynchronizationScope.java",
++        "UnaryOperator.java",
++        "Visibility.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/functions/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/functions/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/functions/BUILD.bazel
+@@ -0,0 +1,13 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.parser.srcs",
++    srcs = [
++        "FunctionDeclaration.java",
++        "FunctionDefinition.java",
++        "FunctionParameter.java",
++        "FunctionSymbol.java",
++        "LazyFunctionParser.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/symbols/constants/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/symbols/constants/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/symbols/constants/BUILD.bazel
+@@ -0,0 +1,21 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.parser.srcs",
++    srcs = [
++        "AbstractConstant.java",
++        "BinaryOperationConstant.java",
++        "BlockAddressConstant.java",
++        "CastConstant.java",
++        "CompareConstant.java",
++        "Constant.java",
++        "GetElementPointerConstant.java",
++        "InlineAsmConstant.java",
++        "NullConstant.java",
++        "SelectConstant.java",
++        "StringConstant.java",
++        "UnaryOperationConstant.java",
++        "UndefinedConstant.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/symbols/constants/aggregate/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/symbols/constants/aggregate/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/symbols/constants/aggregate/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.parser.srcs",
++    srcs = [
++        "AggregateConstant.java",
++        "ArrayConstant.java",
++        "StructureConstant.java",
++        "VectorConstant.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/symbols/constants/floatingpoint/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/symbols/constants/floatingpoint/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/symbols/constants/floatingpoint/BUILD.bazel
+@@ -0,0 +1,13 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.parser.srcs",
++    srcs = [
++        "DoubleConstant.java",
++        "FP128Constant.java",
++        "FloatConstant.java",
++        "FloatingPointConstant.java",
++        "X86FP80Constant.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/symbols/constants/integer/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/symbols/constants/integer/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/symbols/constants/integer/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.parser.srcs",
++    srcs = [
++        "BigIntegerConstant.java",
++        "IntegerConstant.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/symbols/globals/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/symbols/globals/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/symbols/globals/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.parser.srcs",
++    srcs = [
++        "GlobalAlias.java",
++        "GlobalValueSymbol.java",
++        "GlobalVariable.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/symbols/instructions/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/symbols/instructions/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/symbols/instructions/BUILD.bazel
+@@ -0,0 +1,58 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.parser.srcs",
++    srcs = [
++        "AllocateInstruction.java",
++        "BinaryOperationInstruction.java",
++        "BranchInstruction.java",
++        "Call.java",
++        "CallInstruction.java",
++        "CastInstruction.java",
++        "CatchPadInstruction.java",
++        "CatchRetInstruction.java",
++        "CatchSwitchInstruction.java",
++        "CleanupPadInstruction.java",
++        "CleanupRetInstruction.java",
++        "CompareExchangeInstruction.java",
++        "CompareInstruction.java",
++        "ConditionalBranchInstruction.java",
++        "DbgDeclareInstruction.java",
++        "DbgNoaliasScopeDeclInstruction.java",
++        "DbgValueInstruction.java",
++        "DebugInstruction.java",
++        "DebugTrapInstruction.java",
++        "ExtractElementInstruction.java",
++        "ExtractValueInstruction.java",
++        "FenceInstruction.java",
++        "FreezeInstruction.java",
++        "GetElementPointerInstruction.java",
++        "IndirectBranchInstruction.java",
++        "InsertElementInstruction.java",
++        "InsertValueInstruction.java",
++        "Instruction.java",
++        "Invoke.java",
++        "InvokeInstruction.java",
++        "LandingpadInstruction.java",
++        "LoadInstruction.java",
++        "OperandBundle.java",
++        "PhiInstruction.java",
++        "ReadModifyWriteInstruction.java",
++        "ResumeInstruction.java",
++        "ReturnInstruction.java",
++        "SelectInstruction.java",
++        "ShuffleVectorInstruction.java",
++        "StoreInstruction.java",
++        "SwitchInstruction.java",
++        "SwitchOldInstruction.java",
++        "TerminatingInstruction.java",
++        "UnaryOperationInstruction.java",
++        "UnreachableInstruction.java",
++        "VaArgInstruction.java",
++        "ValueInstruction.java",
++        "VoidCallInstruction.java",
++        "VoidInstruction.java",
++        "VoidInvokeInstruction.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/target/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/target/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/target/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.parser.srcs",
++    srcs = [
++        "TargetInformation.java",
++        "TargetTriple.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/visitors/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/visitors/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/model/visitors/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.parser.srcs",
++    srcs = [
++        "FunctionVisitor.java",
++        "InstructionVisitorAdapter.java",
++        "SymbolVisitor.java",
++        "ValueInstructionVisitor.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/nodes/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/nodes/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/nodes/BUILD.bazel
+@@ -0,0 +1,13 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.parser.srcs",
++    srcs = [
++        "LLVMBitcodeInstructionVisitor.java",
++        "LLVMCatchSwitchAddConditionFunctionModifier.java",
++        "LLVMFunctionModifier.java",
++        "LLVMRuntimeDebugInformation.java",
++        "LLVMSymbolReadResolver.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/records/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/records/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/records/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.parser.srcs",
++    srcs = ["DwTagRecord.java"],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/scanner/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/scanner/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/scanner/BUILD.bazel
+@@ -0,0 +1,17 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.parser.srcs",
++    srcs = [
++        "AbbrevRecordId.java",
++        "AbbreviatedRecord.java",
++        "BitStream.java",
++        "Block.java",
++        "BuiltinIDs.java",
++        "LLVMScanner.java",
++        "Primitive.java",
++        "RecordBuffer.java",
++        "ScannerState.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/text/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/text/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/text/BUILD.bazel
+@@ -0,0 +1,13 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.parser.srcs",
++    srcs = [
++        "LLInstructionMapper.java",
++        "LLScanner.java",
++        "LLSourceBuilder.java",
++        "LLSourceMap.java",
++        "LLSourceSection.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/util/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/util/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.parser/src/com/oracle/truffle/llvm/parser/util/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.parser.srcs",
++    srcs = [
++        "LLVMBitcodeTypeHelper.java",
++        "Pair.java",
++        "SymbolNameMangling.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.parser.factories/src/com/oracle/truffle/llvm/parser/factories/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.parser.factories/src/com/oracle/truffle/llvm/parser/factories/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.parser.factories/src/com/oracle/truffle/llvm/parser/factories/BUILD.bazel
+@@ -0,0 +1,20 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.parser.factories.srcs",
++    srcs = [
++        "BasicAMD64PlatformCapability.java",
++        "BasicAarch64PlatformCapability.java",
++        "BasicIntrinsicsProvider.java",
++        "BasicNodeFactory.java",
++        "BasicPlatformCapability.java",
++        "DarwinAArch64PlatformCapability.java",
++        "DarwinAMD64PlatformCapability.java",
++        "LinuxAArch64PlatformCapability.java",
++        "LinuxAMD64PlatformCapability.java",
++        "PlatformCapabilityBase.java",
++        "UnknownBasicPlatformCapability.java",
++        "WindowsAMD64PlatformCapability.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.parser.factories/src/com/oracle/truffle/llvm/parser/factories/inlineasm/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.parser.factories/src/com/oracle/truffle/llvm/parser/factories/inlineasm/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.parser.factories/src/com/oracle/truffle/llvm/parser/factories/inlineasm/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.parser.factories.srcs",
++    srcs = [
++        "AMD64InlineAssemblyParser.java",
++        "Aarch64InlineAssemblyParser.java",
++        "UnknownInlineAssemblyParser.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/META-INF/native-image/org.graalvm.llvm/llvm-language/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/META-INF/native-image/org.graalvm.llvm/llvm-language/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/META-INF/native-image/org.graalvm.llvm/llvm-language/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.resources",
++    srcs = ["native-image.properties"],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/BUILD.bazel
+@@ -0,0 +1,61 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "ArithmeticOperation.java",
++        "CmdlineLibraryLocator.java",
++        "CommonNodeFactory.java",
++        "CompareOperator.java",
++        "ContextExtension.java",
++        "DefaultLibraryLocator.java",
++        "DummyReceiver.java",
++        "ExportSymbolsMapper.java",
++        "GetStackSpaceFactory.java",
++        "IDGenerater.java",
++        "InternalLibraryLocator.java",
++        "LLVMAlias.java",
++        "LLVMArgumentBuffer.java",
++        "LLVMBitcodeLibraryFunctions.java",
++        "LLVMConfig.java",
++        "LLVMContext.java",
++        "LLVMContextWindows.java",
++        "LLVMDebugPointer.java",
++        "LLVMElemPtrSymbol.java",
++        "LLVMExitException.java",
++        "LLVMFileDetector.java",
++        "LLVMFunction.java",
++        "LLVMFunctionCode.java",
++        "LLVMFunctionDescriptor.java",
++        "LLVMGetStackFromFrameNode.java",
++        "LLVMGetStackFromThreadNode.java",
++        "LLVMIVarBit.java",
++        "LLVMIVarBitLarge.java",
++        "LLVMIVarBitSmall.java",
++        "LLVMIntrinsicProvider.java",
++        "LLVMLanguage.java",
++        "LLVMNodeUtils.java",
++        "LLVMRewriteException.java",
++        "LLVMScope.java",
++        "LLVMScopeChain.java",
++        "LLVMSymbol.java",
++        "LLVMSyscallEntry.java",
++        "LLVMThread.java",
++        "LLVMThreadLocalPointer.java",
++        "LLVMThreadLocalSymbol.java",
++        "LLVMUnsupportedException.java",
++        "LLVMVarArgCompoundValue.java",
++        "LibraryLocator.java",
++        "Magic.java",
++        "NativeContextExtension.java",
++        "NodeFactory.java",
++        "PlatformCapability.java",
++        "SulongLibrary.java",
++        "SulongStackTrace.java",
++        "ToolchainConfig.java",
++        "ToolchainImpl.java",
++        "UnaryOperation.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/config/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/config/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/config/BUILD.bazel
+@@ -0,0 +1,13 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "CommonLanguageOptions.java",
++        "Configuration.java",
++        "ConfigurationFactory.java",
++        "Configurations.java",
++        "LLVMCapability.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/datalayout/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/datalayout/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/datalayout/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "DataLayout.java",
++        "DataLayoutParser.java",
++        "DataLayoutType.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/debug/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/debug/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/debug/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLDBSupport.java",
++        "LLVMDebuggerValue.java",
++        "LLVMSourceContext.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/debug/debugexpr/nodes/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/debug/debugexpr/nodes/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/debug/debugexpr/nodes/BUILD.bazel
+@@ -0,0 +1,27 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "DebugExprArrayElementNode.java",
++        "DebugExprBitFlipNode.java",
++        "DebugExprDereferenceNode.java",
++        "DebugExprExecutableNode.java",
++        "DebugExprFunctionCallNode.java",
++        "DebugExprLogicalAndNode.java",
++        "DebugExprLogicalOrNode.java",
++        "DebugExprNodeFactory.java",
++        "DebugExprNotNode.java",
++        "DebugExprObjectMemberNode.java",
++        "DebugExprPointerCastNode.java",
++        "DebugExprShortCircuitEvaluationNode.java",
++        "DebugExprSizeofNode.java",
++        "DebugExprTernaryNode.java",
++        "DebugExprTypeofNode.java",
++        "DebugExprVarNode.java",
++        "DebugExpressionPair.java",
++        "MemberAccessible.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/debug/debugexpr/parser/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/debug/debugexpr/parser/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/debug/debugexpr/parser/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "DebugExprException.java",
++        "DebugExprType.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/debug/debugexpr/parser/antlr/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/debug/debugexpr/parser/antlr/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/debug/debugexpr/parser/antlr/BUILD.bazel
+@@ -0,0 +1,17 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "DebugExprParser.java",
++        "DebugExpressionLexer.java",
++        "DebugExpressionParser.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.resources",
++    srcs = ["DebugExpression.g4"],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/debug/scope/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/debug/scope/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/debug/scope/BUILD.bazel
+@@ -0,0 +1,16 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMDebugGlobalVariable.java",
++        "LLVMDebugThreadLocalGlobalVariable.java",
++        "LLVMDebuggerScopeEntries.java",
++        "LLVMDebuggerScopeFactory.java",
++        "LLVMSourceFileReference.java",
++        "LLVMSourceLocation.java",
++        "LLVMSourceSymbol.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/debug/type/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/debug/type/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/debug/type/BUILD.bazel
+@@ -0,0 +1,24 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "IndexedTypeBounds.java",
++        "LLVMSourceArrayLikeType.java",
++        "LLVMSourceBasicType.java",
++        "LLVMSourceClassLikeType.java",
++        "LLVMSourceDecoratorType.java",
++        "LLVMSourceEnumLikeType.java",
++        "LLVMSourceForeignType.java",
++        "LLVMSourceFunctionType.java",
++        "LLVMSourceInheritanceType.java",
++        "LLVMSourceMemberType.java",
++        "LLVMSourceMethodType.java",
++        "LLVMSourcePointerType.java",
++        "LLVMSourceStaticMemberType.java",
++        "LLVMSourceStructLikeType.java",
++        "LLVMSourceType.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/debug/value/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/debug/value/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/debug/value/BUILD.bazel
+@@ -0,0 +1,17 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMDebugManagedType.java",
++        "LLVMDebugManagedValue.java",
++        "LLVMDebugObject.java",
++        "LLVMDebugObjectBuilder.java",
++        "LLVMDebugTypeConstants.java",
++        "LLVMDebugValue.java",
++        "LLVMFrameValueAccess.java",
++        "LLVMSourceTypeFactory.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/except/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/except/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/except/BUILD.bazel
+@@ -0,0 +1,18 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMAllocationFailureException.java",
++        "LLVMException.java",
++        "LLVMIllegalSymbolIndexException.java",
++        "LLVMLinkerException.java",
++        "LLVMMemoryException.java",
++        "LLVMNativePointerException.java",
++        "LLVMParserException.java",
++        "LLVMPolyglotException.java",
++        "LLVMStackOverflowError.java",
++        "LLVMUserException.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/floating/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/floating/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/floating/BUILD.bazel
+@@ -0,0 +1,16 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "BinaryHelper.java",
++        "DoubleHelper.java",
++        "FloatHelper.java",
++        "LLVM128BitFloat.java",
++        "LLVM80BitFloat.java",
++        "LLVMLongDoubleFloatingPoint.java",
++        "LLVMLongDoubleNode.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/global/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/global/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/global/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMGlobal.java",
++        "LLVMGlobalContainer.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/inlineasm/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/inlineasm/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/inlineasm/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = ["InlineAssemblyParserBase.java"],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/instruments/trace/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/instruments/trace/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/instruments/trace/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMTraceNodeFactory.java",
++        "LLVMTracerInstrument.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/interop/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/interop/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/interop/BUILD.bazel
+@@ -0,0 +1,21 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMAsForeignNode.java",
++        "LLVMDataEscapeNode.java",
++        "LLVMForeignCallNode.java",
++        "LLVMForeignConstructorCallNode.java",
++        "LLVMForeignFunctionCallNode.java",
++        "LLVMForeignIntrinsicCallNode.java",
++        "LLVMGetInteropParamNode.java",
++        "LLVMGetInteropPrimitiveParamNode.java",
++        "LLVMGetInteropStructParamNode.java",
++        "LLVMInternalTruffleObject.java",
++        "LLVMNegatedForeignObject.java",
++        "LLVMTypedForeignObject.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/interop/access/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/interop/access/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/interop/access/BUILD.bazel
+@@ -0,0 +1,23 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMAccessForeignObjectNode.java",
++        "LLVMInteropAccessNode.java",
++        "LLVMInteropInvokeNode.java",
++        "LLVMInteropMethodInvokeNode.java",
++        "LLVMInteropNonvirtualCallNode.java",
++        "LLVMInteropReadNode.java",
++        "LLVMInteropSpecialAccessNode.java",
++        "LLVMInteropType.java",
++        "LLVMInteropVtableAccessNode.java",
++        "LLVMInteropWriteNode.java",
++        "LLVMReadFromForeignObjectNode.java",
++        "LLVMResolveForeignClassChainNode.java",
++        "LLVMSelfArgumentPackNode.java",
++        "LLVMWriteToForeignObjectNode.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/interop/convert/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/interop/convert/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/interop/convert/BUILD.bazel
+@@ -0,0 +1,23 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "ForeignToLLVM.java",
++        "ToAnyLLVM.java",
++        "ToDouble.java",
++        "ToFP128.java",
++        "ToFP80.java",
++        "ToFloat.java",
++        "ToI1.java",
++        "ToI16.java",
++        "ToI32.java",
++        "ToI64.java",
++        "ToI8.java",
++        "ToLLVM.java",
++        "ToPointer.java",
++        "ToVoidLLVM.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/interop/export/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/interop/export/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/interop/export/BUILD.bazel
+@@ -0,0 +1,16 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMForeignDirectSuperElemPtrNode.java",
++        "LLVMForeignGetIndexPointerNode.java",
++        "LLVMForeignGetMemberPointerNode.java",
++        "LLVMForeignGetSuperElemPtrNode.java",
++        "LLVMForeignReadNode.java",
++        "LLVMForeignVirtualSuperElemPtrNode.java",
++        "LLVMForeignWriteNode.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/interop/nfi/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/interop/nfi/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/interop/nfi/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMNativeConvertNode.java",
++        "LLVMNativeWrapper.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/interop/values/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/interop/values/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/interop/values/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMInstantValue.java",
++        "LLVMTimeZoneValue.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/library/internal/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/library/internal/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/library/internal/BUILD.bazel
+@@ -0,0 +1,16 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMAsForeignLibrary.java",
++        "LLVMAsForeignLibraryDefaults.java",
++        "LLVMManagedAccessDefaults.java",
++        "LLVMManagedReadLibrary.java",
++        "LLVMManagedWriteLibrary.java",
++        "LLVMNativeLibrary.java",
++        "LLVMNativeLibraryDefaults.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/memory/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/memory/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/memory/BUILD.bazel
+@@ -0,0 +1,21 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMAllocateNode.java",
++        "LLVMHandleMemoryBase.java",
++        "LLVMMemMoveNode.java",
++        "LLVMMemSetNode.java",
++        "LLVMMemory.java",
++        "LLVMMemoryOpNode.java",
++        "LLVMMemorySizedOpNode.java",
++        "LLVMStack.java",
++        "LLVMSyscallOperationNode.java",
++        "LLVMThreadingStack.java",
++        "LLVMUniquesRegionAllocNode.java",
++        "VarargsAreaStackAllocationNode.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/api/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/api/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/api/BUILD.bazel
+@@ -0,0 +1,25 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMControlFlowNode.java",
++        "LLVMExpressionNode.java",
++        "LLVMFrameNuller.java",
++        "LLVMFrameNullerExpression.java",
++        "LLVMHasDatalayoutNode.java",
++        "LLVMInstrumentableNode.java",
++        "LLVMLazyException.java",
++        "LLVMLoadNode.java",
++        "LLVMNode.java",
++        "LLVMStatementNode.java",
++        "LLVMStoreNode.java",
++        "LLVMToNativeNode.java",
++        "LLVMToPointerNode.java",
++        "LLVMTypes.java",
++        "LLVMTypesLongPointer.java",
++        "LLVMVoidStatementNode.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/asm/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/asm/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/asm/BUILD.bazel
+@@ -0,0 +1,54 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMAMD64AdcNode.java",
++        "LLVMAMD64AddNode.java",
++        "LLVMAMD64AndNode.java",
++        "LLVMAMD64BsfNode.java",
++        "LLVMAMD64BsrNode.java",
++        "LLVMAMD64BswapNode.java",
++        "LLVMAMD64CmpNode.java",
++        "LLVMAMD64CmpXchgNode.java",
++        "LLVMAMD64CpuidNode.java",
++        "LLVMAMD64DecNode.java",
++        "LLVMAMD64DivNode.java",
++        "LLVMAMD64GetFlagNodes.java",
++        "LLVMAMD64GetRspNode.java",
++        "LLVMAMD64IdivNode.java",
++        "LLVMAMD64ImmNode.java",
++        "LLVMAMD64ImulNode.java",
++        "LLVMAMD64IncNode.java",
++        "LLVMAMD64LoadControlWordNode.java",
++        "LLVMAMD64LoadFlags.java",
++        "LLVMAMD64ModNode.java",
++        "LLVMAMD64MulNode.java",
++        "LLVMAMD64NegNode.java",
++        "LLVMAMD64NotNode.java",
++        "LLVMAMD64OrNode.java",
++        "LLVMAMD64PopNode.java",
++        "LLVMAMD64PushNode.java",
++        "LLVMAMD64RdRandNode.java",
++        "LLVMAMD64RdSeedNode.java",
++        "LLVMAMD64RdtscNode.java",
++        "LLVMAMD64ReadControlWordNode.java",
++        "LLVMAMD64RepNode.java",
++        "LLVMAMD64RolNode.java",
++        "LLVMAMD64RorNode.java",
++        "LLVMAMD64SalNode.java",
++        "LLVMAMD64SarNode.java",
++        "LLVMAMD64SetFlagNode.java",
++        "LLVMAMD64ShlNode.java",
++        "LLVMAMD64ShrNode.java",
++        "LLVMAMD64StoreFlags.java",
++        "LLVMAMD64StosNode.java",
++        "LLVMAMD64SubNode.java",
++        "LLVMAMD64Ud2Node.java",
++        "LLVMAMD64XaddNode.java",
++        "LLVMAMD64XchgNode.java",
++        "LLVMAMD64XorNode.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/asm/base/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/asm/base/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/asm/base/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = ["LLVMInlineAssemblyBlockNode.java"],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/asm/support/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/asm/support/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/asm/support/BUILD.bazel
+@@ -0,0 +1,29 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMAMD64AddressComputationNode.java",
++        "LLVMAMD64BarrelShifter.java",
++        "LLVMAMD64Flags.java",
++        "LLVMAMD64FrameSlotNode.java",
++        "LLVMAMD64GetTlsNode.java",
++        "LLVMAMD64LockedInstructionNode.java",
++        "LLVMAMD64ReadAddressNode.java",
++        "LLVMAMD64ReadRegisterNode.java",
++        "LLVMAMD64RegisterToLongNode.java",
++        "LLVMAMD64Target.java",
++        "LLVMAMD64ToI8Node.java",
++        "LLVMAMD64ToRegisterNode.java",
++        "LLVMAMD64UpdateFlagsNode.java",
++        "LLVMAMD64WriteAddressRegisterNode.java",
++        "LLVMAMD64WriteBooleanNode.java",
++        "LLVMAMD64WriteNode.java",
++        "LLVMAMD64WriteTupelNode.java",
++        "LLVMAMD64WriteValueNode.java",
++        "LongDivision.java",
++        "LongMultiplication.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/asm/syscall/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/asm/syscall/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/asm/syscall/BUILD.bazel
+@@ -0,0 +1,26 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMAMD64ArchPrctl.java",
++        "LLVMAMD64Error.java",
++        "LLVMAMD64Memory.java",
++        "LLVMAMD64SyscallArchPrctlNode.java",
++        "LLVMAMD64SyscallBrkNode.java",
++        "LLVMAMD64SyscallGetcwdNode.java",
++        "LLVMAMD64SyscallMmapNode.java",
++        "LLVMAMD64SyscallRtSigactionNode.java",
++        "LLVMAMD64SyscallRtSigprocmaskNode.java",
++        "LLVMAMD64SyscallSetTidAddressNode.java",
++        "LLVMAMD64Time.java",
++        "LLVMInfo.java",
++        "LLVMNativeSyscallNode.java",
++        "LLVMStringHelper.java",
++        "LLVMSyscallExitNode.java",
++        "LLVMSyscallNode.java",
++        "LLVMUnsupportedSyscallNode.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/asm/syscall/darwin/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/asm/syscall/darwin/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/asm/syscall/darwin/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = ["DarwinSyscall.java"],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/asm/syscall/linux/aarch64/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/asm/syscall/linux/aarch64/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/asm/syscall/linux/aarch64/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = ["LinuxAArch64Syscall.java"],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/asm/syscall/linux/amd64/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/asm/syscall/linux/amd64/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/asm/syscall/linux/amd64/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = ["LinuxAMD64Syscall.java"],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/asm/syscall/posix/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/asm/syscall/posix/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/asm/syscall/posix/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMPosixCallNode.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/base/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/base/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/base/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMBasicBlockNode.java",
++        "LLVMFrameNullerUtil.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/cast/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/cast/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/cast/BUILD.bazel
+@@ -0,0 +1,22 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMTo128BitFloatingNode.java",
++        "LLVMTo80BitFloatingNode.java",
++        "LLVMToAddressNode.java",
++        "LLVMToDoubleNode.java",
++        "LLVMToFloatNode.java",
++        "LLVMToI16Node.java",
++        "LLVMToI1Node.java",
++        "LLVMToI32Node.java",
++        "LLVMToI64Node.java",
++        "LLVMToI8Node.java",
++        "LLVMToVarINode.java",
++        "LLVMToVectorNode.java",
++        "LLVMToVectorZeroExtNode.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/control/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/control/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/control/BUILD.bazel
+@@ -0,0 +1,18 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMBrUnconditionalNode.java",
++        "LLVMCatchReturnNode.java",
++        "LLVMCleanupReturnNode.java",
++        "LLVMConditionalBranchNode.java",
++        "LLVMDispatchBasicBlockNode.java",
++        "LLVMFunctionRootNode.java",
++        "LLVMIndirectBranchNode.java",
++        "LLVMRetNode.java",
++        "LLVMSwitchNode.java",
++        "LLVMWritePhisNode.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/func/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/func/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/func/BUILD.bazel
+@@ -0,0 +1,31 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMArgNode.java",
++        "LLVMCallNode.java",
++        "LLVMCatchPadNode.java",
++        "LLVMCatchSwitchNode.java",
++        "LLVMCleanupPadNode.java",
++        "LLVMDispatchNode.java",
++        "LLVMFunctionStartNode.java",
++        "LLVMGlobalRootNode.java",
++        "LLVMInlineAssemblyRootNode.java",
++        "LLVMInvokeNode.java",
++        "LLVMLandingpadNode.java",
++        "LLVMLookupDispatchTargetNode.java",
++        "LLVMLookupDispatchTargetSymbolNode.java",
++        "LLVMNativeCallUtils.java",
++        "LLVMNativeDispatchNode.java",
++        "LLVMPrepareArgumentNode.java",
++        "LLVMRaiseExceptionNode.java",
++        "LLVMRaiseExceptionWindows.java",
++        "LLVMResumeNode.java",
++        "LLVMRootNode.java",
++        "LLVMTypeIdForExceptionNode.java",
++        "LLVMWindowsInitThreadIntrinsics.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/c/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/c/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/c/BUILD.bazel
+@@ -0,0 +1,19 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMAbort.java",
++        "LLVMCMathsIntrinsics.java",
++        "LLVMCTypeIntrinsics.java",
++        "LLVMDLClose.java",
++        "LLVMDLOpen.java",
++        "LLVMDLSym.java",
++        "LLVMExit.java",
++        "LLVMMemIntrinsic.java",
++        "LLVMSignal.java",
++        "LLVMSyscall.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/handles/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/handles/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/handles/BUILD.bazel
+@@ -0,0 +1,17 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "GraalVMCreateDerefHandle.java",
++        "GraalVMCreateHandle.java",
++        "GraalVMIsHandle.java",
++        "GraalVMPointsToHandleSpace.java",
++        "GraalVMReleaseHandle.java",
++        "GraalVMResolveFunction.java",
++        "GraalVMResolveHandle.java",
++        "LLVMTruffleCannotBeHandle.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/interop/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/interop/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/interop/BUILD.bazel
+@@ -0,0 +1,44 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMPolyglotAsDateTimeNode.java",
++        "LLVMPolyglotAsPrimitive.java",
++        "LLVMPolyglotAsString.java",
++        "LLVMPolyglotBoxedPredicate.java",
++        "LLVMPolyglotBufferInfo.java",
++        "LLVMPolyglotEval.java",
++        "LLVMPolyglotExport.java",
++        "LLVMPolyglotFromBufferNode.java",
++        "LLVMPolyglotFromPrimitive.java",
++        "LLVMPolyglotFromString.java",
++        "LLVMPolyglotGetArraySize.java",
++        "LLVMPolyglotGetStringSize.java",
++        "LLVMPolyglotHasMember.java",
++        "LLVMPolyglotImport.java",
++        "LLVMPolyglotInstantFromTimeNode.java",
++        "LLVMPolyglotInvoke.java",
++        "LLVMPolyglotIsValue.java",
++        "LLVMPolyglotJavaType.java",
++        "LLVMPolyglotNativeBufferInfo.java",
++        "LLVMPolyglotNewInstance.java",
++        "LLVMPolyglotRead.java",
++        "LLVMPolyglotReadBuffer.java",
++        "LLVMPolyglotRemove.java",
++        "LLVMPolyglotTimeZoneFromIdNode.java",
++        "LLVMPolyglotTimeZoneGetIdNode.java",
++        "LLVMPolyglotWrite.java",
++        "LLVMPolyglotWriteBuffer.java",
++        "LLVMReadCharsetNode.java",
++        "LLVMReadStringNode.java",
++        "LLVMTruffleDecorateFunction.java",
++        "LLVMTruffleGetArg.java",
++        "LLVMTruffleGetArgCount.java",
++        "LLVMTruffleManagedMalloc.java",
++        "LLVMTruffleWriteManagedToSymbol.java",
++        "LLVMVirtualMalloc.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/interop/typed/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/interop/typed/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/interop/typed/BUILD.bazel
+@@ -0,0 +1,13 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMArrayTypeIDNode.java",
++        "LLVMPolyglotAsTyped.java",
++        "LLVMPolyglotFromTyped.java",
++        "LLVMTypeIDNode.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/llvm/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/llvm/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/llvm/BUILD.bazel
+@@ -0,0 +1,36 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMAdditionalIntrinsics.java",
++        "LLVMAssume.java",
++        "LLVMBuiltin.java",
++        "LLVMByteSwap.java",
++        "LLVMDisabledExpect.java",
++        "LLVMExpect.java",
++        "LLVMFrameAddress.java",
++        "LLVMI64ObjectSize.java",
++        "LLVMIntrinsic.java",
++        "LLVMIntrinsicRootNode.java",
++        "LLVMInvariantEnd.java",
++        "LLVMInvariantStart.java",
++        "LLVMIsConstant.java",
++        "LLVMLifetimeEnd.java",
++        "LLVMLifetimeStart.java",
++        "LLVMMemCopy.java",
++        "LLVMMemMove.java",
++        "LLVMMemSet.java",
++        "LLVMMemSetPattern.java",
++        "LLVMMemoryIntrinsic.java",
++        "LLVMNoOp.java",
++        "LLVMPrefetch.java",
++        "LLVMReturnAddress.java",
++        "LLVMStackBuiltin.java",
++        "LLVMStackRestore.java",
++        "LLVMStackSave.java",
++        "LLVMTrap.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/llvm/aarch64/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/llvm/aarch64/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/llvm/aarch64/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMAArch64_NeonNodes.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/llvm/aarch64/darwin/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/llvm/aarch64/darwin/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/llvm/aarch64/darwin/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMDarwinAarch64VaListStorage.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/llvm/aarch64/linux/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/llvm/aarch64/linux/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/llvm/aarch64/linux/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "Aarch64BitVarArgs.java",
++        "LLVMLinuxAarch64VaListStorage.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/llvm/arith/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/llvm/arith/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/llvm/arith/BUILD.bazel
+@@ -0,0 +1,17 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMArithmetic.java",
++        "LLVMComplex80BitFloatDiv.java",
++        "LLVMComplex80BitFloatMul.java",
++        "LLVMComplexDoubleDiv.java",
++        "LLVMComplexDoubleMul.java",
++        "LLVMComplexFloatDiv.java",
++        "LLVMComplexFloatMul.java",
++        "LLVMVectorReduce.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/llvm/bit/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/llvm/bit/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/llvm/bit/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "BitReverseNode.java",
++        "CountLeadingZeroesNode.java",
++        "CountSetBitsNode.java",
++        "CountTrailingZeroesNode.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/llvm/debug/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/llvm/debug/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/llvm/debug/BUILD.bazel
+@@ -0,0 +1,19 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLDBBoxedPrimitive.java",
++        "LLDBConstant.java",
++        "LLDBGlobalConstant.java",
++        "LLDBMemoryValue.java",
++        "LLDBVector.java",
++        "LLVMDebugAggregateObjectBuilder.java",
++        "LLVMDebugSimpleObjectBuilder.java",
++        "LLVMDebugTrapNode.java",
++        "LLVMToDebugDeclaration.java",
++        "LLVMToDebugValueNode.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/llvm/va/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/llvm/va/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/llvm/va/BUILD.bazel
+@@ -0,0 +1,17 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "GraalVMVAArg.java",
++        "LLVMVAArg.java",
++        "LLVMVACopy.java",
++        "LLVMVAEnd.java",
++        "LLVMVAListNode.java",
++        "LLVMVAStart.java",
++        "LLVMVaListLibrary.java",
++        "LLVMVaListStorage.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/llvm/x86/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/llvm/x86/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/llvm/x86/BUILD.bazel
+@@ -0,0 +1,15 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMX86_64VaListStorage.java",
++        "LLVMX86_ComparisonNode.java",
++        "LLVMX86_ConversionNode.java",
++        "LLVMX86_MissingBuiltin.java",
++        "LLVMX86_VectorMathNode.java",
++        "X86_64BitVarArgs.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/llvm/x86_win/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/llvm/x86_win/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/llvm/x86_win/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMX86_64_WinVaListStorage.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/multithreading/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/multithreading/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/multithreading/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMThreadIntrinsics.java",
++        "LLVMThreadKeyIntrinsics.java",
++        "LLVMThreadStart.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/rust/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/rust/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/rust/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMPanic.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/sulong/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/sulong/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/intrinsics/sulong/BUILD.bazel
+@@ -0,0 +1,13 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMPrintStackTrace.java",
++        "LLVMRunDestructorFunctions.java",
++        "LLVMShouldPrintStackTraceOnAbort.java",
++        "LLVMToolchainNode.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/literals/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/literals/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/literals/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMMetaLiteralNode.java",
++        "LLVMSimpleLiteralNode.java",
++        "LLVMVectorLiteralNode.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/memory/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/memory/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/memory/BUILD.bazel
+@@ -0,0 +1,29 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "AllocateGlobalsBlockNode.java",
++        "FreeGlobalsBlockNode.java",
++        "LLVMCompareExchangeNode.java",
++        "LLVMFence.java",
++        "LLVMFenceExpressionNode.java",
++        "LLVMGetElementPtrNode.java",
++        "LLVMInsertValueNode.java",
++        "LLVMNativePointerSupport.java",
++        "LLVMNativeVarargsAreaStackAllocationNode.java",
++        "LLVMStructByValueNode.java",
++        "LLVMUnpackVarargsNode.java",
++        "LLVMVarArgCompoundAddressNode.java",
++        "LLVMVectorizedGetElementPtrNode.java",
++        "LLVMWithElementPtrLoadNode.java",
++        "LLVMWithElementPtrStoreNode.java",
++        "ManagedMemMoveHelperNode.java",
++        "NativeMemSetNode.java",
++        "NativeProfiledMemMove.java",
++        "NativeProfiledMemMoveToNative.java",
++        "ProtectReadOnlyGlobalsBlockNode.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/memory/literal/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/memory/literal/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/memory/literal/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMArrayLiteralNode.java",
++        "LLVMI8ArrayLiteralNode.java",
++        "LLVMStructArrayLiteralNode.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/memory/load/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/memory/load/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/memory/load/BUILD.bazel
+@@ -0,0 +1,24 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVM128BitFloatLoadNode.java",
++        "LLVM80BitFloatLoadNode.java",
++        "LLVMDerefHandleGetReceiverNode.java",
++        "LLVMDoubleLoadNode.java",
++        "LLVMFloatLoadNode.java",
++        "LLVMI16LoadNode.java",
++        "LLVMI1LoadNode.java",
++        "LLVMI32LoadNode.java",
++        "LLVMI64LoadNode.java",
++        "LLVMI8LoadNode.java",
++        "LLVMIVarBitLoadNode.java",
++        "LLVMLoadVectorNode.java",
++        "LLVMOffsetLoadNode.java",
++        "LLVMPointerLoadNode.java",
++        "LLVMStructLoadNode.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/memory/move/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/memory/move/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/memory/move/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMPrimitiveMoveNode.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/memory/rmw/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/memory/rmw/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/memory/rmw/BUILD.bazel
+@@ -0,0 +1,14 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMI16RMWNode.java",
++        "LLVMI1RMWNode.java",
++        "LLVMI32RMWNode.java",
++        "LLVMI64RMWNode.java",
++        "LLVMI8RMWNode.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/memory/store/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/memory/store/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/memory/store/BUILD.bazel
+@@ -0,0 +1,23 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVM128BitFloatStoreNode.java",
++        "LLVM80BitFloatStoreNode.java",
++        "LLVMDoubleStoreNode.java",
++        "LLVMFloatStoreNode.java",
++        "LLVMI16StoreNode.java",
++        "LLVMI1StoreNode.java",
++        "LLVMI32StoreNode.java",
++        "LLVMI64StoreNode.java",
++        "LLVMI8StoreNode.java",
++        "LLVMIVarBitStoreNode.java",
++        "LLVMOffsetStoreNode.java",
++        "LLVMPointerStoreNode.java",
++        "LLVMStoreVectorNode.java",
++        "LLVMStructStoreNode.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/op/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/op/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/op/BUILD.bazel
+@@ -0,0 +1,22 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMAbstractCompareNode.java",
++        "LLVMAddressEqualsNode.java",
++        "LLVMArithmeticNode.java",
++        "LLVMCompareNode.java",
++        "LLVMFunnelShiftNode.java",
++        "LLVMIsFPClassNode.java",
++        "LLVMPointerCompareNode.java",
++        "LLVMPointerMaskNode.java",
++        "LLVMUnaryNode.java",
++        "LLVMVectorArithmeticNode.java",
++        "LLVMVectorCompareNode.java",
++        "LLVMVectorUnaryNode.java",
++        "ToComparableValue.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/others/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/others/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/others/BUILD.bazel
+@@ -0,0 +1,19 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMAccessElemPtrSymbolNode.java",
++        "LLVMAccessGlobalSymbolNode.java",
++        "LLVMAccessSymbolNode.java",
++        "LLVMAccessThreadLocalSymbolNode.java",
++        "LLVMDynAccessSymbolNode.java",
++        "LLVMSelectNode.java",
++        "LLVMStatementRootNode.java",
++        "LLVMUnreachableNode.java",
++        "LLVMUnsupportedInstructionNode.java",
++        "LLVMVectorSelectNode.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/util/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/util/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/util/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMSameObjectNode.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/vars/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/vars/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/vars/BUILD.bazel
+@@ -0,0 +1,14 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "AggregateLiteralInPlaceNode.java",
++        "AggregateTLGlobalInPlaceNode.java",
++        "LLVMReadNode.java",
++        "LLVMWriteNode.java",
++        "StructLiteralNode.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/vector/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/vector/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/nodes/vector/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMExtractElementNode.java",
++        "LLVMInsertElementNode.java",
++        "LLVMShuffleVectorNode.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/options/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/options/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/options/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "SulongEngineOption.java",
++        "TargetStream.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/pointer/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/pointer/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/pointer/BUILD.bazel
+@@ -0,0 +1,17 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "CommonPointerLibraries.java",
++        "LLVMManagedPointer.java",
++        "LLVMMaybeVaPointer.java",
++        "LLVMNativePointer.java",
++        "LLVMPointer.java",
++        "LLVMPointerImpl.java",
++        "ManagedPointerLibraries.java",
++        "NativePointerLibraries.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/profiling/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/profiling/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/profiling/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "BooleanValueProfile.java",
++        "ShortValueProfile.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/pthread/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/pthread/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/pthread/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMPThreadContext.java",
++        "LLVMThreadException.java",
++        "PThreadExitException.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/target/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/target/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/target/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = ["TargetTriple.java"],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/types/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/types/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/types/BUILD.bazel
+@@ -0,0 +1,21 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "AggregateType.java",
++        "ArrayType.java",
++        "DwLangNameRecord.java",
++        "FunctionType.java",
++        "MetaType.java",
++        "OpaqueType.java",
++        "PointerType.java",
++        "PrimitiveType.java",
++        "StructureType.java",
++        "Type.java",
++        "VariableBitWidthType.java",
++        "VectorType.java",
++        "VoidType.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/types/symbols/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/types/symbols/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/types/symbols/BUILD.bazel
+@@ -0,0 +1,12 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMIdentifier.java",
++        "LocalVariableDebugInfo.java",
++        "SSAValue.java",
++        "Symbol.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/types/visitors/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/types/visitors/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/types/visitors/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "RecursiveTypeCheckVisitor.java",
++        "TypeVisitor.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/vector/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/vector/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.runtime/src/com/oracle/truffle/llvm/runtime/vector/BUILD.bazel
+@@ -0,0 +1,17 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.runtime.srcs",
++    srcs = [
++        "LLVMDoubleVector.java",
++        "LLVMFloatVector.java",
++        "LLVMI16Vector.java",
++        "LLVMI1Vector.java",
++        "LLVMI32Vector.java",
++        "LLVMI64Vector.java",
++        "LLVMI8Vector.java",
++        "LLVMPointerVector.java",
++        "LLVMVector.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.spi/src/com/oracle/truffle/llvm/spi/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.spi/src/com/oracle/truffle/llvm/spi/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.spi/src/com/oracle/truffle/llvm/spi/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.spi.srcs",
++    srcs = ["NativeTypeLibrary.java"],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.spi/src/com/oracle/truffle/llvm/spi/internal/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.spi/src/com/oracle/truffle/llvm/spi/internal/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.spi/src/com/oracle/truffle/llvm/spi/internal/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.spi.srcs",
++    srcs = ["LLVMResourceProvider.java"],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/projects/com.oracle.truffle.llvm.tools/src/com/oracle/truffle/llvm/tools/BUILD.bazel b/sulong/projects/com.oracle.truffle.llvm.tools/src/com/oracle/truffle/llvm/tools/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/projects/com.oracle.truffle.llvm.tools/src/com/oracle/truffle/llvm/tools/BUILD.bazel
+@@ -0,0 +1,25 @@
++load("@rules_java//java:defs.bzl", "java_binary")
++load("@rules_mx//mx:java.bzl", "elide_java_library")
++
++elide_java_library(
++    name = "tools",
++    srcs = ["ExtractBitcode.java"],
++    javac_opts = [
++        "--release",
++        "21",
++        "-parameters",
++    ],
++    unified_release = 21,
++    visibility = ["//:__subpackages__"],
++    deps = [
++        "//sdk:POLYGLOT",
++        "//sulong:com.oracle.truffle.llvm.parser",
++    ],
++)
++
++java_binary(
++    name = "ExtractBitcode",
++    main_class = "com.oracle.truffle.llvm.tools.ExtractBitcode",
++    visibility = ["//visibility:public"],
++    runtime_deps = [":tools"],
++)

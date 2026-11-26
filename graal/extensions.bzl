@@ -13,6 +13,8 @@ OVERLAYS = [
     Label("//graal:vm.patch"),
     Label("//graal:regex.patch"),
     Label("//graal:tools.patch"),
+    Label("//graal:sulong.patch"),
+    Label("//graal:wasm.patch"),
 ]
 
 _source = tag_class(
