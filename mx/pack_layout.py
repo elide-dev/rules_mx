@@ -161,19 +161,15 @@ def _jdk_resource(bundle, recipe, directory, jar, manifest, digest):
 
 
 def _install_image_group(tree, image, kinds, mount):
-    root = Path(image).resolve()
+    root = Path(image)
     destination = tree / _relative(mount.rstrip("/")) if mount else tree
     manifest = json.loads((root / "build-artifacts.json").read_text())
     for kind in kinds:
         for member in manifest.get(kind, []):
             source = root / _relative(member)
-            if not source.is_relative_to(root) or not source.resolve().is_relative_to(root):
-                raise ValueError(f"Invalid image artifact {member}")
             for file in sorted(source.rglob("*")) if source.is_dir() else [source]:
                 if file.is_dir():
                     continue
-                if not file.resolve(strict=True).is_relative_to(root):
-                    raise ValueError(f"Invalid image artifact {file}")
                 target = destination / file.relative_to(root)
                 if target.exists() or target.is_symlink():
                     raise ValueError(f"Duplicate image artifact {target}")
