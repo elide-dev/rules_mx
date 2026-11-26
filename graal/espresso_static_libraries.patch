@@ -1,0 +1,33 @@
+--- a/espresso/mx.espresso/mx_espresso.py
++++ b/espresso/mx.espresso/mx_espresso.py
+@@ -685,12 +685,8 @@
+             # collect quoted strings from Set
+             return set(re.findall(r'\"([a-z]+)\"', m.group(1)))
+ 
+-    @property
+-    def ldflags(self):
+-        platform = mx.get_os() + '-' + mx.get_arch()
+-
+-        assert mx.is_darwin(), "not supported yet: " + platform
+-
++    @staticmethod
++    def jdk_static_library_names():
+         # Most OpenJDK libraries are suitable for static linking, with the exception of
+         # libawt and related libs.
+         #
+@@ -720,6 +716,15 @@
+         missing_libs = expected_by_VM - darwin_linked_in_libs
+         assert not missing_libs, "missing libraries expected by the VM: " + str(missing_libs)
+ 
++        return darwin_linked_in_libs
++
++    @property
++    def ldflags(self):
++        platform = mx.get_os() + '-' + mx.get_arch()
++
++        assert mx.is_darwin(), "not supported yet: " + platform
++
++        darwin_linked_in_libs = self.jdk_static_library_names()
+         static_lib_dir = os.path.join(get_java_home_dep().java_home, "lib", "static", platform)
+         # Allow graal-builder-jdk (built with `make graal-builder-image` in labsjdk repo) to work
+         if not exists(static_lib_dir):

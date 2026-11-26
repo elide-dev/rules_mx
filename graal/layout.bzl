@@ -61,6 +61,12 @@ def _layout_impl(ctx):
             if not separator:
                 fail("Expected an archive member mapping: " + spec)
             if source:
+                if source.startswith("*/"):
+                    # mx multitarget results start with the selected os-architecture pair.
+                    matches = [p for p in sources if p.partition("/")[2] == source[2:]]
+                    if len(matches) != 1:
+                        fail("Expected one member matching %s in %s, got %s" % (source, target.label, matches))
+                    source = matches[0]
                 if source not in sources:
                     fail("No archive member " + source + " in " + str(target.label))
                 _add_entry(entries, destination, sources[source])
@@ -148,7 +154,7 @@ def mx_release_archive(name, install, prefix, **kwargs):
 
 def mx_os_layout(name, os_layouts, **kwargs):
     """Select the mx layout using the target operating system."""
-    branches = {"@platforms//os:" + os: recipe for os, recipe in os_layouts.items()}
+    branches = {Label("//tools/cc:linux_musl") if os == "linux-musl" else "@platforms//os:" + os: recipe for os, recipe in os_layouts.items()}
     attrs = {
         key: select({os: recipe[key] for os, recipe in branches.items()} | {"//conditions:default": empty})
         for key, empty in [("members", {}), ("archive_imports", {}), ("file_list", [])]

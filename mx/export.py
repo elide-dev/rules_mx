@@ -888,6 +888,137 @@ def _is_shaded_project(dep):
     )
 
 
+def _default_native(project):
+    return (type(project).__module__, type(project).__name__) in {
+        ("mx._impl.mx_native", "DefaultNativeProject"),
+        ("mx_espresso", "CustomLibJVMLinking"),
+    } and project.kind == "shared_lib"
+
+
+def _native_shared_recipe(project, pending):
+    from mx._impl.mx_native import TargetSpec, MultitargetSpec
+
+    attrs = project._orig_attrs
+    supported = {
+        "subDir",
+        "native",
+        "deliverable",
+        "platformDependent",
+        "os_arch",
+        "buildDependencies",
+        "license",
+        "testProject",
+    }
+    static_names = []
+    if type(project).__name__ == "CustomLibJVMLinking":
+        if not hasattr(project, "jdk_static_library_names"):
+            raise _UnsupportedLowering(
+                f"{project.name}: mx must export the force-loaded JDK libraries"
+            )
+        static_names = sorted(project.jdk_static_library_names())
+        supported |= {"class", "dir"}
+    if (
+        attrs.keys() - supported
+        or not _resource_path(project.deliverable)
+        or "/" in project.deliverable
+    ):
+        raise _UnsupportedLowering(
+            f"{project.name}: native project needs additional settings"
+        )
+    sources = project._source["files"]
+    if sources.keys() - {".h", ".c", ".cc", ".cpp", ".S"}:
+        raise _UnsupportedLowering(
+            f"{project.name}: unsupported default native sources"
+        )
+    profiles = {}
+    root = Path(project.dir).relative_to(project.suite.dir).as_posix()
+    for system, arch, libc in (
+        ("darwin", "aarch64", "default"),
+        ("linux", "aarch64", "glibc"),
+        ("linux", "amd64", "glibc"),
+    ):
+        platform = attrs.get("os_arch", {})
+        archs = platform.get(system, platform.get("<others>", {}))
+        branch = archs.get(arch, archs.get("<others>", {}))
+        if branch.get("ignore"):
+            continue
+        if branch.keys() - {"cflags", "ldflags", "ldlibs", "multitarget"}:
+            raise _UnsupportedLowering(
+                f"{project.name}: unsupported native settings for {system}"
+            )
+        target = TargetSpec(dict(os=system, arch=arch, libc=libc))
+        mt = branch.get("multitarget", {})
+        specs = mt if isinstance(mt, list) else [mt]
+        if not any(
+            MultitargetSpec(
+                {"os": [system], "arch": [arch], "libc": [libc]} | spec
+            ).matches(target)
+            and {"host", "*"} & set(spec.get("compiler", ["host"]))
+            for spec in specs
+        ):
+            continue
+        filename = (
+            "lib" + project.deliverable + (".dylib" if system == "darwin" else ".so")
+        )
+        link_inputs, linkopts = [], []
+        for flag in branch.get("ldflags", []) + branch.get("ldlibs", []):
+            own = "<path:" + project.qualifiedName() + ">/"
+            if own in flag:
+                prefix, rel = flag.split(own, 1)
+                if not _resource_path(rel) or not (Path(project.dir) / rel).is_file():
+                    raise _UnsupportedLowering(
+                        f"{project.name}: missing linker input {rel}"
+                    )
+                link_inputs.append(root + "/" + rel)
+                flag = prefix + "$(location " + link_inputs[-1] + ")"
+            if "<" in flag:
+                raise _UnsupportedLowering(
+                    f"{project.name}: unresolved linker flag {flag}"
+                )
+            linkopts.append(flag)
+        copts = branch.get("cflags", [])
+        if any("<" in flag for flag in copts):
+            raise _UnsupportedLowering(f"{project.name}: unresolved compiler flags")
+        profile = (
+            {"darwin": "macos", "linux": "linux"}[system]
+            + "_"
+            + {"aarch64": "arm64", "amd64": "amd64"}[arch]
+        )
+        profiles[profile] = {
+            "filename": filename,
+            "member": target.subdir + "/" + filename if mt else filename,
+            "copts": copts,
+            "linkopts": linkopts,
+            "link_inputs": link_inputs,
+        }
+    if not profiles:
+        raise _UnsupportedLowering(f"{project.name}: no compatible native toolchain")
+    deps = []
+    for name in attrs.get("buildDependencies", []):
+        dep = mx.dependency(name, context=project)
+        if dep.suite != project.suite or not _default_native(dep):
+            raise _UnsupportedLowering(
+                f"{project.name}: needs native dependency {name}"
+            )
+        pending.append(dep)
+        deps.append(":" + dep.name)
+    return {
+        "name": project.name,
+        "root": root,
+        "profiles": profiles,
+        "deps": deps,
+        "jdk_static_libraries": static_names,
+        "srcs": sorted(
+            root + "/" + f
+            for ext, files in sources.items()
+            if ext != ".h"
+            for f in files
+        ),
+        "headers": sorted(root + "/" + f for f in sources.get(".h", [])),
+        "testonly": project.is_test_project(),
+    }
+
+
 def _source_project(dep):
     kind = (type(dep).__module__, type(dep).__name__)
     return kind in {
@@ -1335,6 +1466,7 @@ def _can_lower_root(dep):
         or _bash_launcher(dep)
         or _native_image_executable(dep)
         or _language_library(dep)
+        or _default_native(dep)
         or _source_project(dep)
         or _wat_project(dep)
         or _emscripten_project(dep)
@@ -1443,18 +1575,33 @@ def _source_layout_branch(dist, layout, os_name):
             dep = mx.dependency(
                 source["dependency"], fatalIfMissing=False, context=dist
             )
-            if not dep or dep.suite != dist.suite or not _source_project(dep):
-                # A platform may need an additional compiled project, e.g. pthread on Windows.
+            if dep is None:
+                # mx can omit a project from its global registry on the export host.
+                dep = next((p for p in dist.suite.projects if source["dependency"] in (p.qualifiedName(), p.name)), None)
+            if not dep or dep.suite != dist.suite:
+                return None, []
+            entries = {}
+            if _default_native(dep):
+                pattern = "<lib:" + dep.deliverable + ">"
+                if path not in (pattern, "*/<multitarget_libc_selection>/" + pattern) or os_name not in ("linux", "darwin"):
+                    return None, []
+                filename = "lib" + dep.deliverable + (".so" if os_name == "linux" else ".dylib")
+                # mx installs the one target-selected shared library by basename.
+                if path == pattern:
+                    entries[filename] = dest + filename
+                else:
+                    entries["*/" + ("glibc" if os_name == "linux" else "default") + "/" + filename] = dest + filename
+            elif _source_project(dep):
+                for member in _project_files(dep)["members"].values():
+                    matched = glob_match(path, member)
+                    if matched is not None:
+                        prefix = matched.rpartition("/")[0]
+                        entries[member] = dest + (
+                            member.removeprefix(prefix + "/") if prefix else member
+                        )
+            else:
                 return None, []
             projects.append(dep)
-            entries = {}
-            for member in _project_files(dep)["members"].values():
-                matched = glob_match(path, member)
-                if matched is not None:
-                    prefix = matched.rpartition("/")[0]
-                    entries[member] = dest + (
-                        member.removeprefix(prefix + "/") if prefix else member
-                    )
             if not entries:
                 raise _UnsupportedLowering(
                     f"{dist.name}: no results for {source['_str_']}"
@@ -1485,7 +1632,7 @@ def _os_layout(dist, pending):
     attrs = dist._orig_attrs
     if (
         attrs.keys()
-        & {"arch", "os_arch", "layout", "buildDependencies", "dependencies"}
+        & {"arch", "layout", "buildDependencies", "dependencies"}
         or dist.excludedLibs
         or dist.hashEntry
         or dist.fileListEntry
@@ -1494,13 +1641,20 @@ def _os_layout(dist, pending):
         raise _UnsupportedLowering(
             f"{dist.name}: needs additional platform layout inputs"
         )
+    systems = attrs.get("os")
+    if systems is None:
+        systems = {}
+        for system, architectures in attrs["os_arch"].items():
+            if architectures.keys() != {"<others>"}:
+                raise _UnsupportedLowering(f"{dist.name}: layout varies by target architecture")
+            systems[system] = architectures["<others>"]
     recipes = {}
     for os_name, bazel_os in (
         ("linux", "linux"),
         ("darwin", "macos"),
         ("windows", "windows"),
     ):
-        branch = attrs["os"].get(os_name, attrs["os"].get("<others>", {}))
+        branch = systems.get(os_name, systems.get("<others>", {}))
         if branch.keys() != {"layout"}:
             raise _UnsupportedLowering(f"{dist.name}: expected a layout for {os_name}")
         recipe, projects = _source_layout_branch(dist, branch["layout"], os_name)
@@ -1512,6 +1666,15 @@ def _os_layout(dist, pending):
             )
         pending.extend(projects)
         recipes[bazel_os] = recipe
+    if "linux-musl" in systems:
+        branch = systems["linux-musl"]
+        if branch.keys() != {"layout"}:
+            raise _UnsupportedLowering(f"{dist.name}: unsupported musl layout")
+        recipe, projects = _source_layout_branch(dist, branch["layout"], "linux-musl")
+        if recipe is None:
+            raise _UnsupportedLowering(f"{dist.name}: needs native project results for musl")
+        pending.extend(projects)
+        recipes["linux-musl"] = recipe
     return {
         "name": dist.name,
         "format": "dir" if type(dist).__name__ == "LayoutDirDistribution" else "tar",
@@ -2466,6 +2629,7 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
     thin_launchers = {}
     image_projects = {}
     bitcode_suites = {}
+    native_shared = {}
     source_projects = {}
     wasm_programs = {}
     wat_projects = {}
@@ -2487,6 +2651,7 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             or project.name in thin_launchers
             or project.name in image_projects
             or project.name in bitcode_suites
+            or project.name in native_shared
             or project.name in source_projects
             or project.name in wasm_programs
             or project.name in wat_projects
@@ -2500,7 +2665,7 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             if _native_tool_layout(project):
                 tool_layouts[project.name] = _tool_links(project, pending)
                 continue
-            if type(project).__name__ in ("LayoutDirDistribution", "LayoutTARDistribution") and "os" in getattr(project, "_orig_attrs", {}):
+            if type(project).__name__ in ("LayoutDirDistribution", "LayoutTARDistribution") and {"os", "os_arch"} & getattr(project, "_orig_attrs", {}).keys():
                 tar_layouts[project.name] = _os_layout(project, pending)
                 continue
             if type(project).__name__ == "LayoutJARDistribution":
@@ -2575,6 +2740,9 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             continue
         if options.gazelle and project.suite == suite and _thin_launcher(project):
             thin_launchers[project.name] = _thin_launcher_recipe(project)
+            continue
+        if options.gazelle and project.suite == suite and _default_native(project):
+            native_shared[project.name] = _native_shared_recipe(project, pending)
             continue
         if options.gazelle and project.suite == suite and _source_project(project):
             source_projects[project.name] = _project_files(project)
@@ -2976,6 +3144,7 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             | bash_launchers.keys()
             | thin_launchers.keys()
             | image_projects.keys()
+            | native_shared.keys()
             | source_projects.keys()
             | wasm_programs.keys()
             | wat_projects.keys()
@@ -3063,6 +3232,8 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             result["image_projects"] = [
                 image_projects[n] for n in sorted(image_projects)
             ]
+        if native_shared:
+            result["native_shared"] = [native_shared[n] for n in sorted(native_shared)]
         if source_projects:
             result["source_projects"] = [
                 source_projects[n] for n in sorted(source_projects)

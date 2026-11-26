@@ -57,3 +57,48 @@ alias(
     "target_config",
     "all_files",
 ]]
+
+constraint_setting(
+    name = "linux_libc",
+    default_constraint_value = ":glibc",
+    visibility = ["//visibility:public"],
+)
+
+[constraint_value(
+    name = libc,
+    constraint_setting = ":linux_libc",
+    visibility = ["//visibility:public"],
+) for libc in [
+    "glibc",
+    "musl",
+]]
+
+config_setting(
+    name = "linux_musl",
+    constraint_values = [
+        "@platforms//os:linux",
+        ":musl",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+[config_setting(
+    name = "profile_" + profile,
+    constraint_values = constraints,
+    visibility = ["//visibility:public"],
+) for profile, constraints in {
+    "linux_amd64": [
+        "@platforms//os:linux",
+        "@platforms//cpu:x86_64",
+        ":glibc",
+    ],
+    "linux_arm64": [
+        "@platforms//os:linux",
+        "@platforms//cpu:aarch64",
+        ":glibc",
+    ],
+    "macos_arm64": [
+        "@platforms//os:macos",
+        "@platforms//cpu:aarch64",
+    ],
+}.items()]
