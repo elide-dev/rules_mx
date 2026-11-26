@@ -184,6 +184,22 @@ The hosted tests (`SVM_HOSTED_TESTS`, mx's `svm-invariants-tests` configuration)
 - `SVM_GRAALVM_SUPPORT` packages the debug helpers, `SVM_HOSTED_NATIVE`, the reporter library, zstd-jni, the reachability metadata schema and the skills. On macOS AArch64 it also contains the pinned standalone `ld64.lld`.
 - `com.oracle.svm.native.jvm.windows` is compatible only with Windows targets. rules_mx pins no Windows Labs JDK, so building it also needs a Windows Labs JDK registered as `//tools:labs_runtime` for the JVM function fallbacks.
 
+## API references
+
+```sh
+bazelisk test --config=apidocs //graal/apidocs:apidocs_test
+bazelisk build --config=apidocs //graal/apidocs:sdk //graal/apidocs:truffle
+bazelisk build --config=apidocs --//graal/apidocs:version=25.6.0-elide.1 --//graal/apidocs:source_ref="$SHA" //graal/apidocs:sdk
+```
+
+`//graal/apidocs:sdk` and `//graal/apidocs:truffle` render the GraalVM SDK and Truffle Java API references with [elide-dev/doclet](https://github.com/elide-dev/doclet), through rules_elide's `elide_apidocs`. Each produces a site directory (`<name>_site`) and a reproducible `<name>.tar.gz`. The SDK reference documents the packages of `org.graalvm.{collections,home,nativeimage,options,polyglot,word}`. The Truffle reference documents the projects of `mx truffle javadoc`: the SDK set, `com.oracle.svm.core.annotate` and the `com.oracle.truffle.api*` projects. As in mx, only packages with a `package-info.java` are documented, so the implementation packages are left out. `apidocs_test` checks both package sets.
+
+Javadoc runs once per reference, in unnamed-module `-sourcepath` mode, over the source jars of the Bazel-built projects. The compile classpath of those projects supplies the classes that Truffle's annotation processors generate. `--config=apidocs` selects Labs JDK 25: the doclet needs JDK 25, and a GraalVM JDK fails with "package exists in another module". The targets are tagged `manual`, so `//...` skips them. JDK types link to the JDK 25 reference through the checked-in `graal/apidocs/jdk/element-list`. The doclet is built from a pinned commit (`@elide_doclet` in `MODULE.bazel`).
+
+The `version` and `source_ref` build settings name the release. The version becomes the library version and the canonical base URL, `https://static.elideusercontent.com/graalvm/javadoc/<sdk|truffle>/<version>/`. elide-dev/graal's API reference workflow builds both references for each release tag and publishes them there.
+
+The doclet cannot yet represent some Truffle comments, so the Truffle reference reports these as warnings and leaves the affected parts out: 86 external `{@snippet file=...}` examples, one `{@link}` to a type parameter and one malformed `@see`. Source links are off: the doclet's `{path}` is relative to the package root, not to the project directory in the Graal tree.
+
 ## Select the Graal source
 
 `graal/source.json` pins the default archive: its URL, SHA-256 and strip prefix. The `graal` module extension in `graal/extensions.bzl` fetches that archive as `@graal` and applies the overlays generated for it. The Labs JDK pin in `mx/labsjdk.json` follows `labsjdk-ce-latest` in the same tree's `common.json`.

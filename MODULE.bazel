@@ -7,13 +7,13 @@ module(
 bazel_dep(name = "rules_java", version = "9.9.0")
 bazel_dep(name = "rules_python", version = "1.9.2")
 bazel_dep(name = "rules_elide", version = "0.6.1")
-# rules_elide has no release with the unified JVM builder, Native Image toolchain and
-# JavaBuilder processor fixes yet, so pin its main branch by commit.
+# rules_elide has no release with the unified JVM builder, Native Image toolchain,
+# JavaBuilder processor fixes and elide_apidocs yet, so pin its main branch by commit.
 archive_override(
     module_name = "rules_elide",
-    integrity = "sha256-//E8/7JDZWKKiQg4edEJN8ye3S8VaD5EhsQe60GYhnM=",
-    strip_prefix = "rules_elide-50e0e8f8b3696a86b4294491740434db4e9d4260",
-    urls = ["https://github.com/elide-dev/rules_elide/archive/50e0e8f8b3696a86b4294491740434db4e9d4260.tar.gz"],
+    integrity = "sha256-45px5H5DlFKasbn66kMhVgE+1w/jrTOW/JrkRC3SNjY=",
+    strip_prefix = "rules_elide-a4ed40d092d21f8f4aaafa2eecba60398bbaf817",
+    urls = ["https://github.com/elide-dev/rules_elide/archive/a4ed40d092d21f8f4aaafa2eecba60398bbaf817.tar.gz"],
 )
 
 bazel_dep(name = "wabt", version = "1.0.37.bcr.1", dev_dependency = True)
@@ -169,6 +169,20 @@ hsdis(
 
 bazel_dep(name = "bazel_skylib", version = "1.9.2", dev_dependency = True)
 bazel_dep(name = "rules_license", version = "1.0.0", dev_dependency = True)
+
+http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+# elide-dev/doclet renders the SDK and Truffle API references (//graal/apidocs). It has no
+# release, so build it from a pinned commit: main plus the fix for malformed block tags
+# (elide-dev/doclet, branch fix/erroneous-block-tag). Move the pin to main once that merges.
+http_archive(
+    name = "elide_doclet",
+    build_file = "//graal/apidocs:doclet.BUILD.bazel",
+    dev_dependency = True,
+    integrity = "sha256-DFI0X2/eoSEDmGZnbDYD4VIRAsrHVZvCuIKh4JG8tws=",
+    strip_prefix = "doclet-9e1c00741d087297dd9339518cca3d9d9d200edb",
+    urls = ["https://github.com/elide-dev/doclet/archive/9e1c00741d087297dd9339518cca3d9d9d200edb.tar.gz"],
+)
 
 libffi = use_repo_rule("//graal:libffi.bzl", "graal_libffi")
 
