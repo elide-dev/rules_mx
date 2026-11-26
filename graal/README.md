@@ -60,6 +60,8 @@ tools/buildbuddy test --config=buildbuddy-rbe --config=labsjdk --config=elide-pr
 
 The Wasm core JUnit launcher runs the source-built Graal compiler and Truffle runtime on the pinned Labs JDK. Bazel builds WABT 1.0.42 from the upstream source archive using the BCR’s native C++ targets. The tool accepts mx’s explicit feature flags, including features enabled by default in that release.
 
+Sulong’s macOS bootstrap compiler uses the SDK declared by the Elide C/C++ toolchain. With Xcode 27 installed, select a compatible SDK such as macOS 26.4 through `SDKROOT` or a checksum-pinned `llvm.darwin_sdk` archive. The pinned Sulong linker cannot read the arm64e.x1 stubs in the macOS 27 SDK.
+
 ## Build a Sulong fixture
 
 ```sh

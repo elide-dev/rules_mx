@@ -48,12 +48,18 @@ def mx_cmake_project(name, srcs, compiler, config, include_dirs, profiles, testo
             members[":" + label] = member
             if (member.endswith(".so") or member.endswith(".dylib")) or ".so." in member.rpartition("/")[2]:
                 install_modes[member] = "755" if profile == "macos_arm64" else "644"
+        # Native CMake otherwise asks xcrun for the executor's default SDK.
+        if profile == "macos_arm64":
+            sdk = Label("@elide_toolchain_darwin_arm64//:all_files")
+            platform_config = {"CMAKE_OSX_SYSROOT": "$$EXT_BUILD_ROOT$$/" + sdk.workspace_root + "/apple-sdk"}
+        else:
+            # CMake otherwise reads /etc/debian_version to choose shared library permissions.
+            platform_config = {"CMAKE_INSTALL_SO_NO_EXE": "ON"}
         cmake(
             name = rule_name,
             lib_name = name + "-" + profile,
             lib_source = ":" + src_group,
-            # CMake otherwise reads /etc/debian_version to choose shared library permissions.
-            cache_entries = cache | ({} if profile == "macos_arm64" else {"CMAKE_INSTALL_SO_NO_EXE": "ON"}) | recipe["config"],
+            cache_entries = cache | platform_config | recipe["config"],
             build_data = data,
             generate_args = ["-G Ninja"],
             generate_crosstool_file = False,
