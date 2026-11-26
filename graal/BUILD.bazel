@@ -310,6 +310,15 @@ java_test(
     deps = ["@contrib_rules_jvm_deps//:junit_junit", "@graal//sdk:POLYGLOT"],
 )
 
+py_test(
+    name = "sulong_bootstrap_test",
+    size = "large",
+    srcs = ["sulong_bootstrap_test.py"],
+    args = ["$(rootpath @graal//sulong:SULONG_BOOTSTRAP_TOOLCHAIN_NO_HOME)"],
+    data = ["@graal//sulong:SULONG_BOOTSTRAP_TOOLCHAIN_NO_HOME"],
+    tags = ["manual"],
+)
+
 java_test(
     name = "sulong_pipe_test",
     size = "small",

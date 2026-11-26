@@ -2204,6 +2204,7 @@ def prepare_suite(suite, stage):
             [
                 "--whole-project",
                 "com.oracle.truffle.llvm.toolchain.launchers",
+                "--sulong-bootstrap-ninja", str(stage / "gcc.ninja_template"),
                 "--sulong-llvm-link",
                 "@rules_mx//graal:sdk_llvm_link",
                 "--sulong-fixture-sdk",
