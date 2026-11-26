@@ -37,6 +37,12 @@ The SDK and Truffle slice generally targets Java 21. Shaded libraries compile at
 
 Truffle's eight declared processors run on the execution platform. Its DSL processor inspects javac internals that Turbine does not implement. The generator selects `--javac-only-processor truffle:TRUFFLE_DSL_PROCESSOR` for that distribution. Bazel runs javac once on affected projects, then extracts an interface jar containing the generated types for downstream compilation. Eligible Elide compilations keep their worker and ABI settings. For selected pinned Truffle projects the generator sets individual Error Prone checks to warning severity. Stock JavaBuilder reports the upstream diagnostics, including an unconditional recursive call in instrumentation’s `NearestNodesCollector`.
 
+Each discovered SubstrateVM native JUnit class also has a `native_unittest.<fully qualified class>` target. Selecting one builds a test image for that class and uses the upstream Native Image build arguments. Run the allocation sampler with the command below.
+
+```sh
+tools/buildbuddy test --config=buildbuddy-rbe --config=labsjdk --config=elide-processors @graal//substratevm:native_unittest.com.oracle.svm.test.jfr.TestNativeGCAllocationSampleEvent
+```
+
 ## Build the native toolchain launchers
 
 Gazelle gets the Native Image main class, ordered classpath, module path and image options from the mx build task. Each image has its own Bazel target. The Bazel compilation mode controls debug information, so Linux and macOS generate the same overlay. Tool distributions expose individual files and preserve the aliases specified by mx when embedded in another archive. For discovery, Bazel fetches the LLVM and musl suite definitions at the revisions imported by Sandbox Toolchains. The patched LLVM, musl and Rust bootstraps still need build rules.
@@ -224,7 +230,7 @@ graal.source(
     urls = [URL],
     sha256 = SHA256,
     strip_prefix = PREFIX,
-    patches = ["//path/to/overlays:sdk.patch", ...],  # benchmark_timer.patch plus the suite overlays
+    patches = ["//path/to/overlays:sdk.patch", ...],  # source fixes and generated suite overlays
 )
 use_repo(graal, "graal")
 ```

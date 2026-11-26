@@ -1837,7 +1837,7 @@ def svm_native_unittests(directory):
         # The image build uses every core; cpu:4 keeps other tests from competing with it.
         # GitHub1398 needs a multicast-capable network interface, which BuildBuddy's remote
         # executors lack, so the test runs on the host even under the rbe profile.
-        f'svm_native_unittest(name = "native_unittest", tests = {json.dumps(discovered)}, deps = [":SVM_TESTS"], default_group = True, tags = ["cpu:4", "no-remote-exec"])\n'
+        f'svm_native_unittest(name = "native_unittest", tests = {json.dumps(discovered)}, deps = [":SVM_TESTS"], default_group = True, generate_class_tests = True, local_classes = ["com.oracle.svm.test.GitHub1398"], tags = ["cpu:4", "no-remote-exec"])\n'
     )
 
 

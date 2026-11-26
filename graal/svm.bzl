@@ -509,7 +509,7 @@ _svm_unittest_inputs = rule(
     },
 )
 
-def svm_native_unittest(name, tests, deps, build_args = [], default_group = False, tags = [], size = "enormous"):
+def svm_native_unittest(name, tests, deps, build_args = [], default_group = False, tags = [], size = "enormous", generate_class_tests = False, local_classes = []):
     """Run JUnit classes inside a source-built Native Image, as `mx native-unittest` does.
 
     Args:
@@ -521,6 +521,8 @@ def svm_native_unittest(name, tests, deps, build_args = [], default_group = Fals
         argument-less `mx native-unittest` does.
       tags: test tags.
       size: test size.
+      generate_class_tests: expose an individually selectable native image test for each class.
+      local_classes: classes that need facilities available only on the local executor.
     """
     _svm_unittest_inputs(
         name = name + ".inputs",
@@ -529,13 +531,19 @@ def svm_native_unittest(name, tests, deps, build_args = [], default_group = Fals
         junit_support = ":JUNIT_SUPPORT",
         testonly = True,
     )
-    py_test(
-        name = name,
-        srcs = [Label("//graal:svm_native_unittest.py")],
-        main = Label("//graal:svm_native_unittest.py"),
-        args = ["$(rootpath :native-image.root)", "$(rootpath :%s.inputs)" % name] + (["--default-group"] if default_group else []) + ["--tests"] + tests + (["--build-args"] + build_args if build_args else []),
-        data = [":native-image.root", ":%s.inputs" % name],
-        size = size,
-        tags = tags,
-        target_compatible_with = select({":" + s: [] for s in ["svm.darwin-aarch64", "svm.linux-aarch64", "svm.linux-amd64"]} | {"//conditions:default": ["@platforms//:incompatible"]}),
-    )
+    targets = [(name, tests, default_group, tags)]
+    if generate_class_tests:
+        class_tags = [tag for tag in tags if tag != "no-remote-exec"] + ["manual"]
+        for test in tests:
+            targets.append((name + "." + test, [test], False, class_tags + (["no-remote-exec"] if test in local_classes else [])))
+    for target_name, selected_tests, defaults, target_tags in targets:
+        py_test(
+            name = target_name,
+            srcs = [Label("//graal:svm_native_unittest.py")],
+            main = Label("//graal:svm_native_unittest.py"),
+            args = ["$(rootpath :native-image.root)", "$(rootpath :%s.inputs)" % name] + (["--default-group"] if defaults else []) + ["--tests"] + selected_tests + (["--build-args"] + build_args if build_args else []),
+            data = [":native-image.root", ":%s.inputs" % name],
+            size = size,
+            tags = target_tags,
+            target_compatible_with = select({":" + s: [] for s in ["svm.darwin-aarch64", "svm.linux-aarch64", "svm.linux-amd64"]} | {"//conditions:default": ["@platforms//:incompatible"]}),
+        )
