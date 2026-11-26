@@ -17,8 +17,10 @@ def main(nm, objdump, graal, native, resources):
             for row in symbols.splitlines()
             if row.strip()
         ), (library, symbol)
-        sections = subprocess.check_output([objdump, "-h", library], text=True)
-        assert ".llvmbc" in sections or "__bitcode" in sections, (library, sections)
+        section = "__bundle" if Path(library).suffix == ".dylib" else ".llvmbc"
+        dumped = subprocess.check_output([objdump, "-s", "-j", section, library], text=True)
+        words = [row.split()[1].lower() for row in dumped.splitlines() if row.startswith(" ") and len(row.split()) > 1]
+        assert words and words[0] in {"4243c0de", "dec0170b"}, (library, section, words[:1])
     assert Path(graal).name in ("libgraalvm-llvm.so.1", "libgraalvm-llvm.1.dylib")
     assert Path(native).name in ("libsulong-native.so", "libsulong-native.dylib")
 
@@ -28,7 +30,8 @@ def main(nm, objdump, graal, native, resources):
     member = library.relative_to(root).as_posix()
     assert library.read_bytes() == Path(native).read_bytes()
     [(listed, mode)] = [line.split(" = ") for line in manifest.read_text().splitlines()]
-    assert listed == member and mode == "rwxr-xr-x", (listed, mode)
+    expected_mode = "rwxr-xr-x" if library.suffix == ".dylib" else "rw-r--r--"
+    assert (listed, mode) == (member, expected_mode), (listed, mode)
     digest = hashlib.sha256(library.read_bytes() + member.encode()).hexdigest()
     assert (manifest.parent / "sha256").read_text() == digest
 
