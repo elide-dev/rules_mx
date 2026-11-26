@@ -10,8 +10,26 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest-4-cores
+    # Self-hosted pool: pushes, manual runs and same-repository PRs only. Pull requests from forks
+    # never run on it.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: linux-amd64-cipool
     steps:
+      - name: Install Bazelisk
+        env:
+          BAZELISK_VERSION: v1.30.0
+          BAZELISK_SHA256: a248ae2b2b62b5baebb748f6fba7203bff1a27e5d01b55399a8406744cb539e8
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          curl --fail --silent --show-error --location --retry 5 --retry-all-errors \
+            -o "$RUNNER_TEMP/bin/bazelisk" \
+            "https://github.com/bazelbuild/bazelisk/releases/download/${BAZELISK_VERSION}/bazelisk-linux-amd64"
+          echo "${BAZELISK_SHA256}  $RUNNER_TEMP/bin/bazelisk" | sha256sum --check --strict
+          chmod +x "$RUNNER_TEMP/bin/bazelisk"
+          ln -sf bazelisk "$RUNNER_TEMP/bin/bazel"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
