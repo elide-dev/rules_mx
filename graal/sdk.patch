@@ -2,11 +2,12 @@ diff --git a/sdk/BUILD.bazel b/sdk/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/sdk/BUILD.bazel
-@@ -0,0 +1,1227 @@
+@@ -0,0 +1,1237 @@
 +load("@rules_mx//graal:nativebridge.bzl", "nativebridge_launcher")
 +load("@rules_mx//graal:sdk_llvm.bzl", "sdk_llvm_distributions", "sdk_toolchain_descriptors")
 +load("@rules_mx//graal:toolchain_test.bzl", "sdk_toolchain_test")
 +load("@rules_mx//mx:graph.bzl", "mx_jar_dist", "mx_processed_java", "mx_processor", "mx_project", "mx_resource_layout", "mx_shaded_java", "mx_test_class", "mx_whole_java")
++load("@rules_mx//mx:project_files.bzl", "mx_source_archive")
 +
 +exports_files(glob(["src/org.graalvm.launcher.native/src/*.cc"]))
 +
@@ -1223,6 +1224,15 @@ new file mode 100644
 +    visibility = ["//visibility:public"],
 +)
 +
++mx_source_archive(
++    name = "VMACCESS_GUEST.sources",
++    testonly = False,
++    groups = {
++        "//sdk/src/jdk.graal.compiler.vmaccess.guest/src/jdk/graal/compiler/vmaccess/guest:VMACCESS_GUEST.sources.files": "jdk/graal/compiler/vmaccess/guest",
++    },
++    visibility = ["//visibility:public"],
++)
++
 +mx_processor(
 +    name = "mx_plugin.NATIVEBRIDGE_PROCESSOR.org.graalvm.nativebridge.processor.NativeBridgeProcessor",
 +    generates_api = True,
@@ -1265,7 +1275,8 @@ diff --git a/sdk/src/jdk.graal.compiler.vmaccess.guest/src/jdk/graal/compiler/vm
 new file mode 100644
 --- /dev/null
 +++ b/sdk/src/jdk.graal.compiler.vmaccess.guest/src/jdk/graal/compiler/vmaccess/guest/BUILD.bazel
-@@ -0,0 +1,13 @@
+@@ -0,0 +1,20 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
 +load("@rules_mx//mx:java.bzl", "elide_java_library")
 +
 +elide_java_library(
@@ -1278,6 +1289,12 @@ new file mode 100644
 +    ],
 +    unified_release = 21,
 +    visibility = ["//:__subpackages__"],
++)
++
++mx_files(
++    name = "VMACCESS_GUEST.sources.files",
++    srcs = ["HostProxyException.java"],
++    visibility = ["//sdk:__pkg__"],
 +)
 diff --git a/sdk/src/org.graalvm.collections/src/META-INF/native-image/org.graalvm.sdk/collections/BUILD.bazel b/sdk/src/org.graalvm.collections/src/META-INF/native-image/org.graalvm.sdk/collections/BUILD.bazel
 new file mode 100644

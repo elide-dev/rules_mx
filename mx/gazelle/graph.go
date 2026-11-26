@@ -188,7 +188,8 @@ func (g *importer) loadGraph(root, filename string, seen map[label.Label]bool) e
 		ReleaseArchives     []struct {
 			Name, Install, Prefix string
 		} `json:"release_archives"`
-		TarLayouts []struct {
+		SourceExports map[string]map[string]string `json:"source_exports"`
+		TarLayouts    []struct {
 			OSLayouts      map[string]map[string]interface{} `json:"os_layouts"`
 			JDKHomes       map[string]string                 `json:"jdk_homes"`
 			Format         string
@@ -618,6 +619,42 @@ func (g *importer) loadGraph(root, filename string, seen map[label.Label]bool) e
 			return err
 		}
 	}
+	addSources := func(name string, files map[string]string, testonly, public bool) error {
+		byDir := map[string][]string{}
+		for src, dest := range files {
+			if !filepath.IsLocal(src) || !filepath.IsLocal(dest) || path.Base(src) != path.Base(dest) {
+				return fmt.Errorf("invalid source archive member %s -> %s", src, dest)
+			}
+			dir := path.Dir(dest)
+			byDir[dir] = append(byDir[dir], src)
+		}
+		groups := map[string]string{}
+		for dir, srcs := range byDir {
+			sort.Strings(srcs)
+			labels, err := groupFiles(&project{Name: name}, "files", srcs)
+			if err != nil {
+				return err
+			}
+			for _, label := range labels {
+				groups[label] = dir
+			}
+		}
+		archive := rule.NewRule("mx_source_archive", name)
+		archive.SetAttr("groups", groups)
+		archive.SetAttr("testonly", testonly)
+		if public {
+			archive.SetAttr("visibility", []string{"//visibility:public"})
+		}
+		if err := add(suite, archive); err != nil {
+			return err
+		}
+		return nil
+	}
+	for _, name := range slices.Sorted(maps.Keys(graph.SourceExports)) {
+		if err := addSources(name+".sources", graph.SourceExports[name], false, true); err != nil {
+			return err
+		}
+	}
 	for _, layout := range graph.TarLayouts {
 		if macro := layout.Macro; macro != nil {
 			r := rule.NewRule("mx_native_image_properties", macro.Name)
@@ -629,30 +666,7 @@ func (g *importer) loadGraph(root, filename string, seen map[label.Label]bool) e
 			}
 		}
 		for _, name := range slices.Sorted(maps.Keys(layout.SourceArchives)) {
-			files := layout.SourceArchives[name]
-			byDir := map[string][]string{}
-			for src, dest := range files {
-				if !filepath.IsLocal(src) || !filepath.IsLocal(dest) || path.Base(src) != path.Base(dest) {
-					return fmt.Errorf("invalid source archive member %s -> %s", src, dest)
-				}
-				dir := path.Dir(dest)
-				byDir[dir] = append(byDir[dir], src)
-			}
-			groups := map[string]string{}
-			for dir, srcs := range byDir {
-				sort.Strings(srcs)
-				labels, err := groupFiles(&project{Name: name}, "files", srcs)
-				if err != nil {
-					return err
-				}
-				for _, label := range labels {
-					groups[label] = dir
-				}
-			}
-			archive := rule.NewRule("mx_source_archive", name)
-			archive.SetAttr("groups", groups)
-			archive.SetAttr("testonly", layout.Testonly)
-			if err := add(suite, archive); err != nil {
+			if err := addSources(name, layout.SourceArchives[name], layout.Testonly, false); err != nil {
 				return err
 			}
 		}

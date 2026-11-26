@@ -2169,6 +2169,8 @@ def prepare_suite(suite, stage):
         ]
     else:
         export_options = suite_args(directory)
+    if suite == "sdk":
+        export_options += ["--export-source-archive", "VMACCESS_GUEST"]
     if suite == "espresso":
         export_options.extend(
             [

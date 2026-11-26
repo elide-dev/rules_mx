@@ -11,12 +11,13 @@ def _impl(ctx):
         entries[path] = source
     return [
         DefaultInfo(files = depset(entries.values() + ctx.files.srcs)),
-        MxArchiveLayoutInfo(archive = None, entries = entries),
+        MxArchiveLayoutInfo(archive = None, entries = entries, primary = ctx.attr.primary, modes = {ctx.attr.primary: "755"} if ctx.attr.primary else {}),
     ]
 
 mx_project_files = rule(
     implementation = _impl,
     attrs = {
+        "primary": attr.string(),
         "members": attr.label_keyed_string_dict(allow_files = True),
         "srcs": attr.label_list(allow_files = True),
     },
