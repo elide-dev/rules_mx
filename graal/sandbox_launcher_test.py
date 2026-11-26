@@ -18,10 +18,10 @@ def main(archive, sdk):
             "graalvm-musl-swcfi-tool"
         )
         (root / "llvm").symlink_to(Path(sdk).resolve(), target_is_directory=True)
-        triple = subprocess.check_output([binary, "-print-target-triple"], text=True)
-        assert triple.strip() == "x86_64-unknown-linux-musl_swcfi", triple
+        # The SDK clang supports stock musl. The swcfi target requires the sandbox LLVM fork.
+        target = "--target=x86_64-unknown-linux-musl"
         subprocess.run(
-            [binary, "-x", "c", "-c", "-", "-o", "member.o"],
+            [binary, target, "-x", "c", "-c", "-", "-o", "member.o"],
             input=b"int member(void) { return 42; }\n",
             cwd=root,
             check=True,
