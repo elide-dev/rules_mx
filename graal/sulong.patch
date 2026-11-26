@@ -2,7 +2,8 @@ diff --git a/sulong/BUILD.bazel b/sulong/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/sulong/BUILD.bazel
-@@ -0,0 +1,440 @@
+@@ -0,0 +1,473 @@
++load("@rules_mx//mx:bitcode.bzl", "mx_bitcode_suite")
 +load("@rules_mx//mx:graph.bzl", "mx_exported_tar", "mx_jar_dist", "mx_processed_java", "mx_project")
 +
 +filegroup(
@@ -30,6 +31,8 @@ new file mode 100644
 +        ":com.oracle.truffle.llvm.parser.factories",
 +        ":com.oracle.truffle.llvm.runtime",
 +        ":com.oracle.truffle.llvm.spi",
++        ":com.oracle.truffle.llvm.tests.bitcode.other.native",
++        ":com.oracle.truffle.llvm.tests.irdebug.native",
 +        ":com.oracle.truffle.llvm.tools",
 +    ],
 +    visibility = ["//visibility:public"],
@@ -424,6 +427,36 @@ new file mode 100644
 +    release = 21,
 +    visibility = ["//visibility:public"],
 +    deps = ["//sdk:LAUNCHER_COMMON"],
++)
++
++mx_bitcode_suite(
++    name = "com.oracle.truffle.llvm.tests.bitcode.other.native",
++    testonly = True,
++    cases = [
++        "other/allocation_limits.ll",
++        "other/big_endian.ll",
++        "other/unsupported_inline_asm.ll",
++    ],
++    llvm_link = "@rules_mx//graal:sdk_llvm_link",
++    root = "tests/com.oracle.truffle.llvm.tests.bitcode.other.native",
++    visibility = ["//visibility:public"],
++)
++
++mx_bitcode_suite(
++    name = "com.oracle.truffle.llvm.tests.irdebug.native",
++    testonly = True,
++    cases = [
++        "irdebug/controlFlow.ll",
++        "irdebug/globals.ll",
++        "irdebug/primitives-mem2reg.ll",
++        "irdebug/primitives.ll",
++        "irdebug/vectorKinds-mem2reg.ll",
++        "irdebug/vectors-mem2reg.ll",
++        "irdebug/vectors.ll",
++    ],
++    llvm_link = "@rules_mx//graal:sdk_llvm_link",
++    root = "tests/com.oracle.truffle.llvm.tests.irdebug.native",
++    visibility = ["//visibility:public"],
 +)
 +
 +mx_exported_tar(

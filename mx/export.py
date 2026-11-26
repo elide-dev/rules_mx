@@ -67,6 +67,11 @@ def bazel_graph(args):
     parser.add_argument(
         "--imports", action="store_true", help="include loaded imported suites"
     )
+    parser.add_argument(
+        "--cmake-tests",
+        action="store_true",
+        help="include source cases and variants for in-tree Sulong CMake test projects",
+    )
     options = parser.parse_args(args)
     primary = mx.primary_suite() or mx.suite("mx")
     loaded = mx.suites(include_mx=True)
@@ -121,6 +126,8 @@ def bazel_graph(args):
                         node["source_roots"] = [p["path"] for p in inputs]
                     else:
                         node["source_inputs"] = inputs
+                if options.cmake_tests and _in_tree_sulong_tests(dep):
+                    node["cmake_tests"] = _cmake_cases(dep)
                 if dep.isJavaProject():
                     node["compliance"] = repr(dep.javaCompliance)
                     node["testonly"] = dep.is_test_project()
@@ -141,6 +148,77 @@ def bazel_graph(args):
             sort_keys=True,
         )
     )
+
+
+def _in_tree_sulong_tests(dep):
+    # ExternalCMakeTestSuite.getTests() materializes packed libraries.
+    return (type(dep).__module__, type(dep).__name__) == (
+        "mx_sulong_suite_constituents",
+        "SulongCMakeTestSuite",
+    )
+
+
+def _cmake_cases(project):
+    return {
+        "cases": sorted(Path(case).as_posix() for case in project.getTests()),
+        "variants": list(project.getVariants()),
+        "build_reference": project.buildRef,
+        "shared_object": project.buildSharedObject,
+        "variant_config": project.cmake_config_variant,
+    }
+
+
+def _bitcode_suite(project, linker):
+    if not linker:
+        raise _UnsupportedLowering("Sulong CMake bitcode requires --sulong-llvm-link")
+    matrix = _cmake_cases(project)
+    declaration = project.suite.suiteDict["projects"][project.name]
+    if (
+        matrix["variants"] != ["bitcode-O0"]
+        or matrix["build_reference"]
+        or matrix["shared_object"]
+        or matrix["variant_config"]
+        or not matrix["cases"]
+        or any(not case.endswith(".ll") for case in matrix["cases"])
+        or declaration.keys()
+        - {
+            "subDir",
+            "class",
+            "variants",
+            "fileExts",
+            "buildRef",
+            "buildSharedObject",
+            "bundledLLVMOnly",
+            "dependencies",
+            "buildDependencies",
+            "testProject",
+            "defaultBuild",
+        }
+    ):
+        raise _UnsupportedLowering(
+            "Sulong CMake requires additional compile, reference or link steps"
+        )
+    root = Path(project.source_dirs()[0])
+    recipe = [
+        line.strip()
+        for line in (root / "CMakeLists.txt").read_text().splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+    if recipe != [
+        "cmake_minimum_required(VERSION 3.15)",
+        "project(${SULONG_PROJECT_NAME} LANGUAGES NONE)",
+        "include(SulongTestSuite)",
+    ] or any(root.rglob("TestOptions.cmake")):
+        raise _UnsupportedLowering(
+            "Sulong CMake suite has custom build steps or per-case options"
+        )
+    return {
+        "name": project.name,
+        "root": root.relative_to(project.suite.dir).as_posix(),
+        "cases": matrix["cases"],
+        "linker": linker,
+        "testonly": project.is_test_project(),
+    }
 
 
 def _starlark_value(value):
@@ -704,6 +782,7 @@ def _can_lower_root(dep):
     return (
         type(dep).__name__
         in ("JavaProject", "LayoutDirDistribution", "LayoutTARDistribution")
+        or _in_tree_sulong_tests(dep)
         or _is_shaded_project(dep)
         or dep.isJARDistribution()
         or dep.isPOMDistribution()
@@ -1127,6 +1206,11 @@ def bazel_buildfile(args):
         help="export supported closures and report blocked suite roots",
     )
     parser.add_argument(
+        "--sulong-llvm-link",
+        metavar="LABEL",
+        help="execution-platform llvm-link for Sulong bitcode fixtures",
+    )
+    parser.add_argument(
         "--bindings-out",
         type=Path,
         help="write reusable Java bindings for emitted targets",
@@ -1350,6 +1434,7 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
     distributions = {}
     layouts = {}
     tar_layouts = {}
+    bitcode_suites = {}
     javac_only_processors = set(options.javac_only_processor)
     used_javac_only = set()
     processed = False
@@ -1361,6 +1446,7 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             or project.name in distributions
             or project.name in layouts
             or project.name in tar_layouts
+            or project.name in bitcode_suites
         ):
             continue
         if options.classpath_dists and project.suite == suite:
@@ -1398,6 +1484,15 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             if type(project).__name__ == "LayoutDirDistribution":
                 layouts[project.name] = _resource_layout(project, pending, java_deps)
                 continue
+        if (
+            options.gazelle
+            and _in_tree_sulong_tests(project)
+            and project.suite == suite
+        ):
+            bitcode_suites[project.name] = _bitcode_suite(
+                project, options.sulong_llvm_link
+            )
+            continue
         shaded = options.gazelle and _is_shaded_project(project)
         if (
             not shaded and type(project).__name__ != "JavaProject"
@@ -1739,6 +1834,7 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             | rules.keys()
             | layouts.keys()
             | distributions.keys()
+            | bitcode_suites.keys()
             | tar_layouts.keys()
         )
     if (
@@ -1801,6 +1897,10 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             result["distributions"] = [distributions[n] for n in sorted(distributions)]
         if layouts:
             result["layouts"] = [layouts[n] for n in sorted(layouts)]
+        if bitcode_suites:
+            result["bitcode_suites"] = [
+                bitcode_suites[n] for n in sorted(bitcode_suites)
+            ]
         if tar_layouts:
             result["tar_layouts"] = [tar_layouts[n] for n in sorted(tar_layouts)]
         return result

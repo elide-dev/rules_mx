@@ -2032,6 +2032,8 @@ def prepare_suite(suite, stage):
         ]
     else:
         export_options = suite_args(directory)
+    if suite == "sulong":
+        export_options.extend(["--sulong-llvm-link", "@rules_mx//graal:sdk_llvm_link"])
     if suite == "wasm":
         wat2wasm = "@wabt//src/tools:wat2wasm"
         project = "wasm:org.graalvm.wasm.test"

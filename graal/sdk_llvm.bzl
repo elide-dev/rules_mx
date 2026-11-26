@@ -127,3 +127,24 @@ def sdk_toolchain_descriptors(descriptors):
             target_compatible_with = select({setting: [] for setting in variants} | {"//conditions:default": ["@platforms//:incompatible"]}),
             visibility = ["//visibility:public"],
         )
+
+def _llvm_link_impl(ctx):
+    tool = ctx.actions.declare_file(ctx.label.name + "/bin/llvm-link")
+    libraries = ctx.actions.declare_directory(ctx.label.name + "/lib")
+    ctx.actions.run(
+        executable = ctx.executable._extract,
+        inputs = [ctx.file.archive],
+        outputs = [tool, libraries],
+        arguments = [ctx.file.archive.path, tool.path, libraries.path],
+        mnemonic = "ExtractSDKLLVMLink",
+    )
+    return [DefaultInfo(executable = tool, files = depset([tool, libraries]), runfiles = ctx.runfiles(files = [libraries]))]
+
+sdk_llvm_link = rule(
+    implementation = _llvm_link_impl,
+    executable = True,
+    attrs = {
+        "archive": attr.label(allow_single_file = True, mandatory = True),
+        "_extract": attr.label(default = Label("//graal:extract_llvm_link"), cfg = "exec", executable = True),
+    },
+)

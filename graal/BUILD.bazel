@@ -5,6 +5,7 @@ load("@rules_java//java:java_test.bzl", "java_test")
 load("@rules_python//python:py_binary.bzl", "py_binary")
 load("@rules_python//python:py_test.bzl", "py_test")
 load(":automatic_module.bzl", "automatic_module")
+load(":sdk_llvm.bzl", "sdk_llvm_link")
 
 exports_files([
     "benchmark_timer.patch",
@@ -429,4 +430,16 @@ py_test(
         "//tools:exec_linux_arm64": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
+)
+
+py_binary(
+    name = "extract_llvm_link",
+    srcs = ["extract_llvm_link.py"],
+)
+
+sdk_llvm_link(
+    name = "sdk_llvm_link",
+    archive = "@graal//sdk:LLVM_TOOLCHAIN_FULL",
+    tags = ["manual"],
+    visibility = ["//visibility:public"],
 )
