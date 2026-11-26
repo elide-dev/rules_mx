@@ -92,6 +92,13 @@ def configure(spec, build):
         ],
         check=True,
     )
+    def recipe_path(value):
+        # CMake embeds absolute source paths inside relative object filenames. Keep
+        # those filenames identical in the configuration and compilation sandboxes.
+        for path, name in ((root, "execroot"), (build, "build")):
+            value = value.replace(".dir" + str(path) + "/", ".dir/" + name + "/")
+        return value.replace(str(build), "@BUILD@").replace(str(root), "@EXECROOT@")
+
     for case, plan in spec["plans"].items():
         name = (
             spec["variant"] if spec["variant"] == "ref.out" else spec["variant"] + ".bc"
@@ -116,10 +123,8 @@ def configure(spec, build):
                 continue
             steps.append(
                 [
-                    entry["output"],
-                    entry["command"]
-                    .replace(str(build), "@BUILD@")
-                    .replace(str(root), "@EXECROOT@"),
+                    recipe_path(entry["output"]),
+                    recipe_path(entry["command"]),
                 ]
             )
         if not steps or steps[-1][0] != product:
