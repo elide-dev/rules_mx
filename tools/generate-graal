@@ -1741,28 +1741,7 @@ def svm_native_rules(directory):
     )
 
 
-def svm_test_runners(directory):
-    """Launchers for the JVM unit tests, with the flags of their mx unit test configurations."""
-    suite = runpy.run_path(str(directory / "mx.substratevm/suite.py"))["suite"]
-    distributions = suite["distributions"]
-    # SVMInvariantsUnittestConfig checks every non-test JAR distribution of the suite.
-    checked = [
-        ":" + name
-        for name, dist in distributions.items()
-        if not dist.get("native")
-        and "layout" not in dist
-        and not dist.get("testDistribution")
-    ]
-    # mx exports the concealed packages that classpath projects require to ALL-UNNAMED.
-    concealed = sorted(
-        {
-            f"--add-exports={module}/{package}=ALL-UNNAMED"
-            for project in suite["projects"].values()
-            for module, packages in project.get("requiresConcealed", {}).items()
-            if module != "jdk.internal.vm.ci"
-            for package in packages
-        }
-    )
+def vm_access_modules(directory):
     # The invariant checks trust interfaces of the named jdk.graal.compiler.vmaccess module
     # and load the host VM access through its service. mx puts both modules on the module
     # path, with the concealed packages they require.
@@ -1785,6 +1764,32 @@ def svm_test_runners(directory):
                 for owner, packages in concealed_packages.items()
                 for package in packages
             )
+    return vm_access, sorted(vmaccess_exports)
+
+
+def svm_test_runners(directory):
+    """Launchers for the JVM unit tests, with the flags of their mx unit test configurations."""
+    suite = runpy.run_path(str(directory / "mx.substratevm/suite.py"))["suite"]
+    distributions = suite["distributions"]
+    # SVMInvariantsUnittestConfig checks every non-test JAR distribution of the suite.
+    checked = [
+        ":" + name
+        for name, dist in distributions.items()
+        if not dist.get("native")
+        and "layout" not in dist
+        and not dist.get("testDistribution")
+    ]
+    # mx exports the concealed packages that classpath projects require to ALL-UNNAMED.
+    concealed = sorted(
+        {
+            f"--add-exports={module}/{package}=ALL-UNNAMED"
+            for project in suite["projects"].values()
+            for module, packages in project.get("requiresConcealed", {}).items()
+            if module != "jdk.internal.vm.ci"
+            for package in packages
+        }
+    )
+    vm_access, vmaccess_exports = vm_access_modules(directory)
     hosted_flags = [
         "-XX:-UseJVMCICompiler",
         # The mode of the mx gate's "SVM invariants" task.
@@ -2125,26 +2130,6 @@ def prepare_suite(suite, stage):
             ]
         )
     if suite == "web-image":
-        metadata = runpy.run_path(str(directory / "mx.web-image/suite.py"))["suite"]
-        concealed = sorted(
-            {
-                (module, pkg)
-                for project in metadata["projects"].values()
-                for module, packages in project.get("requiresConcealed", {}).items()
-                if module.startswith(("java.", "jdk."))
-                for pkg in packages
-            }
-        )
-        for flag in [
-            "--add-modules=jdk.internal.vm.ci",
-            *(f"--add-exports={module}/{pkg}=ALL-UNNAMED" for module, pkg in concealed),
-        ]:
-            export_options.extend(
-                [
-                    "--test-jvm-flag",
-                    f"web-image:com.oracle.svm.hosted.webimage.test={flag}",
-                ]
-            )
         export_options.extend(
             [
                 "--javac-opt",
@@ -2154,6 +2139,8 @@ def prepare_suite(suite, stage):
                 "com.oracle.svm.webimage.jtt=-XepDisableAllChecks",
                 "--generated-dep",
                 "web-image:com.oracle.svm.hosted.webimage.test=:NET_JAVA_HTML_JSON_TCK",
+                "--test-launcher",
+                "web-image:com.oracle.svm.hosted.webimage.test=:webimage_junit",
             ]
         )
     if suite == "sulong":
@@ -2286,6 +2273,23 @@ def prepare_suite(suite, stage):
         rules = [library_rules(directory)] if suite in JAVA_LIBRARIES else []
         if suite == "web-image":
             rules.extend(mx_library_rules(directory, ["JUNIT-JUPITER-API"])[2])
+            metadata = runpy.run_path(str(directory / "mx.web-image/suite.py"))["suite"]
+            flags = sorted(
+                {
+                    f"--add-exports={module}/{package}=ALL-UNNAMED"
+                    for project in metadata["projects"].values()
+                    for module, packages in project.get("requiresConcealed", {}).items()
+                    if module.startswith("java.")
+                    for package in packages
+                }
+            )
+            vm_access, exports = vm_access_modules(directory)
+            rules.extend(
+                [
+                    'load("@rules_mx//graal:simplelanguage.bzl", "svm_test_runner")',
+                    f'svm_test_runner(name = "webimage_junit", test_classpath = [":WEBIMAGE_TESTS"], jvm_flags = {json.dumps(flags + exports)}, modules = {json.dumps(["//compiler:" + name for name in vm_access.values()])}, root_modules = {json.dumps(sorted(vm_access))})',
+                ]
+            )
             units = sorted(
                 ":" + project["name"] + "." + cls
                 for project in graph["projects"]

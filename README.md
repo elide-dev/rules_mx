@@ -180,7 +180,7 @@ The initial Linux x86_64 REAPI smoke build compiled and packaged the real Graal 
 
 Ordinary Java builds use Elide persistent workers and emit the ABI alongside the class jar for eligible targets. For local builds with explicitly modeled processors, `bazelisk build --config=elide-workers //tests/gazelle/... //:webserver` also enables multiplex workers and digest-keyed classpath reuse. The classpath cache disables implicit processor discovery. Use the separate RBE profile for remote execution.
 
-The archive override pins rules_elide at `0882394`. It includes the unified JVM builder, the JavaBuilder processor adapter, the Native Image toolchain and direct invocation of the Python overlay from execution toolchains. The workspace pins the Elide 1.6.3 SDK. Processor consumers use `--config=elide-processors`. Select `--config=elide-unified` with an SDK advertising unified JVM request version 1 to enable fused compilation for eligible targets. [Python launcher changes](https://github.com/elide-dev/rules_elide/pull/138)
+The archive override pins rules_elide at `bb7c248`. It includes the unified JVM builder, the JavaBuilder processor adapter, the Native Image toolchain and direct invocation of the Python overlay from execution toolchains. The workspace pins the Elide 1.6.3 SDK. Processor consumers use `--config=elide-processors`. Select `--config=elide-unified` with an SDK advertising unified JVM request version 1 to enable fused compilation for eligible targets. [Python launcher changes](https://github.com/elide-dev/rules_elide/pull/138)
 
 ## Labs JDK
 

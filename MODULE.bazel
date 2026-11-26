@@ -12,9 +12,9 @@ bazel_dep(name = "rules_elide", version = "0.6.1")
 # JavaBuilder processor fixes together. The pin also includes the Python launcher fix in PR 138.
 archive_override(
     module_name = "rules_elide",
-    integrity = "sha256-JNv8FlCx1rPsgW1NaF+DE5lXKpf8wivUo4oeO7sTngo=",
-    strip_prefix = "rules_elide-088239475ab627accd2aeacff6017660b1d55ebf",
-    urls = ["https://github.com/elide-dev/rules_elide/archive/088239475ab627accd2aeacff6017660b1d55ebf.tar.gz"],
+    integrity = "sha256-tYeZIjxT0LSGOkY+33kdv30nTO5j08EcqZAYvGEBKic=",
+    strip_prefix = "rules_elide-bb7c2481596cec4082e13f41c25b2daa32e07634",
+    urls = ["https://github.com/elide-dev/rules_elide/archive/bb7c2481596cec4082e13f41c25b2daa32e07634.tar.gz"],
 )
 
 bazel_dep(name = "rules_foreign_cc", version = "0.17.0")

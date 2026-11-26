@@ -2,8 +2,9 @@ diff --git a/web-image/BUILD.bazel b/web-image/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/web-image/BUILD.bazel
-@@ -0,0 +1,1206 @@
+@@ -0,0 +1,1081 @@
 +load("@rules_java//java:java_import.bzl", "java_import")
++load("@rules_mx//graal:simplelanguage.bzl", "svm_test_runner")
 +load("@rules_mx//mx:graph.bzl", "mx_exported_tar", "mx_jar_dist", "mx_jvmci_library", "mx_processed_java", "mx_test_class")
 +load("@rules_mx//mx:jar.bzl", "mx_native_image_properties")
 +
@@ -75,6 +76,48 @@ new file mode 100644
 +    name = "JUNIT-PLATFORM-COMMONS",
 +    jars = ["@graal_shaded_inputs//:mx_JUNIT-PLATFORM-COMMONS.jar"],
 +    deps = [":APIGUARDIAN-API"],
++)
++
++svm_test_runner(
++    name = "webimage_junit",
++    jvm_flags = [
++        "--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.reflect=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.util=ALL-UNNAMED",
++        "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
++        "--add-exports=java.base/sun.security.provider=ALL-UNNAMED",
++        "--add-exports=java.base/sun.util.calendar=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.access=jdk.graal.compiler.hostvmaccess",
++        "--add-exports=java.base/jdk.internal.loader=jdk.graal.compiler.hostvmaccess",
++        "--add-exports=java.base/jdk.internal.misc=jdk.graal.compiler.hostvmaccess",
++        "--add-exports=java.base/jdk.internal.module=jdk.graal.compiler.hostvmaccess",
++        "--add-exports=java.base/jdk.internal.module=jdk.graal.compiler.vmaccess",
++        "--add-exports=java.base/sun.reflect.annotation=jdk.graal.compiler.vmaccess",
++        "--add-exports=jdk.graal.compiler/jdk.graal.compiler.annotation=jdk.graal.compiler.hostvmaccess",
++        "--add-exports=jdk.graal.compiler/jdk.graal.compiler.annotation=jdk.graal.compiler.vmaccess",
++        "--add-exports=jdk.graal.compiler/jdk.graal.compiler.api.replacements=jdk.graal.compiler.hostvmaccess",
++        "--add-exports=jdk.graal.compiler/jdk.graal.compiler.api.runtime=jdk.graal.compiler.hostvmaccess",
++        "--add-exports=jdk.graal.compiler/jdk.graal.compiler.core.target=jdk.graal.compiler.hostvmaccess",
++        "--add-exports=jdk.graal.compiler/jdk.graal.compiler.phases.util=jdk.graal.compiler.hostvmaccess",
++        "--add-exports=jdk.graal.compiler/jdk.graal.compiler.phases.util=jdk.graal.compiler.vmaccess",
++        "--add-exports=jdk.graal.compiler/jdk.graal.compiler.runtime=jdk.graal.compiler.hostvmaccess",
++        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.code=jdk.graal.compiler.hostvmaccess",
++        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.code=jdk.graal.compiler.vmaccess",
++        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta.annotation=jdk.graal.compiler.hostvmaccess",
++        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta.annotation=jdk.graal.compiler.vmaccess",
++        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=jdk.graal.compiler.hostvmaccess",
++        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=jdk.graal.compiler.vmaccess",
++        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.runtime=jdk.graal.compiler.hostvmaccess",
++    ],
++    modules = [
++        "//compiler:VMACCESS",
++        "//compiler:HOSTVMACCESS",
++    ],
++    root_modules = [
++        "jdk.graal.compiler.hostvmaccess",
++        "jdk.graal.compiler.vmaccess",
++    ],
++    test_classpath = [":WEBIMAGE_TESTS"],
 +)
 +
 +test_suite(
@@ -332,242 +375,74 @@ new file mode 100644
 +
 +mx_test_class(
 +    name = "com.oracle.svm.hosted.webimage.test.com.oracle.svm.hosted.webimage.test.JS_JTT_Spec_Test",
-+    jvm_flags = [
-+        "--add-modules=jdk.internal.vm.ci",
-+        "--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED",
-+        "--add-exports=java.base/jdk.internal.reflect=ALL-UNNAMED",
-+        "--add-exports=java.base/jdk.internal.util=ALL-UNNAMED",
-+        "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
-+        "--add-exports=java.base/sun.security.provider=ALL-UNNAMED",
-+        "--add-exports=java.base/sun.util.calendar=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.code=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.code.site=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.common=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta.annotation=ALL-UNNAMED",
-+    ],
++    launcher = ":webimage_junit",
 +    test_class = "com.oracle.svm.hosted.webimage.test.JS_JTT_Spec_Test",
-+    runtime_deps = [":WEBIMAGE_TESTS"],
 +)
 +
 +mx_test_class(
 +    name = "com.oracle.svm.hosted.webimage.test.com.oracle.svm.hosted.webimage.test.WebImageUnitTests",
-+    jvm_flags = [
-+        "--add-modules=jdk.internal.vm.ci",
-+        "--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED",
-+        "--add-exports=java.base/jdk.internal.reflect=ALL-UNNAMED",
-+        "--add-exports=java.base/jdk.internal.util=ALL-UNNAMED",
-+        "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
-+        "--add-exports=java.base/sun.security.provider=ALL-UNNAMED",
-+        "--add-exports=java.base/sun.util.calendar=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.code=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.code.site=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.common=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta.annotation=ALL-UNNAMED",
-+    ],
++    launcher = ":webimage_junit",
 +    test_class = "com.oracle.svm.hosted.webimage.test.WebImageUnitTests",
-+    runtime_deps = [":WEBIMAGE_TESTS"],
 +)
 +
 +mx_test_class(
 +    name = "com.oracle.svm.hosted.webimage.test.com.oracle.svm.hosted.webimage.test.spec.JS_JTT_Bytecodes",
-+    jvm_flags = [
-+        "--add-modules=jdk.internal.vm.ci",
-+        "--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED",
-+        "--add-exports=java.base/jdk.internal.reflect=ALL-UNNAMED",
-+        "--add-exports=java.base/jdk.internal.util=ALL-UNNAMED",
-+        "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
-+        "--add-exports=java.base/sun.security.provider=ALL-UNNAMED",
-+        "--add-exports=java.base/sun.util.calendar=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.code=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.code.site=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.common=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta.annotation=ALL-UNNAMED",
-+    ],
++    launcher = ":webimage_junit",
 +    test_class = "com.oracle.svm.hosted.webimage.test.spec.JS_JTT_Bytecodes",
-+    runtime_deps = [":WEBIMAGE_TESTS"],
 +)
 +
 +mx_test_class(
 +    name = "com.oracle.svm.hosted.webimage.test.com.oracle.svm.hosted.webimage.test.spec.JS_JTT_JSAnnotation",
-+    jvm_flags = [
-+        "--add-modules=jdk.internal.vm.ci",
-+        "--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED",
-+        "--add-exports=java.base/jdk.internal.reflect=ALL-UNNAMED",
-+        "--add-exports=java.base/jdk.internal.util=ALL-UNNAMED",
-+        "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
-+        "--add-exports=java.base/sun.security.provider=ALL-UNNAMED",
-+        "--add-exports=java.base/sun.util.calendar=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.code=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.code.site=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.common=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta.annotation=ALL-UNNAMED",
-+    ],
++    launcher = ":webimage_junit",
 +    test_class = "com.oracle.svm.hosted.webimage.test.spec.JS_JTT_JSAnnotation",
-+    runtime_deps = [":WEBIMAGE_TESTS"],
 +)
 +
 +mx_test_class(
 +    name = "com.oracle.svm.hosted.webimage.test.com.oracle.svm.hosted.webimage.test.spec.JS_JTT_JavaScriptBody",
-+    jvm_flags = [
-+        "--add-modules=jdk.internal.vm.ci",
-+        "--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED",
-+        "--add-exports=java.base/jdk.internal.reflect=ALL-UNNAMED",
-+        "--add-exports=java.base/jdk.internal.util=ALL-UNNAMED",
-+        "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
-+        "--add-exports=java.base/sun.security.provider=ALL-UNNAMED",
-+        "--add-exports=java.base/sun.util.calendar=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.code=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.code.site=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.common=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta.annotation=ALL-UNNAMED",
-+    ],
++    launcher = ":webimage_junit",
 +    test_class = "com.oracle.svm.hosted.webimage.test.spec.JS_JTT_JavaScriptBody",
-+    runtime_deps = [":WEBIMAGE_TESTS"],
 +)
 +
 +mx_test_class(
 +    name = "com.oracle.svm.hosted.webimage.test.com.oracle.svm.hosted.webimage.test.spec.JS_JTT_TCK_Headless",
-+    jvm_flags = [
-+        "--add-modules=jdk.internal.vm.ci",
-+        "--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED",
-+        "--add-exports=java.base/jdk.internal.reflect=ALL-UNNAMED",
-+        "--add-exports=java.base/jdk.internal.util=ALL-UNNAMED",
-+        "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
-+        "--add-exports=java.base/sun.security.provider=ALL-UNNAMED",
-+        "--add-exports=java.base/sun.util.calendar=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.code=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.code.site=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.common=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta.annotation=ALL-UNNAMED",
-+    ],
++    launcher = ":webimage_junit",
 +    test_class = "com.oracle.svm.hosted.webimage.test.spec.JS_JTT_TCK_Headless",
-+    runtime_deps = [":WEBIMAGE_TESTS"],
 +)
 +
 +mx_test_class(
 +    name = "com.oracle.svm.hosted.webimage.test.com.oracle.svm.hosted.webimage.test.spec.JS_JTT_XHR",
-+    jvm_flags = [
-+        "--add-modules=jdk.internal.vm.ci",
-+        "--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED",
-+        "--add-exports=java.base/jdk.internal.reflect=ALL-UNNAMED",
-+        "--add-exports=java.base/jdk.internal.util=ALL-UNNAMED",
-+        "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
-+        "--add-exports=java.base/sun.security.provider=ALL-UNNAMED",
-+        "--add-exports=java.base/sun.util.calendar=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.code=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.code.site=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.common=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta.annotation=ALL-UNNAMED",
-+    ],
++    launcher = ":webimage_junit",
 +    test_class = "com.oracle.svm.hosted.webimage.test.spec.JS_JTT_XHR",
-+    runtime_deps = [":WEBIMAGE_TESTS"],
 +)
 +
 +mx_test_class(
 +    name = "com.oracle.svm.hosted.webimage.test.com.oracle.svm.hosted.webimage.test.spec.JS_JTT_Zip",
-+    jvm_flags = [
-+        "--add-modules=jdk.internal.vm.ci",
-+        "--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED",
-+        "--add-exports=java.base/jdk.internal.reflect=ALL-UNNAMED",
-+        "--add-exports=java.base/jdk.internal.util=ALL-UNNAMED",
-+        "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
-+        "--add-exports=java.base/sun.security.provider=ALL-UNNAMED",
-+        "--add-exports=java.base/sun.util.calendar=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.code=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.code.site=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.common=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta.annotation=ALL-UNNAMED",
-+    ],
++    launcher = ":webimage_junit",
 +    test_class = "com.oracle.svm.hosted.webimage.test.spec.JS_JTT_Zip",
-+    runtime_deps = [":WEBIMAGE_TESTS"],
 +)
 +
 +mx_test_class(
 +    name = "com.oracle.svm.hosted.webimage.test.com.oracle.svm.hosted.webimage.test.unit.CanonicalizePathTest",
-+    jvm_flags = [
-+        "--add-modules=jdk.internal.vm.ci",
-+        "--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED",
-+        "--add-exports=java.base/jdk.internal.reflect=ALL-UNNAMED",
-+        "--add-exports=java.base/jdk.internal.util=ALL-UNNAMED",
-+        "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
-+        "--add-exports=java.base/sun.security.provider=ALL-UNNAMED",
-+        "--add-exports=java.base/sun.util.calendar=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.code=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.code.site=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.common=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta.annotation=ALL-UNNAMED",
-+    ],
++    launcher = ":webimage_junit",
 +    test_class = "com.oracle.svm.hosted.webimage.test.unit.CanonicalizePathTest",
-+    runtime_deps = [":WEBIMAGE_TESTS"],
 +)
 +
 +mx_test_class(
 +    name = "com.oracle.svm.hosted.webimage.test.com.oracle.svm.hosted.webimage.test.unit.MoveResolverTest",
-+    jvm_flags = [
-+        "--add-modules=jdk.internal.vm.ci",
-+        "--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED",
-+        "--add-exports=java.base/jdk.internal.reflect=ALL-UNNAMED",
-+        "--add-exports=java.base/jdk.internal.util=ALL-UNNAMED",
-+        "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
-+        "--add-exports=java.base/sun.security.provider=ALL-UNNAMED",
-+        "--add-exports=java.base/sun.util.calendar=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.code=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.code.site=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.common=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta.annotation=ALL-UNNAMED",
-+    ],
++    launcher = ":webimage_junit",
 +    test_class = "com.oracle.svm.hosted.webimage.test.unit.MoveResolverTest",
-+    runtime_deps = [":WEBIMAGE_TESTS"],
 +)
 +
 +mx_test_class(
 +    name = "com.oracle.svm.hosted.webimage.test.com.oracle.svm.hosted.webimage.test.unit.WasmActiveDataTest",
-+    jvm_flags = [
-+        "--add-modules=jdk.internal.vm.ci",
-+        "--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED",
-+        "--add-exports=java.base/jdk.internal.reflect=ALL-UNNAMED",
-+        "--add-exports=java.base/jdk.internal.util=ALL-UNNAMED",
-+        "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
-+        "--add-exports=java.base/sun.security.provider=ALL-UNNAMED",
-+        "--add-exports=java.base/sun.util.calendar=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.code=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.code.site=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.common=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta.annotation=ALL-UNNAMED",
-+    ],
++    launcher = ":webimage_junit",
 +    test_class = "com.oracle.svm.hosted.webimage.test.unit.WasmActiveDataTest",
-+    runtime_deps = [":WEBIMAGE_TESTS"],
 +)
 +
 +mx_test_class(
 +    name = "com.oracle.svm.hosted.webimage.test.com.oracle.svm.hosted.webimage.test.unit.WasmLMSingleThreadedAtomicsTest",
-+    jvm_flags = [
-+        "--add-modules=jdk.internal.vm.ci",
-+        "--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED",
-+        "--add-exports=java.base/jdk.internal.reflect=ALL-UNNAMED",
-+        "--add-exports=java.base/jdk.internal.util=ALL-UNNAMED",
-+        "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
-+        "--add-exports=java.base/sun.security.provider=ALL-UNNAMED",
-+        "--add-exports=java.base/sun.util.calendar=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.code=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.code.site=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.common=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=ALL-UNNAMED",
-+        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta.annotation=ALL-UNNAMED",
-+    ],
++    launcher = ":webimage_junit",
 +    test_class = "com.oracle.svm.hosted.webimage.test.unit.WasmLMSingleThreadedAtomicsTest",
-+    runtime_deps = [":WEBIMAGE_TESTS"],
 +)
 +
 +mx_jvmci_library(

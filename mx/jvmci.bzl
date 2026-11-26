@@ -114,10 +114,10 @@ def _patch_module_impl(ctx):
     args.add("--java", runtime.java_executable_exec_path)
     args.add("--output", jar)
     args.add("--module", ctx.attr.module_name)
-    args.add_all([prefix + root for root in ctx.attr.roots], before_each = "--path")
+    args.add_all([prefix + root for root in ctx.attr.roots], before_each = "--source-root")
     dependencies = [dep[JavaInfo] for dep in ctx.attr.deps]
     patch_jars = depset(transitive = [dep.transitive_compile_time_jars for dep in dependencies])
-    args.add_all(patch_jars, before_each = "--path")
+    args.add_all(patch_jars, before_each = "--patch-jar")
     args.add_all(ctx.attr.javacopts, format_each = "--javac-opt=%s")
     args.add_all(ctx.files.srcs)
     ctx.actions.run(
