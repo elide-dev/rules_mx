@@ -502,8 +502,14 @@ def _pom_edges(dist, suite, mappings, pending):
 
 
 @cache
+def _espresso_runtime_project(dep):
+    return (type(dep).__module__, type(dep).__name__) == ("mx_espresso", "EspressoRuntimeResourceProject")
+
+
 def _source_packages(project):
     """Index checked-in Java packages without resolving binary library contents."""
+    if _espresso_runtime_project(project):
+        return frozenset([project.name])
     packages = set()
     for directory in map(Path, project.source_dirs()):
         for source in directory.rglob("*.java"):
@@ -1359,6 +1365,10 @@ def _native_image_executable(dep):
     )
 
 
+def _image_library(dep):
+    return type(dep).__module__ == "mx_sdk_vm_ng" and type(dep).__name__ in ("NativeImageLibraryProject", "LanguageLibraryProject")
+
+
 def _language_library(dep):
     return (type(dep).__module__, type(dep).__name__) == (
         "mx_sdk_vm_ng",
@@ -1734,6 +1744,29 @@ def _tool_links(dist, pending):
 
 
 def _image_recipe(project, suite, mappings, pending):
+    if _image_library(project) and not _language_library(project):
+        dynamic = getattr(project, "dynamicBuildArgs", None)
+        resolver = getattr(project.suite.extensions, dynamic + "_for_platform", None) if dynamic else None
+        if dynamic and not resolver:
+            raise _UnsupportedLowering(f"{project.name}: target-aware dynamicBuildArgs required")
+        recipes = {}
+        for os_name, libc, suffix in (("darwin", None, ".dylib"), ("linux", "glibc", ".so")):
+            def substitute(arg):
+                arg = re.sub(r"<lib:([a-zA-Z0-9_.+-]+)>", r"lib\1" + suffix, arg)
+                if "<" in arg or ">" in arg:
+                    raise _UnsupportedLowering(f"{project.name}: unresolved image option {arg}")
+                return arg
+
+            flags = project.get_build_args(substitute=substitute, dynamic_args=resolver(os_name, libc, libc) if resolver else None)
+            recipes[os_name] = _image_command(project, suite, mappings, pending, flags)
+        platform_flags = {os_name: recipe.pop("flags") for os_name, recipe in recipes.items()}
+        if recipes["darwin"] != recipes["linux"]:
+            raise _UnsupportedLowering(f"{project.name}: platform-dependent image classpath")
+        return {**recipes["linux"], "platform_flags": platform_flags, "flags": [], "output_directory": True}
+    return _image_command(project, suite, mappings, pending)
+
+
+def _image_command(project, suite, mappings, pending, project_args=None):
     unsupported = project._orig_attrs.keys() - {
         "class",
         "dependencies",
@@ -1741,7 +1774,7 @@ def _image_recipe(project, suite, mappings, pending):
         "build_args",
         "deliverable",
     }
-    shared = _language_library(project)
+    shared = _image_library(project)
     if shared:
         unsupported -= {"dynamicBuildArgs", "dynamicDependencies"}
     if unsupported:
@@ -1773,7 +1806,8 @@ def _image_recipe(project, suite, mappings, pending):
         disable_debuginfo_stripping=False,
     )
     with mx.runtime_classpath_formatter(render):
-        command = project.getBuildTask(args).get_build_args()
+        task = project.getBuildTask(args)
+        command = task.get_build_args() if project_args is None else task.get_build_args(project_args=project_args)
     recipe = {"name": project.name, "output": project.base_file_name(), "flags": []}
     if shared:
         if "--shared" not in command:
@@ -1859,6 +1893,7 @@ def _can_lower_root(dep):
             "LayoutTARDistribution",
             "LayoutJARDistribution",
         )
+        or _espresso_runtime_project(dep)
         or _standalone_archive(dep)
         or _native_tool_layout(dep)
         or _thin_launcher(dep)
@@ -1866,7 +1901,7 @@ def _can_lower_root(dep):
         or _bootstrap_launcher(dep)
         or _cmake_native_project(dep)
         or _native_image_executable(dep)
-        or _language_library(dep)
+        or _image_library(dep)
         or _default_native(dep)
         or _source_project(dep)
         or _platform_file(dep)
@@ -2249,6 +2284,36 @@ def _tar_layout(dist, pending, mappings, archives):
     }
 
 
+def _jdk_resource_layout(dist, jdk):
+    if not jdk or not dist.fileListEntry or not dist.hashEntry or not hasattr(dist, "layout"):
+        return None
+    sources = list(mx.LayoutDistribution._walk_static_layout(dist.layout, dist.name, distribution_object=dist, context=dist))
+    if len(sources) != 1:
+        return None
+    destination, source = sources[0]
+    if source.get("source_type") != "dependency" or source.get("path") != "*" or not destination.endswith("/"):
+        return None
+    dep = mx.dependency(source["dependency"], context=dist)
+    if (type(dep).__module__, type(dep).__name__) != ("mx_sdk_vm_ng", "JavaHomeDependency"):
+        return None
+    if dep.name != "ESPRESSO_JAVA_HOME" or source.keys() - {"_str_", "source_type", "dependency", "path", "optional", "exclude"}:
+        raise _UnsupportedLowering(f"{dist.name}: bind the selected guest JDK")
+    branches = {}
+    for os_name, arch, profile in (("darwin","aarch64","macos_arm64"),("linux","aarch64","linux_arm64"),("linux","amd64","linux_amd64")):
+        def resolve(path):
+            path = path.replace("<os>", os_name).replace("<arch>", arch)
+            return re.sub(r"<exe:([a-zA-Z0-9._-]+)>", r"\1", path)
+        directory = resolve(destination).rstrip("/")
+        exclude = [resolve(item) for item in source.get("exclude", [])]
+        if not _resource_path(directory) or any("<" in item for item in exclude):
+            raise _UnsupportedLowering(f"{dist.name}: unresolved guest JDK resource path")
+        branches[profile] = {
+            "jdk": jdk, "directory": directory, "exclude": exclude,
+            "file_list_entry": resolve(dist.fileListEntry), "hash_entry": resolve(dist.hashEntry),
+        }
+    return {"name": dist.name, "format": "dir", "os_layouts": branches, "testonly": dist.is_test_distribution()}
+
+
 def _platform_native_layout(dist, pending):
     attrs = dist._orig_attrs
     metadata = bool(dist.fileListEntry and dist.hashEntry)
@@ -2371,6 +2436,7 @@ def _install_layout(dist, pending, mappings, options, bindings):
     members = {}
     imports = {}
     jdks = {}
+    literals = {}
     source_archives = {}
     inputs = set()
     # Keep platform substitutions symbolic until we know the supplying project.
@@ -2378,7 +2444,7 @@ def _install_layout(dist, pending, mappings, options, bindings):
     for destination, source in mx.LayoutDistribution._walk_static_layout(
         dist.layout, dist.name, distribution_object=dist, context=dist
     ):
-        dest = destination.removeprefix("./")
+        dest = destination.removeprefix("./").replace("<jdk_lib_dir>/", "lib/")
         directory = destination.endswith("/")
         kind = source["source_type"]
         path = source.get("path")
@@ -2421,6 +2487,11 @@ def _install_layout(dist, pending, mappings, options, bindings):
                     [entry], dist.suite, mappings, pending, True
                 )
                 members.setdefault(target, []).append(dest + entry.default_filename())
+            continue
+        if kind == "string" and not directory and _resource_path(dest):
+            if source.keys() - {"_str_", "source_type", "value", "optional"} or dest in literals or "<" in source["value"]:
+                raise _UnsupportedLowering(f"{dist.name}: unsupported literal at {dest}")
+            literals[dest] = source["value"]
             continue
         if kind not in ("dependency", "extracted-dependency"):
             raise _UnsupportedLowering(
@@ -2487,7 +2558,7 @@ def _install_layout(dist, pending, mappings, options, bindings):
                 and path
                 and path.endswith("/*")
                 and _resource_path(path[:-2])
-                and type(dep).__name__ == "LayoutDirDistribution"
+                and (type(dep).__name__ == "LayoutDirDistribution" or (_image_library(dep) and not _language_library(dep)))
             ):
                 imports.setdefault(target, []).append(path + "=" + dest)
                 continue
@@ -2569,7 +2640,7 @@ def _install_layout(dist, pending, mappings, options, bindings):
                 kind == "dependency"
                 and path is None
                 and (
-                    _language_library(dep)
+                    _image_library(dep)
                     or _native_image_executable(dep)
                     or _release_file(dep)
                     or _platform_file(dep)
@@ -2590,7 +2661,7 @@ def _install_layout(dist, pending, mappings, options, bindings):
                 f"{dist.name}: invalid install destination {dest}"
             )
         members.setdefault(target, []).append(dest)
-    if inputs != set(dist.buildDependencies) or not (members or imports):
+    if inputs != set(dist.buildDependencies) or not (members or imports or literals):
         raise _UnsupportedLowering(
             f"{dist.name}: install inputs differ from its resolved build dependencies: {sorted(d.name for d in inputs ^ set(dist.buildDependencies))}"
         )
@@ -2607,6 +2678,7 @@ def _install_layout(dist, pending, mappings, options, bindings):
             if jdks
             else {}
         ),
+        **({"literals": literals} if literals else {}),
         **({"source_archives": source_archives} if source_archives else {}),
         "name": dist.name,
         "format": "dir",
@@ -2939,6 +3011,8 @@ def bazel_buildfile(args):
         action="store_true",
         help="generate every project and distribution in the primary suite",
     )
+    parser.add_argument("--include-dynamic", action="append", default=[], metavar="NAME",
+                        help="also generate a named dynamically registered root with --declared-only")
     parser.add_argument(
         "--declared-only",
         action="store_true",
@@ -3073,7 +3147,9 @@ def _suite_candidates(options, suite):
             suite.suiteDict.get("projects", {}).keys()
             | suite.suiteDict.get("distributions", {}).keys()
         )
-        candidates = [dep for dep in candidates if getattr(dep, "declaration_name", dep.name) in declarations]
+        if missing := set(options.include_dynamic) - {dep.name for dep in candidates}:
+            raise _UnsupportedLowering(f"Unknown dynamic roots in {suite.name}: {sorted(missing)}")
+        candidates = [dep for dep in candidates if getattr(dep, "declaration_name", dep.name) in declarations or dep.name in options.include_dynamic]
     return candidates
 
 
@@ -3326,7 +3402,7 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
                 continue
             if type(project).__name__ == "LayoutDirDistribution":
                 if project.fileListEntry and project.hashEntry and project.isPlatformDependent():
-                    tar_layouts[project.name] = _platform_native_layout(project, pending)
+                    tar_layouts[project.name] = _jdk_resource_layout(project, options.standalone_jdk_archive) or _platform_native_layout(project, pending)
                     continue
                 if project.isPlatformDependent() and options.standalone_jdk_release:
                     tar_layouts[project.name] = _install_layout(
@@ -3361,7 +3437,7 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
         if (
             options.gazelle
             and project.suite == suite
-            and (_native_image_executable(project) or _language_library(project))
+            and (_native_image_executable(project) or _image_library(project))
         ):
             image_projects[project.name] = _image_recipe(
                 project, suite, java_deps, pending
@@ -3409,6 +3485,20 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
                     for d, f in project.getProgramSources()
                 ),
                 "testonly": project.is_test_project(),
+            }
+            continue
+        if options.gazelle and project.suite == suite and _espresso_runtime_project(project):
+            from mx_espresso import EspressoRuntimeResourceBuildTask as task
+            template = Path(task._template_file()).relative_to(suite.dir).as_posix()
+            graph[project.name] = {
+                "name": project.name,
+                "release": options.release if options.release and options.release in project.javaCompliance else project.javaCompliance.value,
+                "packages": [project.name],
+                "template": template,
+                "output": Path(task._target_file("", project.name)).as_posix(),
+                "substitutions": {"<package>": project.name, "<resourceId>": project.resource_id},
+                "deps": _dependency_labels(project.deps, suite, java_deps, pending, options.classpath_dists),
+                "processors": _processor_plugins(project, mappings, java_deps, pending, plugins, options.classpath_dists, archives),
             }
             continue
         shaded = options.gazelle and _is_shaded_project(project)

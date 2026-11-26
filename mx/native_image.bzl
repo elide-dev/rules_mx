@@ -29,11 +29,47 @@ def mx_native_image_executable(name, main_class, output, image_args, classpath =
     binary = select({"@platforms//os:windows": output + ".exe", "//conditions:default": output})
     _mx_image(name, binary, image_args, classpath, modulepath, main_class = main_class, visibility = visibility)
 
-def mx_native_image_library(name, output, image_args, classpath = [], modulepath = [], visibility = None):
+def _image_artifacts_impl(ctx):
+    image = ctx.file.image
+    primary = ctx.actions.declare_file(ctx.label.name + "/" + ctx.attr.filename)
+    ctx.actions.run(
+        executable = ctx.executable._pack,
+        arguments = ["--image-primary", image.path, primary.path],
+        inputs = [image],
+        outputs = [primary],
+        mnemonic = "MxImageLibrary",
+    )
+    groups = {kind: [kind] for kind in ("shared_libraries", "executables", "jdk_libraries", "c_headers", "language_resources", "debug_info")}
+    groups["standard-deliverables"] = ["shared_libraries", "executables"] + (["debug_info"] if ctx.var["COMPILATION_MODE"] == "dbg" else [])
+    return [
+        DefaultInfo(files = depset([primary])),
+        OutputGroupInfo(image_directory = depset([image])),
+        MxArchiveLayoutInfo(
+            archive = None,
+            primary = primary.basename,
+            entries = {primary.basename: primary},
+            image_groups = [(image, kinds, group + "/") for group, kinds in groups.items()],
+        ),
+    ]
+
+_image_artifacts = rule(
+    implementation = _image_artifacts_impl,
+    attrs = {
+        "image": attr.label(allow_single_file = True, mandatory = True),
+        "filename": attr.string(mandatory = True),
+        "_pack": attr.label(default = Label("//mx:pack_layout"), executable = True, cfg = "exec"),
+    },
+)
+
+def mx_native_image_library(name, output, image_args, classpath = [], modulepath = [], platform_image_args = {}, output_directory = False, visibility = None):
     """Build a Truffle language shared library with its JNI invocation API."""
     binary = select({"@platforms//os:macos": "lib" + output + ".dylib", "//conditions:default": "lib" + output + ".so"})
+    if platform_image_args:
+        image_args = image_args + select({"@platforms//os:macos": platform_image_args["darwin"], "@platforms//os:linux": platform_image_args["linux"]})
+    if output_directory:
+        _image_artifacts(name = name, image = ":" + name + ".image", filename = binary, visibility = visibility)
     _mx_image(
-        name,
+        name + ".image" if output_directory else name,
         binary,
         image_args,
         classpath,
@@ -45,6 +81,7 @@ def mx_native_image_library(name, output, image_args, classpath = [], modulepath
             "@platforms//os:macos": [],
             "//conditions:default": ["@platforms//:incompatible"],
         }),
+        **({"output_directory": True} if output_directory else {})
     )
 
 def _launcher_script_impl(ctx):

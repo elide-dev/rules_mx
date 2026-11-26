@@ -12,7 +12,7 @@ public class EspressoGuestTest {
                 .allowAllAccess(true)
                 .allowExperimentalOptions(true)
                 .option("engine.WarnInterpreterOnly", "false")
-                .option("java.JavaHome", System.getProperty("java.home"))
+                .option("java.RuntimeResourceId", "openjdk25")
                 .build()) {
             var bindings = context.getBindings("java");
             var list = bindings.getMember("java.util.ArrayList").newInstance();

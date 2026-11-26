@@ -129,7 +129,62 @@ def _resource_metadata(manifest, digest_path, args):
     Path(digest_path).write_bytes(digest.hexdigest().encode())
 
 
+def _jdk_resource(bundle, recipe, directory, jar, manifest, digest):
+    spec = json.loads(recipe)
+    tree = Path(directory)
+    prefix = _relative(spec["directory"])
+    _install_jdk(tree, {"directory": str(prefix), "exclude": spec["exclude"], "bundle": bundle}, set())
+    members = []
+    for file in sorted((tree / prefix).rglob("*")):
+        if file.is_symlink():
+            target = file.resolve(strict=True)
+            if not target.is_relative_to((tree / prefix).resolve()) or not target.is_file():
+                raise ValueError(f"Unexpected JDK resource link {file}")
+            file.unlink()
+            shutil.copy2(target, file)
+        if file.is_file():
+            members.append((file.relative_to(tree).as_posix(), file))
+    _resource_metadata(manifest, digest, [arg for name, file in members for arg in (name, file, "source")])
+    for key, generated in (("file_list_entry", manifest), ("hash_entry", digest)):
+        name = str(_relative(spec[key]))
+        location = tree / name
+        if location.exists():
+            raise ValueError(f"Duplicate resource metadata {name}")
+        shutil.copyfile(generated, location)
+        members.append((name, location))
+    with zipfile.ZipFile(jar, "w") as archive:
+        for name, file in members:
+            entry = zipfile.ZipInfo(name)
+            entry.external_attr = (stat.S_IFREG | (file.stat().st_mode & 0o777)) << 16
+            with file.open("rb") as src, archive.open(entry, "w") as dst:
+                shutil.copyfileobj(src, dst)
+
+
+def _install_image_group(tree, image, kinds, mount):
+    root = Path(image)
+    destination = tree / _relative(mount.rstrip("/")) if mount else tree
+    manifest = json.loads((root / "build-artifacts.json").read_text())
+    for kind in kinds:
+        for member in manifest.get(kind, []):
+            source = root / _relative(member)
+            for file in sorted(source.rglob("*")) if source.is_dir() else [source]:
+                if file.is_dir():
+                    continue
+                target = destination / file.relative_to(root)
+                if target.exists() or target.is_symlink():
+                    raise ValueError(f"Duplicate image artifact {target}")
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(file, target)
+
+
 def main():
+    if sys.argv[1] == "--image-primary":
+        image, out = map(Path, sys.argv[2:])
+        shutil.copy2(image / out.name, out)
+        return
+    if sys.argv[1] == "--jdk-resource":
+        _jdk_resource(*sys.argv[2:])
+        return
     if sys.argv[1] == "--metadata":
         _resource_metadata(sys.argv[2], sys.argv[3], sys.argv[4:])
         return
@@ -158,6 +213,10 @@ def main():
     if args[:1] == ["--tar-trees"]:
         tar_trees = json.loads(args[1])
         args = args[2:]
+    image_groups = []
+    if args[:1] == ["--image-groups"]:
+        image_groups = json.loads(args[1])
+        args = args[2:]
     tree = output if directory else None
     if args[:1] == ["--source-tree"]:
         tree = Path(args[1])
@@ -167,7 +226,7 @@ def main():
         _relative(name)
 
     with ExitStack() as stack:
-        if (homes or tar_trees or prefix) and not tree:
+        if (homes or tar_trees or image_groups or prefix) and not tree:
             tree = Path(stack.enter_context(tempfile.TemporaryDirectory()))
         if tree:
             tree.mkdir(parents=True, exist_ok=True)
@@ -184,6 +243,8 @@ def main():
                                 name, 0o755 if source.stat().st_mode & 0o111 else 0o644
                             )
                         )
+            for image, kinds, mount in image_groups:
+                _install_image_group(tree, image, kinds, mount)
             for filename, mount in tar_trees:
                 destination = tree / _relative(mount.rstrip("/"))
                 if destination.exists():
@@ -195,7 +256,7 @@ def main():
                 _install_jdk(tree, home, {name for name, _ in entries})
             if directory:
                 return
-            if homes or tar_trees or prefix:
+            if homes or tar_trees or image_groups or prefix:
                 _write_tree_archive(tree, output, prefix)
                 return
 
