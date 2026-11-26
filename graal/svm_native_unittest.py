@@ -157,8 +157,14 @@ def main(launcher, manifest_path, *args):
         command = [directory / "svmjunit", "--verbose"]
         for test in group["tests"]:
             command += ["--run-explicit", test]
-        # mx runs the image with JAVA_HOME set to the JDK it built with; JCmdTest runs its jcmd.
-        environment = {**os.environ, "JAVA_HOME": str((runfiles / manifest["java"]).parents[1])}
+        # mx runs the image with JAVA_HOME set to the JDK it built with, and JDK tools on the
+        # PATH of the CI hosts: JCmdTest runs $JAVA_HOME/bin/jcmd and JmxTest runs keytool.
+        java_home = (runfiles / manifest["java"]).parents[1]
+        environment = {
+            **os.environ,
+            "JAVA_HOME": str(java_home),
+            "PATH": os.pathsep.join([str(java_home / "bin"), os.environ.get("PATH", "")]),
+        }
         if run(command, cwd=directory, env=environment).returncode:
             failures.append(group["tests"])
     if failures:
