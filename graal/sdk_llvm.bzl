@@ -1,7 +1,7 @@
 """Redistribute the checksum-pinned LLVM toolchain used by the mx SDK suite."""
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
-load("//graal:layout.bzl", "MxArchiveLayoutInfo")
+load("//graal:layout_info.bzl", "MxArchiveLayoutInfo")
 
 def _register_archives(ctx, lock, prefix, filename):
     pins = json.decode(ctx.read(Label(lock)))

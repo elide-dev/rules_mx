@@ -2,6 +2,7 @@
 
 load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
 load("@rules_java//java/common:java_info.bzl", "JavaInfo")
+load(":layout_info.bzl", _MxArchiveLayoutInfo = "MxArchiveLayoutInfo")
 
 def _static_archive_impl(ctx):
     libraries = [
@@ -22,10 +23,7 @@ static_archive = rule(
     attrs = {"library": attr.label(mandatory = True, providers = [CcInfo])},
 )
 
-MxArchiveLayoutInfo = provider(
-    doc = "Mapping of packaged archive paths to their declared Bazel files.",
-    fields = ["archive", "entries", "links", "jdk_homes", "primary", "resource_jar", "modes", "tar_trees", "image_groups"],
-)
+MxArchiveLayoutInfo = _MxArchiveLayoutInfo
 
 def _add_entry(entries, path, file):
     if path in entries:
