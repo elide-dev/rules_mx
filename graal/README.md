@@ -21,7 +21,7 @@ tools/buildbuddy test --config=buildbuddy-rbe --config=elide-processors //graal/
 | Tools | All 18 projects and all 29 distributions, including the Maven POMs, Native Image support TARs and platform-specific VisualVM support archive. The upstream warmup test project declares dependencies and has an empty source tree. | All 60 discovered JUnit classes. |
 | Espresso Shared | Both named modules, including the source-relocated `ESPRESSO_SVM` used by SubstrateVM. | The SubstrateVM compile exercises the relocated source API. |
 | VM | The VM support TAR packages the upstream README and license texts. | CI builds the support TAR. |
-| SubstrateVM | 61 of 72 projects and 39 of 45 distributions, including the `SVM` builder JAR, its processors, staged modules, ObjectFile, Pointsto, Configure, JVMTI, JDWP, the foreign-function support, the Truffle runtime and native TCK permissions feature, GraalOS support, the libzstd decoder, the image test projects behind `SVM_TRUFFLE_TESTS`, and the Native Image driver. | 11 configuration and two driver test classes on Labs JDK 25. Native Image smoke tests build and run executables, including the upstream resource test for JAR names containing spaces. |
+| SubstrateVM | All 72 projects and all 45 distributions, including the `SVM` builder JAR, its processors, staged modules, ObjectFile, Pointsto, Configure, JVMTI, JDWP, the foreign-function support, the Truffle runtime and native TCK permissions feature, GraalOS support, the libzstd decoder, the native builder helpers, the LLVM backend, the JUnit image support, the GraalVM support layout, the tutorial and benchmark projects, every test distribution, and the Native Image driver. The Windows `libjvm` replacement builds only for Windows targets. | 11 configuration and two driver test classes, seven hosted and 20 standalone Pointsto JVM test classes and one Graal test class on Labs JDK 25. `native_unittest` builds the default `mx native-unittest` group of `SVM_TESTS`, 129 classes, into a source-built JUnit image and runs it. Native Image smoke tests build and run executables, including the upstream resource test for JAR names containing spaces. |
 
 Run `tools/graal-coverage --missing` for the full project and distribution inventory, or run `tools/graal-coverage --missing substratevm` to narrow it. The audit compares upstream declarations with Bazel labels. CI builds and tests the migrated targets.
 
@@ -146,11 +146,32 @@ bazelisk build --config=elide-processors --config=labsjdk @graal//substratevm:SV
 bazelisk test --config=elide-processors --config=labsjdk @graal//substratevm/... //graal:source_native_image_test
 bazelisk build --config=elide-processors --config=labsjdk --output_groups=distribution @graal//substratevm:native-image.root
 bazelisk test --config=source-native-image //graal:source_native_image_action_test @graal//substratevm:com.oracle.svm.with.space.test.com.oracle.svm.with.space.test.NativeImageResourceTest
+bazelisk build --config=elide-processors --config=labsjdk @graal//substratevm:SVM_LLVM @graal//substratevm:SVM_GRAALVM_SUPPORT @graal//substratevm:JUNIT_SUPPORT
 ```
 
 The builder uses the source-built Graal compiler and the relocated Espresso module. Bazel supplies option help files to javac's annotation processors through a declared source tree. The Native Image launcher uses the source-built driver, its generated JVM flags, the pinned Labs JDK and the Bazel C/C++ toolchain. The `source-native-image` profile registers this SDK as the `rules_graalvm` toolchain and selects Labs JDK 25 for both target and execution configurations. The action test exercises compilation as a Bazel build action. The SubstrateVM NFI and Truffle runtime support archives select individual inputs from Truffle’s LibFFI and header layouts. Native Image reads a symbol manifest next to each static library it can link. A Bazel action derives the manifests from `llvm-nm` and `llvm-objdump` output, as mx's static library symbol builders do: one for the SubstrateVM `libjvm.a` in `SVM_HOSTED_NATIVE`, and one per Labs JDK static archive in the launcher root. That root also contains the decoder-only `libzstd.a`, which images use to inflate compressed image-heap blobs, and the `zstd-jni` JAR that the builder uses to compress them.
 
-The `com.oracle.svm.test` and `com.oracle.svm.truffle.test` classes run inside a Native Image under mx, so their Bazel labels are manual. On the pinned fork, `BundlePathMapTest` is also manual. Its class initializer loads every option descriptor, and `ShenandoahOptions` looks up `UnlockDiagnosticVMOptions` by its option name before that option's descriptor has been named, so the lookup fails when the Shenandoah descriptors load first.
+The `com.oracle.svm.test` and `com.oracle.svm.truffle.test` classes run inside a Native Image under mx, so their per-class JVM labels are manual. On the pinned fork, `BundlePathMapTest` is also manual. Its class initializer loads every option descriptor, and `ShenandoahOptions` looks up `UnlockDiagnosticVMOptions` by its option name before that option's descriptor has been named, so the lookup fails when the Shenandoah descriptors load first (elide-dev/graal#257).
+
+### Native unit tests
+
+```sh
+bazelisk test --config=elide-processors --config=labsjdk @graal//substratevm:native_unittest
+```
+
+`svm_native_unittest` follows `mx native-unittest`. The JUNIT_SUPPORT helper groups the selected classes by their `@NativeImageBuildArgs`. Each group becomes an `svmjunit` image, built with `--macro:junit` and the SubstrateVM test features, security providers, extra classpath directories and graph verification flags that the mx gate uses. The image then runs its classes with `--run-explicit`. The Native Image root contains the `junit` macro: its properties, JUNIT_SUPPORT, the mx JUnit harness, and JUnit and Hamcrest under the module names that mx gives them. The image classpath is `SVM_TESTS` without the distributions that the builder already provides.
+
+`native_unittest` selects tests as the argument-less mx command does: the `SVM_TESTS` classes whose names contain `com.oracle.svm.test` or `com.oracle.svm.configure.test`, built into one image without the classes that need custom build arguments. At the pinned fork that is 130 classes and 341 test methods. mx ignores `URLProtocolTraceProcessorTest` there. `JCmdTest` is also left out: its `testVM` expects `jcmd VM.version` to name GraalVM, and the Native Image root is the Labs JDK rather than a GraalVM distribution. Use `svm_native_unittest` with explicit classes to build the custom groups.
+
+### JVM unit tests
+
+The hosted tests (`SVM_HOSTED_TESTS`, mx's `svm-invariants-tests` configuration), the standalone Pointsto tests (`STANDALONE_POINTSTO_TESTS`, `standalone-pointsto-unittest`) and the Graal tests use `svm_test_runner` launchers. They run on Labs JDK 25 with the source-built compiler on the upgrade module path. The launchers open JVMCI, compiler and GraalVM packages as mx's Graal unit test configuration does, and export the concealed packages that SubstrateVM projects require. Their classpath lists dependencies before the JARs that use them, as mx does, so ServiceLoader finds option descriptors in mx's order. `CheckSVMInvariants` receives every non-test SubstrateVM JAR and runs in the gate's `check_exclude_list` mode, with the named VM access modules on its module path. It is manual on the pinned fork: five reflection calls that the fork added, in `ZstdJni`, `ShenandoahFeature`, `MethodHandleInterpreterUtils` and `HostedPLTGOTConfiguration`, are missing from `VerifyReflectionUsage`'s exclude list. The Pointsto tests use the host VM access. The Espresso variant needs the `espresso-compiler-stub` suite, which is not migrated. `IsolatedSpeculationLogEncodingTest` is manual: no mx gate runs it, and on Labs JDK 25.0.5.1 JVMCI's speculation reason encoding differs from `IsolatedSpeculationLog`'s from the first byte.
+
+### Platform-specific parts
+
+- The LLVM backend (`SVM_LLVM`) compiles against the shadowed LLVM and JavaCPP JARs that mx downloads by URL. `graal/svm_inputs.json` pins them for Linux AMD64, Linux AArch64 and macOS AArch64, and a module extension fetches each one only when a build needs it. mx names the modules of the platform-specific JARs for the host it runs on, so `SVM_LLVM` requires them through a `select()`. The `llvm.bin.dir` property that mx passes to images using the backend is not set, and no test builds an image with the LLVM backend.
+- `SVM_GRAALVM_SUPPORT` packages the debug helpers, `SVM_HOSTED_NATIVE`, the reporter library, zstd-jni, the reachability metadata schema and the skills. On macOS AArch64 it also contains the pinned standalone `ld64.lld`.
+- `com.oracle.svm.native.jvm.windows` is compatible only with Windows targets. rules_mx pins no Windows Labs JDK, so building it also needs a Windows Labs JDK registered as `//tools:labs_runtime` for the JVM function fallbacks.
 
 ## Select the Graal source
 
@@ -193,7 +214,7 @@ Run `tools/generate-graal --check` to reproduce the checked-in patches and pins 
 | Truffle upstream gates | Qualify the remaining gate configurations, including broader optimized-runtime and platform coverage. |
 | Tools upstream gates | Run the signature checks and qualify the test harness on the named module path. |
 | Compiler test gates | Qualify more classes from the compiler distribution, including architecture-specific backends and VM-specific test configurations. |
-| SubstrateVM distributions and gates | Package the remaining support layouts and platform variants, and qualify more upstream Native Image tests. |
+| SubstrateVM gates | Run the remaining native unit test groups, the debug info tests and an LLVM backend image, and qualify Windows. |
 | Languages and tools | Migrate Sulong, Wasm, Espresso, Espresso Compiler Stub, Visualizer, Web Image and Sandbox Toolchains with their Java, native and external inputs. Run each suite's upstream tests. |
 | VM assembly | Pin the external components required by each selected VM configuration. Assemble the distribution and run its launchers, component tests and corresponding mx gate equivalents from a clean Linux RBE build. |
 

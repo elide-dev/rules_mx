@@ -447,7 +447,8 @@ def _jar_archive(dist, suite, mappings, pending, release, archives, library_modu
             for d in dist.optionalDependencies
         )
         or dist.manifestEntries
-        or getattr(dist, "javaProperties", None)
+        # mx passes javaProperties on the command line of a JVM that uses the
+        # distribution; they do not change the JAR, so they do not block assembly.
         or dist.module_info_compilation_participants
     ):
         mx.abort(f"{dist.name}: unsupported JAR archive configuration: {participants}")
@@ -469,7 +470,19 @@ def _jar_archive(dist, suite, mappings, pending, release, archives, library_modu
         if dep.isJARDistribution()
         for member in dep.archived_deps()
     }
-    external = [d for d in external if not (d.isJavaProject() and d in packaged)]
+    # An unmapped native distribution of another suite, such as an LLVM toolchain that a
+    # Java property locates, is neither a classpath entry nor a module.
+    external = [
+        d
+        for d in external
+        if not (d.isJavaProject() and d in packaged)
+        and not (
+            d.isDistribution()
+            and not d.isJARDistribution()
+            and d.suite != dist.suite
+            and d.qualifiedName() not in mappings
+        )
+    ]
     base = [d for d in members if not getattr(d, "multiReleaseJarVersion", None)]
     overlays = {
         ":" + d.name: str(d.multiReleaseJarVersion) for d in members if d not in base

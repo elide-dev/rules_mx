@@ -184,6 +184,51 @@ class ExportTest(unittest.TestCase):
                 layer["archive_imports"], {":BASE": "docs/info=share/info"}
             )
 
+    def test_archive_ignores_command_line_java_properties(self):
+        with tempfile.TemporaryDirectory() as directory:
+            suite = Path(directory).resolve()
+            (suite / ".mx_vcs_root").touch()
+            metadata = suite / "mx.props"
+            metadata.mkdir()
+            (metadata / "suite.py").write_text(
+                "suite = "
+                + repr(
+                    {
+                        "name": "props",
+                        "mxversion": "7.89.0",
+                        "projects": {
+                            "lib": {"javaCompliance": "17+", "sourceDirs": ["src"]}
+                        },
+                        "distributions": {
+                            "LIB": {
+                                "dependencies": ["lib"],
+                                # mx passes these to JVMs that use LIB; the JAR is unchanged.
+                                "javaProperties": {"lib.home": "<path:LIB>"},
+                                "moduleInfo": {"name": "demo.lib", "exports": ["lib"]},
+                            }
+                        },
+                    }
+                )
+            )
+            sources = suite / "lib/src/lib"
+            sources.mkdir(parents=True)
+            (sources / "Lib.java").write_text("package lib; public class Lib {}")
+            result = self.run_mx(
+                "bazel-buildfile",
+                "--gazelle",
+                "--classpath-dists",
+                "--release",
+                "17",
+                "--archive-dist",
+                "LIB",
+                "LIB",
+                suite=suite,
+            )
+            (dist,) = json.loads(result.stdout)["distributions"]
+            self.assertEqual(dist["module"], "demo.lib")
+            self.assertEqual(dist["contents"], [":lib"])
+            self.assertIn("exports lib", dist["directives"])
+
     def test_packaged_test_discovery(self):
         with tempfile.TemporaryDirectory() as directory:
             suite = Path(directory).resolve()
