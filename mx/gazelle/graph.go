@@ -203,7 +203,8 @@ func (g *importer) loadGraph(root, filename string, seen map[label.Label]bool) e
 		} `json:"cmake_suites"`
 		CMakeProjects []struct {
 			SourceSubdir string `json:"source_subdir"`
-			MaxJobs      int    `json:"max_jobs"`
+			Directories  map[string]map[string]interface{}
+			MaxJobs      int `json:"max_jobs"`
 			Wrapper      string
 			Name         string
 			Config       map[string]string
@@ -672,6 +673,9 @@ func (g *importer) loadGraph(root, filename string, seen map[label.Label]bool) e
 	}
 	for _, p := range graph.CMakeProjects {
 		r := rule.NewRule("mx_cmake_project", p.Name)
+		if len(p.Directories) > 0 {
+			r.SetAttr("directories", p.Directories)
+		}
 		if p.SourceSubdir != "" {
 			r.SetAttr("source_subdir", p.SourceSubdir)
 			r.SetAttr("max_jobs", p.MaxJobs)

@@ -1521,6 +1521,7 @@ def _cmake_project_recipe(project, pending, layout_bindings, source_bindings):
         "ninja_install_targets",
         "results",
         "os",
+        "os_arch",
         "cmakeConfig",
         "testProject",
     }:
@@ -1553,13 +1554,37 @@ def _cmake_project_recipe(project, pending, layout_bindings, source_bindings):
     srcs = sorted(
         f.relative_to(root).as_posix() for f in directory.rglob("*") if f.is_file()
     )
-    config, includes = {}, {}
+    config, includes, directories, substitutions = {}, {}, {}, {}
     accounted = {compiler.qualifiedName()}
     for key, value in attrs.get("cmakeConfig", {}).items():
-        ref = re.fullmatch(r"<path:([^>]+)>/([\w./-]+)", value)
+        if value in ("<os>", "<arch>"):
+            substitutions[key] = value
+            continue
+        ref = re.fullmatch(r"<path:([^>]+)>(?:/([\w.+/-]+))?", value)
         if ref:
             dep = mx.dependency(ref[1], context=project)
-            if dep.suite == project.suite and _source_project(dep):
+            if not ref[2] and dep.qualifiedName() in source_bindings:
+                (source,) = source_bindings[dep.qualifiedName()]
+                directories[key] = {"source": source}
+                accounted.add(dep.qualifiedName())
+                continue
+            if ref[2] and not _resource_path(ref[2]):
+                raise _UnsupportedLowering(f"{project.name}: invalid CMake input path {ref[2]}")
+            if dep.suite == project.suite and _cmake_native_project(dep) and ref[2]:
+                include = Path(dep.dir) / ref[2]
+                files = {f.relative_to(root).as_posix(): f.relative_to(include).as_posix()
+                         for f in sorted(include.rglob("*")) if f.is_file()}
+                if not files:
+                    raise _UnsupportedLowering(f"{project.name}: missing CMake source directory {include}")
+                directories[key] = {"files": files}
+                accounted.add(dep.qualifiedName())
+                continue
+            if dep.suite == project.suite and type(dep).__name__ == "LayoutTARDistribution" and ref[2]:
+                pending.append(dep)
+                directories[key] = {"archive": ":" + dep.name, "directory": ref[2]}
+                accounted.add(dep.qualifiedName())
+                continue
+            if ref[2] and dep.suite == project.suite and _source_project(dep):
                 pending.append(dep)
                 label = ":" + dep.name
             elif dep.qualifiedName() in layout_bindings:
@@ -1593,6 +1618,11 @@ def _cmake_project_recipe(project, pending, layout_bindings, source_bindings):
         ("linux", "linux_arm64"),
         ("darwin", "macos_arm64"),
     ):
+        arch = "amd64" if profile == "linux_amd64" else "aarch64"
+        os_arch = attrs.get("os_arch", {})
+        architecture = os_arch.get(os_name, os_arch.get("<others>", {}))
+        if architecture.get(arch, architecture.get("<others>", {})):
+            raise _UnsupportedLowering(f"{project.name}: unbound CMake settings for {os_name}/{arch}")
         branches = attrs.get("os", {})
         branch = branches.get(os_name, branches.get("<others>", {}))
         if branch.keys() - {"cmakeConfig", "ninja_targets", "results"}:
@@ -1631,7 +1661,7 @@ def _cmake_project_recipe(project, pending, layout_bindings, source_bindings):
                 f"{project.name}: CMake needs an explicit install plan"
             )
         profiles[profile] = {
-            "config": branch.get("cmakeConfig", {}),
+            "config": branch.get("cmakeConfig", {}) | {k: (os_name if v == "<os>" else arch) for k, v in substitutions.items()},
             "members": members,
             "targets": targets + ["install"],
         }
@@ -1641,6 +1671,7 @@ def _cmake_project_recipe(project, pending, layout_bindings, source_bindings):
         "compiler": ":" + launchers[0].name,
         "config": config,
         "include_dirs": includes,
+        "directories": directories,
         "profiles": profiles,
         "testonly": project.is_test_project(),
     }
@@ -2190,7 +2221,8 @@ def _platform_install_overlay(dist, pending):
         raise _UnsupportedLowering(f"{dist.name}: unsupported mixed platform layout")
     recipes = {}
     for system, target in (("linux", "linux"), ("darwin", "macos")):
-        branch = attrs["os"].get(system, attrs["os"].get("<others>", {}))
+        branches = attrs.get("os", {})
+        branch = branches.get(system, branches.get("<others>", {"layout": {}}))
         if branch.keys() != {"layout"}:
             raise _UnsupportedLowering(f"{dist.name}: unsupported layout for {system}")
         dependencies, steps = [], []
@@ -2505,6 +2537,32 @@ def _platform_native_layout(dist, pending):
             if not _resource_path(result.rstrip("/")):
                 raise _UnsupportedLowering(f"{dist.name}: invalid resource path {path}")
             return result
+
+        sources = list(mx.LayoutDistribution._walk_static_layout(
+            attrs["layout"], dist.name, distribution_object=dist, context=dist))
+        if metadata and sources and all(source["source_type"] == "extracted-dependency" for _, source in sources):
+            if attrs.get("defaultDereference") != "always":
+                raise _UnsupportedLowering(f"{dist.name}: resource archives require an explicit dereference policy")
+            deps, overlay = [], []
+            for destination, source in sources:
+                dep = mx.dependency(source["dependency"], context=dist)
+                if (dep.suite != dist.suite or type(dep).__name__ != "LayoutTARDistribution"
+                        or source.get("optional") or not destination.endswith("/")
+                        or source.keys() - {"source_type", "_str_", "path", "dependency", "optional"}):
+                    raise _UnsupportedLowering(f"{dist.name}: unsupported extracted resource {source['_str_']}")
+                pattern = re.sub(r"<libv:([*\w+-]+)\.([0-9.]+)>",
+                                 lambda m: "lib" + m[1] + ("." + m[2] + ".dylib" if os_name == "darwin" else ".so." + m[2]), source["path"])
+                if not _resource_path(pattern.replace("*", "file")):
+                    raise _UnsupportedLowering(f"{dist.name}: unsupported resource selector {pattern}")
+                pending.append(dep)
+                label = ":" + dep.name
+                if label not in deps:
+                    deps.append(label)
+                overlay.append({"destination": resolve(destination), "input": deps.index(label), "pattern": pattern,
+                                "exclude": [], "dereference": True})
+            profiles[profile] = {"file_list_entry": resolve(dist.fileListEntry), "hash_entry": resolve(dist.hashEntry),
+                                 "deps": deps, "overlay": overlay}
+            continue
 
         imports, members = {}, {}
         for destination, source in mx.LayoutDistribution._walk_static_layout(
@@ -3577,6 +3635,10 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
                 continue
             if type(project).__name__ == "LayoutTARDistribution" and any(_bootstrap_launcher(dep) for dep in project.buildDependencies):
                 tar_layouts[project.name] = _bootstrap_distribution(project, pending)
+                continue
+            if (type(project).__name__ == "LayoutTARDistribution" and project.fileListPurpose
+                    and any(_cmake_native_project(dep) for dep in project.buildDependencies)):
+                tar_layouts[project.name] = _platform_install_overlay(project, pending)
                 continue
             if type(project).__name__ == "LayoutTARDistribution":
                 tar_layouts[project.name] = _tar_layout(project, pending, java_deps, archives)

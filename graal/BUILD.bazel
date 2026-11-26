@@ -4,6 +4,7 @@ load("@rules_java//java:java_library.bzl", "java_library")
 load("@rules_java//java:java_test.bzl", "java_test")
 load("@rules_python//python:py_binary.bzl", "py_binary")
 load("@rules_python//python:py_test.bzl", "py_test")
+load("//mx:bitcode.bzl", "mx_bitcode_suite")
 load("//mx:netbeans.bzl", "netbeans_test_java")
 load(":automatic_module.bzl", "automatic_module")
 load(":layout.bzl", "mx_archive_layout")
@@ -393,8 +394,14 @@ py_test(
     name = "sulong_native_home_test",
     size = "small",
     srcs = ["sulong_native_home_test.py"],
-    args = ["$(rootpath :sulong_home_archive)", "$(rootpath :sulong_home_list)"],
-    data = [":sulong_home_archive", ":sulong_home_list"],
+    args = [
+        "$(rootpath :sulong_home_archive)",
+        "$(rootpath :sulong_home_list)",
+    ],
+    data = [
+        ":sulong_home_archive",
+        ":sulong_home_list",
+    ],
     tags = ["manual"],
 )
 
@@ -455,6 +462,31 @@ java_test(
     deps = [
         "@contrib_rules_jvm_deps//:junit_junit",
         "@graal//sulong:com.oracle.truffle.llvm.tests.pipe",
+    ],
+)
+
+mx_bitcode_suite(
+    name = "sulong_runtime_fixture",
+    testonly = True,
+    cases = ["answer.ll"],
+    llvm_link = ":sdk_llvm_link",
+    root = ".",
+)
+
+java_test(
+    name = "sulong_runtime_test",
+    srcs = ["SulongRuntimeTest.java"],
+    data = [":sulong_runtime_fixture"],
+    jvm_flags = [
+        "--enable-native-access=ALL-UNNAMED",
+        "-Dsulong.fixture=$${TEST_SRCDIR}/$(rlocationpath :sulong_runtime_fixture)",
+    ],
+    tags = ["manual"],
+    test_class = "graal.SulongRuntimeTest",
+    runtime_deps = ["@graal//espresso:JAVA_POM"],
+    deps = [
+        "@contrib_rules_jvm_deps//:junit_junit",
+        "@graal//sdk:POLYGLOT",
     ],
 )
 

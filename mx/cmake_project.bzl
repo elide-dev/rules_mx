@@ -21,7 +21,7 @@ _installed = rule(
     attrs = {"project": attr.label(mandatory = True), "member": attr.string(mandatory = True), "with_archive": attr.bool()},
 )
 
-def mx_cmake_project(name, srcs, compiler, config, include_dirs, profiles, testonly = False, visibility = None, source_subdir = "", wrapper = None, max_jobs = 0):
+def mx_cmake_project(name, srcs, compiler, config, include_dirs, profiles, testonly = False, visibility = None, source_subdir = "", wrapper = None, max_jobs = 0, directories = {}):
     """Apply the selected mx CMake configuration, build targets, and installed results."""
     src_group = name + ".cmake_sources"
     native.filegroup(name = src_group, srcs = srcs, testonly = testonly)
@@ -32,6 +32,24 @@ def mx_cmake_project(name, srcs, compiler, config, include_dirs, profiles, testo
         py_binary(name = name + ".compiler_wrapper", main = wrapper, srcs = [wrapper], testonly = testonly)
         data.append(":" + name + ".compiler_wrapper")
     cache = dict(config)
+    installations = {}
+    for key, item in directories.items():
+        if "source" in item:
+            data.append(item["source"])
+            cache[key] = "$$EXT_BUILD_ROOT$$/" + native.package_relative_label(item["source"]).workspace_root + "/src"
+        elif "files" in item:
+            group = name + ".headers/" + key
+            mx_archive_layout(name = group, format = "dir", members = item["files"], testonly = testonly)
+            data.append(":" + group)
+            cache[key] = "$(execpath :%s)" % group
+        else:
+            archive = item["archive"]
+            if archive not in installations:
+                group = name + ".installed/" + key
+                mx_archive_layout(name = group, format = "dir", members = {}, archive_imports = {archive: "="}, testonly = testonly)
+                installations[archive] = ":" + group
+                data.append(":" + group)
+            cache[key] = "$(execpath %s)/%s" % (installations[archive], item["directory"])
     for key, spec in include_dirs.items():
         inc = name + ".include/" + key
         mx_archive_layout(name = inc, format = "dir", members = {}, archive_imports = {spec[0]: spec[1] + "/*="}, testonly = testonly)

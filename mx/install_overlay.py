@@ -8,13 +8,13 @@ import sys
 import tarfile
 import tempfile
 
-from pack_layout import _relative, _write_tree_archive
+from pack_layout import _package_resources, _relative, _write_tree_archive
 
 
-def assemble(spec, archive, file_list):
+def assemble(spec, archive, file_list, resource=None):
     with tempfile.TemporaryDirectory() as tmp:
-        root = Path(tmp).resolve() / "install"
-        root.mkdir()
+        root = Path(archive).absolute() if resource else Path(tmp).resolve() / "install"
+        root.mkdir(exist_ok=True)
         installed = {}
         for op in spec:
             dest = op["destination"]
@@ -58,6 +58,15 @@ def assemble(spec, archive, file_list):
                         path = select(member.name)
                         if path is None:
                             continue
+                        if op.get("dereference"):
+                            visited = set()
+                            while member.issym() or member.islnk():
+                                if member.name in visited:
+                                    raise ValueError(f"Cyclic link {member.name}")
+                                visited.add(member.name)
+                                link = PurePosixPath(member.linkname)
+                                target = PurePosixPath(member.name).parent / link if member.issym() else link
+                                member = src.getmember(str(_relative(target.as_posix())))
                         if member.issym():
                             # Keep the relative symlink under the assembled installation.
                             if not (path.parent / member.linkname).resolve().is_relative_to(root):
@@ -71,9 +80,18 @@ def assemble(spec, archive, file_list):
                             raise ValueError(f"Unsupported archive member {member.name}")
             if not count:
                 raise ValueError(f"No install inputs matched {pattern} in {op['label']}")
-        _write_tree_archive(root, archive)
-        file_list.write_text("\n".join(installed))
+        if resource:
+            metadata, jar, manifest, digest = resource
+            _package_resources(root, metadata, jar, manifest, digest)
+        else:
+            _write_tree_archive(root, archive)
+            file_list.write_text("\n".join(installed))
 
 
 if __name__ == "__main__":
-    assemble(json.loads(Path(sys.argv[1]).read_text()), Path(sys.argv[2]), Path(sys.argv[3]))
+    recipe = json.loads(Path(sys.argv[1]).read_text())
+    if len(sys.argv) == 6:
+        directory, jar, manifest, digest = map(Path, sys.argv[2:])
+        assemble(recipe["steps"], directory, None, (recipe, jar, manifest, digest))
+    else:
+        assemble(recipe, Path(sys.argv[2]), Path(sys.argv[3]))

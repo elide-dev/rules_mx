@@ -134,12 +134,17 @@ def _jdk_resource(bundle, recipe, directory, jar, manifest, digest):
     tree = Path(directory)
     prefix = _relative(spec["directory"])
     _install_jdk(tree, {"directory": str(prefix), "exclude": spec["exclude"], "bundle": bundle}, set())
+    _package_resources(tree, spec, jar, manifest, digest)
+
+
+def _package_resources(tree, spec, jar, manifest, digest):
+    prefix = spec.get("directory", "")
     members = []
     for file in sorted((tree / prefix).rglob("*")):
         if file.is_symlink():
             target = file.resolve(strict=True)
             if not target.is_relative_to((tree / prefix).resolve()) or not target.is_file():
-                raise ValueError(f"Unexpected JDK resource link {file}")
+                raise ValueError(f"Unexpected resource link {file}")
             file.unlink()
             shutil.copy2(target, file)
         if file.is_file():

@@ -287,6 +287,24 @@ def _overlay_impl(ctx):
             inputs.extend(layout.entries.values())
         steps.append(item)
     recipe = ctx.actions.declare_file(ctx.label.name + ".layout.json")
+    if ctx.attr.file_list_entry:
+        tree = ctx.actions.declare_directory(ctx.label.name + ".files")
+        jar = ctx.actions.declare_file(ctx.label.name + ".resources.jar")
+        manifest = ctx.actions.declare_file(ctx.label.name + ".metadata/files")
+        digest = ctx.actions.declare_file(ctx.label.name + ".metadata/sha256")
+        ctx.actions.write(recipe, json.encode({"steps": steps, "file_list_entry": ctx.attr.file_list_entry, "hash_entry": ctx.attr.hash_entry}))
+        ctx.actions.run(
+            executable = ctx.executable._pack,
+            inputs = inputs + [recipe],
+            outputs = [tree, jar, manifest, digest],
+            arguments = [recipe.path, tree.path, jar.path, manifest.path, digest.path],
+            mnemonic = "MxArchiveResources",
+        )
+        return [
+            DefaultInfo(files = depset([tree])),
+            JavaInfo(output_jar = jar, compile_jar = None),
+            MxArchiveLayoutInfo(archive = None, resource_jar = jar, entries = {ctx.attr.file_list_entry: manifest, ctx.attr.hash_entry: digest}),
+        ]
     ctx.actions.write(recipe, json.encode(steps))
     archive = ctx.actions.declare_file(ctx.label.name.lower().replace("_", "-") + ".tar")
     manifest = ctx.actions.declare_file(archive.basename + ".filelist")
@@ -308,6 +326,8 @@ _overlay = rule(
     attrs = {
         "deps": attr.label_list(providers = [MxArchiveLayoutInfo]),
         "recipe": attr.string(mandatory = True),
+        "file_list_entry": attr.string(),
+        "hash_entry": attr.string(),
         "_pack": attr.label(default = Label("//mx:install_overlay"), executable = True, cfg = "exec"),
     },
 )
@@ -319,6 +339,8 @@ def mx_os_layout(name, os_layouts, **kwargs):
         kwargs.pop("format")
         _overlay(
             name = name,
+            file_list_entry = select({os: recipe.get("file_list_entry", "") for os, recipe in branches.items()} | {"//conditions:default": ""}),
+            hash_entry = select({os: recipe.get("hash_entry", "") for os, recipe in branches.items()} | {"//conditions:default": ""}),
             deps = select({os: recipe["deps"] for os, recipe in branches.items()} | {"//conditions:default": []}),
             recipe = select({os: json.encode(recipe["overlay"]) for os, recipe in branches.items()} | {"//conditions:default": "[]"}),
             target_compatible_with = select({os: [] for os in branches} | {"//conditions:default": ["@platforms//:incompatible"]}),

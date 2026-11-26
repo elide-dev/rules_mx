@@ -2,7 +2,7 @@ diff --git a/sulong/BUILD.bazel b/sulong/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/sulong/BUILD.bazel
-@@ -0,0 +1,5059 @@
+@@ -0,0 +1,5471 @@
 +load("@rules_mx//graal:layout.bzl", "mx_os_layout")
 +load("@rules_mx//graal:sulong_fixture_check.bzl", "sulong_fixture_check")
 +load("@rules_mx//mx:bitcode.bzl", "mx_bitcode_suite")
@@ -18,20 +18,27 @@ new file mode 100644
 +    name = "all_distributions",
 +    testonly = True,
 +    srcs = [
++        ":LLVM_NATIVE_POM",
++        ":LLVM_POM",
 +        ":SULONG_API",
++        ":SULONG_BITCODE_HOME",
++        ":SULONG_BOOTSTRAP_TOOLCHAIN",
 +        ":SULONG_BOOTSTRAP_TOOLCHAIN_NO_HOME",
 +        ":SULONG_CMAKE_TOOLCHAIN",
 +        ":SULONG_CORE",
 +        ":SULONG_CORE_HOME",
 +        ":SULONG_GRAALVM_DOCS",
 +        ":SULONG_GRAALVM_LICENSES",
++        ":SULONG_HOME_NATIVEMODE",
 +        ":SULONG_LAUNCHER",
 +        ":SULONG_LEGACY",
 +        ":SULONG_LIBCXX_COMPILER_WRAPPER",
 +        ":SULONG_LIBLLVMVM",
 +        ":SULONG_NATIVE",
++        ":SULONG_NATIVE_BITCODE_RESOURCES",
 +        ":SULONG_NATIVE_HOME",
 +        ":SULONG_NATIVE_LIB_RESOURCES",
++        ":SULONG_NATIVE_RESOURCES",
 +        ":SULONG_NATIVE_TOOLS",
 +        ":SULONG_NFI",
 +        ":SULONG_NWCC_TEST_SUITE",
@@ -46,12 +53,14 @@ new file mode 100644
 +    name = "all_projects",
 +    testonly = True,
 +    srcs = [
++        ":bootstrap-toolchain-launchers",
 +        ":bootstrap-toolchain-launchers-no-home",
 +        ":com.oracle.truffle.llvm",
 +        ":com.oracle.truffle.llvm.api",
 +        ":com.oracle.truffle.llvm.asm.amd64",
 +        ":com.oracle.truffle.llvm.docs",
 +        ":com.oracle.truffle.llvm.launcher",
++        ":com.oracle.truffle.llvm.libraries.bitcode",
 +        ":com.oracle.truffle.llvm.libraries.bitcode.libcxx",
 +        ":com.oracle.truffle.llvm.libraries.graalvm.llvm",
 +        ":com.oracle.truffle.llvm.libraries.graalvm.llvm.libs",
@@ -632,6 +641,28 @@ new file mode 100644
 +    ],
 +)
 +
++mx_pom_dist(
++    name = "LLVM_NATIVE_POM",
++    out = "llvm-native.pom",
++    content = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project xmlns=\"http://maven.apache.org/POM/4.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\">\n  <modelVersion>4.0.0</modelVersion>\n  <groupId>org.graalvm.llvm</groupId>\n  <artifactId>llvm-native</artifactId>\n  <version>25.6.0-dev</version>\n  <packaging>pom</packaging>\n  <url>http://www.graalvm.org/</url>\n  <name>Llvm Native Pom</name>\n  <description>Graal native LLVM engine.</description>\n  <developers>\n    <developer>\n      <name>GraalVM Development</name>\n      <email>graalvm-dev@oss.oracle.com</email>\n      <organization>Oracle Corporation</organization>\n      <organizationUrl>http://www.graalvm.org/</organizationUrl>\n    </developer>\n  </developers>\n  <licenses>\n    <license>\n      <name>New BSD License (3-clause BSD license)</name>\n      <url>http://opensource.org/licenses/BSD-3-Clause</url>\n    </license>\n  </licenses>\n  <dependencies>\n    <dependency>\n      <groupId>org.graalvm.llvm</groupId>\n      <artifactId>llvm-language</artifactId>\n      <version>25.6.0-dev</version>\n      <scope>runtime</scope>\n    </dependency>\n    <dependency>\n      <groupId>org.graalvm.llvm</groupId>\n      <artifactId>llvm-language-native</artifactId>\n      <version>25.6.0-dev</version>\n      <scope>runtime</scope>\n    </dependency>\n    <dependency>\n      <groupId>org.graalvm.llvm</groupId>\n      <artifactId>llvm-language-native-resources</artifactId>\n      <version>25.6.0-dev</version>\n      <scope>runtime</scope>\n    </dependency>\n    <dependency>\n      <groupId>org.graalvm.llvm</groupId>\n      <artifactId>llvm-language-nfi</artifactId>\n      <version>25.6.0-dev</version>\n      <scope>runtime</scope>\n    </dependency>\n    <dependency>\n      <groupId>org.graalvm.truffle</groupId>\n      <artifactId>truffle-runtime</artifactId>\n      <version>25.6.0-dev</version>\n      <scope>runtime</scope>\n    </dependency>\n  </dependencies>\n</project>\n",
++    visibility = ["//visibility:public"],
++    runtime_deps = [
++        ":SULONG_CORE",
++        ":SULONG_NATIVE",
++        ":SULONG_NATIVE_RESOURCES",
++        ":SULONG_NFI",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_pom_dist(
++    name = "LLVM_POM",
++    out = "llvm-community.pom",
++    content = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project xmlns=\"http://maven.apache.org/POM/4.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\">\n  <modelVersion>4.0.0</modelVersion>\n  <groupId>org.graalvm.llvm</groupId>\n  <artifactId>llvm-community</artifactId>\n  <version>25.6.0-dev</version>\n  <packaging>pom</packaging>\n  <url>http://www.graalvm.org/</url>\n  <name>Llvm Pom</name>\n  <description>Deprecated: Please use the 'llvm-native' Maven artifact instead.</description>\n  <developers>\n    <developer>\n      <name>GraalVM Development</name>\n      <email>graalvm-dev@oss.oracle.com</email>\n      <organization>Oracle Corporation</organization>\n      <organizationUrl>http://www.graalvm.org/</organizationUrl>\n    </developer>\n  </developers>\n  <licenses>\n    <license>\n      <name>New BSD License (3-clause BSD license)</name>\n      <url>http://opensource.org/licenses/BSD-3-Clause</url>\n    </license>\n  </licenses>\n  <dependencies>\n    <dependency>\n      <groupId>org.graalvm.llvm</groupId>\n      <artifactId>llvm-native</artifactId>\n      <version>25.6.0-dev</version>\n      <type>pom</type>\n      <scope>runtime</scope>\n    </dependency>\n  </dependencies>\n</project>\n",
++    visibility = ["//visibility:public"],
++    runtime_deps = [":LLVM_NATIVE_POM"],
++)
++
 +mx_jar_dist(
 +    name = "SULONG_API",
 +    contents = [
@@ -866,6 +897,38 @@ new file mode 100644
 +)
 +
 +mx_jar_dist(
++    name = "SULONG_NATIVE_RESOURCES",
++    contents = [
++        ":com.oracle.truffle.llvm.nativemode.resources",
++        ":SULONG_NATIVE_LIB_RESOURCES",
++        ":SULONG_NATIVE_BITCODE_RESOURCES",
++    ],
++    directives = [
++        "requires org.graalvm.llvm.api",
++        "requires org.graalvm.truffle",
++        "requires static org.graalvm.nativeimage",
++        "requires transitive org.graalvm.word",
++    ],
++    jni_services = True,
++    manifest = {
++        "Implementation-Vendor": "Oracle Corporation",
++        "Implementation-Version": "25.6.0-dev",
++        "Name": "llvm-language-native-resources",
++        "Specification-Vendor": "Oracle Corporation",
++        "Specification-Version": "25.6.0-dev",
++    },
++    module_name = "org.graalvm.llvm.nativemode.resources",
++    release = 21,
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":SULONG_API",
++        "//sdk:NATIVEIMAGE",
++        "//truffle:TRUFFLE_API",
++    ],
++)
++
++mx_jar_dist(
 +    name = "SULONG_NFI",
 +    contents = [":com.oracle.truffle.llvm.nfi"],
 +    directives = [
@@ -1094,6 +1157,68 @@ new file mode 100644
 +)
 +
 +mx_bootstrap_launchers(
++    name = "bootstrap-toolchain-launchers",
++    aliases = {
++        "ar": "com.oracle.truffle.llvm.toolchain.launchers.BinUtil",
++        "c++": "com.oracle.truffle.llvm.toolchain.launchers.ClangXX",
++        "cc": "com.oracle.truffle.llvm.toolchain.launchers.Clang",
++        "cl": "com.oracle.truffle.llvm.toolchain.launchers.ClangCL",
++        "clang": "com.oracle.truffle.llvm.toolchain.launchers.Clang",
++        "clang++": "com.oracle.truffle.llvm.toolchain.launchers.ClangXX",
++        "clang-cl": "com.oracle.truffle.llvm.toolchain.launchers.ClangCL",
++        "flang": "com.oracle.truffle.llvm.toolchain.launchers.Flang",
++        "flang-new": "com.oracle.truffle.llvm.toolchain.launchers.Flang",
++        "g++": "com.oracle.truffle.llvm.toolchain.launchers.ClangXX",
++        "gcc": "com.oracle.truffle.llvm.toolchain.launchers.Clang",
++        "graalvm-clang": "com.oracle.truffle.llvm.toolchain.launchers.Clang",
++        "graalvm-clang++": "com.oracle.truffle.llvm.toolchain.launchers.ClangXX",
++        "graalvm-clang-cl": "com.oracle.truffle.llvm.toolchain.launchers.ClangCL",
++        "graalvm-flang": "com.oracle.truffle.llvm.toolchain.launchers.Flang",
++        "graalvm-native-binutil": "com.oracle.truffle.llvm.toolchain.launchers.BinUtil",
++        "graalvm-native-clang": "com.oracle.truffle.llvm.toolchain.launchers.Clang",
++        "graalvm-native-clang++": "com.oracle.truffle.llvm.toolchain.launchers.ClangXX",
++        "graalvm-native-clang-cl": "com.oracle.truffle.llvm.toolchain.launchers.ClangCL",
++        "graalvm-native-flang": "com.oracle.truffle.llvm.toolchain.launchers.Flang",
++        "graalvm-native-ld": "com.oracle.truffle.llvm.toolchain.launchers.Linker",
++        "ld": "com.oracle.truffle.llvm.toolchain.launchers.Linker",
++        "ld.lld": "com.oracle.truffle.llvm.toolchain.launchers.Linker",
++        "ld64": "com.oracle.truffle.llvm.toolchain.launchers.Linker",
++        "lld": "com.oracle.truffle.llvm.toolchain.launchers.Linker",
++        "lld-link": "com.oracle.truffle.llvm.toolchain.launchers.Linker",
++        "llvm-ar": "com.oracle.truffle.llvm.toolchain.launchers.BinUtil",
++        "llvm-nm": "com.oracle.truffle.llvm.toolchain.launchers.BinUtil",
++        "llvm-objcopy": "com.oracle.truffle.llvm.toolchain.launchers.BinUtil",
++        "llvm-objdump": "com.oracle.truffle.llvm.toolchain.launchers.BinUtil",
++        "llvm-ranlib": "com.oracle.truffle.llvm.toolchain.launchers.BinUtil",
++        "llvm-readelf": "com.oracle.truffle.llvm.toolchain.launchers.BinUtil",
++        "llvm-readobj": "com.oracle.truffle.llvm.toolchain.launchers.BinUtil",
++        "llvm-strip": "com.oracle.truffle.llvm.toolchain.launchers.BinUtil",
++        "nm": "com.oracle.truffle.llvm.toolchain.launchers.BinUtil",
++        "objcopy": "com.oracle.truffle.llvm.toolchain.launchers.BinUtil",
++        "objdump": "com.oracle.truffle.llvm.toolchain.launchers.BinUtil",
++        "ranlib": "com.oracle.truffle.llvm.toolchain.launchers.BinUtil",
++        "readelf": "com.oracle.truffle.llvm.toolchain.launchers.BinUtil",
++        "readobj": "com.oracle.truffle.llvm.toolchain.launchers.BinUtil",
++        "strip": "com.oracle.truffle.llvm.toolchain.launchers.BinUtil",
++    },
++    classpath = [
++        "//sdk:COLLECTIONS",
++        "//sdk:WORD",
++        "//sdk:NATIVEIMAGE",
++        "//sdk:POLYGLOT",
++        "//sdk:JLINE3",
++        "//sdk:LAUNCHER_COMMON",
++        ":com.oracle.truffle.llvm.toolchain.launchers",
++    ],
++    home = ":SULONG_HOME",
++    java_args = [],
++    jdk_archive = "@rules_mx//graal:standalone_jdk_archive",
++    ninja = "# Ninja rules for a GCC toolchain found on the path\n\n# These variables can be overwritten to use a different toolchain than the one on the PATH\nCC = gcc\nCXX = g++\nAR = ar\nCFLAGS =  \nCXXFLAGS =  \nLDFLAGS =  \n\nrule cc\n  command = $CC -MMD -MF $out.d $includes $CFLAGS $cflags -c $in -o $out\n  description = CC $out\n  depfile = $out.d\n  deps = gcc\n\nrule cxx\n  command = $CXX -MMD -MF $out.d $includes $CXXFLAGS $cflags -c $in -o $out\n  description = CXX $out\n  depfile = $out.d\n  deps = gcc\n\nrule link\n  command = $CC $LDFLAGS $ldflags -o $out $in $ldlibs\n  description = LINK $out\n\nrule linkxx\n  command = $CXX $LDFLAGS $ldflags -o $out $in $ldlibs\n  description = LINKXX $out\n\nrule ar\n  command = $AR -rc $out $in\n  description = AR $out\n\nrule asm\n  command = $CC -MMD -MF $out.d $includes $cflags -c $in -o $out\n  description = ASM $out\n  depfile = $out.d\n  deps = gcc\n\nCC = bin/graalvm-native-clang\nCXX = bin/graalvm-native-clang++\nAR = bin/ar\n",
++    sdk = "//sdk:LLVM_TOOLCHAIN",
++    visibility = ["//visibility:public"],
++)
++
++mx_bootstrap_launchers(
 +    name = "bootstrap-toolchain-launchers-no-home",
 +    aliases = {
 +        "ar": "com.oracle.truffle.llvm.toolchain.launchers.BinUtil",
@@ -1275,6 +1400,120 @@ new file mode 100644
 +        "//truffle:TRUFFLE_COMPILER",
 +    ],
 +    output = "llvmvm",
++    visibility = ["//visibility:public"],
++)
++
++mx_cmake_project(
++    name = "com.oracle.truffle.llvm.libraries.bitcode",
++    testonly = False,
++    srcs = [
++        "projects/com.oracle.truffle.llvm.libraries.bitcode/CMakeLists.txt",
++        "projects/com.oracle.truffle.llvm.libraries.bitcode/include/sulong-internal.h",
++        "projects/com.oracle.truffle.llvm.libraries.bitcode/libsulongxx/exception_support.cpp",
++        "projects/com.oracle.truffle.llvm.libraries.bitcode/libsulongxx/windows/cpp_threads.cpp",
++        "projects/com.oracle.truffle.llvm.libraries.bitcode/libsulongxx/windows/exception_helpers.cpp",
++        "projects/com.oracle.truffle.llvm.libraries.bitcode/libsulongxx/windows/sulong++.def",
++        "projects/com.oracle.truffle.llvm.libraries.bitcode/libsulongxx/windows/type_info.cpp",
++        "projects/com.oracle.truffle.llvm.libraries.bitcode/src/abort.c",
++        "projects/com.oracle.truffle.llvm.libraries.bitcode/src/abort.h",
++        "projects/com.oracle.truffle.llvm.libraries.bitcode/src/assert.c",
++        "projects/com.oracle.truffle.llvm.libraries.bitcode/src/builtin.c",
++        "projects/com.oracle.truffle.llvm.libraries.bitcode/src/c11threads.c",
++        "projects/com.oracle.truffle.llvm.libraries.bitcode/src/clone.c",
++        "projects/com.oracle.truffle.llvm.libraries.bitcode/src/complex.c",
++        "projects/com.oracle.truffle.llvm.libraries.bitcode/src/crt0.c",
++        "projects/com.oracle.truffle.llvm.libraries.bitcode/src/exec.c",
++        "projects/com.oracle.truffle.llvm.libraries.bitcode/src/exit.c",
++        "projects/com.oracle.truffle.llvm.libraries.bitcode/src/exit.h",
++        "projects/com.oracle.truffle.llvm.libraries.bitcode/src/fork.c",
++        "projects/com.oracle.truffle.llvm.libraries.bitcode/src/memcpy.c",
++        "projects/com.oracle.truffle.llvm.libraries.bitcode/src/pthreads.c",
++        "projects/com.oracle.truffle.llvm.libraries.bitcode/src/qsort.c",
++        "projects/com.oracle.truffle.llvm.libraries.bitcode/src/setjmp.c",
++        "projects/com.oracle.truffle.llvm.libraries.bitcode/src/signals.c",
++        "projects/com.oracle.truffle.llvm.libraries.bitcode/src/stat.c",
++        "projects/com.oracle.truffle.llvm.libraries.bitcode/src/string.c",
++        "projects/com.oracle.truffle.llvm.libraries.bitcode/src/sulong_dispose_context.c",
++        "projects/com.oracle.truffle.llvm.libraries.bitcode/src/unsupported.h",
++        "projects/com.oracle.truffle.llvm.libraries.bitcode/src/windows/assert.c",
++        "projects/com.oracle.truffle.llvm.libraries.bitcode/sulong.def",
++    ],
++    compiler = ":bootstrap-toolchain-launchers-no-home",
++    config = {
++        "CMAKE_OSX_DEPLOYMENT_TARGET": "10.13",
++    },
++    directories = {
++        "GRAALVM_LLVM_LIBS_INCLUDE_DIR": {
++            "files": {
++                "projects/com.oracle.truffle.llvm.libraries.graalvm.llvm.libs/include/graalvm/llvm/intrinsics.h": "graalvm/llvm/intrinsics.h",
++                "projects/com.oracle.truffle.llvm.libraries.graalvm.llvm.libs/include/graalvm/llvm/threads.h": "graalvm/llvm/threads.h",
++            },
++        },
++        "GRAALVM_LLVM_LIB_DIR": {
++            "archive": ":SULONG_NATIVE_HOME",
++            "directory": "native/lib",
++        },
++        "LIBCXX_ISYSTEM": {
++            "archive": ":SULONG_NATIVE_HOME",
++            "directory": "include/c++/v1",
++        },
++        "LIBCXX_SRC": {
++            "source": "@graal_sdk_llvm_org_src//:runtimes_sources",
++        },
++    },
++    include_dirs = {
++        "GRAALVM_LLVM_INCLUDE_DIR": [
++            ":com.oracle.truffle.llvm.libraries.graalvm.llvm",
++            "include",
++        ],
++    },
++    profiles = {
++        "linux_amd64": {
++            "config": {
++                "MX_ARCH": "amd64",
++                "MX_OS": "linux",
++            },
++            "members": [
++                "bin/libsulong.so",
++                "bin/libsulong++.so",
++            ],
++            "targets": [
++                "libsulong.so",
++                "libsulong++.so",
++                "install",
++            ],
++        },
++        "linux_arm64": {
++            "config": {
++                "MX_ARCH": "aarch64",
++                "MX_OS": "linux",
++            },
++            "members": [
++                "bin/libsulong.so",
++                "bin/libsulong++.so",
++            ],
++            "targets": [
++                "libsulong.so",
++                "libsulong++.so",
++                "install",
++            ],
++        },
++        "macos_arm64": {
++            "config": {
++                "MX_ARCH": "aarch64",
++                "MX_OS": "darwin",
++            },
++            "members": [
++                "bin/libsulong.dylib",
++                "bin/libsulong++.dylib",
++            ],
++            "targets": [
++                "libsulong.dylib",
++                "libsulong++.dylib",
++                "install",
++            ],
++        },
++    },
 +    visibility = ["//visibility:public"],
 +)
 +
@@ -4789,6 +5028,69 @@ new file mode 100644
 +    visibility = ["//visibility:public"],
 +)
 +
++mx_os_layout(
++    name = "SULONG_BITCODE_HOME",
++    format = "tar",
++    os_layouts = {
++        "linux": {
++            "deps": [
++                ":com.oracle.truffle.llvm.libraries.bitcode",
++            ],
++            "overlay": [
++                {
++                    "destination": "native/lib/",
++                    "exclude": [
++                    ],
++                    "input": 0,
++                    "pattern": "bin/libsulong.so",
++                },
++                {
++                    "destination": "native/lib/",
++                    "exclude": [
++                    ],
++                    "input": 0,
++                    "pattern": "bin/libsulong++.so",
++                },
++            ],
++        },
++        "macos": {
++            "deps": [
++                ":com.oracle.truffle.llvm.libraries.bitcode",
++            ],
++            "overlay": [
++                {
++                    "destination": "native/lib/",
++                    "exclude": [
++                    ],
++                    "input": 0,
++                    "pattern": "bin/libsulong.dylib",
++                },
++                {
++                    "destination": "native/lib/",
++                    "exclude": [
++                    ],
++                    "input": 0,
++                    "pattern": "bin/libsulong++.dylib",
++                },
++            ],
++        },
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_exported_tar(
++    name = "SULONG_BOOTSTRAP_TOOLCHAIN",
++    archive_imports = {
++        ":SULONG_CMAKE_TOOLCHAIN": "=",
++        ":bootstrap-toolchain-launchers": "=",
++    },
++    build_inputs = [":SULONG_TOOLCHAIN_LAUNCHERS"],
++    format = "tar",
++    members = {
++    },
++    visibility = ["//visibility:public"],
++)
++
 +mx_exported_tar(
 +    name = "SULONG_BOOTSTRAP_TOOLCHAIN_NO_HOME",
 +    archive_imports = {
@@ -4882,6 +5184,30 @@ new file mode 100644
 +)
 +
 +mx_exported_tar(
++    name = "SULONG_HOME",
++    archive_imports = {
++        ":SULONG_HOME_NATIVEMODE": "=",
++    },
++    format = "tar",
++    members = {
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_exported_tar(
++    name = "SULONG_HOME_NATIVEMODE",
++    archive_imports = {
++        ":SULONG_BITCODE_HOME": "=",
++        ":SULONG_CORE_HOME": "=",
++        ":SULONG_NATIVE_HOME": "=",
++    },
++    format = "tar",
++    members = {
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_exported_tar(
 +    name = "SULONG_LEGACY",
 +    format = "tar",
 +    members = {
@@ -4904,6 +5230,92 @@ new file mode 100644
 +    format = "dir",
 +    members = {
 +        ":libllvmvm": "lib/{basename}",
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_os_layout(
++    name = "SULONG_NATIVE_BITCODE_RESOURCES",
++    format = "dir",
++    os_layouts = {
++        "linux_amd64": {
++            "deps": [
++                ":SULONG_BITCODE_HOME",
++                ":SULONG_NATIVE_HOME",
++            ],
++            "file_list_entry": "META-INF/resources/llvm/native/linux/amd64/files",
++            "hash_entry": "META-INF/resources/llvm/native/linux/amd64/sha256",
++            "overlay": [
++                {
++                    "dereference": True,
++                    "destination": "META-INF/resources/llvm/native/linux/amd64/lib/",
++                    "exclude": [
++                    ],
++                    "input": 0,
++                    "pattern": "native/lib/*",
++                },
++                {
++                    "dereference": True,
++                    "destination": "META-INF/resources/llvm/native/linux/amd64/lib/",
++                    "exclude": [
++                    ],
++                    "input": 1,
++                    "pattern": "native/lib/lib*.so.1",
++                },
++            ],
++        },
++        "linux_arm64": {
++            "deps": [
++                ":SULONG_BITCODE_HOME",
++                ":SULONG_NATIVE_HOME",
++            ],
++            "file_list_entry": "META-INF/resources/llvm/native/linux/aarch64/files",
++            "hash_entry": "META-INF/resources/llvm/native/linux/aarch64/sha256",
++            "overlay": [
++                {
++                    "dereference": True,
++                    "destination": "META-INF/resources/llvm/native/linux/aarch64/lib/",
++                    "exclude": [
++                    ],
++                    "input": 0,
++                    "pattern": "native/lib/*",
++                },
++                {
++                    "dereference": True,
++                    "destination": "META-INF/resources/llvm/native/linux/aarch64/lib/",
++                    "exclude": [
++                    ],
++                    "input": 1,
++                    "pattern": "native/lib/lib*.so.1",
++                },
++            ],
++        },
++        "macos_arm64": {
++            "deps": [
++                ":SULONG_BITCODE_HOME",
++                ":SULONG_NATIVE_HOME",
++            ],
++            "file_list_entry": "META-INF/resources/llvm/native/darwin/aarch64/files",
++            "hash_entry": "META-INF/resources/llvm/native/darwin/aarch64/sha256",
++            "overlay": [
++                {
++                    "dereference": True,
++                    "destination": "META-INF/resources/llvm/native/darwin/aarch64/lib/",
++                    "exclude": [
++                    ],
++                    "input": 0,
++                    "pattern": "native/lib/*",
++                },
++                {
++                    "dereference": True,
++                    "destination": "META-INF/resources/llvm/native/darwin/aarch64/lib/",
++                    "exclude": [
++                    ],
++                    "input": 1,
++                    "pattern": "native/lib/lib*.1.dylib",
++                },
++            ],
++        },
 +    },
 +    visibility = ["//visibility:public"],
 +)
