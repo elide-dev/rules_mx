@@ -24,7 +24,7 @@ static_archive = rule(
 
 MxArchiveLayoutInfo = provider(
     doc = "Mapping of packaged archive paths to their declared Bazel files.",
-    fields = ["archive", "entries", "links", "jdk_homes", "primary", "resource_jar", "modes", "tar_trees"],
+    fields = ["archive", "entries", "links", "jdk_homes", "primary", "resource_jar", "modes", "tar_trees", "image_groups"],
 )
 
 def _add_entry(entries, path, file):
@@ -43,6 +43,12 @@ def _layout_impl(ctx):
     modes = {}
     links = {}
     homes = []
+    image_groups = []
+    for path, value in ctx.attr.literals.items():
+        file = ctx.actions.declare_file(ctx.label.name + ".literals/" + path)
+        ctx.actions.write(file, value)
+        _add_entry(entries, path, file)
+        modes[path] = "644"
     tar_trees = [(target.files.to_list()[0], dest) for target, dest in ctx.attr.tar_trees.items()]
     for target, encoded in ctx.attr.jdk_homes.items():
         [bundle] = target.files.to_list()
@@ -71,7 +77,9 @@ def _layout_impl(ctx):
                 if source.endswith("/*"):
                     prefix = source[:-1]
                     matches = [path for path in sources if path.startswith(prefix)]
-                    if not matches:
+                    groups = [(image, kinds, destination + mount[len(prefix):]) for image, kinds, mount in getattr(target[MxArchiveLayoutInfo], "image_groups", []) if mount.startswith(prefix)]
+                    image_groups.extend(groups)
+                    if not matches and not groups:
                         fail("No archive members under " + prefix + " in " + str(target.label))
                     for path in matches:
                         member = destination + path[len(prefix):]
@@ -100,6 +108,8 @@ def _layout_impl(ctx):
             else:
                 if destination and not destination.endswith("/"):
                     fail("Expected a destination directory: " + destination)
+                for image, kinds, mount in getattr(target[MxArchiveLayoutInfo], "image_groups", []):
+                    image_groups.append((image, kinds, destination + mount))
                 for bundle, mount in getattr(target[MxArchiveLayoutInfo], "tar_trees", []):
                     tar_trees.append((bundle, destination + mount))
                 for home in getattr(target[MxArchiveLayoutInfo], "jdk_homes", []):
@@ -112,7 +122,7 @@ def _layout_impl(ctx):
                         links[destination + path] = source_links[path]
     resource_jar = None
     if ctx.attr.file_list_entry:
-        if links or homes or tar_trees or not directory or not ctx.attr.hash_entry:
+        if links or homes or tar_trees or image_groups or not directory or not ctx.attr.hash_entry:
             fail("Resource metadata requires a directory of regular files")
         manifest = ctx.actions.declare_file(ctx.label.name + ".metadata/files")
         digest = ctx.actions.declare_file(ctx.label.name + ".metadata/sha256")
@@ -157,13 +167,18 @@ def _layout_impl(ctx):
             fail("A mounted tar tree requires a directory or tar layout")
         args.add("--tar-trees")
         args.add(json.encode([[bundle.path, mount] for bundle, mount in tar_trees]))
+    if image_groups:
+        if ctx.attr.format == "jar":
+            fail("Native Image directories require a directory or tar layout")
+        args.add("--image-groups")
+        args.add(json.encode([[image.path, kinds, mount] for image, kinds, mount in image_groups]))
     for path in sorted(entries):
         args.add(path)
         args.add(entries[path])
     ctx.actions.run(
         executable = ctx.executable._pack,
         arguments = [args],
-        inputs = ctx.files.build_inputs + entries.values() + [h.bundle for h in homes] + [bundle for bundle, _ in tar_trees],
+        inputs = ctx.files.build_inputs + entries.values() + [h.bundle for h in homes] + [bundle for bundle, _ in tar_trees] + [image for image, _, _ in image_groups],
         outputs = [output],
         mnemonic = "MxReleaseArchive" if release_prefix else "MxArchiveLayout",
     )
@@ -176,13 +191,14 @@ def _layout_impl(ctx):
         files.append(file_list)
     return [
         DefaultInfo(files = depset(files)),
-        MxArchiveLayoutInfo(archive = None if directory else output, entries = entries, links = links, jdk_homes = homes, resource_jar = resource_jar, modes = modes, tar_trees = tar_trees),
+        MxArchiveLayoutInfo(archive = None if directory else output, entries = entries, links = links, jdk_homes = homes, resource_jar = resource_jar, modes = modes, tar_trees = tar_trees, image_groups = image_groups),
     ] + ([JavaInfo(output_jar = resource_jar, compile_jar = None)] if resource_jar else [])
 
 mx_archive_layout = rule(
     implementation = _layout_impl,
     attrs = {
         # One input can be copied to multiple archive paths.
+        "literals": attr.string_dict(),
         "members": attr.label_keyed_string_dict(allow_files = True, mandatory = True),
         # Map a member to a new path, or use an empty selector to import an entire layout.
         "archive_imports": attr.label_keyed_string_dict(providers = [MxArchiveLayoutInfo]),

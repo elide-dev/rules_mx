@@ -160,7 +160,32 @@ def _jdk_resource(bundle, recipe, directory, jar, manifest, digest):
                 shutil.copyfileobj(src, dst)
 
 
+def _install_image_group(tree, image, kinds, mount):
+    root = Path(image).resolve()
+    destination = tree / _relative(mount.rstrip("/")) if mount else tree
+    manifest = json.loads((root / "build-artifacts.json").read_text())
+    for kind in kinds:
+        for member in manifest.get(kind, []):
+            source = root / _relative(member)
+            if not source.is_relative_to(root) or not source.resolve().is_relative_to(root):
+                raise ValueError(f"Invalid image artifact {member}")
+            for file in sorted(source.rglob("*")) if source.is_dir() else [source]:
+                if file.is_dir():
+                    continue
+                if not file.resolve(strict=True).is_relative_to(root):
+                    raise ValueError(f"Invalid image artifact {file}")
+                target = destination / file.relative_to(root)
+                if target.exists() or target.is_symlink():
+                    raise ValueError(f"Duplicate image artifact {target}")
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(file, target)
+
+
 def main():
+    if sys.argv[1] == "--image-primary":
+        image, out = map(Path, sys.argv[2:])
+        shutil.copy2(image / out.name, out)
+        return
     if sys.argv[1] == "--jdk-resource":
         _jdk_resource(*sys.argv[2:])
         return
@@ -192,6 +217,10 @@ def main():
     if args[:1] == ["--tar-trees"]:
         tar_trees = json.loads(args[1])
         args = args[2:]
+    image_groups = []
+    if args[:1] == ["--image-groups"]:
+        image_groups = json.loads(args[1])
+        args = args[2:]
     tree = output if directory else None
     if args[:1] == ["--source-tree"]:
         tree = Path(args[1])
@@ -201,7 +230,7 @@ def main():
         _relative(name)
 
     with ExitStack() as stack:
-        if (homes or tar_trees or prefix) and not tree:
+        if (homes or tar_trees or image_groups or prefix) and not tree:
             tree = Path(stack.enter_context(tempfile.TemporaryDirectory()))
         if tree:
             tree.mkdir(parents=True, exist_ok=True)
@@ -218,6 +247,8 @@ def main():
                                 name, 0o755 if source.stat().st_mode & 0o111 else 0o644
                             )
                         )
+            for image, kinds, mount in image_groups:
+                _install_image_group(tree, image, kinds, mount)
             for filename, mount in tar_trees:
                 destination = tree / _relative(mount.rstrip("/"))
                 if destination.exists():
@@ -229,7 +260,7 @@ def main():
                 _install_jdk(tree, home, {name for name, _ in entries})
             if directory:
                 return
-            if homes or tar_trees or prefix:
+            if homes or tar_trees or image_groups or prefix:
                 _write_tree_archive(tree, output, prefix)
                 return
 

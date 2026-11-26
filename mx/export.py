@@ -1321,6 +1321,10 @@ def _native_image_executable(dep):
     )
 
 
+def _image_library(dep):
+    return type(dep).__module__ == "mx_sdk_vm_ng" and type(dep).__name__ in ("NativeImageLibraryProject", "LanguageLibraryProject")
+
+
 def _language_library(dep):
     return (type(dep).__module__, type(dep).__name__) == (
         "mx_sdk_vm_ng",
@@ -1696,6 +1700,29 @@ def _tool_links(dist, pending):
 
 
 def _image_recipe(project, suite, mappings, pending):
+    if _image_library(project) and not _language_library(project):
+        dynamic = getattr(project, "dynamicBuildArgs", None)
+        resolver = getattr(project.suite.extensions, dynamic + "_for_platform", None) if dynamic else None
+        if dynamic and not resolver:
+            raise _UnsupportedLowering(f"{project.name}: target-aware dynamicBuildArgs required")
+        recipes = {}
+        for os_name, libc, suffix in (("darwin", None, ".dylib"), ("linux", "glibc", ".so")):
+            def substitute(arg):
+                arg = re.sub(r"<lib:([a-zA-Z0-9_.+-]+)>", r"lib\1" + suffix, arg)
+                if "<" in arg or ">" in arg:
+                    raise _UnsupportedLowering(f"{project.name}: unresolved image option {arg}")
+                return arg
+
+            flags = project.get_build_args(substitute=substitute, dynamic_args=resolver(os_name, libc, libc) if resolver else None)
+            recipes[os_name] = _image_command(project, suite, mappings, pending, flags)
+        platform_flags = {os_name: recipe.pop("flags") for os_name, recipe in recipes.items()}
+        if recipes["darwin"] != recipes["linux"]:
+            raise _UnsupportedLowering(f"{project.name}: platform-dependent image classpath")
+        return {**recipes["linux"], "platform_flags": platform_flags, "flags": [], "output_directory": True}
+    return _image_command(project, suite, mappings, pending)
+
+
+def _image_command(project, suite, mappings, pending, project_args=None):
     unsupported = project._orig_attrs.keys() - {
         "class",
         "dependencies",
@@ -1703,7 +1730,7 @@ def _image_recipe(project, suite, mappings, pending):
         "build_args",
         "deliverable",
     }
-    shared = _language_library(project)
+    shared = _image_library(project)
     if shared:
         unsupported -= {"dynamicBuildArgs", "dynamicDependencies"}
     if unsupported:
@@ -1735,7 +1762,8 @@ def _image_recipe(project, suite, mappings, pending):
         disable_debuginfo_stripping=False,
     )
     with mx.runtime_classpath_formatter(render):
-        command = project.getBuildTask(args).get_build_args()
+        task = project.getBuildTask(args)
+        command = task.get_build_args() if project_args is None else task.get_build_args(project_args=project_args)
     recipe = {"name": project.name, "output": project.base_file_name(), "flags": []}
     if shared:
         if "--shared" not in command:
@@ -1829,7 +1857,7 @@ def _can_lower_root(dep):
         or _bootstrap_launcher(dep)
         or _cmake_native_project(dep)
         or _native_image_executable(dep)
-        or _language_library(dep)
+        or _image_library(dep)
         or _default_native(dep)
         or _source_project(dep)
         or _platform_file(dep)
@@ -2363,6 +2391,7 @@ def _install_layout(dist, pending, mappings, options, bindings):
     members = {}
     imports = {}
     jdks = {}
+    literals = {}
     source_archives = {}
     inputs = set()
     # Keep platform substitutions symbolic until we know the supplying project.
@@ -2370,7 +2399,7 @@ def _install_layout(dist, pending, mappings, options, bindings):
     for destination, source in mx.LayoutDistribution._walk_static_layout(
         dist.layout, dist.name, distribution_object=dist, context=dist
     ):
-        dest = destination.removeprefix("./")
+        dest = destination.removeprefix("./").replace("<jdk_lib_dir>/", "lib/")
         directory = destination.endswith("/")
         kind = source["source_type"]
         path = source.get("path")
@@ -2413,6 +2442,11 @@ def _install_layout(dist, pending, mappings, options, bindings):
                     [entry], dist.suite, mappings, pending, True
                 )
                 members.setdefault(target, []).append(dest + entry.default_filename())
+            continue
+        if kind == "string" and not directory and _resource_path(dest):
+            if source.keys() - {"_str_", "source_type", "value", "optional"} or dest in literals or "<" in source["value"]:
+                raise _UnsupportedLowering(f"{dist.name}: unsupported literal at {dest}")
+            literals[dest] = source["value"]
             continue
         if kind not in ("dependency", "extracted-dependency"):
             raise _UnsupportedLowering(
@@ -2479,7 +2513,7 @@ def _install_layout(dist, pending, mappings, options, bindings):
                 and path
                 and path.endswith("/*")
                 and _resource_path(path[:-2])
-                and type(dep).__name__ == "LayoutDirDistribution"
+                and (type(dep).__name__ == "LayoutDirDistribution" or (_image_library(dep) and not _language_library(dep)))
             ):
                 imports.setdefault(target, []).append(path + "=" + dest)
                 continue
@@ -2561,7 +2595,7 @@ def _install_layout(dist, pending, mappings, options, bindings):
                 kind == "dependency"
                 and path is None
                 and (
-                    _language_library(dep)
+                    _image_library(dep)
                     or _native_image_executable(dep)
                     or _release_file(dep)
                     or _platform_file(dep)
@@ -2582,7 +2616,7 @@ def _install_layout(dist, pending, mappings, options, bindings):
                 f"{dist.name}: invalid install destination {dest}"
             )
         members.setdefault(target, []).append(dest)
-    if inputs != set(dist.buildDependencies) or not (members or imports):
+    if inputs != set(dist.buildDependencies) or not (members or imports or literals):
         raise _UnsupportedLowering(
             f"{dist.name}: install inputs differ from its resolved build dependencies: {sorted(d.name for d in inputs ^ set(dist.buildDependencies))}"
         )
@@ -2599,6 +2633,7 @@ def _install_layout(dist, pending, mappings, options, bindings):
             if jdks
             else {}
         ),
+        **({"literals": literals} if literals else {}),
         **({"source_archives": source_archives} if source_archives else {}),
         "name": dist.name,
         "format": "dir",
@@ -3342,7 +3377,7 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
         if (
             options.gazelle
             and project.suite == suite
-            and (_native_image_executable(project) or _language_library(project))
+            and (_native_image_executable(project) or _image_library(project))
         ):
             image_projects[project.name] = _image_recipe(
                 project, suite, java_deps, pending

@@ -170,6 +170,8 @@ func (g *importer) loadGraph(root, filename string, seen map[label.Label]bool) e
 			PlatformCopts map[string][]string `json:"platform_copts"`
 		} `json:"thin_launchers"`
 		ImageProjects []struct {
+			OutputDirectory              bool                `json:"output_directory"`
+			PlatformFlags                map[string][]string `json:"platform_flags"`
 			Shared                       bool
 			Name, Main, Output           string
 			Classpath, Modulepath, Flags []string
@@ -217,8 +219,9 @@ func (g *importer) loadGraph(root, filename string, seen map[label.Label]bool) e
 			Format         string
 			Name           string
 			Members        map[string]string
-			ArchiveImports map[string]string            `json:"archive_imports"`
-			FileList       []string                     `json:"file_list"`
+			ArchiveImports map[string]string `json:"archive_imports"`
+			FileList       []string          `json:"file_list"`
+			Literals       map[string]string
 			SourceArchives map[string]map[string]string `json:"source_archives"`
 			Macro          *struct {
 				Name            string
@@ -585,6 +588,10 @@ func (g *importer) loadGraph(root, filename string, seen map[label.Label]bool) e
 		}
 		r.SetAttr("output", image.Output)
 		r.SetAttr("image_args", image.Flags)
+		if image.OutputDirectory {
+			r.SetAttr("output_directory", true)
+			r.SetAttr("platform_image_args", image.PlatformFlags)
+		}
 		if len(image.Classpath) != 0 {
 			r.SetAttr("classpath", image.Classpath)
 		}
@@ -746,6 +753,9 @@ func (g *importer) loadGraph(root, filename string, seen map[label.Label]bool) e
 			format = "tar"
 		}
 		r.SetAttr("format", format)
+		if len(layout.Literals) > 0 {
+			r.SetAttr("literals", layout.Literals)
+		}
 		if len(layout.JDKHomes) > 0 {
 			r.SetAttr("jdk_homes", layout.JDKHomes)
 		}
@@ -796,7 +806,7 @@ func graphKind(k string) bool {
 func (g *importer) Kinds() map[string]rule.KindInfo {
 	kinds := g.javaLanguage.Kinds()
 	managed := map[string]bool{}
-	for _, a := range strings.Fields("template substitutions compiler include_dirs build_inputs aliases ninja home jni use_jdk_headers parent_release provenance suites graalvm_version filename jdk_static_libraries headers profiles os_layouts jdk_archive launcher actual install prefix jdk_homes platform_copts main_class output image_args classpath modulepath links windows_command runtime roots builders lines java_args groups exports native_cases copts includes sidecars wat2wasm wasm2wat tool sdk modules languages variants config root cases llvm_link format members file_list archive_imports overlays shade shade_inputs manifest out content contents directives release snippets_pattern archived_libraries jmh_metadata jni_services truffle_services graal_services graal_test_services module_name add_exports module_exports jni_headers abi_after_javac copies literals srcs deps packages launcher tags data runtime_deps jvm_flags test_class project processor_class generates_api plugins resources mx_resource_root mx_resource_roots unified_release javac_opts javacopts testonly visibility") {
+	for _, a := range strings.Fields("template substitutions compiler include_dirs build_inputs aliases ninja home jni use_jdk_headers parent_release provenance suites graalvm_version filename jdk_static_libraries headers profiles os_layouts jdk_archive launcher actual install prefix jdk_homes platform_copts main_class output image_args platform_image_args output_directory classpath modulepath links windows_command runtime roots builders lines java_args groups exports native_cases copts includes sidecars wat2wasm wasm2wat tool sdk modules languages variants config root cases llvm_link format members file_list archive_imports overlays shade shade_inputs manifest out content contents directives release snippets_pattern archived_libraries jmh_metadata jni_services truffle_services graal_services graal_test_services module_name add_exports module_exports jni_headers abi_after_javac copies literals srcs deps packages launcher tags data runtime_deps jvm_flags test_class project processor_class generates_api plugins resources mx_resource_root mx_resource_roots unified_release javac_opts javacopts testonly visibility") {
 		managed[a] = true
 	}
 	for _, k := range strings.Fields("mx_thin_launcher mx_patch_module mx_jvmci_library mx_shaded_java mx_files mx_project mx_whole_java mx_processed_java mx_processor mx_test_class") {
