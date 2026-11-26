@@ -36,16 +36,27 @@ def sulong_fixture_check(name, project, root, modules, sdk):
         testonly = True,
     )
     src = Label("//graal:sulong_fixture_test.py")
-    variants = [project + "/" + c + "." + v for c in cases for v in ["ref.out", "bitcode-Os"]]
-    py_test(
-        name = name,
-        srcs = [src],
-        main = src,
-        size = "small",
-        env = {"UPSTREAM_OUTPUTS": "$(rootpaths :%s)" % golden},
-        args = ["$(rootpath %s)" % sdk] + ["$(rootpath :%s)" % v for v in variants],
-        data = [sdk, ":" + golden] + variants,
-        exec_compatible_with = compatible,
-        target_compatible_with = compatible,
-        visibility = ["//visibility:public"],
-    )
+    tests = []
+    for case in cases:
+        ref = ":" + project + "/" + case + ".ref.out"
+        bitcode = ":" + project + "/" + case + ".bitcode-Os"
+        check = name + "/" + case
+        py_test(
+            name = check,
+            srcs = [src],
+            main = src,
+            size = "small",
+            args = [
+                "$(rootpath %s)" % sdk,
+                case + ".dir/ref.out",
+                "$(rootpath %s)" % ref,
+                "$(rootpath %s)" % bitcode,
+                "$(rootpaths :%s)" % golden,
+            ],
+            data = [sdk, ":" + golden, ref, bitcode],
+            exec_compatible_with = compatible,
+            target_compatible_with = compatible,
+            visibility = ["//visibility:public"],
+        )
+        tests.append(":" + check)
+    native.test_suite(name = name, tests = tests, visibility = ["//visibility:public"])

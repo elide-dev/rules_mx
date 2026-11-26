@@ -39,6 +39,7 @@ Truffle's eight declared processors run on the execution platform. Its DSL proce
 bazelisk build @graal//sulong:com.oracle.truffle.llvm.tests.irdebug.native/irdebug/controlFlow.ll
 tools/buildbuddy build --config=buildbuddy-rbe @graal//sulong:com.oracle.truffle.llvm.tests.sulong.native/c/factorial.c.bitcode-O2
 bazelisk query 'deps(@graal//sulong:com.oracle.truffle.llvm.tests.sulong.native/c/factorial.c, 1)'
+tools/buildbuddy test --config=buildbuddy-rbe @graal//sulong:fixture_test/Os/vectorreduce.c
 tools/buildbuddy test --config=buildbuddy-rbe @graal//sulong:fixture_test
 ```
 
