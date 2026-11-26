@@ -1747,7 +1747,8 @@ def svm_native_unittests(directory):
     return (
         'load("@rules_mx//graal:svm.bzl", "svm_native_unittest")\n'
         # The image build uses every core; cpu:4 keeps other tests from competing with it.
-        f'svm_native_unittest(name = "native_unittest", tests = {json.dumps(discovered)}, deps = [":SVM_TESTS"], default_group = True, tags = ["cpu:4"])\n'
+        # GitHub1398 needs a multicast-capable network interface, which remote executors lack.
+        f'svm_native_unittest(name = "native_unittest", tests = {json.dumps(discovered)}, deps = [":SVM_TESTS"], default_group = True, tags = ["cpu:4", "no-remote-exec"])\n'
     )
 
 
