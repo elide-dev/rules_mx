@@ -6,6 +6,10 @@ common --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 # JVM-only workspaces do not consume a host Android SDK.
 common --repo_env=ANDROID_HOME=
 
+# Graal's NoTagSamplingTest takes a single sample with a 10 ms safepoint timeout, so it
+# misses on loaded runners. Give that one test up to three attempts.
+test --flaky_test_attempts=NoTagSamplingTest@3
+
 build --incompatible_strict_action_env
 build --java_runtime_version=remotejdk_21
 build --tool_java_runtime_version=remotejdk_21
