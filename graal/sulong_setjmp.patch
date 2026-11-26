@@ -1,0 +1,13 @@
+diff --git a/sulong/projects/com.oracle.truffle.llvm.libraries.bitcode/src/setjmp.c b/sulong/projects/com.oracle.truffle.llvm.libraries.bitcode/src/setjmp.c
+--- a/sulong/projects/com.oracle.truffle.llvm.libraries.bitcode/src/setjmp.c
++++ b/sulong/projects/com.oracle.truffle.llvm.libraries.bitcode/src/setjmp.c
+@@ -27,6 +27,9 @@
+  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
+  * OF THE POSSIBILITY OF SUCH DAMAGE.
+  */
++/* glibc fortification redirects both longjmp declarations to __longjmp_chk.
++ * This translation unit defines both public entry points. */
++#undef _FORTIFY_SOURCE
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <setjmp.h>

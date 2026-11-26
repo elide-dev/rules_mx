@@ -27,6 +27,7 @@ exports_files([
     "sdk_musl.json",
     "packed_sources.json",
     "sulong_external_tests.patch",
+    "sulong_setjmp.patch",
     "sl.py.tpl",
     "sl_fixture_test.py",
     "shaded_inputs.json",

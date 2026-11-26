@@ -23,6 +23,7 @@ OVERLAYS = [
     Label("//graal:regex.patch"),
     Label("//graal:tools.patch"),
     Label("//graal:sulong_external_tests.patch"),
+    Label("//graal:sulong_setjmp.patch"),
     Label("//graal:sulong.patch"),
     Label("//graal:sandbox-toolchains.patch"),
     Label("//graal:wasm.patch"),
