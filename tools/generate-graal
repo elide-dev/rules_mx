@@ -29,9 +29,33 @@ SVM_SUPPORT_JARS = (
     "SVM_JDWP_SERVER",
     "TRUFFLE_RUNTIME_SVM",
     "SVM_TRUFFLE_TCK",
+    "SVM_GRAALOS_SUPPORT",
 )
 
-SVM_TEST_JARS = ("SVM_DRIVER_TESTS", "SVM_TEST_TERMINUS", "SVM_TESTS WITH SPACE")
+SVM_TEST_JARS = (
+    "SVM_DRIVER_TESTS",
+    "SVM_TEST_TERMINUS",
+    "SVM_TRUFFLE_TESTS",
+    "SVM_TESTS WITH SPACE",
+)
+
+# Selections that only some Graal revisions use, mapped to the declaration they need.
+# The generator drops each one, together with an option that names it, when the
+# selected suite does not declare that name.
+OPTIONAL = {
+    "substratevm": {
+        "SVM_GRAALOS_SUPPORT": "SVM_GRAALOS_SUPPORT",
+        "SVM_TEST_TERMINUS": "SVM_TEST_TERMINUS",
+        "SVM_TRUFFLE_TESTS": "SVM_TRUFFLE_TESTS",
+        "com.oracle.svm.truffle.test": "SVM_TRUFFLE_TESTS",
+        "com.oracle.svm.test": "SVM_TRUFFLE_TESTS",
+        "SVM_TESTS": "SVM_TRUFFLE_TESTS",
+        "ZSTD_JNI": "ZSTD_JNI",
+    },
+}
+
+# Options in SUITES that take no value.
+FLAGS = {"--infer-source-deps"}
 
 SUITES = {
     "sdk": [
@@ -459,6 +483,15 @@ SUITES = {
         "substratevm:com.oracle.svm.with.space.test=@rules_mx//graal:svm_native_resource_guest",
         "--manual-test-project",
         "com.oracle.svm.with.space.test",
+        # These tests run inside a Native Image (mx svmjunit), not on the JVM.
+        "--manual-test-project",
+        "com.oracle.svm.test",
+        "--manual-test-project",
+        "com.oracle.svm.truffle.test",
+        # SVM_TRUFFLE_TESTS compiles against SVM_TESTS for com.oracle.svm.test, its only
+        # member that it uses. The rest of SVM_TESTS is not migrated yet.
+        "--java-dep",
+        "substratevm:SVM_TESTS=:com.oracle.svm.test",
         "--java-dep",
         "substratevm:TRUFFLE_RUNTIME_SVM_VERSION=:TRUFFLE_RUNTIME_SVM_VERSION",
         "--java-dep",
@@ -598,7 +631,47 @@ SHADED_PROJECTS = {
 JAVA_LIBRARIES = {
     "truffle": ["GUAVA", "JIMFS", "VISUALVM-LIB-JFLUID-HEAP"],
     "compiler": ["JAVA_ALLOCATION_INSTRUMENTER"],
+    "substratevm": ["ZSTD_JNI"],
 }
+
+
+def declared(directory):
+    """Names of the projects, distributions and libraries in a staged suite."""
+    suite = runpy.run_path(str(directory / f"mx.{directory.name}/suite.py"))["suite"]
+    return {
+        name
+        for kind in ("projects", "distributions", "libraries")
+        for name in suite.get(kind, {})
+    }
+
+
+def missing(directory):
+    """Optional selections whose required declaration the staged suite lacks."""
+    available = declared(directory)
+    return {
+        name
+        for name, needed in OPTIONAL.get(directory.name, {}).items()
+        if needed not in available
+    }
+
+
+def present(directory, names):
+    """Keep the names that the staged suite supports."""
+    absent = missing(directory)
+    return [n for n in names if n not in absent]
+
+
+def suite_args(directory):
+    """SUITES arguments for a staged suite, without unsupported optional selections."""
+    absent = missing(directory)
+    args = []
+    for arg in SUITES[directory.name]:
+        if arg.split("=", 1)[0].rpartition(":")[2] in absent:
+            if args and args[-1].startswith("--") and args[-1] not in FLAGS:
+                args.pop()
+            continue
+        args.append(arg)
+    return args
 
 
 def maven_pin(lib, suffix="", key="digest"):
@@ -629,10 +702,14 @@ def jmh_rules(directory):
     return pins, "\n".join(rules) + "\n"
 
 
-def library_rules(suite):
+def library_rules(directory):
+    suite = directory.name
+    names = present(directory, JAVA_LIBRARIES[suite])
+    if not names:
+        return ""
     return 'load("@rules_java//java:java_import.bzl", "java_import")\n' + "".join(
         f'java_import(name = "{name}", jars = ["@graal_shaded_inputs//:{suite}_{name}.jar"], visibility = ["//visibility:public"])\n'
-        for name in JAVA_LIBRARIES[suite]
+        for name in names
     )
 
 
@@ -685,8 +762,8 @@ def harness_options(directory):
             / "META-INF/services/javax.annotation.processing.Processor"
         )
         pending = [
-            *SVM_SUPPORT_JARS,
-            *SVM_TEST_JARS,
+            *present(directory, SVM_SUPPORT_JARS),
+            *present(directory, SVM_TEST_JARS),
             "SVM",
             "SVM_DRIVER",
             "LIBRARY_SUPPORT",
@@ -706,18 +783,28 @@ def harness_options(directory):
                 f"truffle:TRUFFLE_DSL_PROCESSOR=//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.{name}",
             )
         ]
+        args = SUITES["substratevm"]
         seen = set()
+        # Projects with an explicit release in SUITES keep it.
+        explicit = {
+            value.split("=", 1)[0]
+            for option, value in zip(args, args[1:])
+            if option == "--project-release"
+        }
+        # Distributions bound to existing labels contribute no projects to this export.
+        bound = {
+            value.split("=", 1)[0].removeprefix("substratevm:")
+            for option, value in zip(args, args[1:])
+            if option == "--java-dep"
+        }
         releases = []
         while pending:
             name = pending.pop()
-            if name in seen:
+            if name in seen or name in bound:
                 continue
             seen.add(name)
             if project := metadata["projects"].get(name):
-                if (
-                    project.get("javaCompliance") == "24+"
-                    and name != "com.oracle.svm.shared"
-                ):
+                if project.get("javaCompliance") == "24+" and name not in explicit:
                     releases.extend(("--project-release", name + "=24"))
                 pending.extend(project.get("dependencies", []))
             elif dist := metadata["distributions"].get(name):
@@ -760,7 +847,7 @@ def shading_inputs(directory):
                 flags.extend(
                     ["--shaded-input", f"{qualified}=@graal_shaded_inputs//:{filename}"]
                 )
-    for name in JAVA_LIBRARIES.get(directory.name, ()):
+    for name in present(directory, JAVA_LIBRARIES.get(directory.name, ())):
         lib = suite["libraries"][name]
         inputs[f"{directory.name}_{name}.jar"] = maven_pin(lib)
         flags.extend(["--java-dep", f"{directory.name}:{name}=:{name}"])
@@ -1364,8 +1451,12 @@ def svm_native_rules(directory):
         "libcontainer",
         "darwin",
         "reporterchelper",
+        # The heap-blob decoder that images link statically, on revisions that declare it.
+        "libzstd",
     ):
         key = "com.oracle.svm.native." + name
+        if key not in suite["projects"]:
+            continue
         project = suite["projects"][key]
         options = project.get("os") or {
             os: arches["<others>"] for os, arches in project["os_arch"].items()
@@ -1392,10 +1483,16 @@ def svm_native_rules(directory):
             "includes": sorted(includes),
             "jni": project.get("use_jdk_headers", False),
         }
+    builder_libs = {}
+    if zstd := suite["libraries"].get("ZSTD_JNI"):
+        # The builder loads zstd-jni by file name from lib/svm/builder/lib.
+        builder_libs[":ZSTD_JNI"] = f"zstd-jni-{zstd['maven']['version']}.jar"
     return (
         'load("@rules_mx//graal:svm.bzl", "svm_launcher", "svm_native_projects")\n'
         f"svm_native_projects(projects = {repr(projects)})\n"
-        'svm_launcher(name = "native-image")\n'
+        'svm_launcher(name = "native-image"'
+        + (f", builder_libs = {json.dumps(builder_libs)}" if builder_libs else "")
+        + ")\n"
     )
 
 
@@ -1468,8 +1565,11 @@ def svm_support_layouts(directory):
     if source != "dependency:sdk:VERSION/version":
         raise ValueError("Unsupported SubstrateVM Truffle runtime version layout")
     copies = {destination: "//sdk:VERSION.files/version"}
-    targets = [":" + name for name in (*names, *SVM_SUPPORT_JARS, version_name)]
-    tests = [":" + name for name in SVM_TEST_JARS]
+    targets = [
+        ":" + name
+        for name in (*names, *present(directory, SVM_SUPPORT_JARS), version_name)
+    ]
+    tests = [":" + name for name in present(directory, SVM_TEST_JARS)]
     return support_layout_rules(directory, names) + (
         'load("@rules_mx//mx:graph.bzl", "mx_resource_layout")\n'
         f'mx_resource_layout(name = "{version_name}", copies = {json.dumps(copies)}, visibility = ["//visibility:public"]) # keep\n'
@@ -1485,7 +1585,7 @@ def prepare_suite(suite, stage):
             support_layout_rules(directory, ("VM_GRAALVM_SUPPORT",))
         )
         return
-    export_options = SUITES[suite]
+    export_options = suite_args(directory)
     if suite == "truffle":
         metadata = runpy.run_path(str(directory / "mx.truffle/suite.py"))["suite"]
         export_options = [
@@ -1537,7 +1637,7 @@ def prepare_suite(suite, stage):
         )
     elif suite == "compiler":
         (directory / "BUILD.bazel").write_text(
-            library_rules(suite)
+            library_rules(directory)
             + jmh_rules(directory)[1]
             + compiler_harness(directory)
             + qualified_tests(directory)
@@ -1558,7 +1658,7 @@ def prepare_suite(suite, stage):
                 }.items()
             )
             + "\n"
-            + library_rules(suite)
+            + library_rules(directory)
             + qualified_tests(directory)
             + jmh_rules(directory)[1]
             + truffle_native_projects(directory)
@@ -1587,7 +1687,8 @@ def prepare_suite(suite, stage):
         )
     elif suite == "substratevm":
         (directory / "BUILD.bazel").write_text(
-            'load("@rules_mx//graal:svm.bzl", "svm_compiler_flags")\n'
+            library_rules(directory)
+            + 'load("@rules_mx//graal:svm.bzl", "svm_compiler_flags")\n'
             'svm_compiler_flags(name = "svm-compiler-flags-builder", builder = ":SVM", '
             'linux = select({"@platforms//os:linux": True, "//conditions:default": False}))\n'
             'load("@rules_mx//graal:simplelanguage.bzl", "svm_driver_test_runner")\n'
