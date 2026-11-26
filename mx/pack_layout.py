@@ -183,6 +183,24 @@ def _install_image_group(tree, image, kinds, mount):
 
 
 def main():
+    if sys.argv[1] == "--materialize-install-links":
+        tree, sources, build = [Path(arg).resolve() for arg in sys.argv[2:]]
+        source_files = None
+        for link in tree.rglob("*"):
+            if not link.is_symlink():
+                continue
+            target = link.resolve(strict=True)
+            if not link.readlink().is_absolute() and target.is_relative_to(tree):
+                continue
+            # Darwin CMake can install a sandbox input symlink as a header. Check
+            # the resolved file against the declared source tree before copying it.
+            if source_files is None:
+                source_files = {file.resolve() for file in sources.rglob("*") if file.is_file()}
+            if not target.is_file() or (target not in source_files and not target.is_relative_to(build) and not target.is_relative_to(tree)):
+                raise ValueError(f"Unexpected CMake install link {link} -> {target}")
+            link.unlink()
+            shutil.copy2(target, link)
+        return
     if sys.argv[1] in ("--archive-file-tree", "--archive-install-tree"):
         output, prefix, tree = sys.argv[2:]
         _write_tree_archive(Path(tree), Path(output), _relative(prefix), dereference=sys.argv[1] == "--archive-file-tree")

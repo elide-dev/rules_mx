@@ -114,7 +114,8 @@ def mx_cmake_project(name, srcs, compiler, config, include_dirs, profiles, testo
             # rules_foreign_cc owns CMAKE_INSTALL_PREFIX. Preserve the directory
             # name under which mx publishes that complete installation.
             stage = 'mv "$$INSTALLDIR" "$$BUILD_TMPDIR/mx-install" && mkdir -p "$$INSTALLDIR" && mv "$$BUILD_TMPDIR/mx-install" "$$INSTALLDIR/%s"' % directories[0]
-            stage += '\n"$(execpath %s)" --archive-install-tree "$$INSTALLDIR/%s.tar" "%s" "$$INSTALLDIR/%s"' % (Label("//mx:pack_layout"), directory, directory, directory)
+            stage += '\n"$$EXT_BUILD_ROOT$$/$(execpath %s)" --materialize-install-links "$$INSTALLDIR/%s" "$$EXT_BUILD_ROOT$$/%s/src" "$$BUILD_TMPDIR"' % (Label("//mx:pack_layout"), directory, native.package_relative_label(srcs[0]).workspace_root)
+            stage += '\n"$$EXT_BUILD_ROOT$$/$(execpath %s)" --archive-install-tree "$$INSTALLDIR/%s.tar" "%s" "$$INSTALLDIR/%s"' % (Label("//mx:pack_layout"), directory, directory, directory)
         else:
             stage = "\n".join(['mkdir -p "$$INSTALLDIR/%s" && cp -L "%s" "$$INSTALLDIR/%s"' % (m.rpartition("/")[0] or ".", m, m) for m in recipe["members"]])
         cmake(
@@ -138,6 +139,8 @@ def mx_cmake_project(name, srcs, compiler, config, include_dirs, profiles, testo
             out_include_dir = "",
             out_data_files = recipe["members"] + [d + ".tar" for d in directories],
             out_data_dirs = directories,
+            # The libraries are inside the declared install tree.
+            out_headers_only = bool(directories),
             testonly = testonly,
             target_compatible_with = select({condition: [], "//conditions:default": ["@platforms//:incompatible"]}),
         )
