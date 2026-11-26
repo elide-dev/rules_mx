@@ -2,12 +2,12 @@ diff --git a/espresso/BUILD.bazel b/espresso/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/espresso/BUILD.bazel
-@@ -0,0 +1,1498 @@
+@@ -0,0 +1,1575 @@
 +load("@rules_mx//graal:layout.bzl", "mx_os_layout")
 +load("@rules_mx//mx:graph.bzl", "mx_exported_tar", "mx_jar_dist", "mx_jvmci_library", "mx_pom_dist", "mx_processed_java", "mx_processor", "mx_project", "mx_shaded_java", "mx_whole_java")
 +load("@rules_mx//mx:jvmci.bzl", "mx_patch_module")
 +load("@rules_mx//mx:native_project.bzl", "mx_native_shared_project")
-+load("@rules_mx//mx:project_files.bzl", "mx_platform_file", "mx_project_files", "mx_source_archive")
++load("@rules_mx//mx:project_files.bzl", "mx_platform_file", "mx_project_files", "mx_release_file", "mx_source_archive")
 +load("@rules_mx//mx:thin_launcher.bzl", "mx_thin_launcher")
 +
 +filegroup(
@@ -19,6 +19,7 @@ new file mode 100644
 +        ":ESPRESSO_GRAALVM_SUPPORT",
 +        ":ESPRESSO_IO",
 +        ":ESPRESSO_JVMCI",
++        ":ESPRESSO_JVM_STANDALONE",
 +        ":ESPRESSO_JVM_STANDALONE_JAVA_LINKS",
 +        ":ESPRESSO_JVM_STANDALONE_MOKAPOT_SUPPORT",
 +        ":ESPRESSO_JVM_SUPPORT",
@@ -29,6 +30,7 @@ new file mode 100644
 +        ":ESPRESSO_POLYBENCH_BENCHMARKS",
 +        ":ESPRESSO_POLYGLOT",
 +        ":ESPRESSO_PROCESSOR",
++        ":ESPRESSO_STANDALONE_COMMON",
 +        ":ESPRESSO_SUPPORT",
 +        ":ESPRESSO_VMACCESS_GUEST",
 +        ":HOTSWAP",
@@ -60,6 +62,7 @@ new file mode 100644
 +        ":espresso",
 +        ":espresso-legacy-nativeimage-properties",
 +        ":espresso-license-files",
++        ":espresso-release-file",
 +        ":org.graalvm.continuations",
 +    ] + select({
 +        "@rules_mx//tools/cc:profile_linux_amd64": [
@@ -1134,6 +1137,24 @@ new file mode 100644
 +    visibility = ["//visibility:public"],
 +)
 +
++mx_release_file(
++    name = "espresso-release-file",
++    testonly = False,
++    filename = "release",
++    graalvm_version = "25.6.0-dev",
++    parent_release = "@rules_mx//graal:standalone_jdk_release",
++    provenance = "//:mx-source.json",
++    suites = [
++        "espresso",
++        "espresso-shared",
++        "sdk",
++        "sulong",
++        "tools",
++        "truffle",
++    ],
++    visibility = ["//visibility:public"],
++)
++
 +mx_thin_launcher(
 +    name = "espresso",
 +    srcs = ["//sdk:src/org.graalvm.launcher.native/src/launcher.cc"],
@@ -1200,6 +1221,49 @@ new file mode 100644
 +                "LICENSE": "LICENSE_JAVAONTRUFFLE",
 +            },
 +        },
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_exported_tar(
++    name = "ESPRESSO_JVM_STANDALONE",
++    archive_imports = {
++        "//truffle:TRUFFLE_ATTACH_GRAALVM_SUPPORT": "=languages/java/jvmlibs/",
++        "//truffle:TRUFFLE_NFI_NATIVE_GRAALVM_SUPPORT": "=languages/java/jvmlibs/",
++        ":ESPRESSO_JVM_STANDALONE_JAVA_LINKS": "bin/*=bin/",
++        ":ESPRESSO_JVM_STANDALONE_MOKAPOT_SUPPORT": "=languages/java/lib/",
++        ":ESPRESSO_STANDALONE_COMMON": "=",
++    },
++    format = "dir",
++    jdk_homes = {
++        "@rules_mx//graal:standalone_jdk_archive": "[{\"directory\": \"\", \"exclude\": [\"bin\", \"lib/jfr\", \"lib/static\", \"<jdk_lib_dir>/server\", \"README\", \"LICENSE\"]}, {\"directory\": \"languages/java/jvm/\", \"exclude\": [\"bin/native-image*\", \"lib/static\", \"lib/svm\", \"lib/<lib:native-image-agent>\", \"lib/<lib:native-image-diagnostics-agent>\", \"lib/src.zip\", \"jmods\"]}]",
++    },
++    members = {
++        "//espresso-shared:ESPRESSO_SHARED": "languages/java/espresso/espresso-shared.jar",
++        "//sdk:COLLECTIONS": "languages/java/espresso/collections.jar",
++        "//sdk:JLINE3": "languages/java/espresso/jline3.jar",
++        "//sdk:JNIUTILS": "languages/java/espresso/jniutils.jar",
++        "//sdk:LAUNCHER_COMMON": "languages/java/espresso/launcher-common.jar",
++        "//sdk:NATIVEIMAGE": "languages/java/espresso/nativeimage.jar",
++        "//sdk:POLYGLOT": "languages/java/espresso/polyglot.jar",
++        "//sdk:WORD": "languages/java/espresso/word.jar",
++        "//tools:CHROMEINSPECTOR": "languages/java/espresso/chromeinspector.jar",
++        "//tools:DAP": "languages/java/espresso/dap.jar",
++        "//tools:INSIGHT": "languages/java/espresso/insight.jar",
++        "//tools:INSIGHT_HEAP": "languages/java/espresso/insight-heap.jar",
++        "//tools:LSP": "languages/java/espresso/lsp.jar",
++        "//tools:LSP_API": "languages/java/espresso/lsp-api.jar",
++        "//tools:TRUFFLE_COVERAGE": "languages/java/espresso/truffle-coverage.jar",
++        "//tools:TRUFFLE_PROFILER": "languages/java/espresso/truffle-profiler.jar",
++        "//truffle:TRUFFLE_API": "languages/java/espresso/truffle-api.jar",
++        "//truffle:TRUFFLE_COMPILER": "languages/java/espresso/truffle-compiler.jar",
++        "//truffle:TRUFFLE_JSON": "languages/java/espresso/truffle-json.jar",
++        "//truffle:TRUFFLE_NFI": "languages/java/espresso/truffle-nfi.jar",
++        "//truffle:TRUFFLE_NFI_LIBFFI": "languages/java/espresso/truffle-nfi-libffi.jar",
++        "//truffle:TRUFFLE_RUNTIME": "languages/java/espresso/truffle-runtime.jar",
++        ":ESPRESSO": "languages/java/espresso/espresso.jar",
++        ":ESPRESSO_LAUNCHER": "languages/java/espresso/espresso-launcher.jar",
++        ":espresso": "bin/{basename}",
 +    },
 +    visibility = ["//visibility:public"],
 +)
@@ -1375,6 +1439,19 @@ new file mode 100644
 +        ":ESPRESSO_POLYBENCH_BENCHMARK_FIBONACCI": "interpreter/Fibonacci.jar",
 +        ":ESPRESSO_POLYBENCH_BENCHMARK_RICHARDS": "interpreter/Richards.jar",
 +        ":ESPRESSO_POLYBENCH_BENCHMARK_SIEVE": "interpreter/Sieve.jar",
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_exported_tar(
++    name = "ESPRESSO_STANDALONE_COMMON",
++    archive_imports = {
++        ":ESPRESSO_SUPPORT": "=languages/java/",
++        ":espresso-license-files": "=",
++    },
++    format = "dir",
++    members = {
++        ":espresso-release-file": "{basename}",
 +    },
 +    visibility = ["//visibility:public"],
 +)

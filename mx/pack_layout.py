@@ -22,8 +22,10 @@ def _relative(name):
     return path
 
 
-def _install_jdk(tree, spec):
-    destination = tree / _relative(spec["directory"].rstrip("/"))
+def _install_jdk(tree, spec, explicit_members):
+    destination = (
+        tree / _relative(spec["directory"].rstrip("/")) if spec["directory"] else tree
+    )
     destination.mkdir(parents=True, exist_ok=True)
     with tarfile.open(spec["bundle"]) as bundle:
         contents = bundle.getmembers()
@@ -39,7 +41,11 @@ def _install_jdk(tree, spec):
         root = roots[0]
         extension = ".dylib" if root.parts[-2:] == ("Contents", "Home") else ".so"
         excludes = [
-            re.sub(r"<lib:([\w.-]+)>", r"lib\1" + extension, expr)
+            re.sub(
+                r"<lib:([\w.-]+)>",
+                r"lib\1" + extension,
+                expr.replace("<jdk_lib_dir>", "lib"),
+            )
             for expr in spec["exclude"]
         ]
 
@@ -54,6 +60,9 @@ def _install_jdk(tree, spec):
                 for part in (relative, *relative.parents)
                 for pattern in excludes
             ):
+                return None
+            if not spec["directory"] and relative.as_posix() in explicit_members:
+                # A standalone overlays the guest JDK release with its assembled metadata.
                 return None
             target = destination / relative
             if (target.is_symlink() or target.exists()) and not member.isdir():
@@ -172,7 +181,7 @@ def main():
                             )
                         )
             for home in homes:
-                _install_jdk(tree, home)
+                _install_jdk(tree, home, {name for name, _ in entries})
             if directory:
                 return
             if homes or prefix:

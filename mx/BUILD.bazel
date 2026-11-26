@@ -88,3 +88,8 @@ py_binary(
     srcs = ["sulong_cmake.py"],
     visibility = ["//visibility:public"],
 )
+
+py_binary(
+    name = "release_file",
+    srcs = ["release_file.py"],
+)
