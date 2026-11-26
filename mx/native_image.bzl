@@ -7,7 +7,7 @@ def _search_path(labels):
     paths = ["$(execpath " + label + ")" for label in labels]
     return select({"@platforms//os:windows": [";".join(paths)], "//conditions:default": [":".join(paths)]})
 
-def mx_native_image_executable(name, main_class, output, image_args, classpath = [], modulepath = [], visibility = None):
+def _mx_image(name, binary, image_args, classpath, modulepath, **kwargs):
     """Use the runtime artifacts and search order resolved by mx for this image."""
     args = []
     if classpath:
@@ -16,12 +16,34 @@ def mx_native_image_executable(name, main_class, output, image_args, classpath =
         args += ["--module-path"] + _search_path(modulepath)
     native_image(
         name = name,
-        executable_name = select({"@platforms//os:windows": output + ".exe", "//conditions:default": output}),
-        main_class = main_class,
+        executable_name = binary,
         data = classpath + modulepath,
         deps = [],
         extra_args = args + image_args,
+        **kwargs
+    )
+
+def mx_native_image_executable(name, main_class, output, image_args, classpath = [], modulepath = [], visibility = None):
+    """Build a standalone executable from an mx image project."""
+    binary = select({"@platforms//os:windows": output + ".exe", "//conditions:default": output})
+    _mx_image(name, binary, image_args, classpath, modulepath, main_class = main_class, visibility = visibility)
+
+def mx_native_image_library(name, output, image_args, classpath = [], modulepath = [], visibility = None):
+    """Build a Truffle language shared library with its JNI invocation API."""
+    binary = select({"@platforms//os:macos": "lib" + output + ".dylib", "//conditions:default": "lib" + output + ".so"})
+    _mx_image(
+        name,
+        binary,
+        image_args,
+        classpath,
+        modulepath,
+        shared_library = True,
         visibility = visibility,
+        target_compatible_with = select({
+            "@platforms//os:linux": [],
+            "@platforms//os:macos": [],
+            "//conditions:default": ["@platforms//:incompatible"],
+        }),
     )
 
 def _tool_layout_impl(ctx):

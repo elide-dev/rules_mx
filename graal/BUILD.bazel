@@ -38,29 +38,87 @@ exports_files([
     "toolchain_test.py",
 ])
 
-filegroup(
-    name = "wasm_standalone_jars",
-    srcs = ["@graal//wasm:GRAALWASM_STANDALONE_DEPENDENCIES"],
-    output_group = "runtime_jars",
-    tags = ["manual"],
+[
+    config_setting(
+        name = "standalone_" + key,
+        constraint_values = [
+            "@platforms//os:" + os,
+            "@platforms//cpu:" + cpu,
+        ],
+    )
+    for key, os, cpu in [
+        ("darwin_aarch64", "macos", "aarch64"),
+        ("linux_aarch64", "linux", "aarch64"),
+        ("linux_amd64", "linux", "x86_64"),
+    ]
+]
+
+alias(
+    name = "standalone_jdk_release",
+    actual = select({
+        ":standalone_darwin_aarch64": "@labsjdk_darwin_aarch64//:release",
+        ":standalone_linux_aarch64": "@labsjdk_linux_aarch64//:release",
+        ":standalone_linux_amd64": "@labsjdk_linux_amd64//:release",
+    }),
+    visibility = ["//visibility:public"],
+)
+
+alias(
+    name = "standalone_jdk_archive",
+    actual = select({
+        ":standalone_darwin_aarch64": "@standalone_jdk_archive_darwin_aarch64//file",
+        ":standalone_linux_aarch64": "@standalone_jdk_archive_linux_aarch64//file",
+        ":standalone_linux_amd64": "@standalone_jdk_archive_linux_amd64//file",
+    }),
+    visibility = ["//visibility:public"],
 )
 
 java_test(
     name = "wasm_thin_launcher_test",
     size = "small",
     srcs = ["WasmThinLauncherTest.java"],
-    data = [
-        ":wasm_standalone_jars",
-        "@graal//wasm:graalwasm_thin_launcher",
-    ],
+    data = ["@graal//wasm:GRAALWASM_JVM_STANDALONE"],
     env = {
-        "WASM_LAUNCHER": "$(rootpath @graal//wasm:graalwasm_thin_launcher)",
-        "MODULE_JARS": "$(rootpaths :wasm_standalone_jars)",
+        "WASM_INSTALL": "$(rootpath @graal//wasm:GRAALWASM_JVM_STANDALONE)",
+        "WASM_MODE": "jvm",
     },
     tags = ["manual"],
     test_class = "graal.WasmThinLauncherTest",
     deps = ["@contrib_rules_jvm_deps//:junit_junit"],
 )
+
+java_test(
+    name = "wasm_native_launcher_test",
+    size = "small",
+    srcs = ["WasmThinLauncherTest.java"],
+    data = ["@graal//wasm:GRAALWASM_NATIVE_STANDALONE"],
+    env = {
+        "WASM_INSTALL": "$(rootpath @graal//wasm:GRAALWASM_NATIVE_STANDALONE)",
+        "WASM_MODE": "native",
+    },
+    tags = ["manual"],
+    test_class = "graal.WasmThinLauncherTest",
+    deps = ["@contrib_rules_jvm_deps//:junit_junit"],
+)
+
+[
+    py_test(
+        name = "wasm_" + mode + "_release_test",
+        size = "medium",
+        srcs = ["wasm_release_test.py"],
+        args = [
+            "$(rootpath " + archive + ")",
+            mode,
+        ],
+        data = [archive],
+        main = "wasm_release_test.py",
+        tags = ["manual"],
+    )
+    for mode, archive in [
+        ("jvm", "@graal//wasm:GRAALWASM_JVM_STANDALONE_RELEASE_ARCHIVE"),
+        ("native", "@graal//wasm:GRAALWASM_NATIVE_STANDALONE_RELEASE_ARCHIVE"),
+    ]
+]
 
 pom_classpath_test(
     name = "espresso_pom_classpath_test",

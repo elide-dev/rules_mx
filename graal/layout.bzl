@@ -23,7 +23,7 @@ static_archive = rule(
 
 MxArchiveLayoutInfo = provider(
     doc = "Mapping of packaged archive paths to their declared Bazel files.",
-    fields = ["archive", "entries", "links"],
+    fields = ["archive", "entries", "links", "jdk_homes"],
 )
 
 def _add_entry(entries, path, file):
@@ -32,9 +32,19 @@ def _add_entry(entries, path, file):
     entries[path] = file
 
 def _layout_impl(ctx):
-    output = ctx.actions.declare_file(ctx.label.name.lower().replace("_", "-") + "." + ctx.attr.format)
+    directory = ctx.attr.format == "dir"
+    release_prefix = ctx.attr.release_prefix
+    if release_prefix:
+        output = ctx.actions.declare_file(release_prefix + ".tar.gz")
+    else:
+        output = ctx.actions.declare_directory(ctx.label.name + ".files") if directory else ctx.actions.declare_file(ctx.label.name.lower().replace("_", "-") + "." + ctx.attr.format)
     entries = {}
     links = {}
+    homes = []
+    for target, encoded in ctx.attr.jdk_homes.items():
+        [bundle] = target.files.to_list()
+        spec = json.decode(encoded)
+        homes.append(struct(bundle = bundle, directory = spec["directory"], exclude = spec["exclude"]))
     for target, destinations in ctx.attr.members.items():
         files = [target[MxArchiveLayoutInfo].archive] if MxArchiveLayoutInfo in target and target[MxArchiveLayoutInfo].archive else target.files.to_list()
         if len(files) != 1:
@@ -59,24 +69,36 @@ def _layout_impl(ctx):
             else:
                 if destination and not destination.endswith("/"):
                     fail("Expected a destination directory: " + destination)
+                for home in getattr(target[MxArchiveLayoutInfo], "jdk_homes", []):
+                    homes.append(struct(bundle = home.bundle, directory = destination + home.directory, exclude = home.exclude))
                 for path, artifact in sources.items():
                     _add_entry(entries, destination + path, artifact)
                     if path in source_links:
                         links[destination + path] = source_links[path]
     args = ctx.actions.args()
-    args.add(output)
+    args.add(output.path)
+    if directory:
+        args.add("--directory")
+    if release_prefix:
+        args.add("--archive-prefix")
+        args.add(release_prefix)
     if links:
         args.add("--links")
         args.add(json.encode(links))
+    if homes and ctx.attr.format == "jar":
+        fail("A JDK installation requires a directory or tar layout")
+    if homes:
+        args.add("--jdk-homes")
+        args.add(json.encode([{"bundle": h.bundle.path, "directory": h.directory, "exclude": h.exclude} for h in homes]))
     for path in sorted(entries):
         args.add(path)
         args.add(entries[path])
     ctx.actions.run(
         executable = ctx.executable._pack,
         arguments = [args],
-        inputs = entries.values(),
+        inputs = entries.values() + [h.bundle for h in homes],
         outputs = [output],
-        mnemonic = "MxArchiveLayout",
+        mnemonic = "MxReleaseArchive" if release_prefix else "MxArchiveLayout",
     )
     files = [output]
     if ctx.attr.file_list:
@@ -87,7 +109,7 @@ def _layout_impl(ctx):
         files.append(file_list)
     return [
         DefaultInfo(files = depset(files)),
-        MxArchiveLayoutInfo(archive = output, entries = entries, links = links),
+        MxArchiveLayoutInfo(archive = None if directory else output, entries = entries, links = links, jdk_homes = homes),
     ]
 
 mx_archive_layout = rule(
@@ -97,9 +119,29 @@ mx_archive_layout = rule(
         "members": attr.label_keyed_string_dict(allow_files = True, mandatory = True),
         # Map a member to a new path, or use an empty selector to import an entire layout.
         "archive_imports": attr.label_keyed_string_dict(providers = [MxArchiveLayoutInfo]),
+        "jdk_homes": attr.label_keyed_string_dict(allow_files = [".gz"]),
         "file_list": attr.string_list(),
-        "format": attr.string(mandatory = True, values = ["jar", "tar"]),
+        "format": attr.string(mandatory = True, values = ["dir", "jar", "tar"]),
         "target_prefix": attr.string(),
+        "release_prefix": attr.string(),
         "_pack": attr.label(default = Label("//mx:pack_layout"), executable = True, cfg = "exec"),
     },
 )
+
+def mx_release_archive(name, install, prefix, **kwargs):
+    """Package the resolved standalone for the target OS and architecture."""
+    mx_archive_layout(
+        name = name,
+        members = {},
+        archive_imports = {install: "="},
+        format = "tar",
+        release_prefix = select({
+            Label("//graal:standalone_" + key): prefix.replace("<graalvm_os>", os).replace("<arch>", arch)
+            for key, os, arch in [
+                ("darwin_aarch64", "macos", "aarch64"),
+                ("linux_amd64", "linux", "amd64"),
+                ("linux_aarch64", "linux", "aarch64"),
+            ]
+        }),
+        **kwargs
+    )
