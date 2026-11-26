@@ -6,6 +6,7 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 OVERLAYS = [
     Label("//graal:benchmark_timer.patch"),
     Label("//graal:jfr_allocation_samples.patch"),
+    Label("//graal:wasm_exports_test.patch"),
     Label("//graal:sdk.patch"),
     Label("//graal:compiler.patch"),
     Label("//graal:espresso-shared.patch"),

@@ -21,7 +21,7 @@ tools/buildbuddy test --config=buildbuddy-rbe --config=elide-processors //graal/
 | Tools | All 18 projects and all 29 distributions, including the Maven POMs, Native Image support TARs and platform-specific VisualVM support archive. The upstream warmup test project declares dependencies and has an empty source tree. | All 60 discovered JUnit classes. |
 | Sandbox Toolchains | 5 of 31 projects and 8 of 31 distributions. The three native musl launchers, their tool aliases, the Rust tool aliases and the Java distributions build from source. | A packaged compiler alias invokes the pinned SDK clang and compiles a C object for stock x86-64 musl. |
 | Sulong | 33 of 77 projects and 14 of 51 distributions on Linux x86-64, including the Sulong core, native-mode and NFI JARs. | CI builds ten LLVM IR fixtures and 4,731 bitcode or native reference outputs from 1,086 additional cases. A separate test runs three reference programs and their bitcode against an upstream CMake build. The Polyglot discovery test reads the installed LLVM language options. |
-| Wasm | All 15 projects and all 16 distributions, including the native and JVM standalone installations and release archives. | Gazelle emits 55 JUnit targets. The 45 classes in `@graal//wasm:qualified_tests` include the C and WAT suites. Bazel builds each fixture with Emscripten or WABT and packages the upstream sidecars and test index. |
+| Wasm | All 15 projects and all 16 distributions, including the native and JVM standalone installations and release archives. | Gazelle emits 55 JUnit targets. The 53 individual classes in `@graal//wasm:qualified_tests` include OSR, tail calls, typed references, and C and WAT fixtures. The aggregate suite has its own label. `WasiOptionsSuite` also has a label. At the source pin, ten relative-mount cases return WASI `NOENT` for an absolute guest path where the suite expects success. Bazel builds each fixture with Emscripten or WABT and packages the upstream sidecars and test index. |
 | Espresso | 18 of 25 projects and 11 of 24 distributions, including the language, JVMCI and the versioned Java I/O module patches. | The packaging test checks release-specific class entries. |
 | Espresso Compiler Stub | Both projects and all three distributions. | The packaging test opens the compiler support TAR and checks corresponding classes and sources. |
 | Web Image | All eight projects and all 12 distributions, including both Native Image macros. | `@graal//web-image:unit_tests` selects the four unit classes. The integration suites need an installed Web Image toolchain. |
@@ -55,6 +55,8 @@ tools/buildbuddy build --config=buildbuddy-rbe --config=source-native-image @gra
 tools/buildbuddy test --config=buildbuddy-rbe --config=source-native-image //graal:sandbox_launcher_test //graal:wasm_native_release_test //graal:wasm_jvm_release_test
 tools/buildbuddy test --config=buildbuddy-rbe --config=labsjdk --config=elide-processors //graal:wasm_thin_launcher_test
 ```
+
+The Wasm core JUnit launcher runs the source-built Graal compiler and Truffle runtime on the pinned Labs JDK. Bazel builds WABT 1.0.42 from the upstream source archive using the BCR’s native C++ targets. The tool accepts mx’s explicit feature flags, including features enabled by default in that release.
 
 ## Build a Sulong fixture
 

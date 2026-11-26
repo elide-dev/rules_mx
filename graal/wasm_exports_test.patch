@@ -1,0 +1,6 @@
+--- a/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/regress/GR54505Test.java
++++ b/wasm/src/org.graalvm.wasm.test/src/org/graalvm/wasm/test/regress/GR54505Test.java
+@@ -116,2 +116,2 @@
+             // Expected argument types
+-            assertEquals(42, mainExports.execute(0.0, 0, 0).asInt());
++            assertEquals(42, main.execute(0.0, 0, 0).asInt());

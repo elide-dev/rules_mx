@@ -8,6 +8,11 @@ on:
 permissions:
   contents: read
 
+# A new commit supersedes earlier tests for the same PR. Each push to main has its own run.
+concurrency:
+  group: bazel-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   test:
     # Self-hosted pool: pushes, manual runs and same-repository PRs only. Pull requests from forks
