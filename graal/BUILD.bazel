@@ -311,6 +311,16 @@ java_test(
 )
 
 java_test(
+    name = "sulong_pipe_test",
+    size = "small",
+    srcs = ["SulongPipeTest.java"],
+    data = ["@graal//sulong:com.oracle.truffle.llvm.tests.pipe.native.library"],
+    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath @graal//sulong:com.oracle.truffle.llvm.tests.pipe.native.library)"],
+    test_class = "graal.SulongPipeTest",
+    deps = ["@contrib_rules_jvm_deps//:junit_junit", "@graal//sulong:com.oracle.truffle.llvm.tests.pipe"],
+)
+
+java_test(
     name = "sulong_language_test",
     size = "small",
     srcs = ["SulongLanguageTest.java"],

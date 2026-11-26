@@ -908,6 +908,8 @@ def _native_shared_recipe(project, pending):
         "deliverable",
         "platformDependent",
         "os_arch",
+        "os",
+        "use_jdk_headers",
         "buildDependencies",
         "license",
         "testProject",
@@ -943,6 +945,11 @@ def _native_shared_recipe(project, pending):
         platform = attrs.get("os_arch", {})
         archs = platform.get(system, platform.get("<others>", {}))
         branch = archs.get(arch, archs.get("<others>", {}))
+        systems = attrs.get("os", {})
+        system_branch = systems.get(system, systems.get("<others>", {}))
+        if set(branch) & set(system_branch):
+            raise _UnsupportedLowering(f"{project.name}: overlapping os and os_arch compiler options")
+        branch = system_branch | branch
         if branch.get("ignore"):
             continue
         if branch.keys() - {"cflags", "ldflags", "ldlibs", "multitarget"}:
@@ -996,9 +1003,13 @@ def _native_shared_recipe(project, pending):
         }
     if not profiles:
         raise _UnsupportedLowering(f"{project.name}: no compatible native toolchain")
-    deps = []
+    deps, jni = [], []
     for name in attrs.get("buildDependencies", []):
         dep = mx.dependency(name, context=project)
+        if dep.suite == project.suite and dep.isJavaProject() and dep._orig_attrs.get("jniHeaders"):
+            pending.append(dep)
+            jni.append(":" + dep.name + ".jni_headers")
+            continue
         if dep.suite != project.suite or not _default_native(dep):
             raise _UnsupportedLowering(
                 f"{project.name}: needs native dependency {name}"
@@ -1008,6 +1019,8 @@ def _native_shared_recipe(project, pending):
     return {
         "name": project.name,
         "root": root,
+        "jni": jni,
+        "use_jdk_headers": attrs.get("use_jdk_headers", False),
         "profiles": profiles,
         "deps": deps,
         "jdk_static_libraries": static_names,
@@ -1020,6 +1033,26 @@ def _native_shared_recipe(project, pending):
         "headers": sorted(root + "/" + f for f in sources.get(".h", [])),
         "testonly": project.is_test_project(),
     }
+
+
+def _native_property_label(owner, expression):
+    """Resolve an mx archive member to the shared library that produces it."""
+    match = re.fullmatch(r"<path:([^>]+)>/<lib:([\w.-]+)>", expression)
+    if not match:
+        return None
+    dist = mx.dependency(match[1], context=owner)
+    if type(dist).__name__ != "LayoutTARDistribution" or dist.suite != owner.suite:
+        return None
+    candidates = []
+    for path, source in mx.LayoutDistribution._walk_static_layout(
+        dist._orig_attrs.get("layout", {}), dist.name, distribution_object=dist, context=dist
+    ):
+        if path != "./" or source["source_type"] != "dependency" or source.get("path"):
+            continue
+        dep = mx.dependency(source["dependency"], context=dist)
+        if _default_native(dep) and dep.deliverable == match[2] and dep.suite == owner.suite:
+            candidates.append(dep)
+    return candidates[0] if len(candidates) == 1 else None
 
 
 def _release_file(dep):
@@ -3094,6 +3127,10 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             and project._orig_attrs.get("javaProperties")
         ):
             for key, value in project._orig_attrs["javaProperties"].items():
+                library = _native_property_label(project, value)
+                if library:
+                    pending.append(library)
+                    continue
                 match = re.fullmatch(r"<path:([^>]+)>", value)
                 dep = mx.dependency(match[1], context=project) if match else None
                 labels = (
@@ -3393,6 +3430,14 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
                         record["manual_test_classes"] = manual
                     if test_runtime:
                         record["test_runtime"] = test_runtime
+                    for owner in mx.classpath_entries([project]):
+                        for key, value in getattr(owner, "_orig_attrs", {}).get("javaProperties", {}).items():
+                            library = _native_property_label(owner, value)
+                            if library and library.suite == project.suite:
+                                pending.append(library)
+                                target = ":" + library.name + ".library"
+                                property_data.append(target)
+                                property_flags.append(f"-D{key}=$${{TEST_SRCDIR}}/$(rlocationpath {target})")
                     if property_data:
                         record["test_data"] = sorted(set(property_data))
                     if flags := property_flags + test_flags.pop(

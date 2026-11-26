@@ -30,7 +30,22 @@ _jdk_libraries = rule(
     },
 )
 
-def mx_native_shared_project(name, srcs, headers, root, profiles, deps = [], jdk_static_libraries = [], testonly = False, visibility = None):
+def _jni_headers_impl(ctx):
+    tree = ctx.actions.declare_directory(ctx.label.name + ".includes")
+    args = ctx.actions.args()
+    args.add_all(["x", ctx.file.jar, "-d", tree.path])
+    ctx.actions.run(executable = ctx.executable._zipper, arguments = [args], inputs = [ctx.file.jar], outputs = [tree], mnemonic = "MxJniHeaders")
+    return [CcInfo(compilation_context = cc_common.create_compilation_context(headers = depset([tree]), includes = depset([tree.path])))]
+
+_jni_headers = rule(
+    implementation = _jni_headers_impl,
+    attrs = {
+        "jar": attr.label(allow_single_file = True, mandatory = True),
+        "_zipper": attr.label(default = "@bazel_tools//tools/zip:zipper", cfg = "exec", executable = True),
+    },
+)
+
+def mx_native_shared_project(name, srcs, headers, root, profiles, deps = [], jni = [], use_jdk_headers = False, jdk_static_libraries = [], testonly = False, visibility = None):
     public = [header for header in headers if header.startswith(root + "/include/")]
     private = [header for header in headers if header not in public]
     cc_library(
@@ -40,11 +55,18 @@ def mx_native_shared_project(name, srcs, headers, root, profiles, deps = [], jdk
         testonly = testonly,
         visibility = visibility,
     )
+    jni_deps = ["@rules_java//toolchains:jni"] if use_jdk_headers else []
+    for jar in jni:
+        target = name + ".jni/" + jar.removeprefix(":")
+        _jni_headers(name = target, jar = jar, testonly = testonly)
+        jni_deps.append(":" + target)
+    binaries = {}
     variants = {}
     for profile, recipe in profiles.items():
         condition = Label("//tools/cc:profile_" + profile)
         binary = name + "/" + profile + "/" + recipe["filename"]
-        linkdeps = [dep + ".headers" for dep in deps]
+        binaries[condition] = ":" + binary
+        linkdeps = [dep + ".headers" for dep in deps] + jni_deps
         if jdk_static_libraries:
             linker = name + "/" + profile + "/jdk-static"
             _jdk_libraries(name = linker, libraries = jdk_static_libraries, platform = recipe["member"].split("/")[0], testonly = testonly)
@@ -63,6 +85,13 @@ def mx_native_shared_project(name, srcs, headers, root, profiles, deps = [], jdk
             testonly = testonly,
         )
         variants[condition] = {":" + binary: recipe["member"]} | {h: h.removeprefix(root + "/") for h in public}
+    native.filegroup(
+        name = name + ".library",
+        srcs = select({condition: [label] for condition, label in binaries.items()} | {"//conditions:default": []}),
+        target_compatible_with = select({condition: [] for condition in binaries} | {"//conditions:default": ["@platforms//:incompatible"]}),
+        visibility = visibility,
+        testonly = testonly,
+    )
     mx_project_files(
         name = name,
         primary = select({Label("//tools/cc:profile_" + profile): recipe["member"] for profile, recipe in profiles.items()} | {"//conditions:default": ""}),

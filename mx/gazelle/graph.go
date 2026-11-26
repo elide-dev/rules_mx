@@ -131,6 +131,8 @@ func (g *importer) loadGraph(root, filename string, seen map[label.Label]bool) e
 		NativeShared []struct {
 			Name, Root          string
 			Srcs, Headers, Deps []string
+			JNI                 []string
+			UseJDKHeaders       bool     `json:"use_jdk_headers"`
 			JDKStaticLibraries  []string `json:"jdk_static_libraries"`
 			Profiles            map[string]map[string]interface{}
 			Testonly            bool
@@ -461,6 +463,12 @@ func (g *importer) loadGraph(root, filename string, seen map[label.Label]bool) e
 		r.SetAttr("profiles", p.Profiles)
 		r.SetAttr("srcs", p.Srcs)
 		r.SetAttr("headers", p.Headers)
+		if p.UseJDKHeaders {
+			r.SetAttr("use_jdk_headers", true)
+		}
+		if len(p.JNI) > 0 {
+			r.SetAttr("jni", p.JNI)
+		}
 		if len(p.JDKStaticLibraries) > 0 {
 			r.SetAttr("jdk_static_libraries", p.JDKStaticLibraries)
 		}
@@ -741,7 +749,7 @@ func graphKind(k string) bool {
 func (g *importer) Kinds() map[string]rule.KindInfo {
 	kinds := g.javaLanguage.Kinds()
 	managed := map[string]bool{}
-	for _, a := range strings.Fields("parent_release provenance suites graalvm_version filename jdk_static_libraries headers profiles os_layouts jdk_archive launcher actual install prefix jdk_homes platform_copts main_class output image_args classpath modulepath links windows_command runtime roots builders lines java_args groups exports native_cases copts includes sidecars wat2wasm wasm2wat tool sdk modules languages variants config root cases llvm_link format members file_list archive_imports overlays shade shade_inputs manifest out content contents directives release snippets_pattern archived_libraries jmh_metadata jni_services truffle_services graal_services graal_test_services module_name add_exports module_exports jni_headers abi_after_javac copies literals srcs deps packages launcher tags data runtime_deps jvm_flags test_class project processor_class generates_api plugins resources mx_resource_root mx_resource_roots unified_release javac_opts javacopts testonly visibility") {
+	for _, a := range strings.Fields("jni use_jdk_headers parent_release provenance suites graalvm_version filename jdk_static_libraries headers profiles os_layouts jdk_archive launcher actual install prefix jdk_homes platform_copts main_class output image_args classpath modulepath links windows_command runtime roots builders lines java_args groups exports native_cases copts includes sidecars wat2wasm wasm2wat tool sdk modules languages variants config root cases llvm_link format members file_list archive_imports overlays shade shade_inputs manifest out content contents directives release snippets_pattern archived_libraries jmh_metadata jni_services truffle_services graal_services graal_test_services module_name add_exports module_exports jni_headers abi_after_javac copies literals srcs deps packages launcher tags data runtime_deps jvm_flags test_class project processor_class generates_api plugins resources mx_resource_root mx_resource_roots unified_release javac_opts javacopts testonly visibility") {
 		managed[a] = true
 	}
 	for _, k := range strings.Fields("mx_thin_launcher mx_patch_module mx_jvmci_library mx_shaded_java mx_files mx_project mx_whole_java mx_processed_java mx_processor mx_test_class") {

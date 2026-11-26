@@ -2,12 +2,13 @@ diff --git a/sulong/BUILD.bazel b/sulong/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/sulong/BUILD.bazel
-@@ -0,0 +1,2475 @@
+@@ -0,0 +1,2624 @@
 +load("@rules_mx//graal:layout.bzl", "mx_os_layout")
 +load("@rules_mx//graal:sulong_fixture_check.bzl", "sulong_fixture_check")
 +load("@rules_mx//mx:bitcode.bzl", "mx_bitcode_suite")
-+load("@rules_mx//mx:graph.bzl", "mx_exported_tar", "mx_jar_dist", "mx_pom_dist", "mx_processed_java", "mx_project", "mx_whole_java")
++load("@rules_mx//mx:graph.bzl", "mx_exported_tar", "mx_jar_dist", "mx_pom_dist", "mx_processed_java", "mx_project", "mx_test_class", "mx_whole_java")
 +load("@rules_mx//mx:native_image.bzl", "mx_native_image_executable", "mx_native_image_library", "mx_toolchain_tool_layout")
++load("@rules_mx//mx:native_project.bzl", "mx_native_shared_project")
 +load("@rules_mx//mx:project_files.bzl", "mx_project_files")
 +load("@rules_mx//mx:sulong_cmake.bzl", "mx_sulong_cmake_suite")
 +load("@rules_mx//mx:thin_launcher.bzl", "mx_thin_launcher")
@@ -52,9 +53,12 @@ new file mode 100644
 +        ":com.oracle.truffle.llvm.parser.factories",
 +        ":com.oracle.truffle.llvm.runtime",
 +        ":com.oracle.truffle.llvm.spi",
++        ":com.oracle.truffle.llvm.tests.api",
 +        ":com.oracle.truffle.llvm.tests.bitcode.other.native",
 +        ":com.oracle.truffle.llvm.tests.cmake",
++        ":com.oracle.truffle.llvm.tests.harness",
 +        ":com.oracle.truffle.llvm.tests.irdebug.native",
++        ":com.oracle.truffle.llvm.tests.pipe",
 +        ":com.oracle.truffle.llvm.toolchain.launchers",
 +        ":com.oracle.truffle.llvm.tools",
 +        ":graalvm-native-tool",
@@ -62,6 +66,11 @@ new file mode 100644
 +        ":sulong_licenses",
 +        ":sulong_thin_launcher",
 +    ] + select({
++        "@rules_mx//tools/cc:profile_linux_amd64": [":com.oracle.truffle.llvm.tests.pipe.native"],
++        "@rules_mx//tools/cc:profile_linux_arm64": [":com.oracle.truffle.llvm.tests.pipe.native"],
++        "@rules_mx//tools/cc:profile_macos_arm64": [":com.oracle.truffle.llvm.tests.pipe.native"],
++        "//conditions:default": [],
++    }) + select({
 +        "@rules_mx//tools:exec_linux_amd64": [
 +            ":com.oracle.truffle.llvm.tests.bitcode.amd64.native",
 +            ":com.oracle.truffle.llvm.tests.bitcode.native",
@@ -493,6 +502,91 @@ new file mode 100644
 +    deps = ["//truffle:TRUFFLE_API"],
 +)
 +
++mx_processed_java(
++    name = "com.oracle.truffle.llvm.tests.api",
++    testonly = True,
++    srcs = ["//sulong/tests/com.oracle.truffle.llvm.tests.api/src/com/oracle/truffle/llvm/tests/api:com.oracle.truffle.llvm.tests.api.srcs"],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++    ],
++    plugins = [
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":com.oracle.truffle.llvm.api",
++        ":com.oracle.truffle.llvm.tests.pipe",
++        "//sdk:POLYGLOT",
++        "//truffle:TRUFFLE_API",
++        "//truffle:TRUFFLE_TCK",
++        "@contrib_rules_jvm_deps//:junit_junit",
++        "@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
++    ],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.api.com.oracle.truffle.llvm.tests.api.ToolchainAPITest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.api",
++    test_class = "com.oracle.truffle.llvm.tests.api.ToolchainAPITest",
++)
++
++mx_processed_java(
++    name = "com.oracle.truffle.llvm.tests.harness",
++    testonly = True,
++    srcs = ["//sulong/tests/com.oracle.truffle.llvm.tests.harness/src/com/oracle/truffle/llvm/tests/harness:com.oracle.truffle.llvm.tests.harness.srcs"],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++        "--add-modules",
++        "java.logging,jdk.unsupported",
++    ],
++    plugins = [
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":com.oracle.truffle.llvm.tests.pipe",
++        "//sdk:POLYGLOT",
++        "//truffle:TRUFFLE_API",
++        "@contrib_rules_jvm_deps//:junit_junit",
++        "@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
++    ],
++)
++
++mx_processed_java(
++    name = "com.oracle.truffle.llvm.tests.pipe",
++    testonly = True,
++    srcs = ["//sulong/tests/com.oracle.truffle.llvm.tests.pipe/src/com/oracle/truffle/llvm/tests/pipe:com.oracle.truffle.llvm.tests.pipe.srcs"],
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++    ],
++    jni_headers = True,
++    visibility = ["//visibility:public"],
++)
++
 +mx_whole_java(
 +    name = "com.oracle.truffle.llvm.toolchain.launchers",
 +    srcs = [
@@ -817,6 +911,61 @@ new file mode 100644
 +    release = 21,
 +    visibility = ["//visibility:public"],
 +    deps = ["//sdk:LAUNCHER_COMMON"],
++)
++
++mx_native_shared_project(
++    name = "com.oracle.truffle.llvm.tests.pipe.native",
++    testonly = True,
++    srcs = ["tests/com.oracle.truffle.llvm.tests.pipe.native/src/capture.cc"],
++    headers = [],
++    jni = [":com.oracle.truffle.llvm.tests.pipe.jni_headers"],
++    profiles = {
++        "linux_amd64": {
++            "copts": [
++                "-g",
++                "-O3",
++                "-Wall",
++                "-Werror",
++            ],
++            "filename": "libpipe.so",
++            "link_inputs": [
++            ],
++            "linkopts": [
++            ],
++            "member": "libpipe.so",
++        },
++        "linux_arm64": {
++            "copts": [
++                "-g",
++                "-O3",
++                "-Wall",
++                "-Werror",
++            ],
++            "filename": "libpipe.so",
++            "link_inputs": [
++            ],
++            "linkopts": [
++            ],
++            "member": "libpipe.so",
++        },
++        "macos_arm64": {
++            "copts": [
++                "-g",
++                "-O3",
++                "-Wall",
++                "-Werror",
++            ],
++            "filename": "libpipe.dylib",
++            "link_inputs": [
++            ],
++            "linkopts": [
++            ],
++            "member": "libpipe.dylib",
++        },
++    },
++    root = "tests/com.oracle.truffle.llvm.tests.pipe.native",
++    use_jdk_headers = True,
++    visibility = ["//visibility:public"],
 +)
 +
 +mx_project_files(
@@ -2580,7 +2729,7 @@ diff --git a/sulong/projects/com.oracle.truffle.llvm.launcher/src/com/oracle/tru
 new file mode 100644
 --- /dev/null
 +++ b/sulong/projects/com.oracle.truffle.llvm.launcher/src/com/oracle/truffle/llvm/launcher/BUILD.bazel
-@@ -0,0 +1,36 @@
+@@ -0,0 +1,35 @@
 +load("@rules_java//java:defs.bzl", "java_binary")
 +load("@rules_mx//mx:java.bzl", "elide_java_library")
 +
@@ -2598,7 +2747,6 @@ new file mode 100644
 +    unified_release = 21,
 +    visibility = ["//:__subpackages__"],
 +    deps = [
-+        "//espresso:com.oracle.truffle.espresso.io",
 +        "//sdk:LAUNCHER_COMMON",
 +        "//sdk:POLYGLOT",
 +    ],
@@ -5122,7 +5270,7 @@ diff --git a/sulong/projects/com.oracle.truffle.llvm.tools/src/com/oracle/truffl
 new file mode 100644
 --- /dev/null
 +++ b/sulong/projects/com.oracle.truffle.llvm.tools/src/com/oracle/truffle/llvm/tools/BUILD.bazel
-@@ -0,0 +1,26 @@
+@@ -0,0 +1,25 @@
 +load("@rules_java//java:defs.bzl", "java_binary")
 +load("@rules_mx//mx:java.bzl", "elide_java_library")
 +
@@ -5137,7 +5285,6 @@ new file mode 100644
 +    unified_release = 21,
 +    visibility = ["//:__subpackages__"],
 +    deps = [
-+        "//espresso:com.oracle.truffle.espresso.io",
 +        "//sdk:POLYGLOT",
 +        "//sulong:com.oracle.truffle.llvm.parser",
 +    ],
@@ -5148,4 +5295,43 @@ new file mode 100644
 +    main_class = "com.oracle.truffle.llvm.tools.ExtractBitcode",
 +    visibility = ["//visibility:public"],
 +    runtime_deps = [":tools"],
++)
+diff --git a/sulong/tests/com.oracle.truffle.llvm.tests.api/src/com/oracle/truffle/llvm/tests/api/BUILD.bazel b/sulong/tests/com.oracle.truffle.llvm.tests.api/src/com/oracle/truffle/llvm/tests/api/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/tests/com.oracle.truffle.llvm.tests.api/src/com/oracle/truffle/llvm/tests/api/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.tests.api.srcs",
++    srcs = ["ToolchainAPITest.java"],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/tests/com.oracle.truffle.llvm.tests.harness/src/com/oracle/truffle/llvm/tests/harness/BUILD.bazel b/sulong/tests/com.oracle.truffle.llvm.tests.harness/src/com/oracle/truffle/llvm/tests/harness/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/tests/com.oracle.truffle.llvm.tests.harness/src/com/oracle/truffle/llvm/tests/harness/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.tests.harness.srcs",
++    srcs = ["TestHarness.java"],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/tests/com.oracle.truffle.llvm.tests.pipe/src/com/oracle/truffle/llvm/tests/pipe/BUILD.bazel b/sulong/tests/com.oracle.truffle.llvm.tests.pipe/src/com/oracle/truffle/llvm/tests/pipe/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/tests/com.oracle.truffle.llvm.tests.pipe/src/com/oracle/truffle/llvm/tests/pipe/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.tests.pipe.srcs",
++    srcs = [
++        "CaptureNativeOutput.java",
++        "CaptureOutput.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
 +)
