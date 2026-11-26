@@ -22,6 +22,8 @@ def mx_cmake_project(name, srcs, compiler, config, include_dirs, profiles, testo
     src_group = name + ".cmake_sources"
     native.filegroup(name = src_group, srcs = srcs, testonly = testonly)
     data = [compiler, Label("//tools/cc:target_config"), Label("//tools/cc:all_files")]
+    if source_subdir:
+        data.append(Label("//mx:pack_layout"))
     if wrapper:
         py_binary(name = name + ".compiler_wrapper", main = wrapper, srcs = [wrapper], testonly = testonly)
         data.append(":" + name + ".compiler_wrapper")
@@ -90,6 +92,7 @@ def mx_cmake_project(name, srcs, compiler, config, include_dirs, profiles, testo
             # rules_foreign_cc owns CMAKE_INSTALL_PREFIX. Preserve the directory
             # name under which mx publishes that complete installation.
             stage = 'mv "$$INSTALLDIR" "$$BUILD_TMPDIR/mx-install" && mkdir -p "$$INSTALLDIR" && mv "$$BUILD_TMPDIR/mx-install" "$$INSTALLDIR/%s"' % directories[0]
+            stage += '\n"$$EXT_BUILD_ROOT$$/$(execpath %s)" --materialize-install-links "$$INSTALLDIR/%s" "$$EXT_BUILD_ROOT$$/%s/src" "$$BUILD_TMPDIR"' % (Label("//mx:pack_layout"), directory, native.package_relative_label(srcs[0]).workspace_root)
         else:
             stage = "\n".join(['mkdir -p "$$INSTALLDIR/%s" && cp -L "%s" "$$INSTALLDIR/%s"' % (m.rpartition("/")[0] or ".", m, m) for m in recipe["members"]])
         cmake(
