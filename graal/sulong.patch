@@ -2,7 +2,7 @@ diff --git a/sulong/BUILD.bazel b/sulong/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/sulong/BUILD.bazel
-@@ -0,0 +1,2832 @@
+@@ -0,0 +1,2862 @@
 +load("@rules_mx//graal:layout.bzl", "mx_os_layout")
 +load("@rules_mx//graal:sulong_fixture_check.bzl", "sulong_fixture_check")
 +load("@rules_mx//mx:bitcode.bzl", "mx_bitcode_suite")
@@ -30,6 +30,7 @@ new file mode 100644
 +        ":SULONG_LIBCXX_COMPILER_WRAPPER",
 +        ":SULONG_LIBLLVMVM",
 +        ":SULONG_NATIVE",
++        ":SULONG_NATIVE_LIB_RESOURCES",
 +        ":SULONG_NATIVE_TOOLS",
 +        ":SULONG_NFI",
 +        ":SULONG_STANDALONE_DEPENDENCIES",
@@ -2832,6 +2833,35 @@ new file mode 100644
 +    format = "dir",
 +    members = {
 +        ":libllvmvm": "lib/{basename}",
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_os_layout(
++    name = "SULONG_NATIVE_LIB_RESOURCES",
++    format = "dir",
++    os_layouts = {
++        "linux_amd64": {
++            "archive_imports": {
++                ":com.oracle.truffle.llvm.libraries.native": "bin/*=META-INF/resources/llvm/native-lib/linux/amd64/",
++            },
++            "file_list_entry": "META-INF/resources/llvm/native-lib/linux/amd64/files",
++            "hash_entry": "META-INF/resources/llvm/native-lib/linux/amd64/sha256",
++        },
++        "linux_arm64": {
++            "archive_imports": {
++                ":com.oracle.truffle.llvm.libraries.native": "bin/*=META-INF/resources/llvm/native-lib/linux/aarch64/",
++            },
++            "file_list_entry": "META-INF/resources/llvm/native-lib/linux/aarch64/files",
++            "hash_entry": "META-INF/resources/llvm/native-lib/linux/aarch64/sha256",
++        },
++        "macos_arm64": {
++            "archive_imports": {
++                ":com.oracle.truffle.llvm.libraries.native": "bin/*=META-INF/resources/llvm/native-lib/darwin/aarch64/",
++            },
++            "file_list_entry": "META-INF/resources/llvm/native-lib/darwin/aarch64/files",
++            "hash_entry": "META-INF/resources/llvm/native-lib/darwin/aarch64/sha256",
++        },
 +    },
 +    visibility = ["//visibility:public"],
 +)

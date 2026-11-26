@@ -2281,6 +2281,8 @@ def _platform_native_layout(dist, pending):
                         f"{dist.name}: required native input missing for {profile}"
                     )
                 spec = "{primary}=" + dest + "{basename}"
+            elif _cmake_native_project(target) and path and path.endswith("/*") and _resource_path(path[:-2]):
+                spec = path + "=" + dest
             elif type(target).__name__ == "LayoutDirDistribution" and path == "*":
                 spec = "=" + dest
             else:

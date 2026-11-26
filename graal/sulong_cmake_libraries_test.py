@@ -1,11 +1,12 @@
 """Check the installed Sulong CMake libraries and their embedded guest bitcode."""
 
+import hashlib
 from pathlib import Path
 import subprocess
 import sys
 
 
-def main(nm, objdump, graal, native):
+def main(nm, objdump, graal, native, resources):
     for library, symbol in [
         (graal, "polyglot_import"),
         (native, "__sulong_posix_open"),
@@ -20,6 +21,16 @@ def main(nm, objdump, graal, native):
         assert ".llvmbc" in sections or "__bitcode" in sections, (library, sections)
     assert Path(graal).name in ("libgraalvm-llvm.so.1", "libgraalvm-llvm.1.dylib")
     assert Path(native).name in ("libsulong-native.so", "libsulong-native.dylib")
+
+    root = Path(resources)
+    (manifest,) = root.glob("META-INF/resources/llvm/native-lib/*/*/files")
+    library = manifest.parent / Path(native).name
+    member = library.relative_to(root).as_posix()
+    assert library.read_bytes() == Path(native).read_bytes()
+    [(listed, mode)] = [line.split(" = ") for line in manifest.read_text().splitlines()]
+    assert listed == member and mode == "rwxr-xr-x", (listed, mode)
+    digest = hashlib.sha256(library.read_bytes() + member.encode()).hexdigest()
+    assert (manifest.parent / "sha256").read_text() == digest
 
 
 if __name__ == "__main__":
