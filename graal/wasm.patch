@@ -2,11 +2,12 @@ diff --git a/wasm/BUILD.bazel b/wasm/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/wasm/BUILD.bazel
-@@ -0,0 +1,2004 @@
+@@ -0,0 +1,1492 @@
 +load("@rules_java//java:java_import.bzl", "java_import")
 +
 +# gazelle:resolve java org.openjdk.jol.info //wasm:JOL
 +load("@rules_java//java:java_plugin.bzl", "java_plugin")
++load("@rules_mx//graal:simplelanguage.bzl", "svm_test_runner")
 +load("@rules_mx//mx:graph.bzl", "mx_distribution_alias", "mx_exported_tar", "mx_jar_dist", "mx_jvmci_library", "mx_pom_dist", "mx_processed_java", "mx_project", "mx_release_archive", "mx_test_class", "mx_whole_java")
 +load("@rules_mx//mx:native_image.bzl", "mx_native_image_library")
 +load("@rules_mx//mx:project_files.bzl", "mx_project_files", "mx_wat_project")
@@ -66,6 +67,15 @@ new file mode 100644
 +    visibility = ["//visibility:public"],
 +)
 +
++svm_test_runner(
++    name = "wasm_junit",
++    file_properties = {"@wabt//src/tools:wat2wasm": "wasmtest.watToWasmExecutable"},
++    jvm_flags = ["-Dpolyglot.engine.AllowExperimentalOptions=true"],
++    modules = [":WASM"],
++    root_modules = ["org.graalvm.wasm"],
++    test_classpath = [":org.graalvm.wasm.test"],
++)
++
 +java_import(
 +    name = "JMH_1_21",
 +    jars = ["@graal_shaded_inputs//:mx_JMH_1_21.jar"],
@@ -122,7 +132,9 @@ new file mode 100644
 +        ":org.graalvm.wasm.test.org.graalvm.wasm.test.WasmMemoryLeakSuite",
 +        ":org.graalvm.wasm.test.org.graalvm.wasm.test.WasmPolyglotTestSuite",
 +        ":org.graalvm.wasm.test.org.graalvm.wasm.test.WasmReturnCallTest",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.WasmStackTraceTest",
 +        ":org.graalvm.wasm.test.org.graalvm.wasm.test.gc.GCSuite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.regress.GR54505Test",
 +        ":org.graalvm.wasm.test.org.graalvm.wasm.test.regress.WasiRegressionTests",
 +        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.WasmImplementationLimitationsSuite",
 +        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.arithmetic.Float32Suite",
@@ -130,8 +142,13 @@ new file mode 100644
 +        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.arithmetic.Integer32Suite",
 +        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.arithmetic.Integer64Suite",
 +        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.arithmetic.ReferenceTypeSuite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.arithmetic.WideArithmeticSuite",
 +        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.bytecode.BranchHintSuite",
 +        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.bytecode.BytecodeSuite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.bytecode.MultiInstantiationSuite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.bytecode.WasmBranchTargetSuite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.bytecode.WasmLegacyCatchOSRSuite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.bytecode.WasmOSRSuite",
 +        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.compiler.CompilationSuite",
 +        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.control.BlockWithLocalsSuite",
 +        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.control.BranchBlockSuite",
@@ -141,6 +158,7 @@ new file mode 100644
 +        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.control.MultiValueSuite",
 +        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.control.MultipleFunctionsSuite",
 +        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.control.SimpleBlockSuite",
++        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.control.TailCallSuite",
 +        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.debugging.DebugObjectFactorySuite",
 +        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.debugging.DebugSourceLoadSuite",
 +        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.debugging.DebugValidationSuite",
@@ -405,850 +423,320 @@ new file mode 100644
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.TypeRepresentationSuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.TypeRepresentationSuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.WasmIndirectCallTest",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.WasmIndirectCallTest",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.WasmJsApiSuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.WasmJsApiSuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.WasmLateLinkingSuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.WasmLateLinkingSuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.WasmMemoryLeakSuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.WasmMemoryLeakSuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.WasmPolyglotTestSuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.WasmPolyglotTestSuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.WasmReturnCallTest",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.WasmReturnCallTest",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.WasmStackTraceTest",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.WasmStackTraceTest",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.WasmTestSuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.WasmTestSuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.gc.GCSuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.gc.GCSuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.regress.GR54505Test",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.regress.GR54505Test",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.regress.WasiRegressionTests",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.regress.WasiRegressionTests",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.WasmImplementationLimitationsSuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.WasmImplementationLimitationsSuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.arithmetic.Float32Suite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.arithmetic.Float32Suite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.arithmetic.Float64Suite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.arithmetic.Float64Suite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.arithmetic.Integer32Suite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.arithmetic.Integer32Suite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.arithmetic.Integer64Suite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.arithmetic.Integer64Suite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.arithmetic.ReferenceTypeSuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.arithmetic.ReferenceTypeSuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.arithmetic.WideArithmeticSuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.arithmetic.WideArithmeticSuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.bytecode.BranchHintSuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.bytecode.BranchHintSuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.bytecode.BytecodeSuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.bytecode.BytecodeSuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.bytecode.MultiInstantiationSuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.bytecode.MultiInstantiationSuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.bytecode.WasmBranchTargetSuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.bytecode.WasmBranchTargetSuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.bytecode.WasmLegacyCatchOSRSuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.bytecode.WasmLegacyCatchOSRSuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.bytecode.WasmOSRSuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.bytecode.WasmOSRSuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.compiler.CompilationSuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.compiler.CompilationSuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.control.BlockWithLocalsSuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.control.BlockWithLocalsSuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.control.BranchBlockSuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.control.BranchBlockSuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.control.ExceptionSuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.control.ExceptionSuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.control.IfThenElseSuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.control.IfThenElseSuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.control.LoopBlockSuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.control.LoopBlockSuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.control.MultiValueSuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.control.MultiValueSuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.control.MultipleFunctionsSuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.control.MultipleFunctionsSuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.control.SimpleBlockSuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.control.SimpleBlockSuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.control.TailCallSuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.control.TailCallSuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.debugging.DebugObjectFactorySuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.debugging.DebugObjectFactorySuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.debugging.DebugSourceLoadSuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.debugging.DebugSourceLoadSuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.debugging.DebugValidationSuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.debugging.DebugValidationSuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.linker.LinkerSuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.linker.LinkerSuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.memory.Memory64Suite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.memory.Memory64Suite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.memory.MemoryFillSuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.memory.MemoryFillSuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.memory.MemorySuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.memory.MemorySuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.memory.MultiMemorySuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.memory.MultiMemorySuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.memory.ThreadsSuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.memory.ThreadsSuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.table.Table64Suite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.table.Table64Suite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.table.TableSuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.table.TableSuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.validation.MultiValueValidationSuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.validation.MultiValueValidationSuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.validation.ReferenceTypesValidationSuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.validation.ReferenceTypesValidationSuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.validation.ValidationSuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.validation.ValidationSuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.wasi.WasiOptionsSuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.wasi.WasiOptionsSuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.wasi.WasiSuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.wasi.WasiSuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.webassembly.EmscriptenSuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.webassembly.EmscriptenSuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_test_class(
 +    name = "org.graalvm.wasm.test.org.graalvm.wasm.test.suites.webassembly.IssueSuite",
-+    data = ["@wabt//src/tools:wat2wasm"],
-+    jvm_flags = [
-+        "-Dwasmtest.watToWasmExecutable=$(rootpath @wabt//src/tools:wat2wasm)",
-+        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-+        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-+        "--enable-native-access=ALL-UNNAMED",
-+    ],
++    launcher = ":wasm_junit",
 +    test_class = "org.graalvm.wasm.test.suites.webassembly.IssueSuite",
-+    runtime_deps = [
-+        ":org.graalvm.wasm.test",
-+        "//truffle:TRUFFLE_RUNTIME",
-+    ],
 +)
 +
 +mx_whole_java(

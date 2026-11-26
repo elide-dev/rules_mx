@@ -29,6 +29,14 @@ def _sl_main_impl(ctx):
     probe = ctx.file.probe
     property_jars = [jar for dep in ctx.attr.property_jars for jar in dep[JavaInfo].runtime_output_jars]
     jar_properties = {ctx.attr.jar_property: [_runfile(ctx, jar) for jar in property_jars]} if ctx.attr.jar_property else {}
+    file_properties = {}
+    inputs = []
+    for target, property_name in ctx.attr.file_properties.items():
+        [file] = target.files.to_list()
+        if property_name in file_properties:
+            fail("Duplicate file property " + property_name)
+        file_properties[property_name] = _runfile(ctx, file)
+        inputs.append(file)
     ctx.actions.expand_template(
         template = ctx.file._template,
         output = ctx.outputs.out,
@@ -48,9 +56,14 @@ def _sl_main_impl(ctx):
             "{PROBE}": repr(_runfile(ctx, probe)) if probe else "None",
             "{MODULE_ACCESS}": repr(ctx.attr.module_access),
             "{JAR_PROPERTIES}": repr(jar_properties),
+            "{FILE_PROPERTIES}": repr(file_properties),
         },
     )
-    return [DefaultInfo(files = depset([ctx.outputs.out]), runfiles = ctx.runfiles(transitive_files = depset(classpath + property_jars + ctx.files.hsdis + ctx.files.native_test + ([probe] if probe else []), transitive = [modules, runtime.files])))]
+    runfiles = ctx.runfiles(transitive_files = depset(
+        classpath + property_jars + inputs + ctx.files.hsdis + ctx.files.native_test + ([probe] if probe else []),
+        transitive = [modules, runtime.files],
+    )).merge_all([target[DefaultInfo].default_runfiles for target in ctx.attr.file_properties])
+    return [DefaultInfo(files = depset([ctx.outputs.out]), runfiles = runfiles)]
 
 _sl_main = rule(
     implementation = _sl_main_impl,
@@ -70,6 +83,7 @@ _sl_main = rule(
         "module_access": attr.bool(),
         "dependencies_first": attr.bool(),
         # A system property listing the JARs of property_jars, such as the JARs a test inspects.
+        "file_properties": attr.label_keyed_string_dict(allow_files = True),
         "jar_property": attr.string(),
         "property_jars": attr.label_list(providers = [JavaInfo]),
         "labs_runtime": attr.label(),
@@ -202,7 +216,7 @@ def panama_test(name, test_class):
     )
     py_test(name = name, main = name + ".py", srcs = [":" + name + ".main"], data = [":" + name + ".main"], size = "medium")
 
-def svm_test_runner(name, test_classpath, jvm_flags = [], modules = [], root_modules = [], jar_property = None, property_jars = []):
+def svm_test_runner(name, test_classpath, jvm_flags = [], modules = [], root_modules = [], jar_property = None, property_jars = [], file_properties = {}):
     """Run SubstrateVM JVM unit tests alongside the source-built Graal compiler.
 
     The launcher opens JVMCI, compiler and GraalVM module packages to the tests, as mx's
@@ -229,6 +243,7 @@ def svm_test_runner(name, test_classpath, jvm_flags = [], modules = [], root_mod
         labs_runtime = Label("//tools:labs_runtime"),
         test_classpath = test_classpath + [Label("//graal:compiler_junit")],
         jvm_flags = ["--enable-native-access=ALL-UNNAMED", "--add-exports=java.base/jdk.internal.module=ALL-UNNAMED"] + jvm_flags,
+        file_properties = file_properties,
         jar_property = jar_property,
         property_jars = property_jars,
         testonly = True,

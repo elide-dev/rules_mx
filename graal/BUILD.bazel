@@ -11,6 +11,7 @@ load(":sdk_llvm.bzl", "sdk_llvm_link", "sulong_fixture_sdk")
 
 exports_files([
     "benchmark_timer.patch",
+    "wasm_exports_test.patch",
     "compiler.patch",
     "espresso-shared.patch",
     "espresso.patch",
@@ -31,6 +32,7 @@ exports_files([
     "regex.patch",
     "tools.patch",
     "wasm.patch",
+    "wabt_1_0_42.patch",
     "sulong.patch",
     "sulong_fixture_test.py",
     "visualvm.json",

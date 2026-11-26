@@ -1,0 +1,51 @@
+diff --git a/MODULE.bazel b/MODULE.bazel
+--- a/MODULE.bazel
++++ b/MODULE.bazel
+@@ -1,5 +1,5 @@
+ module(
+     name = "wabt",
+-    version = "1.0.37.bcr.1",
++    version = "1.0.42",
+     bazel_compatibility = [">=8.0.0"],
+     compatibility_level = 1,
+diff --git a/build/wabt_build.bzl b/build/wabt_build.bzl
+--- a/build/wabt_build.bzl
++++ b/build/wabt_build.bzl
+@@ -121,4 +121,4 @@
+ _WABT_CXXOPTS_MSVC = [
+-    "/std:c++17",
++    "/std:c++20",
+     "/D_HAS_EXCEPTIONS=0",
+     # Warnings silenced per CMakeLists.txt
+@@ -133,4 +133,4 @@
+ _WABT_CXXOPTS_CLANG_GCC = [
+-    "-std=c++17",
++    "-std=c++20",
+     "-fno-exceptions",
+     "-D__STDC_LIMIT_MACROS=1",
+diff --git a/include/wabt/BUILD.bazel b/include/wabt/BUILD.bazel
+--- a/include/wabt/BUILD.bazel
++++ b/include/wabt/BUILD.bazel
+@@ -10,4 +10,4 @@
+         "//conditions:default": "",
+     }),
+-    version = module_version(),
++    version = "1.0.42",
+ )
+diff --git a/src/feature.cc b/src/feature.cc
+--- a/src/feature.cc
++++ b/src/feature.cc
+@@ -23,9 +23,6 @@
+ void Features::AddOptions(OptionParser* parser) {
+ #define WABT_FEATURE(variable, flag, default_, help)       \
+-  if (default_ == true) {                                  \
+-    parser->AddOption("disable-" flag, "Disable " help,    \
+-                      [this]() { disable_##variable(); }); \
+-  } else {                                                 \
+-    parser->AddOption("enable-" flag, "Enable " help,      \
+-                      [this]() { enable_##variable(); });  \
+-  }
++  parser->AddOption("disable-" flag, "Disable " help,      \
++                    [this]() { disable_##variable(); });   \
++  parser->AddOption("enable-" flag, "Enable " help,        \
++                    [this]() { enable_##variable(); });

@@ -31,7 +31,32 @@ bazel_dep(name = "emsdk", version = "7.0.1")
 emscripten = use_extension("@emsdk//:emscripten_deps.bzl", "emscripten_deps", dev_dependency = True)
 emscripten.config(version = "4.0.10")
 
-bazel_dep(name = "wabt", version = "1.0.37.bcr.1", dev_dependency = True)
+# Reuse the BCR's native C++ targets for WABT 1.0.42. GraalWasm tests use typed
+# reference and tail-call instructions added after the registry's 1.0.37 release.
+bazel_dep(name = "wabt", version = "1.0.42", dev_dependency = True)
+
+_WABT_OVERLAY = {
+    "BUILD.bazel": "sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=",
+    "MODULE.bazel": "sha256-ctnSLg0SoI6G4IEYF7qdI8IpXoeSthyrK5Sci81XzD0=",
+    "build/BUILD.bazel": "sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=",
+    "build/wabt_build.bzl": "sha256-a5Jn7t+/WDZjf/zhzUER5mzhWns41IhVYj4tpXPMrPc=",
+    "include/wabt/BUILD.bazel": "sha256-Ee2jCK8Yi73cfaVkmhQEVdOLA47Cn9r6UD/w+Z9m+hE=",
+    "src/BUILD.bazel": "sha256-gmn6MOmrOkI6DkybedMq3uR5xJ4385Mu3Tb7AU2G+b4=",
+    "src/tools/BUILD.bazel": "sha256-hW7TDmzsvtYO69A79n2nVSp/m3KuhBdwrIaMz56gBrE=",
+    "third_party/picosha2/BUILD.bazel": "sha256-OMR47fn/GTIk4IQizwgHJPxEySq1qkBBuZGlzW3G3Qg=",
+    "third_party/wasm-c-api/BUILD.bazel": "sha256-Gacj2iQv+/54ih5TnVwq4zCIyaBGWrGqj1UbshSr2GI=",
+}
+
+archive_override(
+    module_name = "wabt",
+    patch_strip = 1,
+    patches = ["//graal:wabt_1_0_42.patch"],
+    remote_file_integrity = _WABT_OVERLAY,
+    remote_file_urls = {path: ["https://bcr.bazel.build/modules/wabt/1.0.37.bcr.1/overlay/" + path] for path in _WABT_OVERLAY},
+    sha256 = "a76cda3c174a43097863a07fc0b0c202f770f53e21806ea2636f167d1ffb1e30",
+    strip_prefix = "wabt-1.0.42",
+    urls = ["https://github.com/WebAssembly/wabt/releases/download/1.0.42/wabt-1.0.42.tar.xz"],
+)
 
 bazel_dep(name = "gazelle", version = "0.54.0")
 bazel_dep(name = "contrib_rules_jvm", version = "0.35.0")

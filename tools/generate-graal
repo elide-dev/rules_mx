@@ -707,16 +707,10 @@ PARTIAL_SUITES = (
 
 # These targets remain individually runnable. New classes join CI on regeneration.
 WASM_OPEN_TESTS = {
-    "org.graalvm.wasm.test.WasmTestSuite",  # Aggregates several classes below.
-    "org.graalvm.wasm.test.suites.arithmetic.WideArithmeticSuite",  # Optimizing runtime.
-    "org.graalvm.wasm.test.suites.bytecode.WasmLegacyCatchOSRSuite",
-    "org.graalvm.wasm.test.suites.bytecode.WasmOSRSuite",
-    "org.graalvm.wasm.test.suites.bytecode.WasmBranchTargetSuite",  # WABT br_on_null.
-    "org.graalvm.wasm.test.suites.control.TailCallSuite",  # WABT return_call_ref.
-    "org.graalvm.wasm.test.suites.bytecode.MultiInstantiationSuite",  # Invalid value type.
-    "org.graalvm.wasm.test.WasmStackTraceTest",  # Bytecode index differs.
-    "org.graalvm.wasm.test.regress.GR54505Test",  # Calls execute on the exports object.
-    "org.graalvm.wasm.test.suites.wasi.WasiOptionsSuite",  # Preopened directory lookup.
+    # The aggregate runs the same leaf classes. Keep each leaf individually cacheable in CI.
+    "org.graalvm.wasm.test.WasmTestSuite",
+    # Relative WASI mount names fail the suite's absolute guest path assertions at the source pin.
+    "org.graalvm.wasm.test.suites.wasi.WasiOptionsSuite",
 }
 
 
@@ -2257,27 +2251,10 @@ def prepare_suite(suite, stage):
                 "wasm:org.graalvm.wasm.testcases.test=--enable-native-access=ALL-UNNAMED",
             ]
         )
-        project = "wasm:org.graalvm.wasm.test"
-        export_options.extend(
-            [
-                "--test-data",
-                f"{project}={wat2wasm}",
-                "--test-runtime",
-                f"{project}=:org.graalvm.wasm.test",
-                "--test-runtime",
-                f"{project}=//truffle:TRUFFLE_RUNTIME",
-                *(
-                    arg
-                    for flag in (
-                        f"-Dwasmtest.watToWasmExecutable=$(rootpath {wat2wasm})",
-                        "-Dpolyglot.engine.AllowExperimentalOptions=true",
-                        "-Dpolyglot.engine.WarnInterpreterOnly=false",
-                        "--enable-native-access=ALL-UNNAMED",
-                    )
-                    for arg in ("--test-jvm-flag", f"{project}={flag}")
-                ),
-            ]
-        )
+        export_options += [
+            "--test-launcher",
+            "wasm:org.graalvm.wasm.test=:wasm_junit",
+        ]
     if suite != "vm":
         export_options = [
             *export_options,
@@ -2396,6 +2373,8 @@ def prepare_suite(suite, stage):
                 ]
         if suite == "wasm":
             rules += [
+                'load("@rules_mx//graal:simplelanguage.bzl", "svm_test_runner")',
+                'svm_test_runner(name = "wasm_junit", test_classpath = [":org.graalvm.wasm.test"], modules = [":WASM"], root_modules = ["org.graalvm.wasm"], jvm_flags = ["-Dpolyglot.engine.AllowExperimentalOptions=true"], file_properties = {"@wabt//src/tools:wat2wasm": "wasmtest.watToWasmExecutable"})',
                 "# gazelle:resolve java org.openjdk.jol.info //wasm:JOL",
                 jmh_rules(directory)[1],
                 *(
