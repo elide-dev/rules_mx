@@ -1,7 +1,7 @@
 {
-  "sha256": "a174bfe9204342b53d0e174c9d44a38a73eef2cdd799384cdb59caac95ab738b",
-  "strip_prefix": "graal-7b7825ae92c83d91bb20d76bc64b68b344449cf3",
+  "sha256": "e98cff34bca09cb7d13d0435b09faa01cf27ad077149cb0940032531b13b8b12",
+  "strip_prefix": "graal-21dea4deb60d8aa9b07cbd3cc77b1581b61b6fb2",
   "urls": [
-    "https://codeload.github.com/oracle/graal/tar.gz/7b7825ae92c83d91bb20d76bc64b68b344449cf3"
+    "https://codeload.github.com/elide-dev/graal/tar.gz/21dea4deb60d8aa9b07cbd3cc77b1581b61b6fb2"
   ]
 }

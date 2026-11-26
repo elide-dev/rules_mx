@@ -40,6 +40,7 @@ type project struct {
 	ResourceRoots                        []string `json:"resource_roots"`
 	TestLauncher                         string   `json:"test_launcher"`
 	ManualTests                          bool     `json:"manual_tests"`
+	ManualTestClasses                    []string `json:"manual_test_classes"`
 	TestRuntime                          []string `json:"test_runtime"`
 	TestData                             []string `json:"test_data"`
 	TestJVMFlags                         []string `json:"test_jvm_flags"`
@@ -278,7 +279,7 @@ func (g *importer) loadGraph(root, filename string, seen map[label.Label]bool) e
 			if len(p.TestJVMFlags) > 0 {
 				t.SetAttr("jvm_flags", p.TestJVMFlags)
 			}
-			if p.ManualTests {
+			if p.ManualTests || slices.Contains(p.ManualTestClasses, class) {
 				t.SetAttr("tags", []string{"manual"})
 			}
 			t.SetAttr("test_class", class)

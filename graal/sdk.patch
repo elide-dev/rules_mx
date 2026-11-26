@@ -2,7 +2,7 @@ diff --git a/sdk/BUILD.bazel b/sdk/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/sdk/BUILD.bazel
-@@ -0,0 +1,1224 @@
+@@ -0,0 +1,1225 @@
 +load("@rules_mx//graal:nativebridge.bzl", "nativebridge_launcher")
 +load("@rules_mx//graal:sdk_llvm.bzl", "sdk_llvm_distributions", "sdk_toolchain_descriptors")
 +load("@rules_mx//graal:toolchain_test.bzl", "sdk_toolchain_test")
@@ -657,11 +657,12 @@ new file mode 100644
 +        "java.logging",
 +        "-Xlint:none",
 +        "-Xep:UnnecessaryTypeArgument:OFF",
++        "-Xep:ComparisonOutOfRange:WARN",
 +    ],
 +    mx_resource_root = "src/org.graalvm.shadowed.org.jline/src",
 +    release = 17,
 +    resources = ["//sdk/src/org.graalvm.shadowed.org.jline/src/META-INF/native-image/org.graalvm.shadowed/jline:org.graalvm.shadowed.org.jline.resources"],
-+    shade = "{\"packages\": {\"org.jline\": \"org.graalvm.shadowed.org.jline\"}, \"include\": [\"org/jline/utils/*.caps\", \"org/jline/utils/*.txt\", \"org/jline/builtins/*.txt\"], \"exclude\": [\"META-INF/MANIFEST.MF\", \"org/jline/builtins/TTop.java\", \"META-INF/services/**\", \"META-INF/maven/**\", \"META-INF/native-image/**\"], \"patch\": {\"org/jline/builtins/Nano.java\": {\"import org.mozilla.universalchardet.UniversalDetector;\": \"\", \"\\\\Z\": \"\\n                // Stub for the removed class, we put it at the end of the file\\n                class UniversalDetector {\\n                    UniversalDetector(Object dummy) {}\\n                    void handleData(byte[] a, int b, int c) {}\\n                    void dataEnd() {}\\n                    String getDetectedCharset() { return null; }\\n                }\"}, \"org/jline/terminal/TerminalBuilder.java\": {\"private TerminalBuilder\\\\(\\\\) {}\": \"private TerminalBuilder() { org.graalvm.shadowed.org.jline.terminal.JLineLoggingSupport.init(); }\"}, \"org/jline/terminal/impl/AbstractPty.java\": {\"import org.graalvm.shadowed.org.jline.nativ.JLineLibrary;\": \"\", \"import org.graalvm.shadowed.org.jline.nativ.JLineNativeLoader;\": \"\", \"JLineNativeLoader.initialize\\\\(\\\\);\": \"\", \"return JLineLibrary.newFileDescriptor\\\\(fd\\\\);\": \"throw new RuntimeException(\\\"not implemented\\\");\"}, \"org/jline/terminal/impl/exec/ExecTerminalProvider.java\": {\"import org.graalvm.shadowed.org.jline.nativ.JLineLibrary;\": \"\", \"import org.graalvm.shadowed.org.jline.nativ.JLineNativeLoader;\": \"\", \"JLineNativeLoader.initialize\\\\(\\\\);\": \"\", \"return JLineLibrary.newRedirectPipe\\\\(fd\\\\);\": \"throw new RuntimeException(\\\"not implemented\\\");\"}, \"org/jline/terminal/spi/TerminalProvider.java\": {\"import org.graalvm.shadowed.org.jline.terminal.Terminal;\": \"\\n                import org.graalvm.shadowed.org.jline.terminal.Terminal;\\n                import org.graalvm.shadowed.org.jline.terminal.impl.exec.ExecTerminalProvider;\\n              \", \"static TerminalProvider load\\\\(String name\\\\) throws IOException \\\\x7b\": \"\\n              static TerminalProvider load(String name) throws IOException {\\n                  switch (name) {\\n                      case \\\"exec\\\":\\n                          return new ExecTerminalProvider();\\n                      case \\\"ffm\\\":\\n                          TerminalProvider p = org.graalvm.shadowed.org.jline.terminal.impl.ffm.FFMTerminalProviderLoader.load();\\n                          if (p != null) {\\n                              return p;\\n                          }\\n                      default:\\n                          if (Boolean.TRUE) { // to avoid unreachable code below the switch\\n                              throw new IOException(\\\"Unable to find terminal provider \\\" + name);\\n                          }\\n                  }\\n                  // }\\n              \"}}}",
++    shade = "{\"packages\": {\"org.jline\": \"org.graalvm.shadowed.org.jline\"}, \"include\": [\"org/jline/utils/*.caps\", \"org/jline/utils/*.txt\", \"org/jline/builtins/*.txt\"], \"exclude\": [\"META-INF/MANIFEST.MF\", \"module-info.java\", \"org/jline/builtins/TTop.java\", \"org/jline/builtins/InteractiveCommandGroup.java\", \"org/jline/builtins/PosixCommandGroup.java\", \"org/jline/builtins/SwingTerminal.java\", \"org/jline/builtins/WebTerminal.java\", \"org/jline/terminal/impl/ITerm2Graphics.java\", \"org/jline/terminal/impl/KittyGraphics.java\", \"org/jline/terminal/impl/SixelGraphics.java\", \"org/jline/terminal/impl/TerminalGraphics.java\", \"org/jline/terminal/impl/TerminalGraphicsManager.java\", \"META-INF/services/**\", \"META-INF/jline/**\", \"META-INF/maven/**\", \"META-INF/native-image/**\"], \"patch\": {\"org/jline/builtins/Nano.java\": {\"import org.mozilla.universalchardet.UniversalDetector;\": \"\", \"\\\\Z\": \"\\n                // Stub for the removed class, we put it at the end of the file\\n                class UniversalDetector {\\n                    UniversalDetector(Object dummy) {}\\n                    void handleData(byte[] a, int b, int c) {}\\n                    void dataEnd() {}\\n                    String getDetectedCharset() { return null; }\\n                }\"}, \"org/jline/builtins/PosixCommands.java\": {\"TTop.ttop\\\\(context.terminal\\\\(\\\\), context.out\\\\(\\\\), context.err\\\\(\\\\), argv\\\\);\": \"throw new UnsupportedOperationException(\\\"ttop is not available\\\");\"}, \"org/jline/terminal/TerminalBuilder.java\": {\"private TerminalBuilder\\\\(\\\\) {}\": \"private TerminalBuilder() { org.graalvm.shadowed.org.jline.terminal.JLineLoggingSupport.init(); }\", \"public static final String PROP_PROVIDERS_DEFAULT =\\\\n            String.join\\\\(\\\",\\\", PROP_PROVIDER_FFM, PROP_PROVIDER_JNI, PROP_PROVIDER_EXEC\\\\);\": \"public static final String PROP_PROVIDERS_DEFAULT =\\n            String.join(\\\",\\\", PROP_PROVIDER_FFM, PROP_PROVIDER_EXEC);\", \"checkProvider\\\\(provider, exception, providers, jni, PROP_JNI, PROP_PROVIDER_JNI\\\\);\": \"\"}, \"org/jline/terminal/impl/AbstractPty.java\": {\"import org.graalvm.shadowed.org.jline.nativ.JLineLibrary;\": \"\", \"import org.graalvm.shadowed.org.jline.nativ.JLineNativeLoader;\": \"\", \"JLineNativeLoader.initialize\\\\(\\\\);\": \"\", \"return JLineLibrary.newFileDescriptor\\\\(fd\\\\);\": \"throw new RuntimeException(\\\"not implemented\\\");\"}, \"org/jline/terminal/impl/exec/ExecTerminalProvider.java\": {\"import org.graalvm.shadowed.org.jline.nativ.JLineLibrary;\": \"\", \"import org.graalvm.shadowed.org.jline.nativ.JLineNativeLoader;\": \"\", \"JLineNativeLoader.initialize\\\\(\\\\);\": \"\", \"return JLineLibrary.newRedirectPipe\\\\(fd\\\\);\": \"throw new RuntimeException(\\\"not implemented\\\");\"}, \"org/jline/terminal/spi/TerminalProvider.java\": {\"import org.graalvm.shadowed.org.jline.terminal.Terminal;\": \"\\n                import org.graalvm.shadowed.org.jline.terminal.Terminal;\\n                import org.graalvm.shadowed.org.jline.terminal.impl.exec.ExecTerminalProvider;\\n              \", \"static TerminalProvider load\\\\(String name\\\\) throws IOException \\\\x7b\": \"\\n              static TerminalProvider load(String name) throws IOException {\\n                  switch (name) {\\n                      case \\\"exec\\\":\\n                          return new ExecTerminalProvider();\\n                      case \\\"ffm\\\":\\n                          TerminalProvider p = org.graalvm.shadowed.org.jline.terminal.impl.ffm.FFMTerminalProviderLoader.load();\\n                          if (p != null) {\\n                              return p;\\n                          }\\n                      default:\\n                          if (Boolean.TRUE) { // to avoid unreachable code below the switch\\n                              throw new IOException(\\\"Unable to find terminal provider \\\" + name);\\n                          }\\n                  }\\n                  // }\\n              \"}}}",
 +    shade_inputs = [
 +        "@graal_shaded_inputs//:sdk_JLINE_READER.jar",
 +        "@graal_shaded_inputs//:sdk_JLINE_READER-sources.jar",
@@ -686,7 +687,7 @@ new file mode 100644
 +        "-Xlint:none",
 +    ],
 +    release = 22,
-+    shade = "{\"packages\": {\"org.jline\": \"org.graalvm.shadowed.org.jline\"}, \"exclude\": [\"META-INF/MANIFEST.MF\", \"META-INF/services/**\", \"META-INF/maven/**\", \"META-INF/native-image/**\"]}",
++    shade = "{\"packages\": {\"org.jline\": \"org.graalvm.shadowed.org.jline\"}, \"exclude\": [\"META-INF/MANIFEST.MF\", \"module-info.java\", \"META-INF/services/**\", \"META-INF/jline/**\", \"META-INF/maven/**\", \"META-INF/native-image/**\"]}",
 +    shade_inputs = [
 +        "@graal_shaded_inputs//:sdk_JLINE_TERMINAL_FFM.jar",
 +        "@graal_shaded_inputs//:sdk_JLINE_TERMINAL_FFM-sources.jar",
@@ -753,10 +754,10 @@ new file mode 100644
 +    directives = ["exports org.graalvm.collections"],
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
-+        "Implementation-Version": "25.5.5-dev",
++        "Implementation-Version": "25.6.0-dev",
 +        "Name": "collections",
 +        "Specification-Vendor": "Oracle Corporation",
-+        "Specification-Version": "25.5.5-dev",
++        "Specification-Version": "25.6.0-dev",
 +    },
 +    module_name = "org.graalvm.collections",
 +    release = 21,
@@ -777,10 +778,10 @@ new file mode 100644
 +    ],
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
-+        "Implementation-Version": "25.5.5-dev",
++        "Implementation-Version": "25.6.0-dev",
 +        "Name": "graal-sdk",
 +        "Specification-Vendor": "Oracle Corporation",
-+        "Specification-Version": "25.5.5-dev",
++        "Specification-Version": "25.6.0-dev",
 +    },
 +    module_name = "org.graalvm.sdk",
 +    release = 21,
@@ -816,10 +817,10 @@ new file mode 100644
 +    ],
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
-+        "Implementation-Version": "25.5.5-dev",
++        "Implementation-Version": "25.6.0-dev",
 +        "Name": "jline",
 +        "Specification-Vendor": "Oracle Corporation",
-+        "Specification-Version": "25.5.5-dev",
++        "Specification-Version": "25.6.0-dev",
 +    },
 +    module_name = "org.graalvm.shadowed.jline",
 +    overlays = {
@@ -846,10 +847,10 @@ new file mode 100644
 +    jni_services = True,
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
-+        "Implementation-Version": "25.5.5-dev",
++        "Implementation-Version": "25.6.0-dev",
 +        "Name": "jniutils",
 +        "Specification-Vendor": "Oracle Corporation",
-+        "Specification-Version": "25.5.5-dev",
++        "Specification-Version": "25.6.0-dev",
 +    },
 +    module_name = "org.graalvm.jniutils",
 +    release = 21,
@@ -875,10 +876,10 @@ new file mode 100644
 +    ],
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
-+        "Implementation-Version": "25.5.5-dev",
++        "Implementation-Version": "25.6.0-dev",
 +        "Name": "launcher-common",
 +        "Specification-Vendor": "Oracle Corporation",
-+        "Specification-Version": "25.5.5-dev",
++        "Specification-Version": "25.6.0-dev",
 +    },
 +    module_exports = ["java.base/jdk.internal.module"],
 +    module_name = "org.graalvm.launcher",
@@ -908,11 +909,11 @@ new file mode 100644
 +    ],
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
-+        "Implementation-Version": "25.5.5-dev",
++        "Implementation-Version": "25.6.0-dev",
 +        "Main-Class": "org.graalvm.maven.downloader.Main",
 +        "Name": "maven-downloader",
 +        "Specification-Vendor": "Oracle Corporation",
-+        "Specification-Version": "25.5.5-dev",
++        "Specification-Version": "25.6.0-dev",
 +    },
 +    module_name = "org.graalvm.maven.downloader",
 +    release = 21,
@@ -934,10 +935,10 @@ new file mode 100644
 +    jni_services = True,
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
-+        "Implementation-Version": "25.5.5-dev",
++        "Implementation-Version": "25.6.0-dev",
 +        "Name": "nativebridge",
 +        "Specification-Vendor": "Oracle Corporation",
-+        "Specification-Version": "25.5.5-dev",
++        "Specification-Version": "25.6.0-dev",
 +    },
 +    module_name = "org.graalvm.nativebridge",
 +    release = 21,
@@ -1004,10 +1005,10 @@ new file mode 100644
 +    ],
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
-+        "Implementation-Version": "25.5.5-dev",
++        "Implementation-Version": "25.6.0-dev",
 +        "Name": "nativeimage",
 +        "Specification-Vendor": "Oracle Corporation",
-+        "Specification-Version": "25.5.5-dev",
++        "Specification-Version": "25.6.0-dev",
 +    },
 +    module_name = "org.graalvm.nativeimage",
 +    release = 21,
@@ -1028,10 +1029,10 @@ new file mode 100644
 +    ],
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
-+        "Implementation-Version": "25.5.5-dev",
++        "Implementation-Version": "25.6.0-dev",
 +        "Name": "nativeimage-libgraal",
 +        "Specification-Vendor": "Oracle Corporation",
-+        "Specification-Version": "25.5.5-dev",
++        "Specification-Version": "25.6.0-dev",
 +    },
 +    module_name = "org.graalvm.nativeimage.libgraal",
 +    release = 21,
@@ -1066,10 +1067,10 @@ new file mode 100644
 +    ],
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
-+        "Implementation-Version": "25.5.5-dev",
++        "Implementation-Version": "25.6.0-dev",
 +        "Name": "polyglot",
 +        "Specification-Vendor": "Oracle Corporation",
-+        "Specification-Version": "25.5.5-dev",
++        "Specification-Version": "25.6.0-dev",
 +    },
 +    module_name = "org.graalvm.polyglot",
 +    release = 21,
@@ -1092,10 +1093,10 @@ new file mode 100644
 +    ],
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
-+        "Implementation-Version": "25.5.5-dev",
++        "Implementation-Version": "25.6.0-dev",
 +        "Name": "polyglot-tck",
 +        "Specification-Vendor": "Oracle Corporation",
-+        "Specification-Version": "25.5.5-dev",
++        "Specification-Version": "25.6.0-dev",
 +    },
 +    module_name = "org.graalvm.polyglot_tck",
 +    release = 21,
@@ -1148,10 +1149,10 @@ new file mode 100644
 +    directives = ["exports jdk.graal.compiler.vmaccess.guest"],
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
-+        "Implementation-Version": "25.5.5-dev",
++        "Implementation-Version": "25.6.0-dev",
 +        "Name": "vmaccess-guest",
 +        "Specification-Vendor": "Oracle Corporation",
-+        "Specification-Version": "25.5.5-dev",
++        "Specification-Version": "25.6.0-dev",
 +    },
 +    module_name = "jdk.graal.compiler.vmaccess.guest",
 +    release = 21,
@@ -1165,10 +1166,10 @@ new file mode 100644
 +    directives = ["exports org.graalvm.webimage.api"],
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
-+        "Implementation-Version": "25.5.5-dev",
++        "Implementation-Version": "25.6.0-dev",
 +        "Name": "webimage-preview",
 +        "Specification-Vendor": "Oracle Corporation",
-+        "Specification-Version": "25.5.5-dev",
++        "Specification-Version": "25.6.0-dev",
 +    },
 +    module_name = "org.graalvm.webimage.api",
 +    release = 21,
@@ -1185,10 +1186,10 @@ new file mode 100644
 +    ],
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
-+        "Implementation-Version": "25.5.5-dev",
++        "Implementation-Version": "25.6.0-dev",
 +        "Name": "word",
 +        "Specification-Vendor": "Oracle Corporation",
-+        "Specification-Version": "25.5.5-dev",
++        "Specification-Version": "25.6.0-dev",
 +    },
 +    module_name = "org.graalvm.word",
 +    release = 21,
@@ -1215,7 +1216,7 @@ new file mode 100644
 +mx_resource_layout(
 +    name = "VERSION",
 +    literals = {
-+        "version": "25.5.5",
++        "version": "25.6.0",
 +    },
 +    visibility = ["//visibility:public"],
 +)
@@ -1961,7 +1962,7 @@ diff --git a/sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/BUILD.b
 new file mode 100644
 --- /dev/null
 +++ b/sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/BUILD.bazel
-@@ -0,0 +1,33 @@
+@@ -0,0 +1,31 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -1985,8 +1986,6 @@ new file mode 100644
 +        "Platforms.java",
 +        "ProcessProperties.java",
 +        "RuntimeOptions.java",
-+        "RuntimeStateTrimCallbackException.java",
-+        "RuntimeStateTrimConfig.java",
 +        "StackValue.java",
 +        "Threading.java",
 +        "UnmanagedMemory.java",
@@ -2158,7 +2157,7 @@ diff --git a/sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/impl/BU
 new file mode 100644
 --- /dev/null
 +++ b/sdk/src/org.graalvm.nativeimage/src/org/graalvm/nativeimage/impl/BUILD.bazel
-@@ -0,0 +1,40 @@
+@@ -0,0 +1,44 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -2189,6 +2188,10 @@ new file mode 100644
 +        "RuntimeReflectionSupport.java",
 +        "RuntimeResourceSupport.java",
 +        "RuntimeSerializationSupport.java",
++        "RuntimeState.java",
++        "RuntimeStateSupport.java",
++        "RuntimeStateTrimCallbackException.java",
++        "RuntimeStateTrimConfig.java",
 +        "RuntimeSystemPropertiesSupport.java",
 +        "SizeOfSupport.java",
 +        "ThreadingSupport.java",
@@ -2321,7 +2324,7 @@ diff --git a/sdk/src/org.graalvm.polyglot/src/org/graalvm/polyglot/BUILD.bazel b
 new file mode 100644
 --- /dev/null
 +++ b/sdk/src/org.graalvm.polyglot/src/org/graalvm/polyglot/BUILD.bazel
-@@ -0,0 +1,24 @@
+@@ -0,0 +1,25 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -2335,6 +2338,7 @@ new file mode 100644
 +        "Language.java",
 +        "PolyglotAccess.java",
 +        "PolyglotException.java",
++        "PreinitializedSources.java",
 +        "ResourceLimitEvent.java",
 +        "ResourceLimits.java",
 +        "SandboxPolicy.java",

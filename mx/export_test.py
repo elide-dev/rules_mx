@@ -257,6 +257,22 @@ class ExportTest(unittest.TestCase):
             self.assertEqual(launched["test_launcher"], ":runner")
             self.assertTrue(launched["manual_tests"])
             self.assertNotIn("test_runtime", launched)
+            result = self.run_mx(
+                *args, "--manual-test-class", "example.Concrete", "tck", suite=suite
+            )
+            (single,) = json.loads(result.stdout)["projects"]
+            self.assertEqual(single["manual_test_classes"], ["example.Concrete"])
+            self.assertNotIn("manual_tests", single)
+            unused = self.run_mx(
+                *args,
+                "--manual-test-class",
+                "example.Missing",
+                "tck",
+                suite=suite,
+                check=False,
+            )
+            self.assertNotEqual(unused.returncode, 0)
+            self.assertIn("example.Missing", unused.stderr + unused.stdout)
             invalid = self.run_mx(
                 *args,
                 "--test-runtime",

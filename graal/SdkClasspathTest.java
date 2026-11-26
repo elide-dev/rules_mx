@@ -14,7 +14,7 @@ public class SdkClasspathTest {
             String path = "/META-INF/graalvm/" + artifact + "/version";
             try (InputStream stream = SdkClasspathTest.class.getResourceAsStream(path)) {
                 assertNotNull(path, stream);
-                assertEquals(path, "25.5.5", new String(stream.readAllBytes(), StandardCharsets.UTF_8));
+                assertEquals(path, "25.6.0", new String(stream.readAllBytes(), StandardCharsets.UTF_8));
             }
         }
     }
