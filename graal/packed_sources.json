@@ -1,0 +1,63 @@
+{
+  "graal_sandbox_toolchains_expat": {
+    "integrity": "sha512-DPRjGfpJC47Q6fEURxZBsDe1wiTEx9hk/U+ED6I5/SNG/UjCKKkn0BBU83PLCwb4fSRrphIfFNDLTPEkmUuq4Q==",
+    "urls": [
+      "https://github.com/libexpat/libexpat/releases/download/R_2_8_3/expat-2.8.3.tar.bz2"
+    ]
+  },
+  "graal_sandbox_toolchains_fontconfig": {
+    "integrity": "sha512-w+dp903CEJOtpICEvdrKGrUlscTwTFwR8Ge2k0b6sVPK2V3ouCOLILAui5Z5wxS/Lg6cQhhRHY/g8YJuTExqJA==",
+    "urls": [
+      "https://gitlab.freedesktop.org/api/v4/projects/890/packages/generic/fontconfig/2.18.3/fontconfig-2.18.3.tar.xz"
+    ]
+  },
+  "graal_sandbox_toolchains_gperf": {
+    "integrity": "sha512-JGt1uM59d9aoclzRXxzy5o2kBIElc68dW/MtvmrUIo9IdXuu/He8sfVZfCOXBDwE0x2KBKtQe/p6gPheGrYEXw==",
+    "urls": [
+      "https://ftp.gnu.org/gnu/gperf/gperf-3.3.tar.gz"
+    ]
+  },
+  "graal_sandbox_toolchains_mimalloc": {
+    "integrity": "sha512-bLfRrcZToUq9IJ+YwUEXk5OiqveJFtRshfHdcdyciYtqTzuLe9pU4AggLc6CS3/IhSMQtoghcAZB+PrJSCtOPg==",
+    "urls": [
+      "https://github.com/microsoft/mimalloc/archive/refs/tags/v3.4.5.tar.gz"
+    ]
+  },
+  "graal_sandbox_toolchains_zlib": {
+    "integrity": "sha512-cJY3cepddjYUJ4pptHTwm30jfvj1O2daEP4x2ZI67vYBUEs11+vRsefzR+nrsEjms7R//98Tfnvcfo1etOxGkg==",
+    "urls": [
+      "https://zlib.net/fossils/zlib-1.3.2.tar.gz"
+    ]
+  },
+  "graal_sdk_llvm_org_src": {
+    "integrity": "sha512-rjZFRTMEy+aJjqtBblo8XVzmuvsc457zTuTvoxpxmnYwmnBGrztZkd1Fn/bf0t1HJPMF+Ila/I9ttaspQqgPaw==",
+    "urls": [
+      "https://lafo.ssw.uni-linz.ac.at/pub/llvm/llvm-src-22.1.8-4-g1d96596a53-bg6891668b1e.tar.gz"
+    ]
+  },
+  "graal_sulong_gcc_source": {
+    "integrity": "sha512-0s8IjAh1SvDwbNNs74NUSgW/dcL6XZSG7sS6vs6LMiWESfBLy2UGvz6maBlIV0ulaBK8mIFJe6D1Rg+DWOj85Q==",
+    "urls": [
+      "https://lafo.ssw.uni-linz.ac.at/pub/sulong-deps/gcc-5.2.0.tar.gz"
+    ]
+  },
+  "graal_sulong_llvm_test_suite": {
+    "integrity": "sha512-jMm0/JfYehal9bC9kevIpOeGWlDb/ZjxRW9YMPoSGGAUW2uaqr9iTZ/V61Fk4qkJ58yyE3Xa9U3CTpkNt9cWug==",
+    "urls": [
+      "https://lafo.ssw.uni-linz.ac.at/pub/sulong-deps/test-suite-3.2.src.tar.gz",
+      "https://llvm.org/releases/3.2/test-suite-3.2.src.tar.gz"
+    ]
+  },
+  "graal_sulong_nwcc_suite": {
+    "integrity": "sha512-9q9QvRjhMHC1Er+sZln0nRDTrWXqLExco/GZyLh1QOwUXH276XJy9IkDyhyK+vWMFG7HY8hR2gs1LVmAdG+U9g==",
+    "urls": [
+      "https://lafo.ssw.uni-linz.ac.at/pub/sulong-deps/nwcc_0.8.3.tar.gz"
+    ]
+  },
+  "graal_sulong_shootout_suite": {
+    "integrity": "sha512-GpSgKxYzMgwgePatvjOzEFJnb6HAchfy+zs3kr+2qUQQgSrGOCKVqfTYgozbGd0x0UhfJkU14BvrAjC3msxwaA==",
+    "urls": [
+      "https://lafo.ssw.uni-linz.ac.at/pub/sulong-deps/benchmarksgame-scm-latest.tar.gz"
+    ]
+  }
+}

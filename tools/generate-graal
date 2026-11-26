@@ -1009,6 +1009,32 @@ def shading_inputs(directory):
     return inputs, flags
 
 
+def packed_source_pins(source):
+    pins = {}
+    metadata = {
+        suite: runpy.run_path(str(source / suite / f"mx.{suite}/suite.py"))["suite"]
+        for suite in ("sdk", "sulong", "sandbox-toolchains")
+    }
+    wanted = set()
+    for suite, declarations in metadata.items():
+        for project in declarations.get("projects", {}).values():
+            for dep in [*project.get("buildDependencies", []), project.get("source")]:
+                if isinstance(dep, str):
+                    wanted.add(dep if ":" in dep else suite + ":" + dep)
+    for suite, declarations in metadata.items():
+        libraries = declarations.get("libraries", {})
+        for name, spec in libraries.items():
+            if suite + ":" + name not in wanted or not (spec.get("packedResource") and spec.get("urls") and spec.get("digest")):
+                continue
+            algorithm, digest = spec["digest"].split(":")
+            repo = ("graal_" + suite + "_" + name).lower().replace("-", "_")
+            pins[repo] = {
+                "urls": [url.format(**spec) for url in spec["urls"]],
+                "integrity": algorithm + "-" + base64.b64encode(bytes.fromhex(digest)).decode(),
+            }
+    return pins
+
+
 def sdk_llvm_inputs(directory):
     metadata = runpy.run_path(str(directory / "mx.sdk/suite.py"))["suite"]
     libraries = metadata["libraries"]
@@ -2205,6 +2231,8 @@ def prepare_suite(suite, stage):
                 "--whole-project",
                 "com.oracle.truffle.llvm.toolchain.launchers",
                 "--sulong-bootstrap-ninja", str(stage / "gcc.ninja_template"),
+                "--sulong-packed-source", "sulong:NWCC_SUITE", "@graal_sulong_nwcc_suite//:",
+                str(bazel_source("@graal_sulong_nwcc_suite//:BUILD.bazel").parent),
                 "--sulong-llvm-link",
                 "@rules_mx//graal:sdk_llvm_link",
                 "--sulong-fixture-sdk",
@@ -2716,14 +2744,18 @@ def main():
                 shutil.copytree(
                     source / suite / f"mx.{suite}", stage / suite / f"mx.{suite}"
                 )
-        if "espresso" in (*selected, *providers):
-            for filename in ("espresso_static_libraries.patch", "espresso_platform_properties.patch"):
-                patch = ROOT / "graal" / filename
-                if subprocess.run(
-                    ["git", "apply", "--reverse", "--check", str(patch)],
-                    cwd=stage, stderr=subprocess.DEVNULL,
-                ).returncode:
-                    subprocess.run(["git", "apply", str(patch)], cwd=stage, check=True)
+        for suite, patches in {
+            "espresso": ("espresso_static_libraries.patch", "espresso_platform_properties.patch"),
+            "sulong": ("sulong_external_tests.patch",),
+        }.items():
+            if suite in (*selected, *providers):
+                for filename in patches:
+                    patch = ROOT / "graal" / filename
+                    if subprocess.run(
+                        ["git", "apply", "--reverse", "--check", str(patch)],
+                        cwd=stage, stderr=subprocess.DEVNULL,
+                    ).returncode:
+                        subprocess.run(["git", "apply", str(patch)], cwd=stage, check=True)
         for suite in SUITES:
             for directory in (f"mx.{suite}", "src"):
                 rel = Path(suite) / directory
@@ -2780,6 +2812,12 @@ def main():
             pins,
             args.check,
             "Regenerate the HSDIS pins with tools/generate-graal",
+        )
+        emit(
+            output / "packed_sources.json",
+            json.dumps(packed_source_pins(stage), indent=2, sort_keys=True) + "\n",
+            args.check,
+            "Regenerate the packed source pins with tools/generate-graal",
         )
         sdk_llvm = output / "sdk_llvm.json"
         sdk_llvm_pins = (

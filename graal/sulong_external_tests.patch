@@ -1,0 +1,67 @@
+--- a/sulong/mx.sulong/mx_sulong_suite_constituents.py
++++ b/sulong/mx.sulong/mx_sulong_suite_constituents.py
+@@ -117,7 +117,7 @@
+         """Return the source directory."""
+ 
+ 
+-def collectExcludes(path):
++def collectExcludes(path, target_os=None, target_arch=None):
+     def _collect(path, skip=None):
+         for root, _, files in os.walk(path):
+             if skip and skip(os.path.relpath(root, path)):
+@@ -133,8 +133,8 @@
+     os_arch_root = os.path.join(path, 'os_arch')
+     if os.path.exists(os_arch_root):
+         try:
+-            os_path = next(x for x in (os.path.join(os_arch_root, os_dir) for os_dir in [mx.get_os(), 'others']) if os.path.exists(x))
+-            os_arch_path = next(x for x in (os.path.join(os_path, arch_dir) for arch_dir in [mx.get_arch(), 'others']) if os.path.exists(x))
++            os_path = next(x for x in (os.path.join(os_arch_root, os_dir) for os_dir in [target_os or mx.get_os(), 'others']) if os.path.exists(x))
++            os_arch_path = next(x for x in (os.path.join(os_path, arch_dir) for arch_dir in [target_arch or mx.get_arch(), 'others']) if os.path.exists(x))
+             yield from _collect(os_arch_path)
+         except StopIteration:
+             pass
+@@ -155,6 +155,9 @@
+             self.configDir = 'configs'
+ 
+     def _get_test_intern(self):
++        return self.tests_from_source(self.get_test_source(resolve=True))
++
++    def tests_from_source(self, root, target_os=None, target_arch=None):
+         ### Excludes
+         def _maybe_pattern(name):
+             for c in '*?[]!':
+@@ -166,7 +169,7 @@
+         exclude_files = []
+ 
+         # full name check is cheaper than pattern matching
+-        for exclude in collectExcludes(os.path.join(self.dir, "..", self.configDir)):
++        for exclude in collectExcludes(os.path.join(self.dir, "..", self.configDir), target_os, target_arch):
+             if _maybe_pattern(exclude):
+                 exclude_patterns.append(exclude)
+             else:
+@@ -180,7 +183,6 @@
+ 
+         ## Testcase collection
+         _tests = []
+-        root = self.get_test_source(resolve=True)
+         for path, _, files in os.walk(os.path.join(root, self.testDir)):
+             for f in files:
+                 absPath = os.path.join(path, f)
+@@ -551,7 +553,7 @@
+                                            if k not in self._cmake_config_raw})
+         return ['-C', self.getTestFile()] + super().cmake_config()
+ 
+-    def _get_languages(self):
++    def _get_languages(self, tests=None):
+         lang_ext_map = {
+             'C': ['.c', '.cint', '.gcc'],
+             'CXX': ['.cpp', '.C', '.cc', '.gpp'],
+@@ -565,7 +567,7 @@
+                     return lang
+             self.abort('Cannot determine language of file ' + test)
+ 
+-        return {_get_language(test) for test in self.getTests()}
++        return {_get_language(test) for test in (self.getTests() if tests is None else tests)}
+ 
+     def getBuildTask(self, args):
+         def _variant():

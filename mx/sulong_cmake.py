@@ -44,6 +44,8 @@ def configure(spec, build):
         str(bundle / "include/c++/v1"),
     ]
     settings = dict(spec["config"])
+    if spec.get("source_dir"):
+        settings["SULONG_TEST_SOURCE_DIR"] = root / spec["source_dir"]
     # Sulong appends CPPFLAGS after individual projects override CMAKE_C_FLAGS.
     os.environ["CPPFLAGS"] = shlex.join(flags)
     settings["CMAKE_CXX_FLAGS"] = shlex.join(
