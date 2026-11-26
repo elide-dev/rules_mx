@@ -119,7 +119,7 @@ The Java extension resolves source imports. For whole-project compilations, `--i
 
 ## Consume from another Bzlmod root
 
-Declare `rules_mx` and use a `local_path_override` pointing at this checkout during development. Declare `rules_elide` directly for generated BUILD files. Copy the rules_elide archive override (use `@rules_mx//mx:elide_javabuilder.patch` for its patch label), the Elide installation and its toolchain registration from MODULE.bazel into the consuming root. Bazel applies archive overrides from the root module. For Gazelle, use the pinned Go SDK from MODULE.bazel. For the Python overlay, declare the matching rules_python runtime as shown in tools/BUILD.bazel and select it via `--extra_toolchains`. The CLI is available as `@rules_mx//:mx`. To address the bundled native targets directly, import the mx source repository:
+Declare `rules_mx` and use a `local_path_override` pointing at this checkout during development. Declare `rules_elide` directly for generated BUILD files. Copy the rules_elide archive override, the Elide installation and its toolchain registration from MODULE.bazel into the consuming root. Bazel applies archive overrides from the root module. For Gazelle, use the pinned Go SDK from MODULE.bazel. For the Python overlay, declare the matching rules_python runtime as shown in tools/BUILD.bazel and select it via `--extra_toolchains`. The CLI is available as `@rules_mx//:mx`. To address the bundled native targets directly, import the mx source repository:
 
 ```starlark
 mx_sources = use_extension("@rules_mx//mx:extensions.bzl", "mx_sources")
@@ -164,7 +164,7 @@ The initial Linux x86_64 REAPI smoke build compiled and packaged the real Graal 
 
 Ordinary Java builds use Elide persistent workers and emit the ABI alongside the class jar for eligible targets. For local builds with explicitly modeled processors, `bazelisk build --config=elide-workers //tests/gazelle/... //:webserver` also enables multiplex workers and digest-keyed classpath reuse. The classpath cache disables implicit processor discovery. Use the separate RBE profile for remote execution.
 
-The module pins Native Image toolchain PR #134 at `9d997fb`, which includes unified JVM builder PR #132 and applies the JavaBuilder processor fix from PR #133. With a registered Elide runtime advertising unified JVM request version 1, `--config=elide-unified` enables fused compilation for eligible Elide Java targets. The default Elide 1.6.2 distribution uses the legacy path. Processor consumers use the JavaBuilder adapter via `--config=elide-processors`.
+rules_elide has not released these changes yet, so the module pins its `main` branch at `50e0e8f` with an archive override. That commit includes the unified JVM builder (rules_elide PR #132), the JavaBuilder processor fix (PR #133) and the Native Image toolchain (PR #134). With a registered Elide runtime advertising unified JVM request version 1, `--config=elide-unified` enables fused compilation for eligible Elide Java targets. The default Elide 1.6.2 distribution uses the legacy path. Processor consumers use the JavaBuilder adapter via `--config=elide-processors`.
 
 ## Labs JDK
 
