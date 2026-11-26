@@ -1022,6 +1022,30 @@ def _native_shared_recipe(project, pending):
     }
 
 
+def _platform_file(dep):
+    return callable(getattr(dep, "contents_for_platform", None)) and callable(
+        getattr(dep, "output_file_name", None)
+    )
+
+
+def _platform_file_recipe(dep):
+    filename = dep.output_file_name()
+    if not _resource_path(filename) or "/" in filename or dep.deps or getattr(dep, "buildDependencies", []):
+        raise _UnsupportedLowering(f"{dep.name}: unsupported generated file inputs")
+    return {
+        "name": dep.name,
+        "filename": filename,
+        "variants": {
+            key: dep.contents_for_platform(os_name, libc)
+            for key, os_name, libc in (
+                ("linux", "linux", "glibc"), ("linux-musl", "linux", "musl"),
+                ("macos", "darwin", None), ("windows", "windows", None),
+            )
+        },
+        "testonly": dep.is_test_project(),
+    }
+
+
 def _source_project(dep):
     kind = (type(dep).__module__, type(dep).__name__)
     return kind in {
@@ -1471,6 +1495,7 @@ def _can_lower_root(dep):
         or _language_library(dep)
         or _default_native(dep)
         or _source_project(dep)
+        or _platform_file(dep)
         or _wat_project(dep)
         or _emscripten_project(dep)
         or _in_tree_sulong_tests(dep)
@@ -1694,6 +1719,8 @@ def _tar_layout(dist, pending, mappings, archives):
     ) == ("mx_web_image", "WebImageMacroBuilder"):
         return _web_image_macro_layout(dist, pending, mappings)
     declaration = dist._orig_attrs
+    if dist.isPlatformDependent() and "<multitarget_libc_selection>" in str(declaration.get("layout", {})):
+        return _platform_native_layout(dist, pending)
     # mx also uses platformDependent to choose the staging directory. A fixed
     # layout still produces the same member paths regardless of the Gazelle host.
     platform_layout = declaration.keys() & {"os", "arch", "os_arch", "platforms"}
@@ -1846,37 +1873,46 @@ def _tar_layout(dist, pending, mappings, archives):
     }
 
 
-def _native_resource_directory(dist, pending):
+def _platform_native_layout(dist, pending):
     attrs = dist._orig_attrs
+    metadata = bool(dist.fileListEntry and dist.hashEntry)
     if (
-        not (dist.fileListEntry and dist.hashEntry and attrs.get("layout"))
-        or dist.fileListPurpose
-        or dist.deps
-        or dist.excludedLibs
+        not attrs.get("layout")
+        or bool(dist.fileListEntry) != bool(dist.hashEntry)
+        or dist.fileListPurpose or dist.deps or dist.excludedLibs or dist.compress
+        or attrs.keys() & {"os", "arch", "os_arch"}
     ):
-        raise _UnsupportedLowering(f"{dist.name}: unsupported resource metadata")
+        raise _UnsupportedLowering(f"{dist.name}: unsupported native layout")
     profiles = {}
     for os_name, arch, profile in (
         ("darwin", "aarch64", "macos_arm64"),
         ("linux", "amd64", "linux_amd64"),
         ("linux", "aarch64", "linux_arm64"),
     ):
-        if f"{os_name}-{arch}" not in attrs.get("platforms", []):
+        if "platforms" in attrs and f"{os_name}-{arch}" not in attrs["platforms"]:
             continue
 
         def resolve(path):
-            result = path.replace("<os>", os_name).replace("<arch>", arch)
+            if path == "./":
+                return ""
+            result = path.removeprefix("./").replace("<os>", os_name).replace("<arch>", arch)
             if not _resource_path(result.rstrip("/")):
                 raise _UnsupportedLowering(f"{dist.name}: invalid resource path {path}")
             return result
 
-        imports = {}
+        imports, members = {}, {}
         for destination, source in mx.LayoutDistribution._walk_static_layout(
             attrs["layout"], dist.name, distribution_object=dist, context=dist
         ):
+            dest = resolve(destination)
+            path = source.get("path")
+            if source["source_type"] == "file" and source.keys() == {"_str_", "source_type", "path"}:
+                if not _resource_path(path) or not (Path(dist.suite.dir) / path).is_file():
+                    raise _UnsupportedLowering(f"{dist.name}: missing layout file {path}")
+                members.setdefault(path, []).append(dest + Path(path).name if destination.endswith("/") else dest)
+                continue
             if (
                 source["source_type"] != "dependency"
-                or not destination.endswith("/")
                 or source.keys()
                 - {"_str_", "source_type", "path", "dependency", "optional"}
             ):
@@ -1895,8 +1931,12 @@ def _native_resource_directory(dist, pending):
                 raise _UnsupportedLowering(
                     f"{dist.name}: missing resource producer {source['dependency']}"
                 )
-            path = source["path"]
-            dest = resolve(destination)
+            if _platform_file(target) and not path and not destination.endswith("/"):
+                members.setdefault(":" + target.name, []).append(dest)
+                pending.append(target)
+                continue
+            if not destination.endswith("/"):
+                raise _UnsupportedLowering(f"{dist.name}: expected native layout directory")
             if (
                 _default_native(target)
                 and path
@@ -1919,17 +1959,17 @@ def _native_resource_directory(dist, pending):
             imports.setdefault(":" + target.name, []).append(spec)
             pending.append(target)
         profiles[profile] = {
+            **({"members": {label: "\n".join(paths) for label, paths in members.items()}} if members else {}),
             "archive_imports": {
                 label: "\n".join(specs) for label, specs in imports.items()
             },
-            "file_list_entry": resolve(dist.fileListEntry),
-            "hash_entry": resolve(dist.hashEntry),
+            **({"file_list_entry": resolve(dist.fileListEntry), "hash_entry": resolve(dist.hashEntry)} if metadata else {}),
         }
     if not profiles:
         raise _UnsupportedLowering(f"{dist.name}: no supported resource platforms")
     return {
         "name": dist.name,
-        "format": "dir",
+        "format": "dir" if type(dist).__name__ == "LayoutDirDistribution" else "tar",
         "os_layouts": profiles,
         "testonly": dist.is_test_distribution(),
     }
@@ -2855,7 +2895,7 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
                 continue
             if type(project).__name__ == "LayoutDirDistribution":
                 if project.fileListEntry and project.hashEntry and project.isPlatformDependent():
-                    tar_layouts[project.name] = _native_resource_directory(project, pending)
+                    tar_layouts[project.name] = _platform_native_layout(project, pending)
                     continue
                 if project.isPlatformDependent() and options.standalone_jdk_release:
                     tar_layouts[project.name] = _install_layout(
@@ -2899,6 +2939,9 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             continue
         if options.gazelle and project.suite == suite and _default_native(project):
             native_shared[project.name] = _native_shared_recipe(project, pending)
+            continue
+        if options.gazelle and project.suite == suite and _platform_file(project):
+            source_projects[project.name] = _platform_file_recipe(project)
             continue
         if options.gazelle and project.suite == suite and _source_project(project):
             source_projects[project.name] = _project_files(project)

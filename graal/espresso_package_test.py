@@ -22,7 +22,16 @@ def defined_symbols(tool, library):
 
 
 def main(
-    support, io_jar, launchers, benchmarks, mokapot, platform_support, nm, resources
+    support,
+    io_jar,
+    launchers,
+    benchmarks,
+    mokapot,
+    platform_support,
+    nm,
+    resources,
+    graal_support,
+    jvm_support,
 ):
     with tarfile.open(support) as archive:
         jars = {member.name for member in archive if member.isfile()}
@@ -75,6 +84,23 @@ def main(
     if sys.platform == "darwin":
         # A symbol from the statically linked JDK, beyond the JVM shim itself.
         assert "JIMAGE_Open" in symbols
+
+    extension = ".dylib" if sys.platform == "darwin" else ".so"
+    with tarfile.open(jvm_support) as jvm, tarfile.open(graal_support) as graal:
+        expected = {"truffle/libjvm" + extension}
+        if sys.platform == "darwin":
+            expected.add("truffle/fatpot/libjvm" + extension)
+        assert set(jvm.getnames()) == expected
+        for path in expected:
+            member = "lib/" + path.removeprefix("truffle/")
+            assert jvm.extractfile(path).read() == graal.extractfile(member).read()
+        assert graal.getmember("LICENSE_JAVAONTRUFFLE").size > 0
+        assert graal.getmember("lib/espresso-io.src.zip").size > 0
+        properties = graal.extractfile("native-image.properties").read().decode()
+        assert properties.startswith("Requires = language:nfi")
+        assert ("PreinitializeContextsWithNative=true" in properties) == (
+            sys.platform == "linux"
+        )
 
     with ZipFile(resources) as jar:
         prefixes = [

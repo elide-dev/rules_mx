@@ -1,0 +1,15 @@
+--- a/espresso/mx.espresso/mx_espresso.py
++++ b/espresso/mx.espresso/mx_espresso.py
+@@ -371,8 +371,11 @@
+         return "native-image.properties"
+ 
+     def contents(self):
++        return self.contents_for_platform(mx.get_os(), mx.get_os_variant())
++
++    def contents_for_platform(self, os_name, libc):
+         with_tregex = mx_sdk_vm_impl.has_component('TRegex')
+-        with_pre_init = mx.is_linux() and mx.get_os_variant() != "musl"
++        with_pre_init = os_name == 'linux' and libc != "musl"
+         contents = "Requires = language:nfi"
+         if with_tregex:
+             contents = contents + " language:regex"
