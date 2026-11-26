@@ -24,6 +24,11 @@ def main(nm, objdump, graal, native, resources):
     assert Path(graal).name in ("libgraalvm-llvm.so.1", "libgraalvm-llvm.1.dylib")
     assert Path(native).name in ("libsulong-native.so", "libsulong-native.dylib")
 
+    if Path(native).suffix == ".so":
+        tags = subprocess.check_output([objdump, "-p", native], text=True)
+        needed = {fields[1] for row in tags.splitlines() if (fields := row.split()) and fields[0] == "NEEDED"}
+        assert not needed.intersection({"libc++.so.1", "libc++abi.so.1"}), needed
+
     root = Path(resources)
     (manifest,) = root.glob("META-INF/resources/llvm/native-lib/*/*/files")
     library = manifest.parent / Path(native).name

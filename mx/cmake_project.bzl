@@ -127,6 +127,9 @@ def mx_cmake_project(name, srcs, compiler, config, include_dirs, profiles, testo
             build_data = data,
             toolchains = [Label("@rules_python//python:current_py_toolchain")] if source_subdir else [],
             env = {"CMAKE_BUILD_PARALLEL_LEVEL": str(max_jobs)} if max_jobs else {},
+            # CMake selects the mx C or C++ driver per target. Each driver supplies
+            # its language runtime when linking.
+            features = ["-default_link_libs"],
             generate_args = ["-G Ninja"],
             generate_crosstool_file = False,
             exec_compatible_with = [
