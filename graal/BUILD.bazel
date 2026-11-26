@@ -6,6 +6,7 @@ load("@rules_python//python:py_binary.bzl", "py_binary")
 load("@rules_python//python:py_test.bzl", "py_test")
 load(":automatic_module.bzl", "automatic_module")
 load(":layout.bzl", "mx_archive_layout")
+load(":pom_classpath_test.bzl", "pom_classpath_test")
 load(":sdk_llvm.bzl", "sdk_llvm_link", "sulong_fixture_sdk")
 
 exports_files([
@@ -35,6 +36,17 @@ exports_files([
     "visualvm.json",
     "toolchain_test.py",
 ])
+
+pom_classpath_test(
+    name = "espresso_pom_classpath_test",
+    compile_deps = ["@graal//espresso:ESPRESSO"],
+    pom = "@graal//espresso:JVM_STANDALONE_JARS",
+    runtime_only = [
+        "@graal//tools:LSP",
+        "@graal//tools:CHROMEINSPECTOR",
+    ],
+    tags = ["manual"],
+)
 
 mx_archive_layout(
     name = "sandbox_launcher_tar",
