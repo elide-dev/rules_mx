@@ -2,10 +2,11 @@ diff --git a/sulong/BUILD.bazel b/sulong/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/sulong/BUILD.bazel
-@@ -0,0 +1,2221 @@
+@@ -0,0 +1,2309 @@
 +load("@rules_mx//graal:sulong_fixture_check.bzl", "sulong_fixture_check")
 +load("@rules_mx//mx:bitcode.bzl", "mx_bitcode_suite")
 +load("@rules_mx//mx:graph.bzl", "mx_exported_tar", "mx_jar_dist", "mx_processed_java", "mx_project", "mx_whole_java")
++load("@rules_mx//mx:native_image.bzl", "mx_native_image_executable", "mx_toolchain_tool_layout")
 +load("@rules_mx//mx:project_files.bzl", "mx_project_files")
 +load("@rules_mx//mx:sulong_cmake.bzl", "mx_sulong_cmake_suite")
 +
@@ -22,6 +23,7 @@ new file mode 100644
 +        ":SULONG_LEGACY",
 +        ":SULONG_LIBCXX_COMPILER_WRAPPER",
 +        ":SULONG_NATIVE",
++        ":SULONG_NATIVE_TOOLS",
 +        ":SULONG_NFI",
 +        ":SULONG_TOOLCHAIN_LAUNCHERS",
 +    ],
@@ -50,6 +52,7 @@ new file mode 100644
 +        ":com.oracle.truffle.llvm.tests.irdebug.native",
 +        ":com.oracle.truffle.llvm.toolchain.launchers",
 +        ":com.oracle.truffle.llvm.tools",
++        ":graalvm-native-tool",
 +        ":sulong_licenses",
 +    ] + select({
 +        "@rules_mx//tools:exec_linux_amd64": [
@@ -854,6 +857,91 @@ new file mode 100644
 +        "LICENSE": "LICENSE.txt",
 +        "THIRD_PARTY_LICENSE.txt": "3rd_party_licenses.txt",
 +    },
++    visibility = ["//visibility:public"],
++)
++
++mx_toolchain_tool_layout(
++    name = "SULONG_NATIVE_TOOLS",
++    links = {
++        "ar": "llvm-ar",
++        "c++": "graalvm-native-clang++",
++        "cc": "graalvm-native-clang",
++        "cl": "graalvm-native-clang-cl",
++        "clang": "graalvm-native-clang",
++        "clang++": "graalvm-native-clang++",
++        "clang-cl": "graalvm-native-clang-cl",
++        "flang": "graalvm-native-flang",
++        "flang-new": "graalvm-native-flang",
++        "g++": "graalvm-native-clang++",
++        "gcc": "graalvm-native-clang",
++        "graalvm-clang": "graalvm-native-clang",
++        "graalvm-clang++": "graalvm-native-clang++",
++        "graalvm-clang-cl": "graalvm-native-clang-cl",
++        "graalvm-flang": "graalvm-native-flang",
++        "graalvm-native-clang": "graalvm-native-tool",
++        "graalvm-native-clang++": "graalvm-native-tool",
++        "graalvm-native-clang-cl": "graalvm-native-tool",
++        "graalvm-native-flang": "graalvm-native-tool",
++        "graalvm-native-ld": "graalvm-native-tool",
++        "ld": "graalvm-native-ld",
++        "ld.lld": "graalvm-native-ld",
++        "ld64": "graalvm-native-ld",
++        "lld": "graalvm-native-ld",
++        "lld-link": "graalvm-native-ld",
++        "llvm-ar": "graalvm-native-tool",
++        "llvm-nm": "graalvm-native-tool",
++        "llvm-objcopy": "graalvm-native-tool",
++        "llvm-objdump": "graalvm-native-tool",
++        "llvm-ranlib": "graalvm-native-tool",
++        "llvm-readelf": "graalvm-native-tool",
++        "llvm-readobj": "graalvm-native-tool",
++        "llvm-strip": "graalvm-native-tool",
++        "nm": "llvm-nm",
++        "objcopy": "llvm-objcopy",
++        "objdump": "llvm-objdump",
++        "ranlib": "llvm-ranlib",
++        "readelf": "llvm-readelf",
++        "readobj": "llvm-readobj",
++        "strip": "llvm-strip",
++    },
++    tool = ":graalvm-native-tool",
++    visibility = ["//visibility:public"],
++    windows_command = "@echo off\n\ncall :getScriptLocation location\nset \"GRAALVM_ARGUMENT_VECTOR_PROGRAM_NAME=%~0\"\n\"%location%graalvm-native-tool.exe\" %*\nexit /b %errorlevel%\n\n:: If this script is in `%PATH%` and called quoted without a full path (e.g., `\"js\"`), `%~dp0` is expanded to `cwd`\n:: rather than the path to the script.\n:: This does not happen if `%~dp0` is accessed in a subroutine.\n:getScriptLocation variableName\n    set \"%~1=%~dp0\"\n    exit /b 0",
++)
++
++mx_native_image_executable(
++    name = "graalvm-native-tool",
++    image_args = [
++        "-march=compatibility",
++        "--link-at-build-time",
++        "-Dorg.graalvm.version=25.6.0-dev",
++        "-H:+UnlockExperimentalVMOptions",
++        "-H:+GenerateBuildArtifactsFile",
++        "-H:+AssertInitializationSpecifiedForAllClasses",
++        "-H:+EnforceMaxRuntimeCompileMethods",
++        "-H:+GuaranteeSubstrateTypesLinked",
++        "-H:+ReportExceptionStackTraces",
++        "-H:+DetectUserDirectoriesInImageHeap",
++        "-H:+VerifyRuntimeCompilationFrameStates",
++        "-H:-UnlockExperimentalVMOptions",
++        "--initialize-at-build-time=com.oracle.truffle.llvm.toolchain.launchers",
++        "--gc=epsilon",
++        "-H:+UnlockExperimentalVMOptions",
++        "-H:-ParseRuntimeOptions",
++        "-H:-UnlockExperimentalVMOptions",
++        "-Dorg.graalvm.llvm.relative.path=../../llvm-toolchain",
++    ],
++    main_class = "com.oracle.truffle.llvm.toolchain.launchers.NativeToolchainWrapper",
++    modulepath = [
++        ":SULONG_TOOLCHAIN_LAUNCHERS",
++        "//sdk:COLLECTIONS",
++        "//sdk:WORD",
++        "//sdk:NATIVEIMAGE",
++        "//sdk:POLYGLOT",
++        "//sdk:JLINE3",
++        "//sdk:LAUNCHER_COMMON",
++    ],
++    output = "graalvm-native-tool",
 +    visibility = ["//visibility:public"],
 +)
 +

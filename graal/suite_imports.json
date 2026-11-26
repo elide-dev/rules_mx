@@ -1,0 +1,17 @@
+{
+  "build-sandbox-llvm": {
+    "files": {
+      "build-sandbox-llvm/mx.build-sandbox-llvm/mx_build_sandbox_llvm.py": "0d6878347abe669ff45c7f7a7cbf4e5b209b2530b0e928355ebc2a5327441286",
+      "build-sandbox-llvm/mx.build-sandbox-llvm/suite.py": "1858452434848c9d2ccabdd0cb5ff958e8c34f9adbdeb5aae15980fcdb08d95a"
+    },
+    "repository": "https://github.com/graalvm/llvm-project.git",
+    "revision": "3711a202a431d1417eddc824b1bf1a0780b731bd"
+  },
+  "musl": {
+    "files": {
+      "mx.musl/suite.py": "0b00db04a0d8789cfdf6df5583cab034024bc0d6a5a19a7be139ace7f5f3e4e8"
+    },
+    "repository": "https://github.com/graalvm/musl.git",
+    "revision": "413cbbc929384c8d48372b8156a65a744db1e341"
+  }
+}

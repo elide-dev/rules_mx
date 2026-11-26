@@ -23,7 +23,7 @@ static_archive = rule(
 
 MxArchiveLayoutInfo = provider(
     doc = "Mapping of packaged archive paths to their declared Bazel files.",
-    fields = ["archive", "entries"],
+    fields = ["archive", "entries", "links"],
 )
 
 def _add_entry(entries, path, file):
@@ -34,6 +34,7 @@ def _add_entry(entries, path, file):
 def _layout_impl(ctx):
     output = ctx.actions.declare_file(ctx.label.name.lower().replace("_", "-") + "." + ctx.attr.format)
     entries = {}
+    links = {}
     for target, destinations in ctx.attr.members.items():
         files = [target[MxArchiveLayoutInfo].archive] if MxArchiveLayoutInfo in target and target[MxArchiveLayoutInfo].archive else target.files.to_list()
         if len(files) != 1:
@@ -44,6 +45,7 @@ def _layout_impl(ctx):
             _add_entry(entries, path, source)
     for target, imports in ctx.attr.archive_imports.items():
         sources = target[MxArchiveLayoutInfo].entries
+        source_links = getattr(target[MxArchiveLayoutInfo], "links", {})
         for spec in imports.split("\n"):
             source, separator, destination = spec.partition("=")
             if not separator:
@@ -52,13 +54,20 @@ def _layout_impl(ctx):
                 if source not in sources:
                     fail("No archive member " + source + " in " + str(target.label))
                 _add_entry(entries, destination, sources[source])
+                if source in source_links:
+                    links[destination] = source_links[source]
             else:
                 if destination and not destination.endswith("/"):
                     fail("Expected a destination directory: " + destination)
                 for path, artifact in sources.items():
                     _add_entry(entries, destination + path, artifact)
+                    if path in source_links:
+                        links[destination + path] = source_links[path]
     args = ctx.actions.args()
     args.add(output)
+    if links:
+        args.add("--links")
+        args.add(json.encode(links))
     for path in sorted(entries):
         args.add(path)
         args.add(entries[path])
@@ -78,7 +87,7 @@ def _layout_impl(ctx):
         files.append(file_list)
     return [
         DefaultInfo(files = depset(files)),
-        MxArchiveLayoutInfo(archive = output, entries = entries),
+        MxArchiveLayoutInfo(archive = output, entries = entries, links = links),
     ]
 
 mx_archive_layout = rule(

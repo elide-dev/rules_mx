@@ -696,7 +696,14 @@ SUITES = {
 
 
 # These suites publish every closure that the exporter can lower.
-PARTIAL_SUITES = ("sulong", "wasm", "espresso", "espresso-compiler-stub", "web-image")
+PARTIAL_SUITES = (
+    "sulong",
+    "wasm",
+    "espresso",
+    "espresso-compiler-stub",
+    "web-image",
+    "sandbox-toolchains",
+)
 
 # These targets remain individually runnable. New classes join CI on regeneration.
 WASM_OPEN_TESTS = {
@@ -2082,6 +2089,45 @@ def binding_providers(suite, source):
     return found
 
 
+def stage_external_suites(source, stage, suites):
+    """Stage only the pinned discovery metadata for external imports of selected suites."""
+    imports = {}
+    for suite in suites:
+        metadata = runpy.run_path(str(source / suite / f"mx.{suite}/suite.py"))["suite"]
+        for dep in metadata.get("imports", {}).get("suites", []):
+            if (
+                dep.get("version")
+                and dep.get("urls")
+                and not (source / dep["name"]).is_dir()
+                and not dep.get("dynamic")
+            ):
+                previous = imports.setdefault(dep["name"], dep)
+                if previous["version"] != dep["version"]:
+                    raise ValueError(
+                        f"Conflicting versions for external suite {dep['name']}"
+                    )
+    if not imports:
+        return
+    manifest = bazel_source("@graal_suite_metadata//:imports.json")
+    pins = json.loads(manifest.read_text())
+    for name, dep in imports.items():
+        pin = pins.get(name, {})
+        if pin.get("revision") != dep["version"] or pin.get("repository") not in [
+            item["url"] for item in dep["urls"]
+        ]:
+            raise ValueError(
+                f"Pin discovery metadata for {name} at {dep['version']} in graal/suite_imports.json"
+            )
+        checkout = stage.parent / pin["repository"].rsplit("/", 1)[-1].removesuffix(
+            ".git"
+        )
+        for path in pin["files"]:
+            dest = checkout / path
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(manifest.parent / name / path, dest)
+        (checkout / ".mx_vcs_root").touch()
+
+
 def prepare_suite(suite, stage):
     directory = stage / suite
     if suite == "vm":
@@ -2582,7 +2628,8 @@ def main():
         tempfile.TemporaryDirectory() as temp,
         tempfile.TemporaryDirectory() as fetched,
     ):
-        stage = Path(temp).resolve()
+        stage = Path(temp).resolve() / "graal"
+        stage.mkdir()
         source = args.graal.resolve() if args.graal else None
         if source is None:
             pin_path = ROOT / "graal/source.json"
@@ -2635,6 +2682,7 @@ def main():
                 for owner in binding_providers(suite, source)
             )
         )
+        stage_external_suites(source, stage, [*selected, *providers])
         for suite in PARTIAL_SUITES:
             if suite in selected or suite in providers:
                 shutil.copytree(

@@ -12,7 +12,7 @@ def _sources(_ctx):
         strip_prefix = "mx-" + revision,
         build_file = Label("//mx:upstream.BUILD"),
         files = {"mx.mx/mx_bazel_export.py": Label("//mx:export.py")},
-        patches = [Label("//mx:register.patch"), Label("//mx:module_descriptor.patch")],
+        patches = [Label("//mx:register.patch"), Label("//mx:module_descriptor.patch"), Label("//mx:symbolic_classpath.patch")],
         patch_args = ["-p1"],
     )
 
