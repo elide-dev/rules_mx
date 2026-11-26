@@ -2303,7 +2303,14 @@ def prepare_suite(suite, stage):
             cwd=ROOT,
             check=True,
             stdout=graph,
-            env={**os.environ, "MX_CACHE_DIR": str(stage / ".mx-cache")},
+            env={
+                **os.environ,
+                "MX_CACHE_DIR": str(stage / ".mx-cache"),
+                # mx otherwise bakes the discovery host's debug default into the image
+                # flags. rules_graalvm applies the Bazel compilation mode at analysis.
+                "GENERATE_DEBUGINFO": "false",
+                "DEBUG_IMAGES": "false",
+            },
         )
     if (stage / ".mx-cache").exists() and any(
         p.is_file() for p in (stage / ".mx-cache").rglob("*")

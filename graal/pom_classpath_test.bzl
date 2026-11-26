@@ -9,12 +9,11 @@ def _test_impl(ctx):
     failures = []
     for target in ctx.attr.compile_deps + ctx.attr.runtime_only:
         info = target[JavaInfo]
-        for jar in info.runtime_output_jars:
-            if jar not in runtime_jars:
-                failures.append("Missing runtime JAR " + jar.short_path)
-        for jar in info.compile_jars.to_list():
-            if (jar in compile_jars) != (target in ctx.attr.compile_deps):
-                failures.append("Incorrect compile scope for " + jar.short_path)
+        for output in info.java_outputs:
+            if output.class_jar not in runtime_jars:
+                failures.append("Missing runtime JAR " + output.class_jar.short_path)
+            if (output.compile_jar in compile_jars) != (target in ctx.attr.compile_deps):
+                failures.append("Incorrect compile scope for " + output.class_jar.short_path)
     return [AnalysisTestResultInfo(success = not failures, message = "\n".join(failures))]
 
 pom_classpath_test = rule(

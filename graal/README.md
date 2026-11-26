@@ -39,7 +39,7 @@ Truffle's eight declared processors run on the execution platform. Its DSL proce
 
 ## Build the native toolchain launchers
 
-Gazelle gets the Native Image main class, ordered classpath, module path and image options from the mx build task. Each image has its own Bazel target. Tool distributions expose individual files and preserve the aliases specified by mx when embedded in another archive. For discovery, Bazel fetches the LLVM and musl suite definitions at the revisions imported by Sandbox Toolchains. The patched LLVM, musl and Rust bootstraps still need build rules.
+Gazelle gets the Native Image main class, ordered classpath, module path and image options from the mx build task. Each image has its own Bazel target. The Bazel compilation mode controls debug information, so Linux and macOS generate the same overlay. Tool distributions expose individual files and preserve the aliases specified by mx when embedded in another archive. For discovery, Bazel fetches the LLVM and musl suite definitions at the revisions imported by Sandbox Toolchains. The patched LLVM, musl and Rust bootstraps still need build rules.
 
 ```sh
 bazelisk query 'deps(@graal//sandbox-toolchains:SANDBOXED_MUSL_TOOLS_SWCFI, 2)'
