@@ -44,3 +44,16 @@ alias(
     }),
     visibility = ["//visibility:public"],
 )
+
+[alias(
+    name = name,
+    actual = select({
+        "//tools:exec_linux_amd64": "@elide_toolchain_linux_amd64//:" + name,
+        "//tools:exec_linux_arm64": "@elide_toolchain_linux_arm64//:" + name,
+        "//tools:exec_macos_arm64": "@elide_toolchain_darwin_arm64//:" + name,
+    }),
+    visibility = ["//visibility:public"],
+) for name in [
+    "target_config",
+    "all_files",
+]]

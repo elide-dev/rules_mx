@@ -19,7 +19,7 @@ tools/buildbuddy test --config=buildbuddy-rbe --config=elide-processors //graal/
 | Compiler | All 17 projects and all 20 distributions, including VM access, management, libgraal and its loader, and both JMH suites. | 21 compiler-tool JUnit classes, 19 shared-harness classes, four previously qualified compiler regressions and the last-tier compiled guest probe run by default. |
 | Regex | All three projects and all five distributions, including Native Image metadata archives. | All 20 discovered upstream JUnit classes. |
 | Tools | All 18 projects and all 29 distributions, including the Maven POMs, Native Image support TARs and platform-specific VisualVM support archive. The upstream warmup test project declares dependencies and has an empty source tree. | All 60 discovered JUnit classes. |
-| Sulong | 12 of 77 projects and 4 of 51 distributions, including the LLVM runtime Java compilation, launcher and API. | CI builds the generated aggregates, including ten LLVM bitcode fixtures from the IR debugger and bitcode tests. |
+| Sulong | 23 of 77 projects and 4 of 51 distributions on Linux x86-64, including the LLVM runtime Java compilation, launcher and API. | CI builds ten LLVM IR fixtures and 4,731 bitcode or native reference outputs from 1,086 additional cases. A separate test runs three reference programs and their bitcode against an upstream CMake build. |
 | Wasm | 5 of 15 projects and 5 of 16 distributions, including the language JAR and launcher. | Gazelle emits 53 JUnit targets. CI runs 43 passing targets in `@graal//wasm:qualified_tests` with a checksum-pinned, source-built WABT executable. |
 | Espresso Shared | Both named modules, including the source-relocated `ESPRESSO_SVM` used by SubstrateVM. | The SubstrateVM compile exercises the relocated source API. |
 | VM | The VM support TAR packages the upstream README and license texts. | CI builds the support TAR. |
@@ -37,10 +37,15 @@ Truffle's eight declared processors run on the execution platform. Its DSL proce
 
 ```sh
 bazelisk build @graal//sulong:com.oracle.truffle.llvm.tests.irdebug.native/irdebug/controlFlow.ll
-bazelisk query 'deps(@graal//sulong:com.oracle.truffle.llvm.tests.irdebug.native, 1)'
+tools/buildbuddy build --config=buildbuddy-rbe @graal//sulong:com.oracle.truffle.llvm.tests.sulong.native/c/factorial.c.bitcode-O2
+bazelisk query 'deps(@graal//sulong:com.oracle.truffle.llvm.tests.sulong.native/c/factorial.c, 1)'
+tools/buildbuddy test --config=buildbuddy-rbe @graal//sulong:fixture_test/Os/vectorreduce.c
+tools/buildbuddy test --config=buildbuddy-rbe @graal//sulong:fixture_test
 ```
 
-Each fixture produces the upstream `.dir/bitcode-O0.bc` artifact. The compile and link actions use the LLVM linker and shared library from the pinned Graal SDK. The Sulong test harness can consume these artifacts once its native runtime dependencies have migrated.
+The Linux x86-64 CMake fixtures have labels for a single variant, every variant of one source, and the whole mx project. The planner configures the upstream CMake project once per variant with the case list and settings from mx. It asks Ninja for each case’s compiler, linker and post-processing commands. Bazel caches those recipes and builds each installed output independently. The compiler comes from the pinned Graal LLVM SDK. The target headers, libraries and linker come from the Elide native toolchain.
+
+The qualification test builds the three `sulong.Os.native` reference executables with the standard `rules_foreign_cc` CMake rule. It compares their output with the generated reference programs and with execution of the generated bitcode under the SDK’s `lli`. Running the upstream Sulong guest harness still requires its native runtime and distribution layouts. [BCR CMake and Ninja toolchains](https://registry.bazel.build/modules/rules_foreign_cc/0.17.0)
 
 ## Run SimpleLanguage
 

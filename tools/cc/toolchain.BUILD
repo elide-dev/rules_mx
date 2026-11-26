@@ -156,3 +156,10 @@ filegroup(
     name = "llvm_objdump",
     srcs = ["bin/llvm-objdump"],
 )
+
+filegroup(
+    name = "target_config",
+    srcs = ["bin/" + TRIPLE + ".cfg"],
+)
+
+exports_files(["cc"])

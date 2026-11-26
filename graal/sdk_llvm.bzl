@@ -148,3 +148,22 @@ sdk_llvm_link = rule(
         "_extract": attr.label(default = Label("//graal:extract_llvm_link"), cfg = "exec", executable = True),
     },
 )
+
+def _fixture_sdk_impl(ctx):
+    root = ctx.actions.declare_directory(ctx.label.name + ".files")
+    ctx.actions.run(
+        executable = ctx.executable._extract,
+        inputs = [ctx.file.archive],
+        outputs = [root],
+        arguments = [ctx.file.archive.path, root.path],
+        mnemonic = "ExtractSulongSDK",
+    )
+    return [DefaultInfo(files = depset([root]))]
+
+sulong_fixture_sdk = rule(
+    implementation = _fixture_sdk_impl,
+    attrs = {
+        "archive": attr.label(allow_single_file = True, mandatory = True),
+        "_extract": attr.label(default = Label("//graal:extract_fixture_sdk"), cfg = "exec", executable = True),
+    },
+)

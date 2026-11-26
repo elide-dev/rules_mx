@@ -5,7 +5,7 @@ load("@rules_java//java:java_test.bzl", "java_test")
 load("@rules_python//python:py_binary.bzl", "py_binary")
 load("@rules_python//python:py_test.bzl", "py_test")
 load(":automatic_module.bzl", "automatic_module")
-load(":sdk_llvm.bzl", "sdk_llvm_link")
+load(":sdk_llvm.bzl", "sdk_llvm_link", "sulong_fixture_sdk")
 
 exports_files([
     "benchmark_timer.patch",
@@ -26,6 +26,7 @@ exports_files([
     "tools.patch",
     "wasm.patch",
     "sulong.patch",
+    "sulong_fixture_test.py",
     "visualvm.json",
     "toolchain_test.py",
 ])
@@ -439,6 +440,18 @@ py_binary(
 
 sdk_llvm_link(
     name = "sdk_llvm_link",
+    archive = "@graal//sdk:LLVM_TOOLCHAIN_FULL",
+    tags = ["manual"],
+    visibility = ["//visibility:public"],
+)
+
+py_binary(
+    name = "extract_fixture_sdk",
+    srcs = ["extract_fixture_sdk.py"],
+)
+
+sulong_fixture_sdk(
+    name = "sulong_fixture_sdk",
     archive = "@graal//sdk:LLVM_TOOLCHAIN_FULL",
     tags = ["manual"],
     visibility = ["//visibility:public"],

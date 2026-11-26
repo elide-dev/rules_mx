@@ -124,6 +124,12 @@ func (g *importer) loadGraph(root, filename string, seen map[label.Label]bool) e
 			Literals, Copies map[string]string
 			Testonly         bool
 		}
+		CMakeSuites []struct {
+			Name, Root, SDK, Modules   string
+			Cases, Languages, Variants []string
+			Config                     map[string]string
+			Testonly                   bool
+		} `json:"cmake_suites"`
 		BitcodeSuites []struct {
 			Name, Root, Linker string
 			Cases              []string
@@ -369,6 +375,23 @@ func (g *importer) loadGraph(root, filename string, seen map[label.Label]bool) e
 			return err
 		}
 	}
+	for _, project := range graph.CMakeSuites {
+		r := rule.NewRule("mx_sulong_cmake_suite", project.Name)
+		r.SetAttr("root", project.Root)
+		r.SetAttr("cases", project.Cases)
+		r.SetAttr("sdk", project.SDK)
+		r.SetAttr("modules", project.Modules)
+		r.SetAttr("languages", project.Languages)
+		r.SetAttr("variants", project.Variants)
+		if len(project.Config) != 0 {
+			r.SetAttr("config", project.Config)
+		}
+		r.SetAttr("testonly", project.Testonly)
+		r.SetAttr("visibility", []string{"//visibility:public"})
+		if err := add(suite, r); err != nil {
+			return err
+		}
+	}
 	for _, project := range graph.BitcodeSuites {
 		r := rule.NewRule("mx_bitcode_suite", project.Name)
 		r.SetAttr("root", project.Root)
@@ -410,7 +433,7 @@ func (g *importer) loadGraph(root, filename string, seen map[label.Label]bool) e
 
 func graphKind(k string) bool {
 	switch k {
-	case "mx_bitcode_suite", "mx_exported_tar", "mx_jvmci_library", "mx_shaded_java", "mx_jar_dist", "mx_pom_dist", "mx_resource_layout", "mx_classpath_dist", "mx_files", "mx_project", "mx_whole_java", "mx_processed_java", "mx_processor", "mx_test_class":
+	case "mx_sulong_cmake_suite", "mx_bitcode_suite", "mx_exported_tar", "mx_jvmci_library", "mx_shaded_java", "mx_jar_dist", "mx_pom_dist", "mx_resource_layout", "mx_classpath_dist", "mx_files", "mx_project", "mx_whole_java", "mx_processed_java", "mx_processor", "mx_test_class":
 		return true
 	}
 	return false
@@ -419,12 +442,13 @@ func graphKind(k string) bool {
 func (g *importer) Kinds() map[string]rule.KindInfo {
 	kinds := g.javaLanguage.Kinds()
 	managed := map[string]bool{}
-	for _, a := range strings.Fields("root cases llvm_link format members archive_imports overlays shade shade_inputs manifest out content contents directives release snippets_pattern archived_libraries jmh_metadata jni_services truffle_services graal_services graal_test_services module_name add_exports module_exports jni_headers abi_after_javac copies literals srcs deps packages launcher tags data runtime_deps jvm_flags test_class project processor_class generates_api plugins resources mx_resource_root mx_resource_roots unified_release javac_opts javacopts testonly visibility") {
+	for _, a := range strings.Fields("sdk modules languages variants config root cases llvm_link format members archive_imports overlays shade shade_inputs manifest out content contents directives release snippets_pattern archived_libraries jmh_metadata jni_services truffle_services graal_services graal_test_services module_name add_exports module_exports jni_headers abi_after_javac copies literals srcs deps packages launcher tags data runtime_deps jvm_flags test_class project processor_class generates_api plugins resources mx_resource_root mx_resource_roots unified_release javac_opts javacopts testonly visibility") {
 		managed[a] = true
 	}
 	for _, k := range strings.Fields("mx_jvmci_library mx_shaded_java mx_files mx_project mx_whole_java mx_processed_java mx_processor mx_test_class") {
 		kinds[k] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"srcs": true, "packages": true, "project": true, "test_class": true, "processor_class": true}, MergeableAttrs: managed}
 	}
+	kinds["mx_sulong_cmake_suite"] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"cases": true}, MergeableAttrs: managed}
 	kinds["mx_bitcode_suite"] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"cases": true}, MergeableAttrs: managed}
 	kinds["mx_exported_tar"] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"members": true, "archive_imports": true}, MergeableAttrs: managed}
 	kinds["mx_jar_dist"] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"contents": true}, MergeableAttrs: managed}
@@ -444,6 +468,7 @@ func (g *importer) Kinds() map[string]rule.KindInfo {
 }
 func (g *importer) Loads() []rule.LoadInfo {
 	return append(g.javaLanguage.Loads(),
+		rule.LoadInfo{Name: "@rules_mx//mx:sulong_cmake.bzl", Symbols: []string{"mx_sulong_cmake_suite"}},
 		rule.LoadInfo{Name: "@rules_mx//mx:bitcode.bzl", Symbols: []string{"mx_bitcode_suite"}},
 		rule.LoadInfo{Name: "@rules_mx//mx:graph.bzl", Symbols: strings.Fields("mx_exported_tar mx_jvmci_library mx_shaded_java mx_jar_dist mx_classpath_dist mx_pom_dist mx_resource_layout mx_files mx_processed_java mx_processor mx_project mx_test_class mx_whole_java")},
 	)

@@ -73,3 +73,9 @@ py_binary(
     main = "pack_native_resource.py",
     visibility = ["//graal:__pkg__"],
 )
+
+py_binary(
+    name = "sulong_cmake",
+    srcs = ["sulong_cmake.py"],
+    visibility = ["//visibility:public"],
+)
