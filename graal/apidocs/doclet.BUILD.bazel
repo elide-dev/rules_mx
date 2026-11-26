@@ -1,0 +1,23 @@
+# Builds elide-dev/doclet from source, as `elide build` does: one jar with the doclet
+# (src/main/java and the JDK 25 src/apidocs/java source set) and the renderer resources.
+# Copied from rules_elide's e2e/apidocs. The doclet runs in the exec configuration, so it
+# compiles for Java 25 whatever --tool_java_language_version says; the exec JDK must be 25+.
+load("@rules_java//java:defs.bzl", "java_library")
+
+java_library(
+    name = "doclet",
+    srcs = glob([
+        "doclet/src/main/java/**/*.java",
+        "doclet/src/apidocs/java/**/*.java",
+    ]),
+    javacopts = [
+        "-XepDisableAllChecks",
+        "-source",
+        "25",
+        "-target",
+        "25",
+    ],
+    resource_strip_prefix = "doclet/src/main/resources",
+    resources = glob(["doclet/src/main/resources/**"]),
+    visibility = ["//visibility:public"],
+)

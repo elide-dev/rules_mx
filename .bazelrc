@@ -53,3 +53,9 @@ build:source-native-image --config=labsjdk
 build:source-native-image --tool_java_runtime_version=labsjdk_25
 build:source-native-image --config=elide-processors
 build:source-native-image --extra_toolchains=//graal:source_native_image_toolchain
+
+# The SDK and Truffle API references (//graal/apidocs). elide-dev/doclet needs JDK 25, and javadoc
+# must run on a JDK without GraalVM modules, so the doclet and javadoc use Labs JDK 25.
+build:apidocs --config=labsjdk
+build:apidocs --tool_java_runtime_version=labsjdk_25
+build:apidocs --config=elide-processors

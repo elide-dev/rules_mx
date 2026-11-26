@@ -1,0 +1,157 @@
+load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
+load("@rules_python//python:py_test.bzl", "py_test")
+load(":defs.bzl", "graal_apidocs")
+
+# Build and test with --config=apidocs, which selects Labs JDK 25:
+#   bazelisk test --config=apidocs //graal/apidocs:apidocs_test
+# The targets are manual so that //... on other JDKs skips them.
+
+exports_files(["doclet.BUILD.bazel"])
+
+# The release the references describe. Empty in development builds; the elide-dev/graal
+# publish workflow sets both, e.g.
+#   --//graal/apidocs:version=25.6.0-elide.1 --//graal/apidocs:source_ref=<commit>
+string_flag(
+    name = "version",
+    build_setting_default = "",
+)
+
+string_flag(
+    name = "source_ref",
+    build_setting_default = "",
+)
+
+_THEME = {
+    "brand": "Elide GraalVM",
+    "footer": "Built from elide-dev/graal, Elide's fork of oracle/graal. Licensed under the Universal Permissive License (UPL), Version 1.0.",
+    "links": {
+        "header": [{
+            "label": "Source",
+            "url": "https://github.com/elide-dev/graal",
+        }],
+        "footer": [
+            {
+                "label": "elide-dev/graal",
+                "url": "https://github.com/elide-dev/graal",
+            },
+            {
+                "label": "Elide",
+                "url": "https://elide.dev",
+            },
+        ],
+    },
+    "tokens": {
+        "light": {"accent": "#246785"},
+        "dark": {"accent": "#86cce8"},
+    },
+}
+
+# The SDK packages that `mx sdk javadoc` publishes. Like mx, this documents only packages with a
+# package-info.java: the implementation packages are left out.
+_SDK_PACKAGES = [
+    "org.graalvm.collections",
+    "org.graalvm.home",
+    "org.graalvm.nativeimage",
+    "org.graalvm.options",
+    "org.graalvm.polyglot",
+    "org.graalvm.word",
+]
+
+_SDK_EXCLUDES = [
+    "org.graalvm.home.impl",
+    "org.graalvm.nativeimage.impl",
+    # javadoc keeps this subpackage of an excluded package, so name it too.
+    "org.graalvm.nativeimage.impl.clinit",
+    "org.graalvm.nativeimage.libgraal",
+    "org.graalvm.polyglot.impl",
+    "org.graalvm.polyglot.tck",
+    "org.graalvm.word.impl",
+]
+
+_SDK_PROJECTS = [
+    "@graal//sdk:org.graalvm.collections",
+    "@graal//sdk:org.graalvm.home",
+    "@graal//sdk:org.graalvm.nativeimage",
+    "@graal//sdk:org.graalvm.options",
+    "@graal//sdk:org.graalvm.polyglot",
+    "@graal//sdk:org.graalvm.word",
+]
+
+graal_apidocs(
+    name = "sdk",
+    exclude_packages = _SDK_EXCLUDES,
+    packages = _SDK_PACKAGES,
+    tags = ["manual"],
+    theme = _THEME | {"productName": "GraalVM SDK"},
+    title = "GraalVM SDK",
+    deps = _SDK_PROJECTS,
+)
+
+# The projects of `mx truffle javadoc` (mx_truffle.javadoc): the SDK set plus the Truffle API.
+graal_apidocs(
+    name = "truffle",
+    exclude_packages = _SDK_EXCLUDES + [
+        "com.oracle.truffle.api.debug.impl",
+        "com.oracle.truffle.api.impl",
+        "com.oracle.truffle.api.strings.provider",
+    ],
+    packages = _SDK_PACKAGES + [
+        "com.oracle.svm.core.annotate",
+        "com.oracle.truffle.api",
+    ],
+    # The doclet cannot yet represent these Truffle comments, so they are warnings and the
+    # affected parts are left out:
+    # - snippet: 86 external {@snippet file=...} examples (mx resolves them with --snippet-path).
+    # - reference: a {@link} to a type parameter (BytecodeDescriptor).
+    # - malformed: a @see with a trailing period (StaticProperty).
+    problems = "error,malformed=warning,reference=warning,snippet=warning",
+    tags = ["manual"],
+    theme = _THEME | {"productName": "Truffle"},
+    title = "Truffle",
+    deps = _SDK_PROJECTS + [
+        "@graal//sdk:com.oracle.svm.core.annotate",
+        "@graal//truffle:com.oracle.truffle.api",
+        "@graal//truffle:com.oracle.truffle.api.bytecode",
+        "@graal//truffle:com.oracle.truffle.api.debug",
+        "@graal//truffle:com.oracle.truffle.api.dsl",
+        "@graal//truffle:com.oracle.truffle.api.exception",
+        "@graal//truffle:com.oracle.truffle.api.instrumentation",
+        "@graal//truffle:com.oracle.truffle.api.interop",
+        "@graal//truffle:com.oracle.truffle.api.library",
+        "@graal//truffle:com.oracle.truffle.api.object",
+        "@graal//truffle:com.oracle.truffle.api.profiles",
+        "@graal//truffle:com.oracle.truffle.api.staticobject",
+        "@graal//truffle:com.oracle.truffle.api.strings",
+        "@graal//truffle:com.oracle.truffle.api.utilities",
+    ],
+)
+
+[
+    filegroup(
+        name = name + "_" + kind,
+        srcs = [":" + name],
+        output_group = "apidocs_" + kind,
+        tags = ["manual"],
+    )
+    for name in ("sdk", "truffle")
+    for kind in ("archive", "site")
+]
+
+py_test(
+    name = "apidocs_test",
+    size = "small",
+    srcs = ["apidocs_test.py"],
+    args = [
+        "$(rootpath :sdk_site)",
+        "$(rootpath :truffle_site)",
+        "$(rootpath :sdk_archive)",
+        "$(rootpath :truffle_archive)",
+    ],
+    data = [
+        ":sdk_archive",
+        ":sdk_site",
+        ":truffle_archive",
+        ":truffle_site",
+    ],
+    tags = ["manual"],
+)
