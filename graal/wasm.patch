@@ -2,7 +2,7 @@ diff --git a/wasm/BUILD.bazel b/wasm/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/wasm/BUILD.bazel
-@@ -0,0 +1,1948 @@
+@@ -0,0 +1,1976 @@
 +load("@rules_java//java:java_import.bzl", "java_import")
 +
 +# gazelle:resolve java org.openjdk.jol.info //wasm:JOL
@@ -23,6 +23,7 @@ new file mode 100644
 +    name = "all_distributions",
 +    testonly = True,
 +    srcs = [
++        ":GRAALWASM_JVM_STANDALONE",
 +        ":GRAALWASM_NATIVE_STANDALONE",
 +        ":GRAALWASM_STANDALONE_COMMON",
 +        ":GRAALWASM_STANDALONE_DEPENDENCIES",
@@ -1893,6 +1894,33 @@ new file mode 100644
 +    ],
 +    root = "benchmarks",
 +    tool = "@wabt//src/tools:wat2wasm",
++    visibility = ["//visibility:public"],
++)
++
++mx_exported_tar(
++    name = "GRAALWASM_JVM_STANDALONE",
++    archive_imports = {
++        "//truffle:TRUFFLE_ATTACH_GRAALVM_SUPPORT": "=jvmlibs/",
++        ":GRAALWASM_STANDALONE_COMMON": "=",
++    },
++    format = "dir",
++    jdk_homes = {
++        "@rules_mx//graal:standalone_jdk_archive": "{\"directory\": \"jvm/\", \"exclude\": [\"bin/native-image*\", \"lib/static\", \"lib/svm\", \"lib/<lib:native-image-agent>\", \"lib/<lib:native-image-diagnostics-agent>\", \"lib/src.zip\", \"jmods\"]}",
++    },
++    members = {
++        "//sdk:COLLECTIONS": "modules/collections.jar",
++        "//sdk:JLINE3": "modules/jline3.jar",
++        "//sdk:JNIUTILS": "modules/jniutils.jar",
++        "//sdk:LAUNCHER_COMMON": "modules/launcher-common.jar",
++        "//sdk:NATIVEIMAGE": "modules/nativeimage.jar",
++        "//sdk:POLYGLOT": "modules/polyglot.jar",
++        "//sdk:WORD": "modules/word.jar",
++        "//truffle:TRUFFLE_API": "modules/truffle-api.jar",
++        "//truffle:TRUFFLE_COMPILER": "modules/truffle-compiler.jar",
++        "//truffle:TRUFFLE_RUNTIME": "modules/truffle-runtime.jar",
++        ":WASM": "modules/wasm.jar",
++        ":WASM_LAUNCHER": "modules/wasm-launcher.jar",
++    },
 +    visibility = ["//visibility:public"],
 +)
 +

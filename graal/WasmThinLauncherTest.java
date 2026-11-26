@@ -1,6 +1,7 @@
 package graal;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.nio.charset.StandardCharsets;
@@ -13,25 +14,19 @@ public class WasmThinLauncherTest {
     @Test
     public void runsGuestWithTheResolvedStandaloneModules() throws Exception {
         Path root = Files.createTempDirectory(Path.of(System.getenv("TEST_TMPDIR")), "wasm");
-        String install = System.getenv("WASM_INSTALL");
-        Path launcher;
-        if (install == null) {
-            launcher = Files.createDirectories(root.resolve("bin")).resolve("wasm");
-            Files.copy(Path.of(System.getenv("WASM_LAUNCHER")), launcher);
-            launcher.toFile().setExecutable(true);
-            Files.createSymbolicLink(root.resolve("jvm"), Path.of(System.getProperty("java.home")));
-            Path modules = Files.createDirectory(root.resolve("modules"));
-            for (String jar : System.getenv("MODULE_JARS").split(" ")) {
-                Path source = Path.of(jar);
-                Files.createSymbolicLink(modules.resolve(source.getFileName()), source.toAbsolutePath());
-            }
+        Path distribution = Path.of(System.getenv("WASM_INSTALL"));
+        Path launcher = distribution.resolve("bin/wasm");
+        assertTrue(Files.isRegularFile(distribution.resolve("LICENSE.txt")));
+        assertTrue(Files.isRegularFile(distribution.resolve("3rd_party_licenses.txt")));
+        assertTrue(Files.readString(distribution.resolve("release")).contains("JAVA_VERSION="));
+        assertTrue(Files.isRegularFile(distribution.resolve("native-image.properties")));
+        if ("jvm".equals(System.getenv("WASM_MODE"))) {
+            assertTrue(Files.isExecutable(distribution.resolve("jvm/bin/java")));
+            assertEquals(-1, Files.mismatch(distribution.resolve("release"), distribution.resolve("jvm/release")));
+            assertFalse(Files.exists(distribution.resolve("jvm/jmods")));
+            assertFalse(Files.exists(distribution.resolve("jvm/lib/src.zip")));
         } else {
-            Path distribution = Path.of(install);
-            launcher = distribution.resolve("bin/wasm");
-            assertTrue(Files.isRegularFile(distribution.resolve("LICENSE.txt")));
-            assertTrue(Files.isRegularFile(distribution.resolve("3rd_party_licenses.txt")));
-            assertTrue(Files.readString(distribution.resolve("release")).contains("JAVA_VERSION="));
-            assertTrue(Files.isRegularFile(distribution.resolve("native-image.properties")));
+            assertTrue(Files.isRegularFile(distribution.resolve("lib/" + System.mapLibraryName("wasmvm"))));
         }
         // (module (func (export "_start")))
         Path guest = root.resolve("hello.wasm");

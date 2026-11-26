@@ -1455,7 +1455,7 @@ def _tar_layout(dist, pending, mappings):
     }
 
 
-def _install_layout(dist, pending, mappings, jdk_release):
+def _install_layout(dist, pending, mappings, options):
     attrs = dist._orig_attrs
     if (
         not dist.isPlatformDependent() or not attrs.get("layout")
@@ -1466,26 +1466,48 @@ def _install_layout(dist, pending, mappings, jdk_release):
         raise _UnsupportedLowering(f"{dist.name}: needs a target-specific install recipe")
     members = {}
     imports = {}
+    jdks = {}
     inputs = set()
     # Keep platform substitutions symbolic until we know the supplying project.
     # Asking mx for _walk_layout() here would expand them for the Gazelle host.
     for destination, source in mx.LayoutDistribution._walk_static_layout(
         dist.layout, dist.name, distribution_object=dist, context=dist
     ):
-        if source["source_type"] not in ("dependency", "extracted-dependency") or source.keys() - {
-            "_str_", "source_type", "dependency", "path", "optional"
-        } or source.get("optional"):
+        dest = destination.removeprefix("./")
+        directory = destination.endswith("/")
+        kind = source["source_type"]
+        path = source.get("path")
+        if source.get("optional"):
+            raise _UnsupportedLowering(f"{dist.name}: optional install member {source['_str_']}")
+        if kind == "classpath-dependencies" and directory and _resource_path(dest.rstrip("/")):
+            if source.keys() - {"source_type", "_str_", "dependencies", "optional"}:
+                raise _UnsupportedLowering(f"{dist.name}: unsupported classpath install attributes")
+            roots = [mx.dependency(n, context=dist) for n in source["dependencies"]]
+            inputs.update(roots)
+            for entry in mx.classpath_entries(roots):
+                if not entry.isJARDistribution():
+                    raise _UnsupportedLowering(f"{dist.name}: classpath needs the artifact {entry.qualifiedName()}")
+                (target,) = _dependency_labels([entry], dist.suite, mappings, pending, True)
+                members.setdefault(target, []).append(dest + entry.default_filename())
+            continue
+        if kind not in ("dependency", "extracted-dependency"):
             raise _UnsupportedLowering(f"{dist.name}: unsupported install source {source['_str_']}")
         dep = mx.dependency(source["dependency"], context=dist)
         inputs.add(dep)
-        dest = destination.removeprefix("./")
-        directory = destination.endswith("/")
-        path = source.get("path")
-        kind = source["source_type"]
+        allowed = {"_str_", "source_type", "dependency", "path", "optional"}
+        if kind == "dependency" and path == "*" and directory and dep.qualifiedName() == "sdk:STANDALONE_JAVA_HOME":
+            if not options.standalone_jdk_archive or source.keys() - allowed - {"exclude"} or not _resource_path(dest.rstrip("/")):
+                raise _UnsupportedLowering(f"{dist.name}: bind the standalone JDK archive and installation path")
+            if options.standalone_jdk_archive in jdks:
+                raise _UnsupportedLowering(f"{dist.name}: multiple JDK homes in the layout")
+            jdks[options.standalone_jdk_archive] = json.dumps({"directory": dest, "exclude": source.get("exclude", [])}, sort_keys=True)
+            continue
+        if source.keys() - allowed:
+            raise _UnsupportedLowering(f"{dist.name}: unsupported install attributes for {source['_str_']}")
         if kind == "dependency" and path == "release" and dep.qualifiedName() == "sdk:STANDALONE_JAVA_HOME":
-            if not jdk_release:
+            if not options.standalone_jdk_release:
                 raise _UnsupportedLowering(f"{dist.name}: bind the release file of STANDALONE_JAVA_HOME")
-            target = jdk_release
+            target = options.standalone_jdk_release
         else:
             if dep.suite == dist.suite:
                 target = ":" + dep.name
@@ -1523,6 +1545,7 @@ def _install_layout(dist, pending, mappings, jdk_release):
     if inputs != set(dist.buildDependencies) or not (members or imports):
         raise _UnsupportedLowering(f"{dist.name}: install inputs differ from its resolved build dependencies")
     return {
+        **({"jdk_homes": jdks} if jdks else {}),
         "name": dist.name, "format": "dir", "testonly": dist.is_test_distribution(),
         "members": {key: "\n".join(paths) for key, paths in members.items()},
         "archive_imports": {key: "\n".join(paths) for key, paths in imports.items()},
@@ -1885,6 +1908,8 @@ def bazel_buildfile(args):
         metavar="//PACKAGE=FILE",
         help="import the Java bindings published by another suite",
     )
+    parser.add_argument("--standalone-jdk-archive", metavar="LABEL", help="bind the tar archive of mx STANDALONE_JAVA_HOME")
+    parser.add_argument("--layout-dep", action="append", default=[], metavar="SUITE:NAME=LABEL", help="bind an imported distribution that implements MxArchiveLayoutInfo")
     parser.add_argument("--standalone-jdk-release", metavar="LABEL", help="bind the release file from mx STANDALONE_JAVA_HOME")
     parser.add_argument("--svm-macro", action="append", default=[], metavar="COMPONENT", help="export the registered Native Image macro and its component dependencies")
     parser.add_argument("projects", nargs="*")
@@ -2179,7 +2204,7 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
                 continue
             if type(project).__name__ == "LayoutDirDistribution":
                 if project.isPlatformDependent() and options.standalone_jdk_release:
-                    tar_layouts[project.name] = _install_layout(project, pending, java_deps, options.standalone_jdk_release)
+                    tar_layouts[project.name] = _install_layout(project, pending, java_deps | _mappings(parser, options.layout_dep, "--layout-dep"), options)
                 else:
                     layouts[project.name] = _resource_layout(project, pending, java_deps)
                 continue

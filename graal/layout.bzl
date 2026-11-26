@@ -23,7 +23,7 @@ static_archive = rule(
 
 MxArchiveLayoutInfo = provider(
     doc = "Mapping of packaged archive paths to their declared Bazel files.",
-    fields = ["archive", "entries", "links"],
+    fields = ["archive", "entries", "links", "jdk_homes"],
 )
 
 def _add_entry(entries, path, file):
@@ -36,6 +36,11 @@ def _layout_impl(ctx):
     output = ctx.actions.declare_directory(ctx.label.name + ".files") if directory else ctx.actions.declare_file(ctx.label.name.lower().replace("_", "-") + "." + ctx.attr.format)
     entries = {}
     links = {}
+    homes = []
+    for target, encoded in ctx.attr.jdk_homes.items():
+        [bundle] = target.files.to_list()
+        spec = json.decode(encoded)
+        homes.append(struct(bundle = bundle, directory = spec["directory"], exclude = spec["exclude"]))
     for target, destinations in ctx.attr.members.items():
         files = [target[MxArchiveLayoutInfo].archive] if MxArchiveLayoutInfo in target and target[MxArchiveLayoutInfo].archive else target.files.to_list()
         if len(files) != 1:
@@ -60,6 +65,8 @@ def _layout_impl(ctx):
             else:
                 if destination and not destination.endswith("/"):
                     fail("Expected a destination directory: " + destination)
+                for home in getattr(target[MxArchiveLayoutInfo], "jdk_homes", []):
+                    homes.append(struct(bundle = home.bundle, directory = destination + home.directory, exclude = home.exclude))
                 for path, artifact in sources.items():
                     _add_entry(entries, destination + path, artifact)
                     if path in source_links:
@@ -71,13 +78,16 @@ def _layout_impl(ctx):
     if links:
         args.add("--links")
         args.add(json.encode(links))
+    if homes:
+        args.add("--jdk-homes")
+        args.add(json.encode([{"bundle": h.bundle.path, "directory": h.directory, "exclude": h.exclude} for h in homes]))
     for path in sorted(entries):
         args.add(path)
         args.add(entries[path])
     ctx.actions.run(
         executable = ctx.executable._pack,
         arguments = [args],
-        inputs = entries.values(),
+        inputs = entries.values() + [h.bundle for h in homes],
         outputs = [output],
         mnemonic = "MxArchiveLayout",
     )
@@ -90,7 +100,7 @@ def _layout_impl(ctx):
         files.append(file_list)
     return [
         DefaultInfo(files = depset(files)),
-        MxArchiveLayoutInfo(archive = None if directory else output, entries = entries, links = links),
+        MxArchiveLayoutInfo(archive = None if directory else output, entries = entries, links = links, jdk_homes = homes),
     ]
 
 mx_archive_layout = rule(
@@ -100,8 +110,9 @@ mx_archive_layout = rule(
         "members": attr.label_keyed_string_dict(allow_files = True, mandatory = True),
         # Map a member to a new path, or use an empty selector to import an entire layout.
         "archive_imports": attr.label_keyed_string_dict(providers = [MxArchiveLayoutInfo]),
+        "jdk_homes": attr.label_keyed_string_dict(allow_files = [".gz"]),
         "file_list": attr.string_list(),
-        "format": attr.string(mandatory = True, values = ["dir", "jar", "tar"]),
+        "format": attr.string(mandatory = True, values = ["dir", "jar", "tar", "tar.gz"]),
         "target_prefix": attr.string(),
         "_pack": attr.label(default = Label("//mx:pack_layout"), executable = True, cfg = "exec"),
     },
