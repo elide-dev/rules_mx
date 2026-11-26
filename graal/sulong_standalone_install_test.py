@@ -20,7 +20,11 @@ def main(program, objdump, archives):
                 if sys.platform.startswith("linux"):
                     install = launcher.parent.parent
                     for lib in sorted((install / "lib/sulong/native/lib").glob("*.so*")):
-                        if not lib.is_symlink():
+                        if lib.is_symlink():
+                            continue
+                        with lib.open("rb") as stream:
+                            is_elf = stream.read(4) == b"\x7fELF"
+                        if is_elf:
                             tags = subprocess.check_output([objdump, "-p", lib], text=True, errors="replace")
                             print(lib.name, [row.strip() for row in tags.splitlines() if any(t in row for t in ("NEEDED", "RUNPATH", "RPATH"))])
                     traced = subprocess.run([launcher, fixture], cwd=directory, capture_output=True, text=True,
