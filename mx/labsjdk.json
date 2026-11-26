@@ -1,0 +1,8 @@
+{
+  "platforms": {
+    "darwin-aarch64": "08d73b48434c033be7fb52f92c8a05f7579af575d2cfd4a26255c9f9cea5083a",
+    "linux-aarch64": "d82205166184bcd4687657942ea2919cec72328e4717b845b7a635efbacf04e6",
+    "linux-amd64": "871a0de0c24c35cbc17b364f9c3e322c709a85edd52d7ad5143bbb302c41232f"
+  },
+  "version": "ce-25.0.4.1.1+1-jvmci-25.4-b23"
+}

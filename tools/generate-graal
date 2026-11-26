@@ -3,6 +3,7 @@
 
 import argparse
 import base64
+import hashlib
 import difflib
 import json
 import os
@@ -12,7 +13,9 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
+import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
 SVM_SUPPORT_JARS = (
@@ -1636,13 +1639,68 @@ def bazel_source(label):
     return Path(location.split(": source file ", 1)[0].rsplit(":", 2)[0])
 
 
+def emit(path, text, check, message):
+    if check:
+        if not path.exists() or path.read_text() != text:
+            sys.exit(message)
+    else:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text)
+
+
+def fetch_source(pin, stage):
+    """Download and verify a source archive described like //graal:source.json."""
+    archive = stage / "source.tar.gz"
+    request = urllib.request.Request(
+        pin["urls"][0], headers={"User-Agent": "rules_mx-generate-graal"}
+    )
+    digest = hashlib.sha256()
+    with urllib.request.urlopen(request) as response, archive.open("wb") as out:
+        while chunk := response.read(1 << 20):
+            digest.update(chunk)
+            out.write(chunk)
+    if pin.get("sha256") and digest.hexdigest() != pin["sha256"]:
+        sys.exit(
+            f"{pin['urls'][0]} has SHA-256 {digest.hexdigest()}, expected {pin['sha256']}"
+        )
+    root = stage / "source"
+    with tarfile.open(archive) as tar:
+        tar.extractall(root, filter="data")
+    archive.unlink()
+    return root / pin["strip_prefix"], digest.hexdigest()
+
+
+def labsjdk_pin(source, current):
+    """Pin labsjdk-ce-latest from the selected source's common.json."""
+    version = json.loads((source / "common.json").read_text())["jdks"][
+        "labsjdk-ce-latest"
+    ]["version"]
+    if current.get("version") == version:
+        return current
+    jdk, jvmci = version.split("-jvmci-")
+    request = urllib.request.Request(
+        f"https://api.github.com/repos/graalvm/labs-openjdk/releases/tags/jvmci-{jvmci}",
+        headers={"User-Agent": "rules_mx-generate-graal"},
+    )
+    with urllib.request.urlopen(request) as response:
+        assets = {a["name"]: a for a in json.load(response)["assets"]}
+    platforms = {}
+    for platform in current["platforms"]:
+        asset = assets[f"labsjdk-{version}-{platform}.tar.gz"]
+        algorithm, digest = asset["digest"].split(":")
+        if algorithm != "sha256":
+            raise ValueError(f"Unexpected digest for {asset['name']}")
+        platforms[platform] = digest
+    return {"platforms": platforms, "version": version}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "graal",
         nargs="?",
         type=Path,
-        help="Graal checkout (defaults to the pinned archive)",
+        help="Graal checkout (defaults to the archive in graal/source.json)",
     )
     parser.add_argument(
         "--check", action="store_true", help="compare with the checked-in overlay"
@@ -1653,12 +1711,55 @@ def main():
         choices=[*SUITES, "vm"],
         help="only regenerate the named BUILD overlays",
     )
+    parser.add_argument("--archive", help="Graal source archive URL to generate for")
+    parser.add_argument("--sha256", help="expected SHA-256 of --archive")
+    parser.add_argument(
+        "--strip-prefix", help="directory prefix of the --archive members"
+    )
+    parser.add_argument(
+        "--pin",
+        action="store_true",
+        help="record --archive in graal/source.json as the default source",
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=ROOT / "graal",
+        help="directory for the overlay patches and input pins (default: graal/)",
+    )
     args = parser.parse_args()
-    with tempfile.TemporaryDirectory() as temp:
+    if args.archive and args.graal:
+        parser.error("Pass either a checkout or --archive")
+    if args.pin and not args.archive:
+        parser.error("--pin requires --archive")
+    if args.archive and args.strip_prefix is None:
+        parser.error("--archive requires --strip-prefix")
+    output = args.output.resolve()
+    # Keep a downloaded tree outside the stage so mx sees one copy of each suite.
+    with tempfile.TemporaryDirectory() as temp, tempfile.TemporaryDirectory() as fetched:
         stage = Path(temp).resolve()
-        source = args.graal
+        source = args.graal.resolve() if args.graal else None
         if source is None:
-            source = bazel_source("@graal//sdk:BUILD.bazel").parents[1]
+            pin_path = ROOT / "graal/source.json"
+            pin = json.loads(pin_path.read_text())
+            if args.archive:
+                pin = {
+                    "sha256": args.sha256,
+                    "strip_prefix": args.strip_prefix,
+                    "urls": [args.archive],
+                }
+            source, digest = fetch_source(pin, Path(fetched))
+            if args.pin:
+                pin["sha256"] = digest
+                pin_path.write_text(json.dumps(pin, indent=2, sort_keys=True) + "\n")
+        labsjdk = ROOT / "mx/labsjdk.json"
+        current = json.loads(labsjdk.read_text())
+        emit(
+            labsjdk if output == ROOT / "graal" else output / "labsjdk.json",
+            json.dumps(labsjdk_pin(source, current), indent=2, sort_keys=True) + "\n",
+            args.check,
+            "Regenerate the Labs JDK pin with tools/generate-graal",
+        )
         mx_suite = bazel_source("@graal_mx//:mx.mx/suite.py")
         shutil.copyfile(mx_suite, stage / "mx-suite.py")
         for family in ("gcc", "msvc"):
@@ -1694,7 +1795,7 @@ def main():
             "libraries"
         ]["LIBFFI_SOURCES"]
         algorithm, digest = lib["digest"].split(":")
-        libffi = ROOT / "graal/libffi.json"
+        libffi = output / "libffi.json"
         pin = (
             json.dumps(
                 dict(
@@ -1708,50 +1809,55 @@ def main():
             )
             + "\n"
         )
-        if args.check:
-            if libffi.read_text() != pin:
-                sys.exit("Regenerate the libffi pin with tools/generate-graal")
-        else:
-            libffi.write_text(pin)
-        hsdis = ROOT / "graal/hsdis.json"
+        emit(
+            libffi,
+            pin,
+            args.check,
+            "Regenerate the libffi pin with tools/generate-graal",
+        )
+        hsdis = output / "hsdis.json"
         pins = (
             json.dumps(hsdis_inputs(stage / "compiler"), indent=2, sort_keys=True)
             + "\n"
         )
-        if args.check:
-            if hsdis.read_text() != pins:
-                sys.exit("Regenerate the HSDIS pins with tools/generate-graal")
-        else:
-            hsdis.write_text(pins)
-        sdk_llvm = ROOT / "graal/sdk_llvm.json"
+        emit(
+            hsdis,
+            pins,
+            args.check,
+            "Regenerate the HSDIS pins with tools/generate-graal",
+        )
+        sdk_llvm = output / "sdk_llvm.json"
         sdk_llvm_pins = (
             json.dumps(sdk_llvm_inputs(stage / "sdk"), indent=2, sort_keys=True) + "\n"
         )
-        if args.check:
-            if sdk_llvm.read_text() != sdk_llvm_pins:
-                sys.exit("Regenerate the SDK LLVM pins with tools/generate-graal")
-        else:
-            sdk_llvm.write_text(sdk_llvm_pins)
-        sdk_musl = ROOT / "graal/sdk_musl.json"
+        emit(
+            sdk_llvm,
+            sdk_llvm_pins,
+            args.check,
+            "Regenerate the SDK LLVM pins with tools/generate-graal",
+        )
+        sdk_musl = output / "sdk_musl.json"
         sdk_musl_pins = (
             json.dumps(sdk_musl_inputs(stage / "sdk"), indent=2, sort_keys=True) + "\n"
         )
-        if args.check:
-            if sdk_musl.read_text() != sdk_musl_pins:
-                sys.exit("Regenerate the SDK musl pins with tools/generate-graal")
-        else:
-            sdk_musl.write_text(sdk_musl_pins)
-        visualvm = ROOT / "graal/visualvm.json"
+        emit(
+            sdk_musl,
+            sdk_musl_pins,
+            args.check,
+            "Regenerate the SDK musl pins with tools/generate-graal",
+        )
+        visualvm = output / "visualvm.json"
         visualvm_pins = (
             json.dumps(visualvm_inputs(stage / "tools"), indent=2, sort_keys=True)
             + "\n"
         )
-        if args.check:
-            if visualvm.read_text() != visualvm_pins:
-                sys.exit("Regenerate the VisualVM pins with tools/generate-graal")
-        else:
-            visualvm.write_text(visualvm_pins)
-        lock = ROOT / "graal/shaded_inputs.json"
+        emit(
+            visualvm,
+            visualvm_pins,
+            args.check,
+            "Regenerate the VisualVM pins with tools/generate-graal",
+        )
+        lock = output / "shaded_inputs.json"
         lock_text = (
             json.dumps(
                 {
@@ -1764,27 +1870,23 @@ def main():
             )
             + "\n"
         )
-        if args.check:
-            if lock.read_text() != lock_text:
-                sys.exit(
-                    "Shaded dependency pins differ. Regenerate with tools/generate-graal."
-                )
-        else:
-            lock.write_text(lock_text)
+        emit(
+            lock,
+            lock_text,
+            args.check,
+            "Shaded dependency pins differ. Regenerate with tools/generate-graal.",
+        )
         selected = list(dict.fromkeys(args.suite or [*SUITES, "vm"]))
         for suite in selected:
             prepare_suite(suite, stage)
         generate_build_files(selected, stage)
         for suite in selected:
-            overlay = ROOT / f"graal/{suite}.patch"
-            patch = build_patch(stage / suite, stage)
-            if args.check:
-                if overlay.read_text() != patch:
-                    sys.exit(
-                        f"{suite} overlay differs. Regenerate it with tools/generate-graal."
-                    )
-            else:
-                overlay.write_text(patch)
+            emit(
+                output / f"{suite}.patch",
+                build_patch(stage / suite, stage),
+                args.check,
+                f"{suite} overlay differs. Regenerate it with tools/generate-graal.",
+            )
 
 
 if __name__ == "__main__":

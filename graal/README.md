@@ -150,11 +150,41 @@ bazelisk test --config=source-native-image //graal:source_native_image_action_te
 
 The builder uses the source-built Graal compiler and the relocated Espresso module. Bazel supplies option help files to javac's annotation processors through a declared source tree. The Native Image launcher uses the source-built driver, its generated JVM flags, the pinned Labs JDK and the Bazel C/C++ toolchain. The `source-native-image` profile registers this SDK as the `rules_graalvm` toolchain and selects Labs JDK 25 for both target and execution configurations. The action test exercises compilation as a Bazel build action. The SubstrateVM NFI and Truffle runtime support archives select individual inputs from Truffle’s LibFFI and header layouts.
 
+## Select the Graal source
+
+`graal/source.json` pins the default archive: its URL, SHA-256 and strip prefix. The `graal` module extension in `graal/extensions.bzl` fetches that archive as `@graal` and applies the overlays generated for it. The Labs JDK pin in `mx/labsjdk.json` follows `labsjdk-ce-latest` in the same tree's `common.json`.
+
+A consuming root module can select another archive. Generate overlays for it first, because the BUILD files list each suite's sources, projects and distributions:
+
+```sh
+tools/generate-graal --archive "$URL" --sha256 "$SHA256" --strip-prefix "$PREFIX" --output path/to/overlays
+```
+
+```starlark
+graal = use_extension("@rules_mx//graal:extensions.bzl", "graal")
+graal.source(
+    urls = [URL],
+    sha256 = SHA256,
+    strip_prefix = PREFIX,
+    patches = ["//path/to/overlays:sdk.patch", ...],  # benchmark_timer.patch plus the suite overlays
+)
+use_repo(graal, "graal")
+```
+
+Only the root module may declare `graal.source()`. Without it, the extension uses `graal/source.json` and the checked-in overlays. The external inputs (`shaded_inputs.json`, `libffi.json`, the LLVM, musl, HSDIS and VisualVM pins) are generated into the same output directory. The repository rules in this module still read the rules_mx copies, so a different source must match them or supply its own repositories.
+
+To move this repository to a new revision, record the archive and regenerate everything in place:
+
+```sh
+tools/generate-graal --archive "$URL" --sha256 "$SHA256" --strip-prefix "$PREFIX" --pin
+tools/generate-graal --check
+```
+
 ## Extending the graph
 
 The generator exports the selected suites from mx and runs Gazelle once across the suite graphs. SDK, Truffle, compiler, Regex, Tools and Espresso Shared select their roots from the resolved suite inventory. Suites with dynamically registered product configurations can select just their declared roots and still retain the resolved dependencies. Suite-specific settings bind custom native actions, artifacts and test launchers.
 
-Run `tools/generate-graal --check` to reproduce the checked-in patches from the pinned archive. Add suite or external dependency bindings to `tools/generate-graal` as needed, regenerate, and inspect the BUILD diff. To try an upstream revision before changing the pin, pass a checkout path to the generator. Make the archive pin, patches and regression tests part of the same change.
+Run `tools/generate-graal --check` to reproduce the checked-in patches and pins from the archive in `graal/source.json`. The generator downloads and verifies the archive itself and runs mx discovery in a temporary tree that contains only the copied suites. Add suite or external dependency bindings to `tools/generate-graal` as needed, regenerate, and inspect the BUILD diff. To try a revision before changing the pin, pass a checkout path or `--archive` to the generator, with `--output` pointing outside `graal/`. Make the archive pin, patches and regression tests part of the same change.
 
 | Next checkpoint | Acceptance under Bazel |
 | --- | --- |
