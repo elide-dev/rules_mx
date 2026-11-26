@@ -3,6 +3,7 @@
 load("@rules_java//java/common:java_common.bzl", "java_common")
 load("@rules_java//java/common:java_info.bzl", "JavaInfo")
 load("//graal:automatic_module.bzl", "RenamedModuleInfo")
+load("//graal:layout.bzl", "MxArchiveLayoutInfo")
 
 MxJarInfo = provider(fields = ["uses_jvmci", "required_exports", "renamed_originals", "direct_exports"])
 
@@ -12,7 +13,10 @@ def _jar_impl(ctx):
     toolchain = ctx.toolchains[_TOOLCHAIN].java
     jar = ctx.actions.declare_file(ctx.label.name + ".jar")
     dependencies = [dep[JavaInfo] for dep in ctx.attr.deps]
-    inputs = depset(transitive = [dep.files for dep in ctx.attr.contents])
+    inputs = depset(transitive = [
+        depset([dep[MxArchiveLayoutInfo].resource_jar]) if MxArchiveLayoutInfo in dep and getattr(dep[MxArchiveLayoutInfo], "resource_jar", None) else dep.files
+        for dep in ctx.attr.contents
+    ])
     args = ctx.actions.args()
     args.add("--output", jar)
     args.add_all(inputs, before_each = "--input")

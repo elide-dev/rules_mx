@@ -3,10 +3,12 @@
 from contextlib import ExitStack
 import fnmatch
 import gzip
+import hashlib
 import json
 from pathlib import Path, PurePosixPath
 import re
 import shutil
+import stat
 import sys
 import tarfile
 import tempfile
@@ -93,7 +95,35 @@ def _write_tree_archive(tree, output, prefix=None):
                 archive.addfile(member)
 
 
+def _resource_metadata(manifest, digest_path, args):
+    replacements = {
+        "\t": "\\t",
+        "\n": "\\n",
+        **{char: "\\" + char for char in "\\:=#! "},
+    }
+    digest = hashlib.sha256()
+    lines = []
+    for member, filename, mode in zip(args[::3], args[1::3], args[2::3], strict=True):
+        _relative(member)
+        file = Path(filename)
+        with file.open("rb") as stream:
+            for block in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(block)
+        digest.update(member.encode())
+        bits = file.stat().st_mode if mode == "source" else int(mode, 8)
+        escaped = "".join(
+            replacements.get(char, char if char.isascii() else f"\\u{ord(char):04x}")
+            for char in member
+        )
+        lines.append(f"{escaped} = {stat.filemode(bits)[1:]}")
+    Path(manifest).write_bytes("\n".join(lines).encode())
+    Path(digest_path).write_bytes(digest.hexdigest().encode())
+
+
 def main():
+    if sys.argv[1] == "--metadata":
+        _resource_metadata(sys.argv[2], sys.argv[3], sys.argv[4:])
+        return
     output = Path(sys.argv[1])
     args = sys.argv[2:]
     directory = args[:1] == ["--directory"]
@@ -106,6 +136,10 @@ def main():
     links = {}
     if args[:1] == ["--links"]:
         links = json.loads(args[1])
+        args = args[2:]
+    modes = {}
+    if args[:1] == ["--modes"]:
+        modes = {path: int(mode, 8) for path, mode in json.loads(args[1]).items()}
         args = args[2:]
     homes = []
     if args[:1] == ["--jdk-homes"]:
@@ -133,7 +167,9 @@ def main():
                     shutil.copyfile(source, destination)
                     if directory or homes or prefix:
                         destination.chmod(
-                            0o755 if source.stat().st_mode & 0o111 else 0o644
+                            modes.get(
+                                name, 0o755 if source.stat().st_mode & 0o111 else 0o644
+                            )
                         )
             for home in homes:
                 _install_jdk(tree, home)
@@ -147,7 +183,9 @@ def main():
         with zipfile.ZipFile(output, "w") as archive:
             for name, source in entries:
                 entry = zipfile.ZipInfo(name)
-                entry.external_attr = (0o120777 if name in links else 0o100644) << 16
+                entry.external_attr = (
+                    0o120777 if name in links else stat.S_IFREG | modes.get(name, 0o644)
+                ) << 16
                 archive.writestr(
                     entry,
                     links[name].encode() if name in links else source.read_bytes(),
@@ -163,7 +201,9 @@ def main():
                     archive.addfile(entry)
                     continue
                 entry.size = source.stat().st_size
-                entry.mode = 0o755 if source.stat().st_mode & 0o111 else 0o644
+                entry.mode = modes.get(
+                    name, 0o755 if source.stat().st_mode & 0o111 else 0o644
+                )
                 with source.open("rb") as file:
                     archive.addfile(entry, file)
 

@@ -364,6 +364,7 @@ def _write_bindings(path, graph):
                 "java": java,
                 "processors": processors,
                 "artifacts": sorted(artifacts),
+                **({"source_archives": sorted(graph["source_exports"])} if graph.get("source_exports") else {}),
             },
             sort_keys=True,
             indent=2,
@@ -373,7 +374,7 @@ def _write_bindings(path, graph):
 
 
 def _read_bindings(parser, options):
-    result = {"java": {}, "plugins": {}, "packages": {}, "artifacts": {}}
+    result = {"java": {}, "plugins": {}, "packages": {}, "artifacts": {}, "source_archives": {}}
     suites = set()
     for spec in options.bindings:
         package, sep, filename = spec.partition("=")
@@ -390,6 +391,8 @@ def _read_bindings(parser, options):
             qualified = f"{suite}:{name}"
             result["java"][qualified] = f"{package}:{name}"
             result["packages"][qualified] = packages
+        for name in index.get("source_archives", []):
+            result["source_archives"][f"{suite}:{name}"] = f"{package}:{name}.sources"
         for name in index.get("artifacts", []):
             result["artifacts"][f"{suite}:{name}"] = [f"{package}:{name}"]
         for name, plugins in index["processors"].items():
@@ -1484,16 +1487,17 @@ def _source_archive_groups(dist):
         if (
             type(project).__name__ != "JavaProject"
             or project.annotation_processors()
-            or getattr(project, "multiReleaseJarVersion", None)
             or project.suite != dist.suite
         ):
             raise _UnsupportedLowering(
                 f"{dist.name}: source archive requires generated or external sources"
             )
+        version = getattr(project, "multiReleaseJarVersion", None)
+        prefix = f"META-INF/versions/{version}/" if version else ""
         for directory in map(Path, project.source_dirs()):
             for file in sorted(directory.rglob("*.java")):
                 rel = file.relative_to(dist.suite.dir).as_posix()
-                groups[rel] = file.relative_to(directory).as_posix()
+                groups[rel] = prefix + file.relative_to(directory).as_posix()
     if not groups:
         raise _UnsupportedLowering(f"{dist.name}: empty source archive")
     return groups
@@ -1842,7 +1846,96 @@ def _tar_layout(dist, pending, mappings, archives):
     }
 
 
-def _install_layout(dist, pending, mappings, options):
+def _native_resource_directory(dist, pending):
+    attrs = dist._orig_attrs
+    if (
+        not (dist.fileListEntry and dist.hashEntry and attrs.get("layout"))
+        or dist.fileListPurpose
+        or dist.deps
+        or dist.excludedLibs
+    ):
+        raise _UnsupportedLowering(f"{dist.name}: unsupported resource metadata")
+    profiles = {}
+    for os_name, arch, profile in (
+        ("darwin", "aarch64", "macos_arm64"),
+        ("linux", "amd64", "linux_amd64"),
+        ("linux", "aarch64", "linux_arm64"),
+    ):
+        if f"{os_name}-{arch}" not in attrs.get("platforms", []):
+            continue
+
+        def resolve(path):
+            result = path.replace("<os>", os_name).replace("<arch>", arch)
+            if not _resource_path(result.rstrip("/")):
+                raise _UnsupportedLowering(f"{dist.name}: invalid resource path {path}")
+            return result
+
+        imports = {}
+        for destination, source in mx.LayoutDistribution._walk_static_layout(
+            attrs["layout"], dist.name, distribution_object=dist, context=dist
+        ):
+            if (
+                source["source_type"] != "dependency"
+                or not destination.endswith("/")
+                or source.keys()
+                - {"_str_", "source_type", "path", "dependency", "optional"}
+            ):
+                raise _UnsupportedLowering(
+                    f"{dist.name}: unsupported resource source {source['_str_']}"
+                )
+            target = next(
+                (
+                    d
+                    for d in dist.suite.projects + dist.suite.dists
+                    if source["dependency"] in (d.name, d.qualifiedName())
+                ),
+                None,
+            )
+            if not target:
+                raise _UnsupportedLowering(
+                    f"{dist.name}: missing resource producer {source['dependency']}"
+                )
+            path = source["path"]
+            dest = resolve(destination)
+            if (
+                _default_native(target)
+                and path
+                == "*/<multitarget_libc_selection>/<lib:" + target.deliverable + ">"
+            ):
+                enabled = _native_shared_recipe(target, [])["profiles"]
+                if profile not in enabled:
+                    if source["optional"]:
+                        continue
+                    raise _UnsupportedLowering(
+                        f"{dist.name}: required native input missing for {profile}"
+                    )
+                spec = "{primary}=" + dest + "{basename}"
+            elif type(target).__name__ == "LayoutDirDistribution" and path == "*":
+                spec = "=" + dest
+            else:
+                raise _UnsupportedLowering(
+                    f"{dist.name}: unsupported resource member {source['_str_']}"
+                )
+            imports.setdefault(":" + target.name, []).append(spec)
+            pending.append(target)
+        profiles[profile] = {
+            "archive_imports": {
+                label: "\n".join(specs) for label, specs in imports.items()
+            },
+            "file_list_entry": resolve(dist.fileListEntry),
+            "hash_entry": resolve(dist.hashEntry),
+        }
+    if not profiles:
+        raise _UnsupportedLowering(f"{dist.name}: no supported resource platforms")
+    return {
+        "name": dist.name,
+        "format": "dir",
+        "os_layouts": profiles,
+        "testonly": dist.is_test_distribution(),
+    }
+
+
+def _install_layout(dist, pending, mappings, options, bindings):
     attrs = dist._orig_attrs
     if (
         not dist.isPlatformDependent()
@@ -1861,6 +1954,7 @@ def _install_layout(dist, pending, mappings, options):
     members = {}
     imports = {}
     jdks = {}
+    source_archives = {}
     inputs = set()
     # Keep platform substitutions symbolic until we know the supplying project.
     # Asking mx for _walk_layout() here would expand them for the Gazelle host.
@@ -1871,7 +1965,17 @@ def _install_layout(dist, pending, mappings, options):
         directory = destination.endswith("/")
         kind = source["source_type"]
         path = source.get("path")
-        if source.get("optional"):
+        optional_project_layout = (
+            kind == "dependency"
+            and path == "*"
+            and directory
+            and any(
+                d.qualifiedName() == source.get("dependency")
+                and type(d).__name__ == "LayoutDirDistribution"
+                for d in dist.buildDependencies
+            )
+        )
+        if source.get("optional") and not optional_project_layout:
             raise _UnsupportedLowering(
                 f"{dist.name}: optional install member {source['_str_']}"
             )
@@ -1951,6 +2055,47 @@ def _install_layout(dist, pending, mappings, options):
                         f"{dist.name}: bind install input {dep.qualifiedName()}"
                     )
                 target = labels[0]
+            if directory and dest and not _resource_path(dest.rstrip("/")):
+                raise _UnsupportedLowering(
+                    f"{dist.name}: invalid install destination {dest}"
+                )
+            if (
+                kind == "dependency"
+                and directory
+                and path == "*"
+                and dep.isJARDistribution()
+            ):
+                for _, filename in dep.getArchivableResults():
+                    if filename == dep.default_filename():
+                        label = target
+                    elif filename == dep.default_source_filename():
+                        if dep.suite == dist.suite:
+                            name = dist.name + ".sources." + dep.name
+                            source_archives[name] = _source_archive_groups(dep)
+                            label = ":" + name
+                        else:
+                            label = bindings["source_archives"].get(dep.qualifiedName())
+                            if not label:
+                                raise _UnsupportedLowering(
+                                    f"{dist.name}: export source archive {dep.qualifiedName()}"
+                                )
+                    else:
+                        raise _UnsupportedLowering(
+                            f"{dist.name}: unknown JAR result {filename}"
+                        )
+                    members.setdefault(label, []).append(dest + filename)
+                continue
+            if (
+                kind == "dependency"
+                and directory
+                and _default_native(dep)
+                and path
+                == "*/<multitarget_libc_selection>/<lib:" + dep.deliverable + ">"
+            ):
+                imports.setdefault(target, []).append(
+                    "{primary}=" + dest + "{basename}"
+                )
+                continue
             if directory and (
                 (
                     kind == "extracted-dependency"
@@ -2009,6 +2154,7 @@ def _install_layout(dist, pending, mappings, options):
         )
     return {
         **({"jdk_homes": jdks} if jdks else {}),
+        **({"source_archives": source_archives} if source_archives else {}),
         "name": dist.name,
         "format": "dir",
         "testonly": dist.is_test_distribution(),
@@ -2214,6 +2360,13 @@ def bazel_buildfile(args):
         "--classpath-dists",
         action="store_true",
         help="expose same-suite source JAR distributions as Java classpaths in Gazelle",
+    )
+    parser.add_argument(
+        "--export-source-archive",
+        action="append",
+        default=[],
+        metavar="DIST",
+        help="publish a distribution source archive for imported suite layouts",
     )
     parser.add_argument(
         "--archive-dist",
@@ -2701,9 +2854,12 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
                 tar_layouts[project.name] = _tar_layout(project, pending, java_deps, archives)
                 continue
             if type(project).__name__ == "LayoutDirDistribution":
+                if project.fileListEntry and project.hashEntry and project.isPlatformDependent():
+                    tar_layouts[project.name] = _native_resource_directory(project, pending)
+                    continue
                 if project.isPlatformDependent() and options.standalone_jdk_release:
                     tar_layouts[project.name] = _install_layout(
-                        project, pending, java_deps | layout_deps, options
+                        project, pending, java_deps | layout_deps, options, bindings
                     )
                 else:
                     layouts[project.name] = _resource_layout(
@@ -3232,6 +3388,8 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             result["image_projects"] = [
                 image_projects[n] for n in sorted(image_projects)
             ]
+        if options.export_source_archive:
+            result["source_exports"] = {name: _source_archive_groups(suite.dependency(name)) for name in sorted(options.export_source_archive)}
         if native_shared:
             result["native_shared"] = [native_shared[n] for n in sorted(native_shared)]
         if source_projects:

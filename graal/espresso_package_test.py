@@ -1,5 +1,6 @@
 """Check the distribution paths and release overlays consumed by Espresso."""
 
+import hashlib
 import io
 from pathlib import Path
 import os
@@ -20,7 +21,9 @@ def defined_symbols(tool, library):
     }
 
 
-def main(support, io_jar, launchers, benchmarks, mokapot, platform_support, nm):
+def main(
+    support, io_jar, launchers, benchmarks, mokapot, platform_support, nm, resources
+):
     with tarfile.open(support) as archive:
         jars = {member.name for member in archive if member.isfile()}
         assert jars == {"lib/espresso-graal.jar", "lib/espresso-graal.src.zip"}, jars
@@ -72,6 +75,42 @@ def main(support, io_jar, launchers, benchmarks, mokapot, platform_support, nm):
     if sys.platform == "darwin":
         # A symbol from the statically linked JDK, beyond the JVM shim itself.
         assert "JIMAGE_Open" in symbols
+
+    with ZipFile(resources) as jar:
+        prefixes = [
+            n.removesuffix("sha256")
+            for n in jar.namelist()
+            if n.startswith("META-INF/resources/java/espresso-libs/")
+            and n.endswith("/sha256")
+        ]
+        assert len(prefixes) == 1, prefixes
+        prefix = prefixes[0]
+        digest = hashlib.sha256()
+        files = {}
+        for line in jar.read(prefix + "files").decode().splitlines():
+            member, mode = line.split(" = ")
+            assert member.startswith(prefix) and member not in files
+            files[member.removeprefix(prefix)] = mode
+            digest.update(jar.read(member))
+            digest.update(member.encode())
+        assert digest.hexdigest() == jar.read(prefix + "sha256").decode()
+        assert set(files) == {
+            n.removeprefix(prefix) for n in jar.namelist() if n.startswith(prefix)
+        } - {"files", "sha256"}
+        assert files["lib/vmaccess-guest.jar"] == "rw-r--r--"
+        assert files["lib/espresso-io.src.zip"] == "rw-r--r--"
+        with ZipFile(
+            io.BytesIO(jar.read(prefix + "lib/espresso-io.src.zip"))
+        ) as sources:
+            for version in (21, 25):
+                assert any(
+                    n.startswith(f"META-INF/versions/{version}/")
+                    and n.endswith(".java")
+                    for n in sources.namelist()
+                )
+        suffix = "dylib" if sys.platform == "darwin" else "so"
+        assert files["lib/libnespresso." + suffix] == "rwxr-xr-x"
+        assert files["lib/libjvm." + suffix] == "rwxr-xr-x"
 
 
 if __name__ == "__main__":

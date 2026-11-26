@@ -2,12 +2,12 @@ diff --git a/espresso/BUILD.bazel b/espresso/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/espresso/BUILD.bazel
-@@ -0,0 +1,1275 @@
+@@ -0,0 +1,1419 @@
 +load("@rules_mx//graal:layout.bzl", "mx_os_layout")
 +load("@rules_mx//mx:graph.bzl", "mx_exported_tar", "mx_jar_dist", "mx_jvmci_library", "mx_pom_dist", "mx_processed_java", "mx_processor", "mx_project", "mx_shaded_java", "mx_whole_java")
 +load("@rules_mx//mx:jvmci.bzl", "mx_patch_module")
 +load("@rules_mx//mx:native_project.bzl", "mx_native_shared_project")
-+load("@rules_mx//mx:project_files.bzl", "mx_project_files")
++load("@rules_mx//mx:project_files.bzl", "mx_project_files", "mx_source_archive")
 +load("@rules_mx//mx:thin_launcher.bzl", "mx_thin_launcher")
 +
 +filegroup(
@@ -21,10 +21,13 @@ new file mode 100644
 +        ":ESPRESSO_JVM_STANDALONE_JAVA_LINKS",
 +        ":ESPRESSO_JVM_STANDALONE_MOKAPOT_SUPPORT",
 +        ":ESPRESSO_LAUNCHER",
++        ":ESPRESSO_LIBS_DIR",
++        ":ESPRESSO_LIBS_RESOURCES",
 +        ":ESPRESSO_PD_SUPPORT",
 +        ":ESPRESSO_POLYBENCH_BENCHMARKS",
 +        ":ESPRESSO_POLYGLOT",
 +        ":ESPRESSO_PROCESSOR",
++        ":ESPRESSO_SUPPORT",
 +        ":ESPRESSO_VMACCESS_GUEST",
 +        ":HOTSWAP",
 +        ":JVM_STANDALONE_JARS",
@@ -669,6 +672,31 @@ new file mode 100644
 +)
 +
 +mx_jar_dist(
++    name = "ESPRESSO_LIBS_RESOURCES",
++    contents = [
++        ":com.oracle.truffle.espresso.resources.libs",
++        ":ESPRESSO_LIBS_DIR",
++    ],
++    directives = [
++        "requires org.graalvm.truffle",
++        "requires transitive org.graalvm.word",
++    ],
++    jni_services = True,
++    manifest = {
++        "Implementation-Vendor": "Oracle Corporation",
++        "Implementation-Version": "25.6.0-dev",
++        "Name": "espresso-libs-resources",
++        "Specification-Vendor": "Oracle Corporation",
++        "Specification-Version": "25.6.0-dev",
++    },
++    module_name = "org.graalvm.espresso.resources.libs",
++    release = 21,
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = ["//truffle:TRUFFLE_API"],
++)
++
++mx_jar_dist(
 +    name = "ESPRESSO_POLYBENCH_BENCHMARK_DELTABLUE",
 +    testonly = True,
 +    contents = [":benchmarks.interpreter.espresso.deltablue"],
@@ -1186,6 +1214,39 @@ new file mode 100644
 +)
 +
 +mx_os_layout(
++    name = "ESPRESSO_LIBS_DIR",
++    format = "dir",
++    os_layouts = {
++        "linux_amd64": {
++            "archive_imports": {
++                ":ESPRESSO_SUPPORT": "=META-INF/resources/java/espresso-libs/linux/amd64/",
++                ":com.oracle.truffle.espresso.mokapot": "{primary}=META-INF/resources/java/espresso-libs/linux/amd64/lib/{basename}",
++            },
++            "file_list_entry": "META-INF/resources/java/espresso-libs/linux/amd64/files",
++            "hash_entry": "META-INF/resources/java/espresso-libs/linux/amd64/sha256",
++        },
++        "linux_arm64": {
++            "archive_imports": {
++                ":ESPRESSO_SUPPORT": "=META-INF/resources/java/espresso-libs/linux/aarch64/",
++                ":com.oracle.truffle.espresso.mokapot": "{primary}=META-INF/resources/java/espresso-libs/linux/aarch64/lib/{basename}",
++            },
++            "file_list_entry": "META-INF/resources/java/espresso-libs/linux/aarch64/files",
++            "hash_entry": "META-INF/resources/java/espresso-libs/linux/aarch64/sha256",
++        },
++        "macos_arm64": {
++            "archive_imports": {
++                ":ESPRESSO_SUPPORT": "=META-INF/resources/java/espresso-libs/darwin/aarch64/",
++                ":com.oracle.truffle.espresso.fatpot": "{primary}=META-INF/resources/java/espresso-libs/darwin/aarch64/lib/fatpot/{basename}",
++                ":com.oracle.truffle.espresso.mokapot": "{primary}=META-INF/resources/java/espresso-libs/darwin/aarch64/lib/{basename}",
++            },
++            "file_list_entry": "META-INF/resources/java/espresso-libs/darwin/aarch64/files",
++            "hash_entry": "META-INF/resources/java/espresso-libs/darwin/aarch64/sha256",
++        },
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_os_layout(
 +    name = "ESPRESSO_PD_SUPPORT",
 +    format = "dir",
 +    os_layouts = {
@@ -1235,6 +1296,89 @@ new file mode 100644
 +        ":ESPRESSO_POLYBENCH_BENCHMARK_FIBONACCI": "interpreter/Fibonacci.jar",
 +        ":ESPRESSO_POLYBENCH_BENCHMARK_RICHARDS": "interpreter/Richards.jar",
 +        ":ESPRESSO_POLYBENCH_BENCHMARK_SIEVE": "interpreter/Sieve.jar",
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_source_archive(
++    name = "ESPRESSO_SUPPORT.sources.CONTINUATIONS",
++    testonly = False,
++    groups = {
++        "//espresso/src/org.graalvm.continuations/src/org/graalvm/continuations:ESPRESSO_SUPPORT.sources.CONTINUATIONS.files": "org/graalvm/continuations",
++    },
++)
++
++mx_source_archive(
++    name = "ESPRESSO_SUPPORT.sources.ESPRESSO_IO",
++    testonly = False,
++    groups = {
++        "//espresso/src/com.oracle.truffle.espresso.io.jdk21/src/sun/nio/ch:ESPRESSO_SUPPORT.sources.ESPRESSO_IO.files": "META-INF/versions/21/sun/nio/ch",
++        "//espresso/src/com.oracle.truffle.espresso.io.jdk21/src/sun/nio/fs:ESPRESSO_SUPPORT.sources.ESPRESSO_IO.files": "META-INF/versions/21/sun/nio/fs",
++        "//espresso/src/com.oracle.truffle.espresso.io.jdk25/src/sun/nio/ch:ESPRESSO_SUPPORT.sources.ESPRESSO_IO.files": "META-INF/versions/25/sun/nio/ch",
++        "//espresso/src/com.oracle.truffle.espresso.io.jdk25/src/sun/nio/fs:ESPRESSO_SUPPORT.sources.ESPRESSO_IO.files": "META-INF/versions/25/sun/nio/fs",
++        "//espresso/src/com.oracle.truffle.espresso.io/src/java/io:ESPRESSO_SUPPORT.sources.ESPRESSO_IO.files": "java/io",
++        "//espresso/src/com.oracle.truffle.espresso.io/src/sun/nio/ch:ESPRESSO_SUPPORT.sources.ESPRESSO_IO.files": "sun/nio/ch",
++        "//espresso/src/com.oracle.truffle.espresso.io/src/sun/nio/fs:ESPRESSO_SUPPORT.sources.ESPRESSO_IO.files": "sun/nio/fs",
++    },
++)
++
++mx_source_archive(
++    name = "ESPRESSO_SUPPORT.sources.ESPRESSO_JVMCI",
++    testonly = False,
++    groups = {
++        "//espresso/src/com.oracle.truffle.espresso.jvmci/src/com/oracle/truffle/espresso/jvmci/meta:ESPRESSO_SUPPORT.sources.ESPRESSO_JVMCI.files": "com/oracle/truffle/espresso/jvmci/meta",
++        "//espresso/src/com.oracle.truffle.espresso.jvmci/src/com/oracle/truffle/espresso/jvmci:ESPRESSO_SUPPORT.sources.ESPRESSO_JVMCI.files": "com/oracle/truffle/espresso/jvmci",
++    },
++)
++
++mx_source_archive(
++    name = "ESPRESSO_SUPPORT.sources.ESPRESSO_POLYGLOT",
++    testonly = False,
++    groups = {
++        "//espresso/src/com.oracle.truffle.espresso.polyglot/src/com/oracle/truffle/espresso/polyglot/collections:ESPRESSO_SUPPORT.sources.ESPRESSO_POLYGLOT.files": "com/oracle/truffle/espresso/polyglot/collections",
++        "//espresso/src/com.oracle.truffle.espresso.polyglot/src/com/oracle/truffle/espresso/polyglot/impl:ESPRESSO_SUPPORT.sources.ESPRESSO_POLYGLOT.files": "com/oracle/truffle/espresso/polyglot/impl",
++        "//espresso/src/com.oracle.truffle.espresso.polyglot/src/com/oracle/truffle/espresso/polyglot:ESPRESSO_SUPPORT.sources.ESPRESSO_POLYGLOT.files": "com/oracle/truffle/espresso/polyglot",
++    },
++)
++
++mx_source_archive(
++    name = "ESPRESSO_SUPPORT.sources.ESPRESSO_VMACCESS_GUEST",
++    testonly = False,
++    groups = {
++        "//espresso/src/com.oracle.truffle.espresso.vmaccess.guest/src/com/oracle/truffle/espresso/vmaccess/guest:ESPRESSO_SUPPORT.sources.ESPRESSO_VMACCESS_GUEST.files": "com/oracle/truffle/espresso/vmaccess/guest",
++    },
++)
++
++mx_source_archive(
++    name = "ESPRESSO_SUPPORT.sources.HOTSWAP",
++    testonly = False,
++    groups = {
++        "//espresso/src/com.oracle.truffle.espresso.hotswap/src/com/oracle/truffle/espresso/hotswap:ESPRESSO_SUPPORT.sources.HOTSWAP.files": "com/oracle/truffle/espresso/hotswap",
++    },
++)
++
++mx_exported_tar(
++    name = "ESPRESSO_SUPPORT",
++    archive_imports = {
++        ":ESPRESSO_PD_SUPPORT": "=",
++        ":com.oracle.truffle.espresso.native": "{primary}=lib/{basename}",
++    },
++    format = "dir",
++    members = {
++        "//sdk:VMACCESS_GUEST": "lib/vmaccess-guest.jar",
++        "//sdk:VMACCESS_GUEST.sources": "lib/vmaccess-guest.src.zip",
++        ":CONTINUATIONS": "lib/continuations.jar",
++        ":ESPRESSO_IO": "lib/espresso-io.jar",
++        ":ESPRESSO_JVMCI": "lib/espresso-jvmci.jar",
++        ":ESPRESSO_POLYGLOT": "lib/espresso-polyglot.jar",
++        ":ESPRESSO_SUPPORT.sources.CONTINUATIONS": "lib/continuations.src.zip",
++        ":ESPRESSO_SUPPORT.sources.ESPRESSO_IO": "lib/espresso-io.src.zip",
++        ":ESPRESSO_SUPPORT.sources.ESPRESSO_JVMCI": "lib/espresso-jvmci.src.zip",
++        ":ESPRESSO_SUPPORT.sources.ESPRESSO_POLYGLOT": "lib/espresso-polyglot.src.zip",
++        ":ESPRESSO_SUPPORT.sources.ESPRESSO_VMACCESS_GUEST": "lib/espresso-vmaccess-guest.src.zip",
++        ":ESPRESSO_SUPPORT.sources.HOTSWAP": "lib/hotswap.src.zip",
++        ":ESPRESSO_VMACCESS_GUEST": "lib/espresso-vmaccess-guest.jar",
++        ":HOTSWAP": "lib/hotswap.jar",
 +    },
 +    visibility = ["//visibility:public"],
 +)
@@ -3201,7 +3345,7 @@ diff --git a/espresso/src/com.oracle.truffle.espresso.hotswap/src/com/oracle/tru
 new file mode 100644
 --- /dev/null
 +++ b/espresso/src/com.oracle.truffle.espresso.hotswap/src/com/oracle/truffle/espresso/hotswap/BUILD.bazel
-@@ -0,0 +1,14 @@
+@@ -0,0 +1,27 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -3216,11 +3360,24 @@ new file mode 100644
 +    ],
 +    visibility = ["//espresso:__pkg__"],
 +)
++
++mx_files(
++    name = "ESPRESSO_SUPPORT.sources.HOTSWAP.files",
++    srcs = [
++        "EspressoHotSwap.java",
++        "HotSwapAction.java",
++        "HotSwapHandler.java",
++        "HotSwapPlugin.java",
++        "ServiceWatcher.java",
++        "package-info.java",
++    ],
++    visibility = ["//espresso:__pkg__"],
++)
 diff --git a/espresso/src/com.oracle.truffle.espresso.io/src/java/io/BUILD.bazel b/espresso/src/com.oracle.truffle.espresso.io/src/java/io/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/espresso/src/com.oracle.truffle.espresso.io/src/java/io/BUILD.bazel
-@@ -0,0 +1,7 @@
+@@ -0,0 +1,13 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -3228,11 +3385,17 @@ new file mode 100644
 +    srcs = ["TruffleFileSystem.java"],
 +    visibility = ["//espresso:__pkg__"],
 +)
++
++mx_files(
++    name = "ESPRESSO_SUPPORT.sources.ESPRESSO_IO.files",
++    srcs = ["TruffleFileSystem.java"],
++    visibility = ["//espresso:__pkg__"],
++)
 diff --git a/espresso/src/com.oracle.truffle.espresso.io/src/sun/nio/ch/BUILD.bazel b/espresso/src/com.oracle.truffle.espresso.io/src/sun/nio/ch/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/espresso/src/com.oracle.truffle.espresso.io/src/sun/nio/ch/BUILD.bazel
-@@ -0,0 +1,17 @@
+@@ -0,0 +1,33 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -3250,11 +3413,27 @@ new file mode 100644
 +    ],
 +    visibility = ["//espresso:__pkg__"],
 +)
++
++mx_files(
++    name = "ESPRESSO_SUPPORT.sources.ESPRESSO_IO.files",
++    srcs = [
++        "DefaultAsynchronousChannelProvider.java",
++        "DefaultPollerProvider.java",
++        "DefaultSelectorProvider.java",
++        "DummyAsynchronousChannelProvider.java",
++        "FileDispatcherImpl.java",
++        "SocketDispatcher.java",
++        "TruffleDispatcher.java",
++        "TruffleSelector.java",
++        "TruffleSelectorProvider.java",
++    ],
++    visibility = ["//espresso:__pkg__"],
++)
 diff --git a/espresso/src/com.oracle.truffle.espresso.io/src/sun/nio/fs/BUILD.bazel b/espresso/src/com.oracle.truffle.espresso.io/src/sun/nio/fs/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/espresso/src/com.oracle.truffle.espresso.io/src/sun/nio/fs/BUILD.bazel
-@@ -0,0 +1,20 @@
+@@ -0,0 +1,39 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -3275,15 +3454,43 @@ new file mode 100644
 +    ],
 +    visibility = ["//espresso:__pkg__"],
 +)
++
++mx_files(
++    name = "ESPRESSO_SUPPORT.sources.ESPRESSO_IO.files",
++    srcs = [
++        "DefaultFileSystemProvider.java",
++        "DummyWatchService.java",
++        "FileAttributeParser.java",
++        "MapFilterIterator.java",
++        "NewFileChannelHelper.java",
++        "TruffleBasicFileAttributeView.java",
++        "TruffleBasicFileAttributes.java",
++        "TruffleFileStore.java",
++        "TruffleFileSystem.java",
++        "TruffleFileSystemProvider.java",
++        "TruffleFilteredDirectoryStream.java",
++        "TrufflePath.java",
++    ],
++    visibility = ["//espresso:__pkg__"],
++)
 diff --git a/espresso/src/com.oracle.truffle.espresso.io.jdk21/src/sun/nio/ch/BUILD.bazel b/espresso/src/com.oracle.truffle.espresso.io.jdk21/src/sun/nio/ch/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/espresso/src/com.oracle.truffle.espresso.io.jdk21/src/sun/nio/ch/BUILD.bazel
-@@ -0,0 +1,10 @@
+@@ -0,0 +1,19 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
 +    name = "com.oracle.truffle.espresso.io.jdk21.srcs",
++    srcs = [
++        "DefaultPollerProvider.java",
++        "TrufflePoller.java",
++    ],
++    visibility = ["//espresso:__pkg__"],
++)
++
++mx_files(
++    name = "ESPRESSO_SUPPORT.sources.ESPRESSO_IO.files",
 +    srcs = [
 +        "DefaultPollerProvider.java",
 +        "TrufflePoller.java",
@@ -3294,7 +3501,7 @@ diff --git a/espresso/src/com.oracle.truffle.espresso.io.jdk21/src/sun/nio/fs/BU
 new file mode 100644
 --- /dev/null
 +++ b/espresso/src/com.oracle.truffle.espresso.io.jdk21/src/sun/nio/fs/BUILD.bazel
-@@ -0,0 +1,7 @@
+@@ -0,0 +1,13 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -3302,11 +3509,17 @@ new file mode 100644
 +    srcs = ["NewFileChannelHelper.java"],
 +    visibility = ["//espresso:__pkg__"],
 +)
++
++mx_files(
++    name = "ESPRESSO_SUPPORT.sources.ESPRESSO_IO.files",
++    srcs = ["NewFileChannelHelper.java"],
++    visibility = ["//espresso:__pkg__"],
++)
 diff --git a/espresso/src/com.oracle.truffle.espresso.io.jdk25/src/sun/nio/ch/BUILD.bazel b/espresso/src/com.oracle.truffle.espresso.io.jdk25/src/sun/nio/ch/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/espresso/src/com.oracle.truffle.espresso.io.jdk25/src/sun/nio/ch/BUILD.bazel
-@@ -0,0 +1,10 @@
+@@ -0,0 +1,19 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -3317,15 +3530,30 @@ new file mode 100644
 +    ],
 +    visibility = ["//espresso:__pkg__"],
 +)
++
++mx_files(
++    name = "ESPRESSO_SUPPORT.sources.ESPRESSO_IO.files",
++    srcs = [
++        "DefaultPollerProvider.java",
++        "TrufflePoller.java",
++    ],
++    visibility = ["//espresso:__pkg__"],
++)
 diff --git a/espresso/src/com.oracle.truffle.espresso.io.jdk25/src/sun/nio/fs/BUILD.bazel b/espresso/src/com.oracle.truffle.espresso.io.jdk25/src/sun/nio/fs/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/espresso/src/com.oracle.truffle.espresso.io.jdk25/src/sun/nio/fs/BUILD.bazel
-@@ -0,0 +1,7 @@
+@@ -0,0 +1,13 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
 +    name = "com.oracle.truffle.espresso.io.jdk25.srcs",
++    srcs = ["NewFileChannelHelper.java"],
++    visibility = ["//espresso:__pkg__"],
++)
++
++mx_files(
++    name = "ESPRESSO_SUPPORT.sources.ESPRESSO_IO.files",
 +    srcs = ["NewFileChannelHelper.java"],
 +    visibility = ["//espresso:__pkg__"],
 +)
@@ -3424,7 +3652,7 @@ diff --git a/espresso/src/com.oracle.truffle.espresso.jvmci/src/com/oracle/truff
 new file mode 100644
 --- /dev/null
 +++ b/espresso/src/com.oracle.truffle.espresso.jvmci/src/com/oracle/truffle/espresso/jvmci/BUILD.bazel
-@@ -0,0 +1,11 @@
+@@ -0,0 +1,21 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -3436,15 +3664,58 @@ new file mode 100644
 +    ],
 +    visibility = ["//espresso:__pkg__"],
 +)
++
++mx_files(
++    name = "ESPRESSO_SUPPORT.sources.ESPRESSO_JVMCI.files",
++    srcs = [
++        "DummyCodeCacheProvider.java",
++        "DummyStackIntrospection.java",
++        "EspressoJVMCIRuntime.java",
++    ],
++    visibility = ["//espresso:__pkg__"],
++)
 diff --git a/espresso/src/com.oracle.truffle.espresso.jvmci/src/com/oracle/truffle/espresso/jvmci/meta/BUILD.bazel b/espresso/src/com.oracle.truffle.espresso.jvmci/src/com/oracle/truffle/espresso/jvmci/meta/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/espresso/src/com.oracle.truffle.espresso.jvmci/src/com/oracle/truffle/espresso/jvmci/meta/BUILD.bazel
-@@ -0,0 +1,34 @@
+@@ -0,0 +1,67 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
 +    name = "com.oracle.truffle.espresso.jvmci.srcs",
++    srcs = [
++        "AbstractEspressoConstantPool.java",
++        "AbstractEspressoResolvedArrayType.java",
++        "AbstractEspressoResolvedInstanceType.java",
++        "AbstractEspressoResolvedJavaField.java",
++        "AbstractEspressoResolvedJavaMethod.java",
++        "AbstractEspressoResolvedJavaRecordComponent.java",
++        "AbstractEspressoResolvedPrimitiveType.java",
++        "AbstractEspressoSignature.java",
++        "ConstantReflectionProviderWithStaticsBase.java",
++        "EspressoBootstrapMethodInvocation.java",
++        "EspressoConstantPool.java",
++        "EspressoConstantReflectionProvider.java",
++        "EspressoMetaAccessProvider.java",
++        "EspressoMethodHandleAccessProvider.java",
++        "EspressoObjectConstant.java",
++        "EspressoResolvedArrayType.java",
++        "EspressoResolvedInstanceType.java",
++        "EspressoResolvedJavaField.java",
++        "EspressoResolvedJavaMethod.java",
++        "EspressoResolvedJavaRecordComponent.java",
++        "EspressoResolvedJavaType.java",
++        "EspressoResolvedObjectType.java",
++        "EspressoResolvedPrimitiveType.java",
++        "EspressoSignature.java",
++        "ExtendedModifiers.java",
++        "KlassConstant.java",
++    ],
++    visibility = ["//espresso:__pkg__"],
++)
++
++mx_files(
++    name = "ESPRESSO_SUPPORT.sources.ESPRESSO_JVMCI.files",
 +    srcs = [
 +        "AbstractEspressoConstantPool.java",
 +        "AbstractEspressoResolvedArrayType.java",
@@ -3614,7 +3885,7 @@ diff --git a/espresso/src/com.oracle.truffle.espresso.polyglot/src/com/oracle/tr
 new file mode 100644
 --- /dev/null
 +++ b/espresso/src/com.oracle.truffle.espresso.polyglot/src/com/oracle/truffle/espresso/polyglot/BUILD.bazel
-@@ -0,0 +1,25 @@
+@@ -0,0 +1,49 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -3640,11 +3911,35 @@ new file mode 100644
 +    ],
 +    visibility = ["//espresso:__pkg__"],
 +)
++
++mx_files(
++    name = "ESPRESSO_SUPPORT.sources.ESPRESSO_POLYGLOT.files",
++    srcs = [
++        "ArityException.java",
++        "ExceptionType.java",
++        "ForeignException.java",
++        "GuestTypeConversion.java",
++        "Interop.java",
++        "InteropException.java",
++        "InvalidArrayIndexException.java",
++        "InvalidBufferOffsetException.java",
++        "Polyglot.java",
++        "StopIterationException.java",
++        "TypeLiteral.java",
++        "UnknownIdentifierException.java",
++        "UnknownKeyException.java",
++        "UnsupportedMessageException.java",
++        "UnsupportedTypeException.java",
++        "VMHelper.java",
++        "package-info.java",
++    ],
++    visibility = ["//espresso:__pkg__"],
++)
 diff --git a/espresso/src/com.oracle.truffle.espresso.polyglot/src/com/oracle/truffle/espresso/polyglot/collections/BUILD.bazel b/espresso/src/com.oracle.truffle.espresso.polyglot/src/com/oracle/truffle/espresso/polyglot/collections/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/espresso/src/com.oracle.truffle.espresso.polyglot/src/com/oracle/truffle/espresso/polyglot/collections/BUILD.bazel
-@@ -0,0 +1,15 @@
+@@ -0,0 +1,29 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -3660,15 +3955,35 @@ new file mode 100644
 +    ],
 +    visibility = ["//espresso:__pkg__"],
 +)
++
++mx_files(
++    name = "ESPRESSO_SUPPORT.sources.ESPRESSO_POLYGLOT.files",
++    srcs = [
++        "AbstractListWithoutField.java",
++        "EspressoForeignCollection.java",
++        "EspressoForeignIterable.java",
++        "EspressoForeignIterator.java",
++        "EspressoForeignList.java",
++        "EspressoForeignMap.java",
++        "EspressoForeignSet.java",
++    ],
++    visibility = ["//espresso:__pkg__"],
++)
 diff --git a/espresso/src/com.oracle.truffle.espresso.polyglot/src/com/oracle/truffle/espresso/polyglot/impl/BUILD.bazel b/espresso/src/com.oracle.truffle.espresso.polyglot/src/com/oracle/truffle/espresso/polyglot/impl/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/espresso/src/com.oracle.truffle.espresso.polyglot/src/com/oracle/truffle/espresso/polyglot/impl/BUILD.bazel
-@@ -0,0 +1,7 @@
+@@ -0,0 +1,13 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
 +    name = "com.oracle.truffle.espresso.polyglot.srcs",
++    srcs = ["EspressoForeignNumber.java"],
++    visibility = ["//espresso:__pkg__"],
++)
++
++mx_files(
++    name = "ESPRESSO_SUPPORT.sources.ESPRESSO_POLYGLOT.files",
 +    srcs = ["EspressoForeignNumber.java"],
 +    visibility = ["//espresso:__pkg__"],
 +)
@@ -3749,11 +4064,21 @@ diff --git a/espresso/src/com.oracle.truffle.espresso.vmaccess.guest/src/com/ora
 new file mode 100644
 --- /dev/null
 +++ b/espresso/src/com.oracle.truffle.espresso.vmaccess.guest/src/com/oracle/truffle/espresso/vmaccess/guest/BUILD.bazel
-@@ -0,0 +1,11 @@
+@@ -0,0 +1,21 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
 +    name = "com.oracle.truffle.espresso.vmaccess.guest.srcs",
++    srcs = [
++        "EspressoHostProxyException.java",
++        "GuestAnnotationProxyBuilder.java",
++        "GuestHostProxyHandler.java",
++    ],
++    visibility = ["//espresso:__pkg__"],
++)
++
++mx_files(
++    name = "ESPRESSO_SUPPORT.sources.ESPRESSO_VMACCESS_GUEST.files",
 +    srcs = [
 +        "EspressoHostProxyException.java",
 +        "GuestAnnotationProxyBuilder.java",
@@ -3777,11 +4102,31 @@ diff --git a/espresso/src/org.graalvm.continuations/src/org/graalvm/continuation
 new file mode 100644
 --- /dev/null
 +++ b/espresso/src/org.graalvm.continuations/src/org/graalvm/continuations/BUILD.bazel
-@@ -0,0 +1,21 @@
+@@ -0,0 +1,41 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
 +    name = "org.graalvm.continuations.srcs",
++    srcs = [
++        "Continuation.java",
++        "ContinuationEntryPoint.java",
++        "ContinuationExecutionException.java",
++        "ContinuationImpl.java",
++        "ContinuationSerializable.java",
++        "FormatVersionException.java",
++        "FrameRecordSerializer.java",
++        "Generator.java",
++        "IdentityHashCodes.java",
++        "IllegalContinuationStateException.java",
++        "IllegalMaterializedRecordException.java",
++        "SuspendCapability.java",
++        "package-info.java",
++    ],
++    visibility = ["//espresso:__pkg__"],
++)
++
++mx_files(
++    name = "ESPRESSO_SUPPORT.sources.CONTINUATIONS.files",
 +    srcs = [
 +        "Continuation.java",
 +        "ContinuationEntryPoint.java",

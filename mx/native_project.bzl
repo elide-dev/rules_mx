@@ -65,6 +65,7 @@ def mx_native_shared_project(name, srcs, headers, root, profiles, deps = [], jdk
         variants[condition] = {":" + binary: recipe["member"]} | {h: h.removeprefix(root + "/") for h in public}
     mx_project_files(
         name = name,
+        primary = select({Label("//tools/cc:profile_" + profile): recipe["member"] for profile, recipe in profiles.items()} | {"//conditions:default": ""}),
         members = select(variants | {"//conditions:default": {}}),
         target_compatible_with = select({k: [] for k in variants} | {"//conditions:default": ["@platforms//:incompatible"]}),
         testonly = testonly,

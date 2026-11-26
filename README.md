@@ -20,7 +20,7 @@ The default Python is managed CPython 3.13. The alternate configuration selects 
 
 ## Build GraalVM
 
-The pinned Elide Graal fork exposes 299 of 371 declared mx projects and 248 of 315 distributions through Bazel. The SDK, Truffle, compiler, Regex, Tools, SubstrateVM, Espresso Shared, Espresso Compiler Stub, Web Image, Wasm and VM suites have labels for every declared project and distribution. Run individual upstream tests by label. Use `tools/graal-coverage --missing` to see which roots still need a Bazel implementation. [Build and test coverage by suite](graal/README.md#current-coverage)
+The pinned Elide Graal fork exposes 299 of 371 declared mx projects and 251 of 315 distributions (251 of 313 active) through Bazel. The SDK, Truffle, compiler, Regex, Tools, SubstrateVM, Espresso Shared, Espresso Compiler Stub, Web Image, Wasm and VM suites have labels for every declared project and distribution. Run individual upstream tests by label. Use `tools/graal-coverage --active-only --missing` to list the active roots that still need a Bazel implementation. [Build and test coverage by suite](graal/README.md#current-coverage)
 
 ```sh
 bazelisk build --config=elide-processors @graal//truffle:all_projects @graal//compiler:all_distributions @graal//regex:all_distributions

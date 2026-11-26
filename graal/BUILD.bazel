@@ -261,6 +261,7 @@ py_test(
         "$(rootpath @graal//espresso:ESPRESSO_JVM_STANDALONE_MOKAPOT_SUPPORT)",
         "$(rootpath @graal//espresso:ESPRESSO_PD_SUPPORT)",
         "$(rootpath //tools/cc:llvm_nm)",
+        "$(rootpath @graal//espresso:ESPRESSO_LIBS_RESOURCES)",
     ],
     data = [
         "@graal//espresso:ESPRESSO_IO",
@@ -269,6 +270,7 @@ py_test(
         "@graal//espresso:ESPRESSO_JVM_STANDALONE_MOKAPOT_SUPPORT",
         "@graal//espresso:ESPRESSO_PD_SUPPORT",
         "//tools/cc:llvm_nm",
+        "@graal//espresso:ESPRESSO_LIBS_RESOURCES",
         "@graal//espresso-compiler-stub:ESPRESSO_COMPILER_SUPPORT",
     ],
     tags = ["manual"],
