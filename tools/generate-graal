@@ -1159,6 +1159,9 @@ def svm_url_library_rules(directory):
             f'target_compatible_with = {compatible}, visibility = ["//visibility:public"])\n'
         )
         flags.extend(["--java-dep", f"substratevm:{name}=:{name}"])
+        if "os_arch" in library:
+            # svm_platform_requires adds the module names for each platform.
+            flags.extend(["--platform-library", f"substratevm:{name}"])
     # Libraries checked into the suite, such as a JAR whose resource path contains a space.
     for name, library in sorted(suite["libraries"].items()):
         if "path" in library and library["path"].endswith(".jar"):
@@ -1632,7 +1635,10 @@ def svm_native_rules(directory):
         }
         flags = {}
         includes = set()
-        for system in ("linux", "darwin", "windows"):
+        # The Windows builds of the shared helpers are not migrated, so only the Windows-only
+        # libjvm replacement takes its Windows flags.
+        systems = ("windows",) if name == "jvm.windows" else ("linux", "darwin")
+        for system in systems:
             target = options.get(system, options.get("<others>", {}))
             if "cflags" in target:
                 flags[system] = []
@@ -1754,51 +1760,54 @@ def svm_native_unittests(directory):
 
 
 def svm_platform_requires(directory):
-    """Make `requires` of platform-specific library modules depend on the target platform.
+    """Require the modules of platform-specific libraries per target platform.
 
     mx names the module of a platform-specific library, such as the LLVM backend's shadowed
-    JavaCPP natives, for the host it runs on. The generated BUILD moves each such `requires`
-    into a select() of the names that mx would use on every pinned platform.
+    JavaCPP natives, for the host it runs on, and on some platforms the suite names none.
+    The exporter leaves these libraries out of module descriptors (--platform-library). This
+    adds the `requires` that mx would emit on each pinned platform as a select().
     """
     suite = runpy.run_path(str(directory / "mx.substratevm/suite.py"))["suite"]
-    per_platform = {setting: [] for _, _, setting in SVM_INPUT_PLATFORMS.values()}
-    names = set()
+    modules = {}
     for name in SVM_URL_LIBRARIES:
         library = suite["libraries"].get(name, {})
-        for os_name, arches in library.get("os_arch", {}).items():
-            for arch, config in arches.items():
-                if module := config.get("moduleName"):
-                    names.add(module)
-        for os_name, arch, setting in SVM_INPUT_PLATFORMS.values():
-            config = library.get("os_arch", {}).get(os_name, {}).get(arch, {})
-            if module := config.get("moduleName"):
-                per_platform[setting].append("requires " + module)
-    build = directory / "BUILD.bazel"
-    lines = build.read_text().splitlines(True)
-    output = []
-    found = False
-    for line in lines:
-        if line.strip().strip('",') in {"requires " + n for n in names}:
-            found = True
+        if "os_arch" not in library:
             continue
-        output.append(line)
-        if found and line == "    ],\n":
-            entries = "".join(
-                f'        ":{setting}": [\n'
-                + "".join(f'            "{d}",\n' for d in sorted(directives))
-                + "        ],\n"
+        modules[name] = {
+            setting: config["moduleName"]
+            for os_name, arch, setting in SVM_INPUT_PLATFORMS.values()
+            if "moduleName" in (config := library["os_arch"].get(os_name, {}).get(arch, {}))
+        }
+    build = directory / "BUILD.bazel"
+    blocks = re.split(r"(?m)^(?=\S)", build.read_text())
+    for index, block in enumerate(blocks):
+        used = [name for name in modules if f'        ":{name}",\n' in block]
+        if not block.startswith("mx_jar_dist(") or not used:
+            continue
+        entries = []
+        for _, _, setting in sorted(SVM_INPUT_PLATFORMS.values(), key=lambda v: v[2]):
+            directives = sorted(
+                f'            "requires {modules[name][setting]}",\n'
+                for name in used
+                if setting in modules[name]
+            )
+            entries.append(
+                f'        ":{setting}": [\n' + "".join(directives) + "        ],\n"
                 if directives
                 else f'        ":{setting}": [],\n'
-                for setting, directives in sorted(per_platform.items())
             )
-            output.append(
-                "    platform_directives = select({\n"
-                + entries
-                + '        "//conditions:default": [],\n'
-                + "    }),\n"
-            )
-            found = False
-    build.write_text("".join(output))
+        select = (
+            "    platform_directives = select({\n"
+            + "".join(entries)
+            + '        "//conditions:default": [],\n'
+            + "    }),\n"
+        )
+        head, marker, tail = block.partition("    directives = [\n")
+        if not marker:
+            raise ValueError("Expected module directives in " + block.splitlines()[1])
+        listing, end, rest = tail.partition("    ],\n")
+        blocks[index] = head + marker + listing + end + select + rest
+    build.write_text("".join(blocks))
 
 
 def svm_graalvm_support(directory):

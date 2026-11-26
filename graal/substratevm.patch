@@ -2,7 +2,7 @@ diff --git a/substratevm/BUILD.bazel b/substratevm/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/substratevm/BUILD.bazel
-@@ -0,0 +1,7205 @@
+@@ -0,0 +1,7187 @@
 +load("@rules_java//java:java_import.bzl", "java_import")
 +load("@rules_mx//graal:layout.bzl", "mx_archive_layout")
 +load("@rules_mx//graal:simplelanguage.bzl", "svm_driver_test_runner", "svm_test_runner")
@@ -237,11 +237,6 @@ new file mode 100644
 +                "-fvisibility=hidden",
 +                "-D_FORTIFY_SOURCE=0",
 +            ],
-+            "windows": [
-+                "-Zi",
-+                "-O2",
-+                "-D_LITTLE_ENDIAN",
-+            ],
 +        },
 +        "includes": [],
 +        "jni": False,
@@ -331,11 +326,6 @@ new file mode 100644
 +                "-Wall",
 +                "-Werror",
 +            ],
-+            "windows": [
-+                "-g",
-+                "-O2",
-+                "-Wall",
-+            ],
 +        },
 +        "includes": [],
 +        "jni": True,
@@ -376,14 +366,6 @@ new file mode 100644
 +                "-DZSTD_STATIC_LINKING_ONLY",
 +                "-DZSTDLIB_VISIBILITY=",
 +                "-DZSTDERRORLIB_VISIBILITY=",
-+            ],
-+            "windows": [
-+                "-O2",
-+                "-DZSTD_DISABLE_ASM",
-+                "-DZSTD_LEGACY_SUPPORT=0",
-+                "-DZSTD_NO_TRACE",
-+                "-DXXH_NAMESPACE=ZSTD_",
-+                "-DZSTD_STATIC_LINKING_ONLY",
 +            ],
 +        },
 +        "includes": [],
