@@ -14,6 +14,7 @@ def _packed_sources(ctx):
 package(default_visibility = ["//visibility:public"])
 filegroup(name = "runtimes_sources", srcs = ["BUILD.bazel"] + glob([
     "src/runtimes/**", "src/cmake/**", "src/libcxx/**", "src/libcxxabi/**", "src/libunwind/**",
+    "src/libc/shared/**", "src/libc/src/**", "src/libc/hdr/**", "src/libc/include/**", "src/libc/config/**",
     "src/llvm/cmake/**", "src/llvm/include/**", "src/llvm/utils/llvm-lit/**", "src/llvm/utils/lit/**",
 ], exclude = ["src/libcxx/test/**", "src/libcxxabi/test/**", "src/libcxx/benchmarks/**"]) + glob([
     "src/libcxx/test/configs/**", "src/libcxxabi/test/configs/**",
