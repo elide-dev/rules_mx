@@ -1,0 +1,52 @@
+#!/usr/bin/env python3
+"""Record the immutable artifacts and version choices from a clean Maven repository."""
+
+import argparse
+import hashlib
+import json
+from pathlib import Path
+from xml.etree import ElementTree
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("repository", type=Path)
+    parser.add_argument("--output", type=Path, default=Path(__file__).resolve().parents[1] / "graal/netbeans_maven.json")
+    args = parser.parse_args()
+    files = {}
+    metadata = {}
+    for path in sorted(args.repository.rglob("*")):
+        if not path.is_file():
+            continue
+        name = path.relative_to(args.repository).as_posix()
+        if path.suffix in (".pom", ".jar", ".nbm"):
+            if "SNAPSHOT" in name:
+                raise ValueError(f"Expected a released dependency: {name}")
+            digest = path.with_name(path.name + ".sha1").read_text().split()[0]
+            data = path.read_bytes()
+            if hashlib.sha1(data).hexdigest() != digest:
+                raise ValueError(f"Maven Central checksum mismatch for {name}")
+            files[name] = hashlib.sha256(data).hexdigest()
+        elif path.name == "maven-metadata-central.xml":
+            root = ElementTree.parse(path).getroot()
+            versioning = root.find("versioning")
+            versions = versioning.find("versions")
+            for version in list(versions):
+                if not (path.parent / version.text).is_dir():
+                    versions.remove(version)
+            selected = [v.text for v in versions]
+            if not selected:
+                continue
+            for tag in ("latest", "release"):
+                item = versioning.find(tag)
+                if item is not None:
+                    item.text = selected[-1]
+            updated = versioning.find("lastUpdated")
+            if updated is not None:
+                versioning.remove(updated)
+            metadata[name] = ElementTree.tostring(root, encoding="unicode")
+    args.output.write_text(json.dumps({"artifacts": files, "metadata": metadata}, indent=2, sort_keys=True) + "\n")
+
+
+if __name__ == "__main__":
+    main()

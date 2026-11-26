@@ -697,6 +697,7 @@ SUITES = {
 
 # These suites publish every closure that the exporter can lower.
 PARTIAL_SUITES = (
+    "visualizer",
     "sulong",
     "wasm",
     "espresso",

@@ -1,0 +1,559 @@
+diff --git a/visualizer/BUILD.bazel b/visualizer/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/visualizer/BUILD.bazel
+@@ -0,0 +1,554 @@
++load("@rules_mx//mx:netbeans.bzl", "mx_netbeans_distribution", "mx_netbeans_project")
++
++filegroup(
++    name = "all_distributions",
++    testonly = True,
++    srcs = [
++        ":C1VISUALIZER",
++        ":IDEALGRAPHVISUALIZER",
++    ],
++    visibility = ["//visibility:public"],
++)
++
++filegroup(
++    name = "all_projects",
++    testonly = True,
++    srcs = [
++        ":C1Visualizer",
++        ":IdealGraphVisualizer",
++    ],
++    visibility = ["//visibility:public"],
++)
++
++mx_netbeans_project(
++    name = "C1Visualizer",
++    group = "at.ssw.visualizer",
++    install = "c1visualizer",
++    modules = {
++        "BlockView": {
++            "artifact": "BlockView",
++            "deps": [
++                "CompilationModel",
++                "VisualizerUI",
++            ],
++            "kind": "nbm",
++        },
++        "BytecodeEditor": {
++            "artifact": "BytecodeEditor",
++            "deps": [
++                "BytecodeModel",
++                "CompilationModel",
++                "TextEditor",
++                "VisualizerUI",
++            ],
++            "kind": "nbm",
++        },
++        "BytecodeModel": {
++            "artifact": "BytecodeModel",
++            "deps": [
++                "CompilationModel",
++            ],
++            "kind": "nbm",
++        },
++        "BytecodeView": {
++            "artifact": "BytecodeView",
++            "deps": [
++                "BytecodeEditor",
++                "BytecodeModel",
++                "CompilationModel",
++                "TextEditor",
++                "VisualizerUI",
++            ],
++            "kind": "nbm",
++        },
++        "CompilationModel": {
++            "artifact": "CompilationModel",
++            "deps": [
++            ],
++            "kind": "nbm",
++        },
++        "CompilationView": {
++            "artifact": "CompilationView",
++            "deps": [
++                "CompilationModel",
++                "VisualizerUI",
++            ],
++            "kind": "nbm",
++        },
++        "ControlFlowEditor": {
++            "artifact": "ControlFlowEditor",
++            "deps": [
++                "CompilationModel",
++                "VisualizerUI",
++            ],
++            "kind": "nbm",
++        },
++        "DataFlowEditor": {
++            "artifact": "DataFlowEditor",
++            "deps": [
++                "CompilationModel",
++                "DataFlowGraph",
++                "GraphLayoutAPI",
++                "GraphLayoutImpl",
++                "VisualizerUI",
++            ],
++            "kind": "nbm",
++        },
++        "DataFlowGraph": {
++            "artifact": "DataFlowGraph",
++            "deps": [
++                "CompilationModel",
++                "GraphHelper",
++                "GraphLayoutAPI",
++                "GraphLayoutImpl",
++            ],
++            "kind": "nbm",
++        },
++        "DataFlowView": {
++            "artifact": "DataFlowView",
++            "deps": [
++                "CompilationModel",
++                "DataFlowGraph",
++                "VisualizerUI",
++            ],
++            "kind": "nbm",
++        },
++        "GraphHelper": {
++            "artifact": "GraphHelper",
++            "deps": [
++            ],
++            "kind": "nbm",
++        },
++        "GraphLayoutAPI": {
++            "artifact": "GraphLayoutAPI",
++            "deps": [
++            ],
++            "kind": "nbm",
++        },
++        "GraphLayoutImpl": {
++            "artifact": "GraphLayoutImpl",
++            "deps": [
++                "GraphHelper",
++                "GraphLayoutAPI",
++            ],
++            "kind": "nbm",
++        },
++        "IntermediateCodeEditor": {
++            "artifact": "IntermediateCodeEditor",
++            "deps": [
++                "CompilationModel",
++                "TextEditor",
++                "VisualizerUI",
++            ],
++            "kind": "nbm",
++        },
++        "IntermediateCodeViews": {
++            "artifact": "IntermediateCodeViews",
++            "deps": [
++                "CompilationModel",
++                "IntermediateCodeEditor",
++                "TextEditor",
++                "VisualizerUI",
++            ],
++            "kind": "nbm",
++        },
++        "IntervalEditor": {
++            "artifact": "IntervalEditor",
++            "deps": [
++                "CompilationModel",
++                "TextEditor",
++                "VisualizerUI",
++            ],
++            "kind": "nbm",
++        },
++        "IntervalView": {
++            "artifact": "IntervalView",
++            "deps": [
++                "CompilationModel",
++                "VisualizerUI",
++            ],
++            "kind": "nbm",
++        },
++        "NativeCodeEditor": {
++            "artifact": "NativeCodeEditor",
++            "deps": [
++                "CompilationModel",
++                "TextEditor",
++                "VisualizerUI",
++            ],
++            "kind": "nbm",
++        },
++        "NativeCodeView": {
++            "artifact": "NativeCodeView",
++            "deps": [
++                "CompilationModel",
++                "NativeCodeEditor",
++                "TextEditor",
++            ],
++            "kind": "nbm",
++        },
++        "TextEditor": {
++            "artifact": "TextEditor",
++            "deps": [
++                "CompilationModel",
++                "VisualizerUI",
++            ],
++            "kind": "nbm",
++        },
++        "VisualizerUI": {
++            "artifact": "VisualizerUI",
++            "deps": [
++            ],
++            "kind": "nbm",
++        },
++        "application": {
++            "artifact": "C1Visualizer-app",
++            "deps": [
++                "BlockView",
++                "BytecodeEditor",
++                "BytecodeModel",
++                "BytecodeView",
++                "CompilationModel",
++                "CompilationView",
++                "ControlFlowEditor",
++                "DataFlowEditor",
++                "DataFlowGraph",
++                "DataFlowView",
++                "GraphHelper",
++                "GraphLayoutAPI",
++                "GraphLayoutImpl",
++                "IntermediateCodeEditor",
++                "IntermediateCodeViews",
++                "IntervalEditor",
++                "IntervalView",
++                "NativeCodeEditor",
++                "NativeCodeView",
++                "TextEditor",
++                "VisualizerUI",
++                "branding",
++            ],
++            "kind": "nbm-application",
++        },
++        "branding": {
++            "artifact": "branding",
++            "deps": [
++            ],
++            "kind": "nbm",
++        },
++    },
++    parent_artifact = "C1Visualizer-parent",
++    root = "C1Visualizer",
++    version = "1.14-SNAPSHOT",
++    visibility = ["//visibility:public"],
++)
++
++mx_netbeans_project(
++    name = "IdealGraphVisualizer",
++    group = "org.graalvm.visualizer",
++    install = "idealgraphvisualizer",
++    modules = {
++        "Bytecodes": {
++            "artifact": "Bytecodes",
++            "deps": [
++                "Data",
++                "Util",
++            ],
++            "kind": "nbm",
++        },
++        "ControlFlow": {
++            "artifact": "ControlFlow",
++            "deps": [
++                "Data",
++                "HierarchicalLayout",
++                "Layout",
++                "Settings",
++                "Util",
++            ],
++            "kind": "nbm",
++        },
++        "Coordinator": {
++            "artifact": "Coordinator",
++            "deps": [
++                "Data",
++                "Difference",
++                "NetworkConnection",
++                "Settings",
++                "Util",
++                "ViewerApi",
++            ],
++            "kind": "nbm",
++        },
++        "Data": {
++            "artifact": "Data",
++            "deps": [
++                "Settings",
++            ],
++            "kind": "nbm",
++            "test_jar": True,
++        },
++        "Difference": {
++            "artifact": "Difference",
++            "deps": [
++                "Data",
++            ],
++            "kind": "nbm",
++        },
++        "Filter": {
++            "artifact": "Filter",
++            "deps": [
++                "Data",
++                "Graph",
++                "PolyglotRunner",
++            ],
++            "kind": "nbm",
++        },
++        "FilterProfiles": {
++            "artifact": "FilterProfiles",
++            "deps": [
++                "Data",
++                "Filter",
++                "Graal",
++                "Graph",
++                "HierarchicalLayout",
++                "Layout",
++                "PolyglotRunner",
++                "SelectionCoordinator",
++                "Settings",
++                "Shell",
++                "Util",
++                "ViewerApi",
++            ],
++            "kind": "nbm",
++        },
++        "FilterWindow": {
++            "artifact": "FilterWindow",
++            "deps": [
++                "Data",
++                "Filter",
++                "FilterProfiles",
++                "Graph",
++                "GraphSearch",
++                "Util",
++                "ViewerApi",
++            ],
++            "kind": "nbm",
++        },
++        "Graal": {
++            "artifact": "Graal",
++            "deps": [
++                "Data",
++                "Filter",
++                "Graph",
++                "Layout",
++            ],
++            "kind": "nbm",
++        },
++        "Graph": {
++            "artifact": "Graph",
++            "deps": [
++                "Data",
++                "HierarchicalLayout",
++                "Layout",
++                "Settings",
++                "Util",
++            ],
++            "kind": "nbm",
++            "test_jar": True,
++        },
++        "GraphSearch": {
++            "artifact": "GraphSearch",
++            "deps": [
++                "Data",
++                "Graph",
++                "Util",
++                "View",
++                "ViewerApi",
++            ],
++            "kind": "nbm",
++        },
++        "HierarchicalLayout": {
++            "artifact": "HierarchicalLayout",
++            "deps": [
++                "Layout",
++                "Settings",
++            ],
++            "kind": "nbm",
++        },
++        "JavaSources": {
++            "artifact": "JavaSources",
++            "deps": [
++                "Data",
++                "SourceRepository",
++            ],
++            "kind": "nbm",
++        },
++        "Layout": {
++            "artifact": "Layout",
++            "deps": [
++                "Settings",
++            ],
++            "kind": "nbm",
++            "test_jar": True,
++        },
++        "NetworkConnection": {
++            "artifact": "NetworkConnection",
++            "deps": [
++                "Data",
++                "Settings",
++            ],
++            "kind": "nbm",
++        },
++        "PolyglotRunner": {
++            "artifact": "PolyglotRunner",
++            "deps": [
++            ],
++            "kind": "nbm",
++        },
++        "SelectionCoordinator": {
++            "artifact": "SelectionCoordinator",
++            "deps": [
++                "Data",
++            ],
++            "kind": "nbm",
++        },
++        "Settings": {
++            "artifact": "Settings",
++            "deps": [
++            ],
++            "kind": "nbm",
++        },
++        "SettingsUI": {
++            "artifact": "SettingsUI",
++            "deps": [
++                "Settings",
++            ],
++            "kind": "nbm",
++        },
++        "Shell": {
++            "artifact": "Shell",
++            "deps": [
++                "Data",
++                "Filter",
++                "PolyglotRunner",
++                "Util",
++                "ViewerApi",
++            ],
++            "kind": "nbm",
++        },
++        "SourceRepository": {
++            "artifact": "SourceRepository",
++            "deps": [
++                "Data",
++                "Graph",
++                "SelectionCoordinator",
++                "Settings",
++                "Util",
++                "View",
++                "ViewerApi",
++            ],
++            "kind": "nbm",
++        },
++        "Upgrade": {
++            "artifact": "Upgrade",
++            "deps": [
++            ],
++            "kind": "nbm",
++        },
++        "Util": {
++            "artifact": "Util",
++            "deps": [
++                "Data",
++            ],
++            "kind": "nbm",
++        },
++        "View": {
++            "artifact": "View",
++            "deps": [
++                "Data",
++                "Difference",
++                "Filter",
++                "Graph",
++                "HierarchicalLayout",
++                "Layout",
++                "PolyglotRunner",
++                "SelectionCoordinator",
++                "Settings",
++                "Util",
++                "ViewerApi",
++            ],
++            "kind": "nbm",
++        },
++        "ViewerApi": {
++            "artifact": "ViewerApi",
++            "deps": [
++                "Data",
++                "Graph",
++                "Util",
++            ],
++            "kind": "nbm",
++        },
++        "VisualizerUI": {
++            "artifact": "VisualizerUI",
++            "deps": [
++            ],
++            "kind": "nbm",
++        },
++        "application": {
++            "artifact": "IdealGraphVisualizer-app",
++            "deps": [
++                "Bytecodes",
++                "ControlFlow",
++                "Coordinator",
++                "Data",
++                "Difference",
++                "Filter",
++                "FilterProfiles",
++                "FilterWindow",
++                "Graal",
++                "Graph",
++                "GraphSearch",
++                "HierarchicalLayout",
++                "JavaSources",
++                "Layout",
++                "NetworkConnection",
++                "PolyglotRunner",
++                "SelectionCoordinator",
++                "Settings",
++                "SettingsUI",
++                "Shell",
++                "SourceRepository",
++                "Upgrade",
++                "Util",
++                "View",
++                "ViewerApi",
++                "VisualizerUI",
++                "branding",
++            ],
++            "kind": "nbm-application",
++        },
++        "branding": {
++            "artifact": "IdealGraphVisualizer-branding",
++            "deps": [
++            ],
++            "kind": "nbm",
++        },
++    },
++    parent_artifact = "IdealGraphVisualizer-parent",
++    root = "IdealGraphVisualizer",
++    version = "1.24-SNAPSHOT",
++    visibility = ["//visibility:public"],
++)
++
++mx_netbeans_distribution(
++    name = "C1VISUALIZER",
++    installation = ":C1Visualizer",
++    prefix = "c1visualizer",
++    visibility = ["//visibility:public"],
++)
++
++mx_netbeans_distribution(
++    name = "IDEALGRAPHVISUALIZER",
++    installation = ":IdealGraphVisualizer",
++    prefix = "idealgraphvisualizer",
++    visibility = ["//visibility:public"],
++)

@@ -4,6 +4,7 @@ module(
     bazel_compatibility = [">=9.3.3"],
 )
 
+bazel_dep(name = "bazel_lib", version = "3.2.0")
 bazel_dep(name = "rules_java", version = "9.9.0")
 bazel_dep(name = "rules_python", version = "1.9.2")
 bazel_dep(name = "rules_elide", version = "0.6.1")
@@ -184,6 +185,9 @@ use_repo(
     "graal_svm_llvm_platform_specific_shadowed_linux_amd64",
     "graal_svm_llvm_wrapper_shadowed",
 )
+
+netbeans = use_extension("//graal:netbeans_maven.bzl", "netbeans_maven", dev_dependency = True)
+use_repo(netbeans, "netbeans_maven_distribution", "netbeans_maven_repository")
 
 packed_sources = use_extension("//graal:packed_sources.bzl", "packed_sources", dev_dependency = True)
 use_repo(packed_sources, "graal_sulong_gcc_source_parsertorture", "graal_sulong_nwcc_suite")

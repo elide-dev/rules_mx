@@ -78,14 +78,14 @@ def _install_jdk(tree, spec, explicit_members):
         bundle.extractall(destination, members=contents, filter=select)
 
 
-def _write_tree_archive(tree, output, prefix=None):
+def _write_tree_archive(tree, output, prefix=None, dereference=False):
     with ExitStack() as stack:
         stream = stack.enter_context(output.open("wb"))
         if output.name.endswith(".tar.gz"):
             stream = stack.enter_context(
                 gzip.GzipFile(filename="", fileobj=stream, mode="wb", mtime=0)
             )
-        archive = stack.enter_context(tarfile.open(fileobj=stream, mode="w"))
+        archive = stack.enter_context(tarfile.open(fileobj=stream, mode="w", dereference=dereference))
         paths = sorted(tree.rglob("*"))
         if prefix:
             paths.insert(0, tree)
@@ -178,6 +178,10 @@ def _install_image_group(tree, image, kinds, mount):
 
 
 def main():
+    if sys.argv[1] == "--archive-file-tree":
+        output, prefix, tree = sys.argv[2:]
+        _write_tree_archive(Path(tree), Path(output), _relative(prefix), dereference=True)
+        return
     if sys.argv[1] == "--image-primary":
         image, out = map(Path, sys.argv[2:])
         shutil.copy2(image / out.name, out)

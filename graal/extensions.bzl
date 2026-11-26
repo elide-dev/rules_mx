@@ -16,6 +16,7 @@ OVERLAYS = [
     Label("//graal:espresso.patch"),
     Label("//graal:espresso-compiler-stub.patch"),
     Label("//graal:web-image.patch"),
+    Label("//graal:visualizer.patch"),
     Label("//graal:truffle.patch"),
     Label("//graal:substratevm.patch"),
     Label("//graal:vm.patch"),
