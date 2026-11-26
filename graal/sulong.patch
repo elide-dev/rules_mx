@@ -2,10 +2,11 @@ diff --git a/sulong/BUILD.bazel b/sulong/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/sulong/BUILD.bazel
-@@ -0,0 +1,2700 @@
+@@ -0,0 +1,2862 @@
 +load("@rules_mx//graal:layout.bzl", "mx_os_layout")
 +load("@rules_mx//graal:sulong_fixture_check.bzl", "sulong_fixture_check")
 +load("@rules_mx//mx:bitcode.bzl", "mx_bitcode_suite")
++load("@rules_mx//mx:cmake_project.bzl", "mx_cmake_project")
 +load("@rules_mx//mx:graph.bzl", "mx_exported_tar", "mx_jar_dist", "mx_pom_dist", "mx_processed_java", "mx_project", "mx_test_class", "mx_whole_java")
 +load("@rules_mx//mx:native_image.bzl", "mx_bootstrap_launchers", "mx_native_image_executable", "mx_native_image_library", "mx_toolchain_tool_layout")
 +load("@rules_mx//mx:native_project.bzl", "mx_native_shared_project")
@@ -29,6 +30,7 @@ new file mode 100644
 +        ":SULONG_LIBCXX_COMPILER_WRAPPER",
 +        ":SULONG_LIBLLVMVM",
 +        ":SULONG_NATIVE",
++        ":SULONG_NATIVE_LIB_RESOURCES",
 +        ":SULONG_NATIVE_TOOLS",
 +        ":SULONG_NFI",
 +        ":SULONG_STANDALONE_DEPENDENCIES",
@@ -48,6 +50,8 @@ new file mode 100644
 +        ":com.oracle.truffle.llvm.docs",
 +        ":com.oracle.truffle.llvm.launcher",
 +        ":com.oracle.truffle.llvm.libraries.graalvm.llvm",
++        ":com.oracle.truffle.llvm.libraries.graalvm.llvm.libs",
++        ":com.oracle.truffle.llvm.libraries.native",
 +        ":com.oracle.truffle.llvm.nativemode",
 +        ":com.oracle.truffle.llvm.nativemode.resources",
 +        ":com.oracle.truffle.llvm.nfi",
@@ -1265,6 +1269,135 @@ new file mode 100644
 +        "//truffle:TRUFFLE_COMPILER",
 +    ],
 +    output = "llvmvm",
++    visibility = ["//visibility:public"],
++)
++
++mx_cmake_project(
++    name = "com.oracle.truffle.llvm.libraries.graalvm.llvm.libs",
++    testonly = False,
++    srcs = [
++        "projects/com.oracle.truffle.llvm.libraries.graalvm.llvm.libs/CMakeLists.txt",
++        "projects/com.oracle.truffle.llvm.libraries.graalvm.llvm.libs/graalvm-llvm.def",
++        "projects/com.oracle.truffle.llvm.libraries.graalvm.llvm.libs/include/graalvm/llvm/intrinsics.h",
++        "projects/com.oracle.truffle.llvm.libraries.graalvm.llvm.libs/include/graalvm/llvm/threads.h",
++        "projects/com.oracle.truffle.llvm.libraries.graalvm.llvm.libs/src/common.c",
++        "projects/com.oracle.truffle.llvm.libraries.graalvm.llvm.libs/src/common.h",
++        "projects/com.oracle.truffle.llvm.libraries.graalvm.llvm.libs/src/handles.c",
++        "projects/com.oracle.truffle.llvm.libraries.graalvm.llvm.libs/src/intrinsics.c",
++        "projects/com.oracle.truffle.llvm.libraries.graalvm.llvm.libs/src/polyglot.c",
++        "projects/com.oracle.truffle.llvm.libraries.graalvm.llvm.libs/src/polyglot-buffer.c",
++        "projects/com.oracle.truffle.llvm.libraries.graalvm.llvm.libs/src/polyglot-time.c",
++        "projects/com.oracle.truffle.llvm.libraries.graalvm.llvm.libs/src/threads.c",
++        "projects/com.oracle.truffle.llvm.libraries.graalvm.llvm.libs/src/toolchain-api.c",
++        "projects/com.oracle.truffle.llvm.libraries.graalvm.llvm.libs/src/truffle-compat.c",
++    ],
++    compiler = ":bootstrap-toolchain-launchers-no-home",
++    config = {
++        "CMAKE_OSX_DEPLOYMENT_TARGET": "10.13",
++    },
++    include_dirs = {
++        "GRAALVM_LLVM_INCLUDE_DIR": [
++            ":com.oracle.truffle.llvm.libraries.graalvm.llvm",
++            "include",
++        ],
++    },
++    profiles = {
++        "linux_amd64": {
++            "config": {
++            },
++            "members": [
++                "bin/libgraalvm-llvm.so.1",
++            ],
++            "targets": [
++                "libgraalvm-llvm.so.1",
++                "install",
++            ],
++        },
++        "linux_arm64": {
++            "config": {
++            },
++            "members": [
++                "bin/libgraalvm-llvm.so.1",
++            ],
++            "targets": [
++                "libgraalvm-llvm.so.1",
++                "install",
++            ],
++        },
++        "macos_arm64": {
++            "config": {
++            },
++            "members": [
++                "bin/libgraalvm-llvm.1.dylib",
++            ],
++            "targets": [
++                "libgraalvm-llvm.1.dylib",
++                "install",
++            ],
++        },
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_cmake_project(
++    name = "com.oracle.truffle.llvm.libraries.native",
++    testonly = False,
++    srcs = [
++        "projects/com.oracle.truffle.llvm.libraries.native/CMakeLists.txt",
++        "projects/com.oracle.truffle.llvm.libraries.native/src/globals.c",
++        "projects/com.oracle.truffle.llvm.libraries.native/src/longdouble.c",
++        "projects/com.oracle.truffle.llvm.libraries.native/src/misc.c",
++        "projects/com.oracle.truffle.llvm.libraries.native/src/posix.c",
++        "projects/com.oracle.truffle.llvm.libraries.native/src/stat.c",
++    ],
++    compiler = ":bootstrap-toolchain-launchers-no-home",
++    config = {
++        "CMAKE_OSX_DEPLOYMENT_TARGET": "10.13",
++    },
++    include_dirs = {
++        "TRUFFLE_NFI_NATIVE_INCLUDE": [
++            "//truffle:TRUFFLE_NFI_NATIVE",
++            "include",
++        ],
++    },
++    profiles = {
++        "linux_amd64": {
++            "config": {
++                "CMAKE_SHARED_LINKER_FLAGS": "-lm",
++            },
++            "members": [
++                "bin/libsulong-native.so",
++            ],
++            "targets": [
++                "libsulong-native.so",
++                "install",
++            ],
++        },
++        "linux_arm64": {
++            "config": {
++                "CMAKE_SHARED_LINKER_FLAGS": "-lm",
++            },
++            "members": [
++                "bin/libsulong-native.so",
++            ],
++            "targets": [
++                "libsulong-native.so",
++                "install",
++            ],
++        },
++        "macos_arm64": {
++            "config": {
++                "CMAKE_SHARED_LINKER_FLAGS": "-lm",
++            },
++            "members": [
++                "bin/libsulong-native.dylib",
++            ],
++            "targets": [
++                "libsulong-native.dylib",
++                "install",
++            ],
++        },
++    },
 +    visibility = ["//visibility:public"],
 +)
 +
@@ -2700,6 +2833,35 @@ new file mode 100644
 +    format = "dir",
 +    members = {
 +        ":libllvmvm": "lib/{basename}",
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_os_layout(
++    name = "SULONG_NATIVE_LIB_RESOURCES",
++    format = "dir",
++    os_layouts = {
++        "linux_amd64": {
++            "archive_imports": {
++                ":com.oracle.truffle.llvm.libraries.native": "bin/*=META-INF/resources/llvm/native-lib/linux/amd64/",
++            },
++            "file_list_entry": "META-INF/resources/llvm/native-lib/linux/amd64/files",
++            "hash_entry": "META-INF/resources/llvm/native-lib/linux/amd64/sha256",
++        },
++        "linux_arm64": {
++            "archive_imports": {
++                ":com.oracle.truffle.llvm.libraries.native": "bin/*=META-INF/resources/llvm/native-lib/linux/aarch64/",
++            },
++            "file_list_entry": "META-INF/resources/llvm/native-lib/linux/aarch64/files",
++            "hash_entry": "META-INF/resources/llvm/native-lib/linux/aarch64/sha256",
++        },
++        "macos_arm64": {
++            "archive_imports": {
++                ":com.oracle.truffle.llvm.libraries.native": "bin/*=META-INF/resources/llvm/native-lib/darwin/aarch64/",
++            },
++            "file_list_entry": "META-INF/resources/llvm/native-lib/darwin/aarch64/files",
++            "hash_entry": "META-INF/resources/llvm/native-lib/darwin/aarch64/sha256",
++        },
 +    },
 +    visibility = ["//visibility:public"],
 +)

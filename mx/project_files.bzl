@@ -9,15 +9,19 @@ def _impl(ctx):
             fail("Duplicate project result " + path)
         (source,) = target.files.to_list()
         entries[path] = source
+    modes = dict(ctx.attr.modes)
+    if ctx.attr.primary:
+        modes[ctx.attr.primary] = "755"
     return [
         DefaultInfo(files = depset(entries.values() + ctx.files.srcs)),
-        MxArchiveLayoutInfo(archive = None, entries = entries, primary = ctx.attr.primary, modes = {ctx.attr.primary: "755"} if ctx.attr.primary else {}),
+        MxArchiveLayoutInfo(archive = None, entries = entries, primary = ctx.attr.primary, modes = modes),
     ]
 
 mx_project_files = rule(
     implementation = _impl,
     attrs = {
         "primary": attr.string(),
+        "modes": attr.string_dict(),
         "members": attr.label_keyed_string_dict(allow_files = True),
         "srcs": attr.label_list(allow_files = True),
     },
