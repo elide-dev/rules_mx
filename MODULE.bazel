@@ -121,9 +121,9 @@ register_toolchains(
 bazel_dep(name = "rules_graalvm", version = "0.12.0")
 archive_override(
     module_name = "rules_graalvm",
-    integrity = "sha256-Ixpnwahukt2/1i87vAH88b4lMHJr18NCnlRx75mQsyo=",
-    strip_prefix = "rules_graalvm-93d1511e7d5406d2e399537b397073d3baa430f2",
-    urls = ["https://github.com/sgammon/rules_graalvm/archive/93d1511e7d5406d2e399537b397073d3baa430f2.tar.gz"],
+    integrity = "sha256-zdlAyBG8yZYCTdsez8tM1qC7T6+9MKgOw2/JMrMtQ70=",
+    strip_prefix = "rules_graalvm-b987a21ef0d5dc3a282f60f6f6e3572e4b7407c5",
+    urls = ["https://github.com/sgammon/rules_graalvm/archive/b987a21ef0d5dc3a282f60f6f6e3572e4b7407c5.tar.gz"],
 )
 
 inject_repo(elide, "rules_graalvm")
