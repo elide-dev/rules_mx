@@ -11,12 +11,8 @@ load(":sdk_llvm.bzl", "sdk_llvm_link", "sulong_fixture_sdk")
 
 exports_files([
     "benchmark_timer.patch",
-<<<<<<< HEAD
-    "wasm_exports_test.patch",
-||||||| 79cafe5
-=======
     "jfr_allocation_samples.patch",
->>>>>>> origin/fix/jfr-allocation-sampling
+    "wasm_exports_test.patch",
     "compiler.patch",
     "espresso-shared.patch",
     "espresso.patch",
