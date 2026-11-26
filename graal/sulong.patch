@@ -2,7 +2,7 @@ diff --git a/sulong/BUILD.bazel b/sulong/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/sulong/BUILD.bazel
-@@ -0,0 +1,5581 @@
+@@ -0,0 +1,5644 @@
 +load("@rules_mx//graal:layout.bzl", "mx_os_layout")
 +load("@rules_mx//graal:sulong_fixture_check.bzl", "sulong_fixture_check")
 +load("@rules_mx//mx:bitcode.bzl", "mx_bitcode_suite")
@@ -50,6 +50,7 @@ new file mode 100644
 +        ":SULONG_PARSER_TORTURE",
 +        ":SULONG_STANDALONE_COMMON",
 +        ":SULONG_STANDALONE_DEPENDENCIES",
++        ":SULONG_TEST_NATIVE",
 +        ":SULONG_TOOLCHAIN_LAUNCHERS",
 +    ],
 +    visibility = ["//visibility:public"],
@@ -83,6 +84,7 @@ new file mode 100644
 +        ":com.oracle.truffle.llvm.tests.cmake",
 +        ":com.oracle.truffle.llvm.tests.harness",
 +        ":com.oracle.truffle.llvm.tests.irdebug.native",
++        ":com.oracle.truffle.llvm.tests.native",
 +        ":com.oracle.truffle.llvm.tests.pipe",
 +        ":com.oracle.truffle.llvm.toolchain.launchers",
 +        ":com.oracle.truffle.llvm.tools",
@@ -1754,6 +1756,54 @@ new file mode 100644
 +            "targets": [
 +                "libsulong-native.dylib",
 +                "install",
++            ],
++        },
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_cmake_project(
++    name = "com.oracle.truffle.llvm.tests.native",
++    testonly = True,
++    srcs = [
++        "tests/com.oracle.truffle.llvm.tests.native/CMakeLists.txt",
++        "tests/com.oracle.truffle.llvm.tests.native/src/callbackLibrary.c",
++        "tests/com.oracle.truffle.llvm.tests.native/src/caller.c",
++    ],
++    compiler = ":bootstrap-toolchain-launchers",
++    config = {
++    },
++    include_dirs = {
++    },
++    profiles = {
++        "linux_amd64": {
++            "config": {
++            },
++            "members": [
++                "libsulongtest.so",
++            ],
++            "targets": [
++                "default",
++            ],
++        },
++        "linux_arm64": {
++            "config": {
++            },
++            "members": [
++                "libsulongtest.so",
++            ],
++            "targets": [
++                "default",
++            ],
++        },
++        "macos_arm64": {
++            "config": {
++            },
++            "members": [
++                "libsulongtest.dylib",
++            ],
++            "targets": [
++                "default",
 +            ],
 +        },
 +    },
@@ -5581,6 +5631,19 @@ new file mode 100644
 +    members = {
 +        ":sulong_thin_launcher": "bin/lli",
 +        "@rules_mx//graal:standalone_jdk_release": "release",
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_exported_tar(
++    name = "SULONG_TEST_NATIVE",
++    testonly = True,
++    archive_imports = {
++        ":com.oracle.truffle.llvm.tests.native": "=",
++        ":com.oracle.truffle.llvm.tests.pipe.native": "{primary}={basename}",
++    },
++    format = "tar",
++    members = {
 +    },
 +    visibility = ["//visibility:public"],
 +)

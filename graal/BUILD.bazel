@@ -452,6 +452,15 @@ py_test(
     tags = ["manual"],
 )
 
+py_test(
+    name = "sulong_test_native_archive_test",
+    size = "small",
+    srcs = ["sulong_test_native_archive_test.py"],
+    args = ["$(rootpath @graal//sulong:SULONG_TEST_NATIVE)"],
+    data = ["@graal//sulong:SULONG_TEST_NATIVE"],
+    tags = ["manual"],
+)
+
 java_test(
     name = "sulong_pipe_test",
     size = "small",

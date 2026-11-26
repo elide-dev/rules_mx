@@ -1652,18 +1652,15 @@ def _cmake_project_recipe(project, pending, layout_bindings, source_bindings):
         targets = list(
             map(member, branch.get("ninja_targets", attrs.get("ninja_targets", [])))
         )
-        if (
-            not members
-            or not targets
-            or attrs.get("ninja_install_targets") != ["install"]
-        ):
+        install_targets = attrs.get("ninja_install_targets", [])
+        if not members or not targets or install_targets not in ([], ["install"]):
             raise _UnsupportedLowering(
-                f"{project.name}: CMake needs an explicit install plan"
+                f"{project.name}: CMake requires declared build targets and result paths"
             )
         profiles[profile] = {
             "config": branch.get("cmakeConfig", {}) | {k: (os_name if v == "<os>" else arch) for k, v in substitutions.items()},
             "members": members,
-            "targets": targets + ["install"],
+            "targets": targets + install_targets,
         }
     return {
         "name": project.name,
@@ -2371,12 +2368,19 @@ def _tar_layout(dist, pending, mappings, archives):
         ):
             dep = mx.dependency(source["dependency"], context=dist)
             inputs.add(dep)
+            if kind == "dependency" and not path and _default_native(dep) and dep.suite == dist.suite:
+                if destination and not _resource_path(destination.rstrip("/")):
+                    raise _UnsupportedLowering(f"{dist.name}: invalid native result destination {destination!r}")
+                pending.append(dep)
+                member = destination + "{basename}" if directory else destination
+                imports.setdefault(":" + dep.name, []).append("{primary}=" + member)
+                continue
             if (
                 kind == "dependency"
                 and path == "*"
                 and directory
                 and dep.suite == dist.suite
-                and (_wat_project(dep) or _source_project(dep) or _external_sulong_tests(dep) or _in_tree_sulong_tests(dep))
+                and (_cmake_native_project(dep) or _wat_project(dep) or _source_project(dep) or _external_sulong_tests(dep) or _in_tree_sulong_tests(dep))
             ):
                 if destination and not _resource_path(destination.rstrip("/")):
                     raise _UnsupportedLowering(
