@@ -4,6 +4,7 @@ load("@rules_java//java:java_library.bzl", "java_library")
 load("@rules_java//java:java_test.bzl", "java_test")
 load("@rules_python//python:py_binary.bzl", "py_binary")
 load("@rules_python//python:py_test.bzl", "py_test")
+load(":automatic_module.bzl", "automatic_module")
 
 exports_files([
     "benchmark_timer.patch",
@@ -157,6 +158,43 @@ java_library(
     ],
 )
 
+# The mx JUnit harness, mx:JUNIT_TOOL, and the JUnit libraries under the module names
+# that mx gives them. SubstrateVM's JUnit image support (JUNIT_SUPPORT) requires all three.
+java_library(
+    name = "mx_junit_tool_classes",
+    srcs = ["@graal_mx//:junit_runner_sources"],
+    add_exports = ["java.base/jdk.internal.module"],
+    deps = ["@contrib_rules_jvm_deps//:junit_junit"],
+)
+
+automatic_module(
+    name = "hamcrest",
+    jar = "@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
+    module_name = "hamcrest",
+    visibility = ["//visibility:public"],
+)
+
+automatic_module(
+    name = "junit",
+    jar = "@contrib_rules_jvm_deps//:junit_junit",
+    module_name = "junit",
+    visibility = ["//visibility:public"],
+    deps = [":hamcrest"],
+)
+
+automatic_module(
+    name = "mx_junit_tool",
+    jar = ":mx_junit_tool_classes",
+    module_name = "com.oracle.mxtool.junit",
+    visibility = ["//visibility:public"],
+    deps = [":junit"],
+)
+
+py_binary(
+    name = "automatic_module",
+    srcs = ["automatic_module.py"],
+)
+
 py_test(
     name = "truffle_layout_test",
     size = "small",
@@ -246,7 +284,10 @@ py_binary(
     srcs = ["static_symbols.py"],
 )
 
-exports_files(["source_native_image.py.tpl"])
+exports_files([
+    "source_native_image.py.tpl",
+    "svm_native_unittest.py",
+])
 
 py_binary(
     name = "assemble_svm",

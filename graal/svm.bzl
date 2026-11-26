@@ -9,6 +9,7 @@ load("@rules_java//java/common:java_common.bzl", "java_common")
 load("@rules_java//java/common:java_info.bzl", "JavaInfo")
 load("@rules_mx//mx:jar.bzl", "MxJarInfo")
 load("@rules_python//python:py_binary.bzl", "py_binary")
+load("@rules_python//python:py_test.bzl", "py_test")
 load(":layout.bzl", "mx_archive_layout", "static_archive")
 
 def _compiler_flags_impl(ctx):
@@ -62,10 +63,11 @@ def _jvm_fallbacks_impl(ctx):
     root = runtime.java_home + "/lib/static/" + ctx.attr.platform + "/"
     if ctx.attr.platform.startswith("linux-"):
         root += "glibc/"
-    archives = sorted([f.path for f in runtime.files.to_list() if f.path.startswith(root) and f.extension == "a"])
+    extension = "lib" if ctx.attr.platform.startswith("windows-") else "a"
+    inputs = [f for f in runtime.files.to_list() if f.path.startswith(root) and f.extension == extension]
+    archives = sorted([f.path for f in inputs])
     if not archives:
         fail("The Labs JDK must provide static archives at " + root)
-    inputs = [f for f in runtime.files.to_list() if f.path.startswith(root) and f.extension == "a"]
     output = ctx.actions.declare_file(ctx.label.name + ".c")
     args = ctx.actions.args()
     args.add_all([output, ctx.file._nm, ctx.file.implementation, ctx.file.metadata])
@@ -183,6 +185,8 @@ def svm_native_projects(projects):
     """Lower the native builder helpers to target C/C++ libraries and mx archive paths."""
     linux = "@platforms//os:linux"
     macos = "@platforms//os:macos"
+    windows = "@platforms//os:windows"
+    systems = [(linux, "linux"), (macos, "darwin"), (windows, "windows")]
     platform = {}
     for name, os, cpu in [
         ("darwin-aarch64", macos, "aarch64"),
@@ -193,14 +197,20 @@ def svm_native_projects(projects):
         native.config_setting(name = setting, constraint_values = [os, "@platforms//cpu:" + cpu])
         platform[":" + setting] = name
 
+    # Only the Windows libjvm replacement uses this setting. rules_mx pins no Windows Labs
+    # JDK, so the fallbacks for Windows need one registered as //tools:labs_runtime.
+    native.config_setting(name = "svm.windows-amd64", constraint_values = [windows, "@platforms//cpu:x86_64"])
     svm_jvm_fallbacks(
         name = "svm-jvmfuncs-fallback-builder",
-        implementation = _source_root("jvm.posix") + "/src/JvmFuncs.c",
+        implementation = select({
+            windows: _source_root("jvm.windows") + "/src/JvmFuncs.c",
+            "//conditions:default": _source_root("jvm.posix") + "/src/JvmFuncs.c",
+        }),
         metadata = "mx.substratevm/mx_substratevm.py",
-        platform = select(platform),
+        platform = select(platform | {":svm.windows-amd64": "windows-amd64"}),
     )
 
-    _labs_jni(name = "svm-labs-jni", os = select({linux: "linux", macos: "darwin"}))
+    _labs_jni(name = "svm-labs-jni", os = select({linux: "linux", macos: "darwin", windows: "win32"}))
     archive_paths = {}
     for short, options in projects.items():
         name = "com.oracle.svm.native." + short
@@ -209,13 +219,13 @@ def svm_native_projects(projects):
         headers = native.glob([root + "/src/**/*.h", root + "/src/**/*.hpp", root + "/include/*.h"], allow_empty = True)
         if not sources:
             fail("No sources for " + name)
-        supported = [os for os, key in [(linux, "linux"), (macos, "darwin")] if key in options["cflags"]]
+        supported = [os for os, key in systems if key in options["cflags"]]
         compatible = select({os: [] for os in supported} | {"//conditions:default": ["@platforms//:incompatible"]})
         copts = select({
             os: options["cflags"][key]
-            for os, key in [(linux, "linux"), (macos, "darwin")]
+            for os, key in systems
             if key in options["cflags"]
-        })
+        } | ({} if len(supported) == len(systems) else {"//conditions:default": []}))
         if short == "darwin":
             # The pinned Mach-O linker cannot synthesize Clang's Objective-C call stubs.
             copts += ["-fno-objc-msgsend-class-selector-stubs", "-fno-objc-msgsend-selector-stubs"]
@@ -241,7 +251,7 @@ def svm_native_projects(projects):
 
         cc_library(
             name = name,
-            srcs = sources + ([":svm-jvmfuncs-fallback-builder"] if short == "jvm.posix" else []),
+            srcs = sources + ([":svm-jvmfuncs-fallback-builder"] if short in ("jvm.posix", "jvm.windows") else []),
             hdrs = headers,
             copts = copts,
             includes = [root + "/include"] + options["includes"],
@@ -287,6 +297,38 @@ def svm_native_projects(projects):
         visibility = ["//visibility:public"],
     )
 
+# The builder_jar_distributions of mx's SubstrateVM component, with SVM_FOREIGN as on JDK 22
+# and later.
+_BUILDER_JARS = [
+    ":SVM",
+    ":SVM_CONFIGURE",
+    ":SVM_GUEST_STAGING",
+    ":SVM_SHARED",
+    ":SVM_JVMCI_GUEST_STAGING",
+    ":SVM_JVMCI_SHARED",
+    "//espresso-shared:ESPRESSO_SVM",
+    ":OBJECTFILE",
+    ":POINTSTO",
+    ":SVM_CAPNPROTO_RUNTIME",
+    ":NATIVE_IMAGE_BASE",
+    "//compiler:VMACCESS",
+    "//sdk:VMACCESS_GUEST",
+    "//compiler:HOSTVMACCESS",
+    ":SVM_FOREIGN",
+]
+
+# Its jar_distributions, which Native Image loads for the image itself.
+_GUEST_JARS = {
+    ":LIBRARY_SUPPORT": "library-support",
+    ":SVM_GUEST": "svm-guest",
+    ":SVM_GUEST_STAGING": "svm-guest-staging",
+    ":SVM_SHARED": "svm-shared",
+    ":SVM_JVMCI_GUEST": "svm-jvmci-guest",
+    ":SVM_JVMCI_GUEST_STAGING": "svm-jvmci-guest-staging",
+    ":SVM_JVMCI_SHARED": "svm-jvmci-shared",
+    "//sdk:VMACCESS_GUEST": "vmaccess-guest",
+}
+
 def _runfile(ctx, artifact):
     return artifact.short_path[3:] if artifact.short_path.startswith("../") else ctx.workspace_name + "/" + artifact.short_path
 
@@ -307,7 +349,7 @@ def _native_image_root_impl(ctx):
     entries = {}
     for jar in depset(transitive = [
         target[JavaInfo].transitive_runtime_jars
-        for target in [driver, ctx.attr.management]
+        for target in [driver, ctx.attr.management] + ctx.attr.builder
     ]).to_list():
         entries[jar_paths.get(jar.basename, "lib/svm/builder/" + jar.basename.lower())] = jar
     java_home = runtime.java_home + "/"
@@ -324,6 +366,11 @@ def _native_image_root_impl(ctx):
     for target, name in ctx.attr.builder_libs.items():
         [jar] = target[JavaInfo].runtime_output_jars
         entries["lib/svm/builder/lib/" + name] = jar
+    for target, path in ctx.attr.macros.items():
+        files = target[JavaInfo].runtime_output_jars if JavaInfo in target else target.files.to_list()
+        if len(files) != 1:
+            fail("Expected one file for the macro path " + path)
+        entries["lib/svm/macros/" + path] = files[0]
     flags = ctx.actions.declare_file(ctx.label.name + ".exports")
     exports = sorted(driver[MxJarInfo].required_exports.to_list())
     ctx.actions.write(flags, "\n".join(exports) + "\n")
@@ -365,9 +412,11 @@ _native_image_root = rule(
         "out": attr.output(mandatory = True),
         "driver": attr.label(providers = [JavaInfo, MxJarInfo], mandatory = True),
         "management": attr.label(providers = [JavaInfo], mandatory = True),
+        "builder": attr.label_list(providers = [JavaInfo]),
         "guest": attr.label_keyed_string_dict(providers = [JavaInfo], mandatory = True),
         "reporter": attr.label(allow_single_file = True, mandatory = True),
         "builder_libs": attr.label_keyed_string_dict(providers = [JavaInfo]),
+        "macros": attr.label_keyed_string_dict(allow_files = True),
         "native_archive": attr.label(allow_single_file = [".tar"], mandatory = True),
         "platform": attr.string(mandatory = True),
         "_jdk": attr.label(default = Label("//tools:labs_runtime")),
@@ -393,18 +442,20 @@ def svm_launcher(name, builder_libs = {}):
         out = name + ".py",
         driver = ":SVM_DRIVER",
         management = "//compiler:GRAAL_MANAGEMENT",
-        guest = {
-            ":LIBRARY_SUPPORT": "library-support",
-            ":SVM_GUEST": "svm-guest",
-            ":SVM_GUEST_STAGING": "svm-guest-staging",
-            ":SVM_SHARED": "svm-shared",
-            ":SVM_JVMCI_GUEST": "svm-jvmci-guest",
-            ":SVM_JVMCI_GUEST_STAGING": "svm-jvmci-guest-staging",
-            ":SVM_JVMCI_SHARED": "svm-jvmci-shared",
-            "//sdk:VMACCESS_GUEST": "vmaccess-guest",
-        },
+        builder = _BUILDER_JARS,
+        guest = _GUEST_JARS,
         reporter = ":com.oracle.svm.native.reporterchelper",
         builder_libs = builder_libs,
+        # The NATIVE_IMAGE_JUNIT_SUPPORT macro and the JARs of mx's native-image JUnit
+        # component, which `--macro:junit` loads to build test images.
+        macros = {
+            "mx.substratevm/macro-junit.properties": "junit/native-image.properties",
+            "mx.substratevm/svm-junit.packages": "junit/svm-junit.packages",
+            ":JUNIT_SUPPORT": "junit/junit-support.jar",
+            Label("//graal:mx_junit_tool"): "junit/junit-tool.jar",
+            Label("//graal:junit"): "junit/junit.jar",
+            Label("//graal:hamcrest"): "junit/hamcrest.jar",
+        },
         native_archive = ":SVM_HOSTED_NATIVE",
         platform = select({":" + setting: setting.removeprefix("svm.") for setting in ["svm.darwin-aarch64", "svm.linux-aarch64", "svm.linux-amd64"]}),
         visibility = ["//visibility:public"],
@@ -415,4 +466,61 @@ def svm_launcher(name, builder_libs = {}):
         main = name + ".py",
         data = [":" + name + ".root"],
         visibility = ["//visibility:public"],
+    )
+
+def _svm_unittest_inputs_impl(ctx):
+    runtime = ctx.attr._jdk[java_common.JavaRuntimeInfo]
+    [java] = [f for f in runtime.files.to_list() if f.path == runtime.java_executable_exec_path]
+    tests = depset(transitive = [dep[JavaInfo].transitive_runtime_jars for dep in ctx.attr.deps])
+    # The image builder already provides its own distributions, as mx's implicit_excludes do.
+    provided = {jar: True for jar in depset(transitive = [dep[JavaInfo].transitive_runtime_jars for dep in ctx.attr.provided]).to_list()}
+    classpath = [jar for jar in tests.to_list() if jar not in provided]
+    helper = depset(transitive = [tests, ctx.attr.junit_support[JavaInfo].transitive_runtime_jars]).to_list()
+    manifest = ctx.actions.declare_file(ctx.label.name + ".json")
+    ctx.actions.write(manifest, json.encode({
+        "classpath": [_runfile(ctx, jar) for jar in classpath],
+        "helper_classpath": [_runfile(ctx, jar) for jar in helper],
+        "java": _runfile(ctx, java),
+    }))
+    return [DefaultInfo(files = depset([manifest]), runfiles = ctx.runfiles(transitive_files = depset(helper, transitive = [runtime.files])))]
+
+_svm_unittest_inputs = rule(
+    implementation = _svm_unittest_inputs_impl,
+    attrs = {
+        "deps": attr.label_list(providers = [JavaInfo], mandatory = True),
+        "provided": attr.label_list(providers = [JavaInfo]),
+        "junit_support": attr.label(providers = [JavaInfo], mandatory = True),
+        "_jdk": attr.label(default = Label("//tools:labs_runtime")),
+    },
+)
+
+def svm_native_unittest(name, tests, deps, build_args = [], default_group = False, tags = [], size = "enormous"):
+    """Run JUnit classes inside a source-built Native Image, as `mx native-unittest` does.
+
+    Args:
+      name: test name.
+      tests: fully qualified test classes; they are grouped by @NativeImageBuildArgs.
+      deps: Java targets that provide the test classes and their dependencies.
+      build_args: additional image builder arguments.
+      default_group: only build the classes without custom @NativeImageBuildArgs, as the
+        argument-less `mx native-unittest` does.
+      tags: test tags.
+      size: test size.
+    """
+    _svm_unittest_inputs(
+        name = name + ".inputs",
+        deps = deps,
+        provided = [":SVM_DRIVER", "//compiler:GRAAL_MANAGEMENT", ":JUNIT_SUPPORT"] + _BUILDER_JARS + [label for label in _GUEST_JARS if label not in _BUILDER_JARS],
+        junit_support = ":JUNIT_SUPPORT",
+        testonly = True,
+    )
+    py_test(
+        name = name,
+        srcs = [Label("//graal:svm_native_unittest.py")],
+        main = Label("//graal:svm_native_unittest.py"),
+        args = ["$(rootpath :native-image.root)", "$(rootpath :%s.inputs)" % name] + (["--default-group"] if default_group else []) + ["--tests"] + tests + (["--build-args"] + build_args if build_args else []),
+        data = [":native-image.root", ":%s.inputs" % name],
+        size = size,
+        tags = tags,
+        target_compatible_with = select({":" + s: [] for s in ["svm.darwin-aarch64", "svm.linux-aarch64", "svm.linux-amd64"]} | {"//conditions:default": ["@platforms//:incompatible"]}),
     )
