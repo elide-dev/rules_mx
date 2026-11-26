@@ -3906,7 +3906,7 @@ diff --git a/espresso/src/com.oracle.truffle.espresso.launcher/src/com/oracle/tr
 new file mode 100644
 --- /dev/null
 +++ b/espresso/src/com.oracle.truffle.espresso.launcher/src/com/oracle/truffle/espresso/launcher/BUILD.bazel
-@@ -0,0 +1,29 @@
+@@ -0,0 +1,28 @@
 +load("@rules_java//java:defs.bzl", "java_binary")
 +load("@rules_mx//mx:java.bzl", "elide_java_library")
 +
@@ -3924,7 +3924,6 @@ new file mode 100644
 +    unified_release = 21,
 +    visibility = ["//:__subpackages__"],
 +    deps = [
-+        "//espresso:com.oracle.truffle.espresso.io",
 +        "//sdk:LAUNCHER_COMMON",
 +        "//sdk:POLYGLOT",
 +    ],

@@ -887,7 +887,9 @@ func (g *importer) Imports(c *config.Config, r *rule.Rule, f *rule.File) []resol
 		return g.javaLanguage.Imports(c, r, f)
 	}
 	p := g.projects[label.New("", f.Pkg, r.Name())]
-	if p == nil || len(p.Sources) == 0 {
+	// A patch to an existing JDK module is installed explicitly by its
+	// consumer. Indexing its packages would add it to unrelated Java classpaths.
+	if p == nil || len(p.Sources) == 0 || p.PatchModule != "" {
 		return nil
 	}
 	var specs []resolve.ImportSpec
