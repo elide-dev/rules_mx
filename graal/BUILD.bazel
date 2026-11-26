@@ -375,6 +375,29 @@ py_test(
     ],
 )
 
+filegroup(
+    name = "sulong_home_archive",
+    srcs = ["@graal//sulong:SULONG_NATIVE_HOME"],
+    output_group = "archive",
+    tags = ["manual"],
+)
+
+filegroup(
+    name = "sulong_home_list",
+    srcs = ["@graal//sulong:SULONG_NATIVE_HOME"],
+    output_group = "file_list",
+    tags = ["manual"],
+)
+
+py_test(
+    name = "sulong_native_home_test",
+    size = "small",
+    srcs = ["sulong_native_home_test.py"],
+    args = ["$(rootpath :sulong_home_archive)", "$(rootpath :sulong_home_list)"],
+    data = [":sulong_home_archive", ":sulong_home_list"],
+    tags = ["manual"],
+)
+
 py_test(
     name = "sulong_cxx_runtime_test",
     size = "small",

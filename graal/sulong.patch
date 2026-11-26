@@ -2,7 +2,7 @@ diff --git a/sulong/BUILD.bazel b/sulong/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/sulong/BUILD.bazel
-@@ -0,0 +1,4956 @@
+@@ -0,0 +1,5059 @@
 +load("@rules_mx//graal:layout.bzl", "mx_os_layout")
 +load("@rules_mx//graal:sulong_fixture_check.bzl", "sulong_fixture_check")
 +load("@rules_mx//mx:bitcode.bzl", "mx_bitcode_suite")
@@ -30,6 +30,7 @@ new file mode 100644
 +        ":SULONG_LIBCXX_COMPILER_WRAPPER",
 +        ":SULONG_LIBLLVMVM",
 +        ":SULONG_NATIVE",
++        ":SULONG_NATIVE_HOME",
 +        ":SULONG_NATIVE_LIB_RESOURCES",
 +        ":SULONG_NATIVE_TOOLS",
 +        ":SULONG_NFI",
@@ -4903,6 +4904,108 @@ new file mode 100644
 +    format = "dir",
 +    members = {
 +        ":libllvmvm": "lib/{basename}",
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_os_layout(
++    name = "SULONG_NATIVE_HOME",
++    format = "tar",
++    os_layouts = {
++        "linux": {
++            "deps": [
++                ":SULONG_CMAKE_TOOLCHAIN",
++                ":com.oracle.truffle.llvm.libraries.native",
++                ":com.oracle.truffle.llvm.libraries.graalvm.llvm.libs",
++                ":com.oracle.truffle.llvm.libraries.bitcode.libcxx",
++            ],
++            "overlay": [
++                {
++                    "destination": "native/",
++                    "exclude": [
++                    ],
++                    "input": 0,
++                    "pattern": "*",
++                },
++                {
++                    "destination": "native/lib/",
++                    "exclude": [
++                    ],
++                    "input": 1,
++                    "pattern": "bin/*",
++                },
++                {
++                    "destination": "native/lib/",
++                    "exclude": [
++                    ],
++                    "input": 2,
++                    "pattern": "bin/*",
++                },
++                {
++                    "destination": "",
++                    "exclude": [
++                        "native/lib/*.a",
++                    ],
++                    "input": 3,
++                    "pattern": "*",
++                },
++                {
++                    "destination": "native/lib/libgraalvm-llvm.so",
++                    "link": "libgraalvm-llvm.so.1",
++                },
++                {
++                    "destination": "native/lib/libpolyglot-mock.so",
++                    "link": "libgraalvm-llvm.so",
++                },
++            ],
++        },
++        "macos": {
++            "deps": [
++                ":SULONG_CMAKE_TOOLCHAIN",
++                ":com.oracle.truffle.llvm.libraries.native",
++                ":com.oracle.truffle.llvm.libraries.graalvm.llvm.libs",
++                ":com.oracle.truffle.llvm.libraries.bitcode.libcxx",
++            ],
++            "overlay": [
++                {
++                    "destination": "native/",
++                    "exclude": [
++                    ],
++                    "input": 0,
++                    "pattern": "*",
++                },
++                {
++                    "destination": "native/lib/",
++                    "exclude": [
++                    ],
++                    "input": 1,
++                    "pattern": "bin/*",
++                },
++                {
++                    "destination": "native/lib/",
++                    "exclude": [
++                    ],
++                    "input": 2,
++                    "pattern": "bin/*",
++                },
++                {
++                    "destination": "",
++                    "exclude": [
++                        "native/lib/*.a",
++                    ],
++                    "input": 3,
++                    "pattern": "*",
++                },
++                {
++                    "destination": "native/lib/libgraalvm-llvm.dylib",
++                    "link": "libgraalvm-llvm.1.dylib",
++                },
++                {
++                    "destination": "native/lib/libpolyglot-mock.dylib",
++                    "link": "libgraalvm-llvm.dylib",
++                },
++            ],
++        },
 +    },
 +    visibility = ["//visibility:public"],
 +)

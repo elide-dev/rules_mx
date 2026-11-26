@@ -2,7 +2,7 @@
 
 load("@rules_foreign_cc//foreign_cc:defs.bzl", "cmake")
 load("@rules_python//python:py_binary.bzl", "py_binary")
-load("//graal:layout.bzl", "mx_archive_layout")
+load("//graal:layout.bzl", "MxArchiveLayoutInfo", "mx_archive_layout")
 load("//mx:project_files.bzl", "mx_project_files")
 
 def _installed_impl(ctx):
@@ -10,11 +10,15 @@ def _installed_impl(ctx):
     files = [f for f in ctx.attr.project.files.to_list() if f.path.endswith(suffix)]
     if len(files) != 1:
         fail("Expected one installed CMake output " + ctx.attr.member)
-    return [DefaultInfo(files = depset(files))]
+    result = [DefaultInfo(files = depset(files))]
+    if ctx.attr.with_archive:
+        [archive] = [f for f in ctx.attr.project.files.to_list() if f.path.endswith(suffix + ".tar")]
+        result.append(MxArchiveLayoutInfo(archive = archive, entries = {}, tar_trees = [(archive, "")]))
+    return result
 
 _installed = rule(
     implementation = _installed_impl,
-    attrs = {"project": attr.label(mandatory = True), "member": attr.string(mandatory = True)},
+    attrs = {"project": attr.label(mandatory = True), "member": attr.string(mandatory = True), "with_archive": attr.bool()},
 )
 
 def mx_cmake_project(name, srcs, compiler, config, include_dirs, profiles, testonly = False, visibility = None, source_subdir = "", wrapper = None, max_jobs = 0):
@@ -22,6 +26,8 @@ def mx_cmake_project(name, srcs, compiler, config, include_dirs, profiles, testo
     src_group = name + ".cmake_sources"
     native.filegroup(name = src_group, srcs = srcs, testonly = testonly)
     data = [compiler, Label("//tools/cc:target_config"), Label("//tools/cc:all_files")]
+    if source_subdir:
+        data.append(Label("//mx:pack_layout"))
     if wrapper:
         py_binary(name = name + ".compiler_wrapper", main = wrapper, srcs = [wrapper], testonly = testonly)
         data.append(":" + name + ".compiler_wrapper")
@@ -83,13 +89,14 @@ def mx_cmake_project(name, srcs, compiler, config, include_dirs, profiles, testo
                 platform_config[key] = value.replace("@COMPILER@", "$(execpath %s)" % compiler).replace("@WRAPPER@", "$(execpath :%s.compiler_wrapper)" % name)
         if directories:
             directory = directories[0]
-            _installed(name = rule_name + ".installed", project = ":" + rule_name, member = directory, testonly = testonly)
+            _installed(name = rule_name + ".installed", project = ":" + rule_name, member = directory, with_archive = True, testonly = testonly)
             installed[condition] = ":" + rule_name + ".installed"
             platform_config["Python3_EXECUTABLE"] = "$$EXT_BUILD_ROOT$$/$(PYTHON3)"
 
             # rules_foreign_cc owns CMAKE_INSTALL_PREFIX. Preserve the directory
             # name under which mx publishes that complete installation.
             stage = 'mv "$$INSTALLDIR" "$$BUILD_TMPDIR/mx-install" && mkdir -p "$$INSTALLDIR" && mv "$$BUILD_TMPDIR/mx-install" "$$INSTALLDIR/%s"' % directories[0]
+            stage += '\n"$(execpath %s)" --archive-install-tree "$$INSTALLDIR/%s.tar" "%s" "$$INSTALLDIR/%s"' % (Label("//mx:pack_layout"), directory, directory, directory)
         else:
             stage = "\n".join(['mkdir -p "$$INSTALLDIR/%s" && cp -L "%s" "$$INSTALLDIR/%s"' % (m.rpartition("/")[0] or ".", m, m) for m in recipe["members"]])
         cmake(
@@ -111,7 +118,7 @@ def mx_cmake_project(name, srcs, compiler, config, include_dirs, profiles, testo
             install = False,
             postfix_script = stage,
             out_include_dir = "",
-            out_data_files = recipe["members"],
+            out_data_files = recipe["members"] + [d + ".tar" for d in directories],
             out_data_dirs = directories,
             testonly = testonly,
             target_compatible_with = select({condition: [], "//conditions:default": ["@platforms//:incompatible"]}),

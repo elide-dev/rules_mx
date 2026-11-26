@@ -178,9 +178,9 @@ def _install_image_group(tree, image, kinds, mount):
 
 
 def main():
-    if sys.argv[1] == "--archive-file-tree":
+    if sys.argv[1] in ("--archive-file-tree", "--archive-install-tree"):
         output, prefix, tree = sys.argv[2:]
-        _write_tree_archive(Path(tree), Path(output), _relative(prefix), dereference=True)
+        _write_tree_archive(Path(tree), Path(output), _relative(prefix), dereference=sys.argv[1] == "--archive-file-tree")
         return
     if sys.argv[1] == "--image-primary":
         image, out = map(Path, sys.argv[2:])

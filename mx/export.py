@@ -2182,9 +2182,59 @@ def _source_layout_branch(dist, layout, os_name):
     }, projects
 
 
+def _platform_install_overlay(dist, pending):
+    attrs = dist._orig_attrs
+    if (not dist.fileListPurpose or type(dist).__name__ != "LayoutTARDistribution"
+            or dist.fileListEntry or dist.hashEntry or dist.excludedLibs or dist.compress
+            or attrs.keys() & {"arch", "os_arch", "buildDependencies", "dependencies"}):
+        raise _UnsupportedLowering(f"{dist.name}: unsupported mixed platform layout")
+    recipes = {}
+    for system, target in (("linux", "linux"), ("darwin", "macos")):
+        branch = attrs["os"].get(system, attrs["os"].get("<others>", {}))
+        if branch.keys() != {"layout"}:
+            raise _UnsupportedLowering(f"{dist.name}: unsupported layout for {system}")
+        dependencies, steps = [], []
+        def substitute(path):
+            extension = ".dylib" if system == "darwin" else ".so"
+            path = re.sub(r"<lib:([\w.+-]+)>", lambda m: "lib" + m[1] + extension, path)
+            return re.sub(r"<libv:([\w+-]+)\.([0-9.]+)>",
+                          lambda m: "lib" + m[1] + ("." + m[2] + extension if system == "darwin" else extension + "." + m[2]), path)
+        for layout in (attrs["layout"], branch["layout"]):
+            for dest, source in mx.LayoutDistribution._walk_static_layout(layout, dist.name, distribution_object=dist, context=dist):
+                dest = substitute(dest.removeprefix("./"))
+                if dest and not _resource_path(dest.rstrip("/")):
+                    raise _UnsupportedLowering(f"{dist.name}: unsupported overlay destination {dest}")
+                kind = source["source_type"]
+                if kind == "link":
+                    link = substitute(source["path"])
+                    if not _resource_path(link):
+                        raise _UnsupportedLowering(f"{dist.name}: unsupported overlay link {link}")
+                    steps.append({"destination": dest, "link": link})
+                    continue
+                if kind not in ("dependency", "extracted-dependency") or source.get("optional") or source.keys() - {"dependency", "source_type", "path", "exclude", "optional", "_str_"}:
+                    raise _UnsupportedLowering(f"{dist.name}: unsupported overlay source {source['_str_']}")
+                dep = mx.dependency(source["dependency"], context=dist)
+                if dep.suite != dist.suite or not (_cmake_native_project(dep) or type(dep).__name__ == "LayoutTARDistribution"):
+                    raise _UnsupportedLowering(f"{dist.name}: bind overlay input {dep.qualifiedName()}")
+                pattern = substitute(source.get("path") or "*")
+                if not _resource_path(pattern.replace("*", "file")):
+                    raise _UnsupportedLowering(f"{dist.name}: unsupported overlay selector {pattern}")
+                exclude = source.get("exclude", [])
+                label = ":" + dep.name
+                if label not in dependencies:
+                    dependencies.append(label)
+                    pending.append(dep)
+                steps.append({"destination": dest, "input": dependencies.index(label), "pattern": pattern,
+                              "exclude": [exclude] if isinstance(exclude, str) else exclude})
+        recipes[target] = {"deps": dependencies, "overlay": steps}
+    return {"name": dist.name, "format": "tar", "os_layouts": recipes, "testonly": dist.is_test_distribution()}
+
+
 def _os_layout(dist, pending):
     """Lower OS-specific source layouts without expanding them for the Gazelle host."""
     attrs = dist._orig_attrs
+    if "layout" in attrs and "os" in attrs:
+        return _platform_install_overlay(dist, pending)
     if (
         attrs.keys()
         & {"arch", "layout", "buildDependencies", "dependencies"}

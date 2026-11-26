@@ -99,3 +99,14 @@ py_binary(
     srcs = ["netbeans.py"],
     visibility = ["//visibility:public"],
 )
+
+py_binary(
+    name = "install_overlay",
+    srcs = [
+        "install_overlay.py",
+        "pack_layout.py",
+    ],
+    imports = ["."],
+    main = "install_overlay.py",
+    visibility = ["//visibility:public"],
+)
