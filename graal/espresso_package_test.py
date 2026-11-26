@@ -2,6 +2,7 @@
 
 import hashlib
 import io
+import json
 from pathlib import Path
 import os
 import subprocess
@@ -32,7 +33,30 @@ def main(
     resources,
     graal_support,
     jvm_support,
+    common,
+    parent_release,
+    source_info,
 ):
+    def read_release(path):
+        return dict(line.split("=", 1) for line in Path(path).read_text().splitlines())
+
+    release = read_release(Path(common, "release"))
+    parent = read_release(parent_release)
+    for field in ("JAVA_VERSION", "OS_NAME", "OS_ARCH"):
+        assert release[field] == parent[field]
+    source = json.loads(Path(source_info).read_text()).get("commit")
+    commits = json.loads(release["COMMIT_INFO"])
+    if source:
+        assert "espresso" in commits and "sdk" in commits
+        assert all(commit == source for commit in commits.values())
+        assert all(
+            name + ":" + source["commit.rev"] in release["SOURCE"] for name in commits
+        )
+    else:
+        assert commits == {}
+    assert Path(common, "3rd_party_licenses.txt").is_file()
+    assert Path(common, "languages/java/lib/espresso-io.jar").is_file()
+
     with tarfile.open(support) as archive:
         jars = {member.name for member in archive if member.isfile()}
         assert jars == {"lib/espresso-graal.jar", "lib/espresso-graal.src.zip"}, jars

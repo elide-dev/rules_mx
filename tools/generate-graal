@@ -2174,6 +2174,7 @@ def prepare_suite(suite, stage):
     if suite == "espresso":
         export_options.extend(
             [
+                "--standalone-source-provenance", "//:mx-source.json",
                 "--whole-project",
                 "com.oracle.truffle.espresso.libjavavm",
                 "--project-release",

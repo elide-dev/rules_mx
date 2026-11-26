@@ -264,6 +264,9 @@ py_test(
         "$(rootpath @graal//espresso:ESPRESSO_LIBS_RESOURCES)",
         "$(rootpath @graal//espresso:ESPRESSO_GRAALVM_SUPPORT)",
         "$(rootpath @graal//espresso:ESPRESSO_JVM_SUPPORT)",
+        "$(rootpath @graal//espresso:ESPRESSO_STANDALONE_COMMON)",
+        "$(rootpath :standalone_jdk_release)",
+        "$(rootpath @graal//:mx-source.json)",
     ],
     data = [
         "@graal//espresso:ESPRESSO_IO",
@@ -275,8 +278,20 @@ py_test(
         "@graal//espresso:ESPRESSO_LIBS_RESOURCES",
         "@graal//espresso:ESPRESSO_GRAALVM_SUPPORT",
         "@graal//espresso:ESPRESSO_JVM_SUPPORT",
+        "@graal//espresso:ESPRESSO_STANDALONE_COMMON",
+        ":standalone_jdk_release",
+        "@graal//:mx-source.json",
         "@graal//espresso-compiler-stub:ESPRESSO_COMPILER_SUPPORT",
     ],
+    tags = ["manual"],
+)
+
+py_test(
+    name = "espresso_standalone_test",
+    size = "medium",
+    srcs = ["espresso_standalone_test.py"],
+    args = ["$(rootpath @graal//espresso:ESPRESSO_JVM_STANDALONE)"],
+    data = ["@graal//espresso:ESPRESSO_JVM_STANDALONE"],
     tags = ["manual"],
 )
 

@@ -100,3 +100,32 @@ def mx_platform_file(name, filename, variants, **kwargs):
         content = select({Label("//tools/cc:linux_musl") if os == "linux-musl" else "@platforms//os:" + os: content for os, content in variants.items()}),
         **kwargs
     )
+
+def _release_file_impl(ctx):
+    out = ctx.actions.declare_file(ctx.label.name + "/" + ctx.attr.filename)
+    args = ctx.actions.args()
+    args.add_all([out, ctx.file.parent_release, ctx.file.provenance, ctx.attr.graalvm_version])
+    args.add_all(ctx.attr.suites)
+    ctx.actions.run(
+        executable = ctx.executable._writer,
+        arguments = [args],
+        inputs = [ctx.file.parent_release, ctx.file.provenance],
+        outputs = [out],
+        mnemonic = "MxReleaseFile",
+    )
+    return [
+        DefaultInfo(files = depset([out])),
+        MxArchiveLayoutInfo(archive = None, entries = {out.basename: out}, modes = {out.basename: "644"}),
+    ]
+
+mx_release_file = rule(
+    implementation = _release_file_impl,
+    attrs = {
+        "filename": attr.string(mandatory = True),
+        "parent_release": attr.label(allow_single_file = True, mandatory = True),
+        "provenance": attr.label(allow_single_file = True, mandatory = True),
+        "graalvm_version": attr.string(mandatory = True),
+        "suites": attr.string_list(mandatory = True),
+        "_writer": attr.label(default = Label("//mx:release_file"), executable = True, cfg = "exec"),
+    },
+)

@@ -1022,6 +1022,33 @@ def _native_shared_recipe(project, pending):
     }
 
 
+def _release_file(dep):
+    return (type(dep).__module__, type(dep).__name__) == (
+        "mx_espresso",
+        "EspressoReleaseFileProject",
+    )
+
+
+def _release_file_recipe(dep, options):
+    if not options.standalone_source_provenance or not options.standalone_jdk_release:
+        raise _UnsupportedLowering(
+            f"{dep.name}: bind the source provenance and target JDK release file"
+        )
+    suites = sorted(s.name for s in mx.suites())
+    version = mx.suite("sdk").release_version_from_suite()
+    if not version:
+        raise _UnsupportedLowering(f"{dep.name}: no declared GraalVM version")
+    return {
+        "name": dep.name,
+        "filename": dep.output_file_name(),
+        "parent_release": options.standalone_jdk_release,
+        "provenance": options.standalone_source_provenance,
+        "suites": suites,
+        "graalvm_version": version,
+        "testonly": dep.is_test_project(),
+    }
+
+
 def _platform_file(dep):
     return callable(getattr(dep, "contents_for_platform", None)) and callable(
         getattr(dep, "output_file_name", None)
@@ -1496,6 +1523,7 @@ def _can_lower_root(dep):
         or _default_native(dep)
         or _source_project(dep)
         or _platform_file(dep)
+        or _release_file(dep)
         or _wat_project(dep)
         or _emscripten_project(dep)
         or _in_tree_sulong_tests(dep)
@@ -1986,7 +2014,6 @@ def _install_layout(dist, pending, mappings, options, bindings):
         or dist.fileListEntry
         or dist.hashEntry
         or dist.fileListPurpose
-        or dist._removed_deps
     ):
         raise _UnsupportedLowering(
             f"{dist.name}: needs a target-specific install recipe"
@@ -2005,15 +2032,20 @@ def _install_layout(dist, pending, mappings, options, bindings):
         directory = destination.endswith("/")
         kind = source["source_type"]
         path = source.get("path")
-        optional_project_layout = (
-            kind == "dependency"
-            and path == "*"
-            and directory
-            and any(
-                d.qualifiedName() == source.get("dependency")
-                and type(d).__name__ == "LayoutDirDistribution"
-                for d in dist.buildDependencies
+        if source.get("optional") and kind in ("dependency", "extracted-dependency"):
+            producer = mx.dependency(
+                source["dependency"], fatalIfMissing=False, context=dist
             )
+            if (
+                producer is None
+                or producer.name in dist._removed_deps
+                or getattr(producer, "ignore", False)
+            ):
+                if producer in dist.buildDependencies:
+                    inputs.add(producer)
+                continue
+        optional_project_layout = (
+            kind in ("dependency", "extracted-dependency") and path == "*" and directory
         )
         if source.get("optional") and not optional_project_layout:
             raise _UnsupportedLowering(
@@ -2051,24 +2083,24 @@ def _install_layout(dist, pending, mappings, options, bindings):
             kind == "dependency"
             and path == "*"
             and directory
-            and dep.qualifiedName() == "sdk:STANDALONE_JAVA_HOME"
+            and (
+                dep.qualifiedName() == "sdk:STANDALONE_JAVA_HOME"
+                or (type(dep).__module__, type(dep).__name__)
+                == ("mx_sdk_vm_ng", "JavaHomeDependency")
+            )
         ):
             if (
                 not options.standalone_jdk_archive
                 or source.keys() - allowed - {"exclude"}
-                or not _resource_path(dest.rstrip("/"))
+                or (dest and not _resource_path(dest.rstrip("/")))
             ):
                 raise _UnsupportedLowering(
                     f"{dist.name}: bind the standalone JDK archive and installation path"
                 )
-            if options.standalone_jdk_archive in jdks:
-                raise _UnsupportedLowering(
-                    f"{dist.name}: multiple JDK homes in the layout"
-                )
-            jdks[options.standalone_jdk_archive] = json.dumps(
-                {"directory": dest, "exclude": source.get("exclude", [])},
-                sort_keys=True,
-            )
+            homes = jdks.setdefault(options.standalone_jdk_archive, [])
+            if any(home["directory"] == dest for home in homes):
+                raise _UnsupportedLowering(f"{dist.name}: duplicate JDK home {dest}")
+            homes.append({"directory": dest, "exclude": source.get("exclude", [])})
             continue
         if source.keys() - allowed:
             raise _UnsupportedLowering(
@@ -2077,7 +2109,11 @@ def _install_layout(dist, pending, mappings, options, bindings):
         if (
             kind == "dependency"
             and path == "release"
-            and dep.qualifiedName() == "sdk:STANDALONE_JAVA_HOME"
+            and (
+                dep.qualifiedName() == "sdk:STANDALONE_JAVA_HOME"
+                or (type(dep).__module__, type(dep).__name__)
+                == ("mx_sdk_vm_ng", "JavaHomeDependency")
+            )
         ):
             if not options.standalone_jdk_release:
                 raise _UnsupportedLowering(
@@ -2095,6 +2131,16 @@ def _install_layout(dist, pending, mappings, options, bindings):
                         f"{dist.name}: bind install input {dep.qualifiedName()}"
                     )
                 target = labels[0]
+            if (
+                kind == "dependency"
+                and directory
+                and path
+                and path.endswith("/*")
+                and _resource_path(path[:-2])
+                and type(dep).__name__ == "LayoutDirDistribution"
+            ):
+                imports.setdefault(target, []).append(path + "=" + dest)
+                continue
             if directory and dest and not _resource_path(dest.rstrip("/")):
                 raise _UnsupportedLowering(
                     f"{dist.name}: invalid install destination {dest}"
@@ -2172,7 +2218,13 @@ def _install_layout(dist, pending, mappings, options, bindings):
             elif not (
                 kind == "dependency"
                 and path is None
-                and (_language_library(dep) or _native_image_executable(dep))
+                and (
+                    _language_library(dep)
+                    or _native_image_executable(dep)
+                    or _release_file(dep)
+                    or _platform_file(dep)
+                    or _thin_launcher(dep)
+                )
             ):
                 raise _UnsupportedLowering(
                     f"{dist.name}: unsupported install member {source['_str_']}"
@@ -2190,10 +2242,21 @@ def _install_layout(dist, pending, mappings, options, bindings):
         members.setdefault(target, []).append(dest)
     if inputs != set(dist.buildDependencies) or not (members or imports):
         raise _UnsupportedLowering(
-            f"{dist.name}: install inputs differ from its resolved build dependencies"
+            f"{dist.name}: install inputs differ from its resolved build dependencies: {sorted(d.name for d in inputs ^ set(dist.buildDependencies))}"
         )
     return {
-        **({"jdk_homes": jdks} if jdks else {}),
+        **(
+            {
+                "jdk_homes": {
+                    label: json.dumps(
+                        homes[0] if len(homes) == 1 else homes, sort_keys=True
+                    )
+                    for label, homes in jdks.items()
+                }
+            }
+            if jdks
+            else {}
+        ),
         **({"source_archives": source_archives} if source_archives else {}),
         "name": dist.name,
         "format": "dir",
@@ -2400,6 +2463,10 @@ def bazel_buildfile(args):
         "--classpath-dists",
         action="store_true",
         help="expose same-suite source JAR distributions as Java classpaths in Gazelle",
+    )
+    parser.add_argument(
+        "--standalone-source-provenance", metavar="LABEL",
+        help="source archive manifest for installed release metadata",
     )
     parser.add_argument(
         "--export-source-archive",
@@ -2939,6 +3006,9 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             continue
         if options.gazelle and project.suite == suite and _default_native(project):
             native_shared[project.name] = _native_shared_recipe(project, pending)
+            continue
+        if options.gazelle and project.suite == suite and _release_file(project):
+            source_projects[project.name] = _release_file_recipe(project, options)
             continue
         if options.gazelle and project.suite == suite and _platform_file(project):
             source_projects[project.name] = _platform_file_recipe(project)

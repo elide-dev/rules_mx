@@ -32,6 +32,7 @@ _source = tag_class(
         "sha256": attr.string(doc = "SHA-256 of the archive. Prefer this or integrity."),
         "integrity": attr.string(doc = "Subresource Integrity digest of the archive."),
         "strip_prefix": attr.string(doc = "Directory prefix to remove from archive members."),
+        "provenance": attr.label(allow_single_file = [".json"], doc = "Optional source manifest containing mx commit metadata for this archive."),
         "patches": attr.label_list(
             default = OVERLAYS,
             doc = "Overlay patches, applied with -p1. Defaults to the rules_mx overlays, which match //graal:source.json. Generate overlays for another revision with tools/generate-graal --output.",
@@ -56,6 +57,7 @@ def _graal_impl(ctx):
             integrity = selected.integrity,
             strip_prefix = selected.strip_prefix,
             patches = selected.patches,
+            provenance = selected.provenance,
         )
     else:
         pin = json.decode(ctx.read(Label("//graal:source.json")))
@@ -65,10 +67,14 @@ def _graal_impl(ctx):
             integrity = "",
             strip_prefix = pin["strip_prefix"],
             patches = OVERLAYS,
+            provenance = Label("//graal:source.json"),
         )
     http_archive(
         name = "graal",
-        build_file_content = "",
+        build_file_content = """exports_files(["mx-source.json"])""" if source.provenance else """load("@bazel_skylib//rules:write_file.bzl", "write_file")
+write_file(name = "mx-source.json", out = "source-info.json", content = ["{}"], visibility = ["//visibility:public"])
+""",
+        files = {"mx-source.json": source.provenance} if source.provenance else {},
         patch_strip = 1,
         patches = source.patches,
         sha256 = source.sha256,

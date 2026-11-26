@@ -136,12 +136,16 @@ func (g *importer) loadGraph(root, filename string, seen map[label.Label]bool) e
 			Testonly            bool
 		} `json:"native_shared"`
 		SourceProjects []struct {
-			Filename string
-			Variants map[string]string
-			Name     string
-			Members  map[string]string
-			Srcs     []string
-			Testonly bool
+			ParentRelease  string `json:"parent_release"`
+			Provenance     string
+			Suites         []string
+			GraalVMVersion string `json:"graalvm_version"`
+			Filename       string
+			Variants       map[string]string
+			Name           string
+			Members        map[string]string
+			Srcs           []string
+			Testonly       bool
 		} `json:"source_projects"`
 		ToolLayouts []struct {
 			Name, Tool, Launcher string
@@ -471,7 +475,14 @@ func (g *importer) loadGraph(root, filename string, seen map[label.Label]bool) e
 	}
 	for _, p := range graph.SourceProjects {
 		r := rule.NewRule("mx_project_files", p.Name)
-		if p.Filename != "" {
+		if p.ParentRelease != "" {
+			r.SetKind("mx_release_file")
+			r.SetAttr("filename", p.Filename)
+			r.SetAttr("parent_release", p.ParentRelease)
+			r.SetAttr("provenance", p.Provenance)
+			r.SetAttr("suites", p.Suites)
+			r.SetAttr("graalvm_version", p.GraalVMVersion)
+		} else if p.Filename != "" {
 			r.SetKind("mx_platform_file")
 			r.SetAttr("filename", p.Filename)
 			r.SetAttr("variants", p.Variants)
@@ -721,7 +732,7 @@ func (g *importer) loadGraph(root, filename string, seen map[label.Label]bool) e
 
 func graphKind(k string) bool {
 	switch k {
-	case "mx_platform_file", "mx_native_shared_project", "mx_os_layout", "mx_jvm_tool_launcher", "mx_distribution_alias", "mx_release_archive", "mx_native_image_library", "mx_thin_launcher", "mx_toolchain_tool_layout", "mx_native_image_executable", "mx_patch_module", "mx_native_image_properties", "mx_source_archive", "mx_wasm_programs", "mx_project_files", "mx_wat_project", "mx_sulong_cmake_suite", "mx_bitcode_suite", "mx_exported_tar", "mx_jvmci_library", "mx_shaded_java", "mx_jar_dist", "mx_pom_dist", "mx_resource_layout", "mx_classpath_dist", "mx_files", "mx_project", "mx_whole_java", "mx_processed_java", "mx_processor", "mx_test_class":
+	case "mx_release_file", "mx_platform_file", "mx_native_shared_project", "mx_os_layout", "mx_jvm_tool_launcher", "mx_distribution_alias", "mx_release_archive", "mx_native_image_library", "mx_thin_launcher", "mx_toolchain_tool_layout", "mx_native_image_executable", "mx_patch_module", "mx_native_image_properties", "mx_source_archive", "mx_wasm_programs", "mx_project_files", "mx_wat_project", "mx_sulong_cmake_suite", "mx_bitcode_suite", "mx_exported_tar", "mx_jvmci_library", "mx_shaded_java", "mx_jar_dist", "mx_pom_dist", "mx_resource_layout", "mx_classpath_dist", "mx_files", "mx_project", "mx_whole_java", "mx_processed_java", "mx_processor", "mx_test_class":
 		return true
 	}
 	return false
@@ -730,7 +741,7 @@ func graphKind(k string) bool {
 func (g *importer) Kinds() map[string]rule.KindInfo {
 	kinds := g.javaLanguage.Kinds()
 	managed := map[string]bool{}
-	for _, a := range strings.Fields("filename jdk_static_libraries headers profiles os_layouts jdk_archive launcher actual install prefix jdk_homes platform_copts main_class output image_args classpath modulepath links windows_command runtime roots builders lines java_args groups exports native_cases copts includes sidecars wat2wasm wasm2wat tool sdk modules languages variants config root cases llvm_link format members file_list archive_imports overlays shade shade_inputs manifest out content contents directives release snippets_pattern archived_libraries jmh_metadata jni_services truffle_services graal_services graal_test_services module_name add_exports module_exports jni_headers abi_after_javac copies literals srcs deps packages launcher tags data runtime_deps jvm_flags test_class project processor_class generates_api plugins resources mx_resource_root mx_resource_roots unified_release javac_opts javacopts testonly visibility") {
+	for _, a := range strings.Fields("parent_release provenance suites graalvm_version filename jdk_static_libraries headers profiles os_layouts jdk_archive launcher actual install prefix jdk_homes platform_copts main_class output image_args classpath modulepath links windows_command runtime roots builders lines java_args groups exports native_cases copts includes sidecars wat2wasm wasm2wat tool sdk modules languages variants config root cases llvm_link format members file_list archive_imports overlays shade shade_inputs manifest out content contents directives release snippets_pattern archived_libraries jmh_metadata jni_services truffle_services graal_services graal_test_services module_name add_exports module_exports jni_headers abi_after_javac copies literals srcs deps packages launcher tags data runtime_deps jvm_flags test_class project processor_class generates_api plugins resources mx_resource_root mx_resource_roots unified_release javac_opts javacopts testonly visibility") {
 		managed[a] = true
 	}
 	for _, k := range strings.Fields("mx_thin_launcher mx_patch_module mx_jvmci_library mx_shaded_java mx_files mx_project mx_whole_java mx_processed_java mx_processor mx_test_class") {
@@ -740,6 +751,7 @@ func (g *importer) Kinds() map[string]rule.KindInfo {
 	kinds["mx_source_archive"] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"groups": true}, MergeableAttrs: managed}
 	kinds["mx_project_files"] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"members": true, "srcs": true}, MergeableAttrs: managed}
 	kinds["mx_native_shared_project"] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"profiles": true}, MergeableAttrs: managed}
+	kinds["mx_release_file"] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"parent_release": true}, MergeableAttrs: managed}
 	kinds["mx_platform_file"] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"variants": true}, MergeableAttrs: managed}
 	kinds["mx_os_layout"] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"os_layouts": true}, MergeableAttrs: managed}
 	kinds["mx_jvm_tool_launcher"] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"jdk_archive": true}, MergeableAttrs: managed}
@@ -777,7 +789,7 @@ func (g *importer) Loads() []rule.LoadInfo {
 		rule.LoadInfo{Name: "@rules_mx//mx:wasm_programs.bzl", Symbols: []string{"mx_wasm_programs"}},
 		rule.LoadInfo{Name: "@rules_mx//mx:jvmci.bzl", Symbols: []string{"mx_patch_module"}},
 		rule.LoadInfo{Name: "@rules_mx//mx:jar.bzl", Symbols: []string{"mx_native_image_properties"}},
-		rule.LoadInfo{Name: "@rules_mx//mx:project_files.bzl", Symbols: []string{"mx_platform_file", "mx_project_files", "mx_source_archive", "mx_wat_project"}},
+		rule.LoadInfo{Name: "@rules_mx//mx:project_files.bzl", Symbols: []string{"mx_platform_file", "mx_project_files", "mx_release_file", "mx_source_archive", "mx_wat_project"}},
 		rule.LoadInfo{Name: "@rules_mx//mx:sulong_cmake.bzl", Symbols: []string{"mx_sulong_cmake_suite"}},
 		rule.LoadInfo{Name: "@rules_mx//mx:bitcode.bzl", Symbols: []string{"mx_bitcode_suite"}},
 		rule.LoadInfo{Name: "@rules_mx//mx:graph.bzl", Symbols: strings.Fields("mx_release_archive mx_distribution_alias mx_exported_tar mx_jvmci_library mx_shaded_java mx_jar_dist mx_classpath_dist mx_pom_dist mx_resource_layout mx_files mx_processed_java mx_processor mx_project mx_test_class mx_whole_java")},

@@ -46,7 +46,8 @@ def _layout_impl(ctx):
     for target, encoded in ctx.attr.jdk_homes.items():
         [bundle] = target.files.to_list()
         spec = json.decode(encoded)
-        homes.append(struct(bundle = bundle, directory = spec["directory"], exclude = spec["exclude"]))
+        for home in spec if type(spec) == "list" else [spec]:
+            homes.append(struct(bundle = bundle, directory = home["directory"], exclude = home["exclude"]))
     for target, destinations in ctx.attr.members.items():
         files = [target[MxArchiveLayoutInfo].archive] if MxArchiveLayoutInfo in target and target[MxArchiveLayoutInfo].archive else target.files.to_list()
         if len(files) != 1:
@@ -66,6 +67,19 @@ def _layout_impl(ctx):
             if not separator:
                 fail("Expected an archive member mapping: " + spec)
             if source:
+                if source.endswith("/*"):
+                    prefix = source[:-1]
+                    matches = [path for path in sources if path.startswith(prefix)]
+                    if not matches:
+                        fail("No archive members under " + prefix + " in " + str(target.label))
+                    for path in matches:
+                        member = destination + path[len(prefix):]
+                        _add_entry(entries, member, sources[path])
+                        if path in source_modes:
+                            modes[member] = source_modes[path]
+                        if path in source_links:
+                            links[member] = source_links[path]
+                    continue
                 if source == "{primary}":
                     source = target[MxArchiveLayoutInfo].primary
                     destination = destination.replace("{basename}", source.rpartition("/")[2])

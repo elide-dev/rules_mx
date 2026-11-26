@@ -1,4 +1,9 @@
 {
+  "commit": {
+    "commit.committer": "GitHub <noreply@github.com>",
+    "commit.committer-ts": 1794960070,
+    "commit.rev": "21dea4deb60d8aa9b07cbd3cc77b1581b61b6fb2"
+  },
   "sha256": "e98cff34bca09cb7d13d0435b09faa01cf27ad077149cb0940032531b13b8b12",
   "strip_prefix": "graal-21dea4deb60d8aa9b07cbd3cc77b1581b61b6fb2",
   "urls": [
