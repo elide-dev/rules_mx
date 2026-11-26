@@ -1,0 +1,13 @@
+diff --git a/tools/src/com.oracle.truffle.tools.profiler.test/src/com/oracle/truffle/tools/profiler/test/NoTagSamplingTest.java b/tools/src/com.oracle.truffle.tools.profiler.test/src/com/oracle/truffle/tools/profiler/test/NoTagSamplingTest.java
+--- a/tools/src/com.oracle.truffle.tools.profiler.test/src/com/oracle/truffle/tools/profiler/test/NoTagSamplingTest.java
++++ b/tools/src/com.oracle.truffle.tools.profiler.test/src/com/oracle/truffle/tools/profiler/test/NoTagSamplingTest.java
+@@ -69,7 +69,8 @@
+             Future<?> f = singleThread.submit(() -> context.eval(source).asInt());
+ 
+             awaitStart.acquire();
+-            Map<Thread, List<StackTraceEntry>> sample = sampler.takeSample();
++            // The guest stays blocked until awaitFinish. Allow its safepoint to run on a busy executor.
++            Map<Thread, List<StackTraceEntry>> sample = sampler.takeSample(10, TimeUnit.SECONDS);
+ 
+             // wait for future
+             awaitFinish.release();

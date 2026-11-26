@@ -9,6 +9,7 @@ OVERLAYS = [
     Label("//graal:espresso_platform_properties.patch"),
     Label("//graal:espresso_static_libraries.patch"),
     Label("//graal:jfr_allocation_samples.patch"),
+    Label("//graal:profiler_sample_timeout.patch"),
     Label("//graal:wasm_exports_test.patch"),
     Label("//graal:sdk.patch"),
     Label("//graal:compiler.patch"),
