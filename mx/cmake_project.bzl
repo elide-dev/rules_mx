@@ -36,19 +36,24 @@ def mx_cmake_project(name, srcs, compiler, config, include_dirs, profiles, testo
         "CMAKE_CXX_FLAGS": "-Qunused-arguments --config=$(execpath %s)" % Label("//tools/cc:target_config"),
     })
     variants = {}
+    modes = {}
     for profile, recipe in profiles.items():
         condition = Label("//tools/cc:profile_" + profile)
         rule_name = name + ".cmake/" + profile
         members = {}
+        install_modes = {}
         for member in recipe["members"]:
             label = rule_name + "/" + member
             _installed(name = label, project = ":" + rule_name, member = member, testonly = testonly)
             members[":" + label] = member
+            if (member.endswith(".so") or member.endswith(".dylib")) or ".so." in member.rpartition("/")[2]:
+                install_modes[member] = "755" if profile == "macos_arm64" else "644"
         cmake(
             name = rule_name,
             lib_name = name + "-" + profile,
             lib_source = ":" + src_group,
-            cache_entries = cache | recipe["config"],
+            # CMake otherwise reads /etc/debian_version to choose shared library permissions.
+            cache_entries = cache | ({} if profile == "macos_arm64" else {"CMAKE_INSTALL_SO_NO_EXE": "ON"}) | recipe["config"],
             build_data = data,
             generate_args = ["-G Ninja"],
             generate_crosstool_file = False,
@@ -65,9 +70,11 @@ def mx_cmake_project(name, srcs, compiler, config, include_dirs, profiles, testo
             target_compatible_with = select({condition: [], "//conditions:default": ["@platforms//:incompatible"]}),
         )
         variants[condition] = members
+        modes[condition] = install_modes
     mx_project_files(
         name = name,
         members = select(variants | {"//conditions:default": {}}),
+        modes = select(modes | {"//conditions:default": {}}),
         target_compatible_with = select({c: [] for c in variants} | {"//conditions:default": ["@platforms//:incompatible"]}),
         testonly = testonly,
         visibility = visibility,
