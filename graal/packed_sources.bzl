@@ -15,7 +15,9 @@ package(default_visibility = ["//visibility:public"])
 filegroup(name = "runtimes_sources", srcs = ["BUILD.bazel"] + glob([
     "src/runtimes/**", "src/cmake/**", "src/libcxx/**", "src/libcxxabi/**", "src/libunwind/**",
     "src/llvm/cmake/**", "src/llvm/include/**", "src/llvm/utils/llvm-lit/**", "src/llvm/utils/lit/**",
-], exclude = ["**/test/**", "**/benchmarks/**"]))
+], exclude = ["src/libcxx/test/**", "src/libcxxabi/test/**", "src/libcxx/benchmarks/**"]) + glob([
+    "src/libcxx/test/configs/**", "src/libcxxabi/test/configs/**",
+]))
 """ if name == "graal_sdk_llvm_org_src" else """
 package(default_visibility = ["//visibility:public"])
 exports_files(["BUILD.bazel"] + glob(["**/*.c", "**/*.cpp", "**/*.cc", "**/*.C", "**/*.ll"], allow_empty = True))
