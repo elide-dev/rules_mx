@@ -1,0 +1,24 @@
+--- a/substratevm/src/com.oracle.svm.test/src/com/oracle/svm/test/jfr/TestNativeGCAllocationSampleEvent.java
++++ b/substratevm/src/com.oracle.svm.test/src/com/oracle/svm/test/jfr/TestNativeGCAllocationSampleEvent.java
+@@ -81,5 +81,5 @@
+             }
+             String type = event.getClass("objectClass").getName();
+-            if (type.equals(Payload.class.getName()) || type.equals(byte[].class.getName())) {
++            if (type.equals(Payload.class.getName()) || type.equals(Payload[].class.getName())) {
+                 assertTrue("sample weight must be positive", event.getLong("weight") > 0);
+                 assertNotNull("allocation stack must be recorded", event.getStackTrace());
+@@ -87,5 +87,5 @@
+                 assertTrue("allocation stack must identify the allocating method", event.getStackTrace().getFrames().stream().anyMatch(frame -> frame.getMethod().getName().equals(allocator)));
+                 foundPayload |= type.equals(Payload.class.getName());
+-                foundArray |= type.equals(byte[].class.getName());
++                foundArray |= type.equals(Payload[].class.getName());
+             }
+         }
+@@ -104,5 +104,6 @@
+     private static void allocateArrays() {
+         for (int i = 0; i < 64; i++) {
+-            allocated = new byte[1024 * 1024];
++            // A private component type distinguishes our samples from byte arrays allocated by JFR itself.
++            allocated = new Payload[256 * 1024];
+         }
+     }

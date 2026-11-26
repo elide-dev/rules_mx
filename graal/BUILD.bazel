@@ -11,6 +11,7 @@ load(":sdk_llvm.bzl", "sdk_llvm_link", "sulong_fixture_sdk")
 
 exports_files([
     "benchmark_timer.patch",
+    "jfr_allocation_samples.patch",
     "compiler.patch",
     "espresso-shared.patch",
     "espresso.patch",
