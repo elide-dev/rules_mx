@@ -2,13 +2,14 @@ diff --git a/sulong/BUILD.bazel b/sulong/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/sulong/BUILD.bazel
-@@ -0,0 +1,2326 @@
+@@ -0,0 +1,2361 @@
 +load("@rules_mx//graal:sulong_fixture_check.bzl", "sulong_fixture_check")
 +load("@rules_mx//mx:bitcode.bzl", "mx_bitcode_suite")
 +load("@rules_mx//mx:graph.bzl", "mx_exported_tar", "mx_jar_dist", "mx_pom_dist", "mx_processed_java", "mx_project", "mx_whole_java")
 +load("@rules_mx//mx:native_image.bzl", "mx_native_image_executable", "mx_toolchain_tool_layout")
 +load("@rules_mx//mx:project_files.bzl", "mx_project_files")
 +load("@rules_mx//mx:sulong_cmake.bzl", "mx_sulong_cmake_suite")
++load("@rules_mx//mx:thin_launcher.bzl", "mx_thin_launcher")
 +
 +filegroup(
 +    name = "all_distributions",
@@ -55,6 +56,7 @@ new file mode 100644
 +        ":com.oracle.truffle.llvm.tools",
 +        ":graalvm-native-tool",
 +        ":sulong_licenses",
++        ":sulong_thin_launcher",
 +    ] + select({
 +        "@rules_mx//tools:exec_linux_amd64": [
 +            ":com.oracle.truffle.llvm.tests.bitcode.amd64.native",
@@ -924,6 +926,39 @@ new file mode 100644
 +    tool = ":graalvm-native-tool",
 +    visibility = ["//visibility:public"],
 +    windows_command = "@echo off\n\ncall :getScriptLocation location\nset \"GRAALVM_ARGUMENT_VECTOR_PROGRAM_NAME=%~0\"\n\"%location%graalvm-native-tool.exe\" %*\nexit /b %errorlevel%\n\n:: If this script is in `%PATH%` and called quoted without a full path (e.g., `\"js\"`), `%~dp0` is expanded to `cwd`\n:: rather than the path to the script.\n:: This does not happen if `%~dp0` is accessed in a subroutine.\n:getScriptLocation variableName\n    set \"%~1=%~dp0\"\n    exit /b 0",
++)
++
++mx_thin_launcher(
++    name = "sulong_thin_launcher",
++    srcs = ["//sdk:src/org.graalvm.launcher.native/src/launcher.cc"],
++    platform_copts = {
++        "linux": [
++            "-DGRAALVM_VERSION=25.6.0-dev",
++            "-DLAUNCHER_MAIN_MODULE=org.graalvm.llvm.launcher",
++            "-DLAUNCHER_CLASS=com.oracle.truffle.llvm.launcher.LLVMLauncher",
++            "-DLAUNCHER_MODULE_PATH={\"../modules\"}",
++            "-DLIBLANG_RELPATH=../lib/libllvmvm.so",
++            "-DLAUNCHER_LANG_HOME_NAMES={\"llvm\"}",
++            "-DLAUNCHER_LANG_HOME_PATHS={\"../lib/sulong\"}",
++            "-DLAUNCHER_EXTRACTED_LIB_NAMES={\"truffle.attach.library\", \"truffle.nfi.library\"}",
++            "-DLAUNCHER_EXTRACTED_LIB_PATHS={\"../jvmlibs/libtruffleattach.so\", \"../jvmlibs/libtrufflenfi.so\"}",
++            "-DLIBJVM_RELPATH=../jvm/lib/server/libjvm.so",
++        ],
++        "macos": [
++            "-DGRAALVM_VERSION=25.6.0-dev",
++            "-DLAUNCHER_MAIN_MODULE=org.graalvm.llvm.launcher",
++            "-DLAUNCHER_CLASS=com.oracle.truffle.llvm.launcher.LLVMLauncher",
++            "-DLAUNCHER_MODULE_PATH={\"../modules\"}",
++            "-DLIBLANG_RELPATH=../lib/libllvmvm.dylib",
++            "-DLAUNCHER_LANG_HOME_NAMES={\"llvm\"}",
++            "-DLAUNCHER_LANG_HOME_PATHS={\"../lib/sulong\"}",
++            "-DLAUNCHER_EXTRACTED_LIB_NAMES={\"truffle.attach.library\", \"truffle.nfi.library\"}",
++            "-DLAUNCHER_EXTRACTED_LIB_PATHS={\"../jvmlibs/libtruffleattach.dylib\", \"../jvmlibs/libtrufflenfi.dylib\"}",
++            "-DLIBJVM_RELPATH=../jvm/lib/server/libjvm.dylib",
++            "-DLIBJLI_RELPATH=../jvm/lib/libjli.dylib",
++        ],
++    },
++    visibility = ["//visibility:public"],
 +)
 +
 +mx_native_image_executable(

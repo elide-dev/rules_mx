@@ -158,12 +158,14 @@ def mx_resource_layout(name, literals = {}, copies = {}, testonly = False, **kwa
 def _pom_dist_impl(ctx):
     ctx.actions.write(ctx.outputs.out, ctx.attr.content)
     deps = ctx.attr.deps
+    java = java_common.merge([dep[JavaInfo] for dep in deps])
     return [
         DefaultInfo(
             files = depset([ctx.outputs.out]),
             runfiles = ctx.runfiles(transitive_files = depset(transitive = [dep.files for dep in deps])).merge_all([dep[DefaultInfo].default_runfiles for dep in deps]),
         ),
-        java_common.merge([dep[JavaInfo] for dep in deps]),
+        OutputGroupInfo(runtime_jars = java.transitive_runtime_jars),
+        java,
     ]
 
 _pom_dist = rule(

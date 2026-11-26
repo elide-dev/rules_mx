@@ -2,11 +2,13 @@ diff --git a/sdk/BUILD.bazel b/sdk/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/sdk/BUILD.bazel
-@@ -0,0 +1,1225 @@
+@@ -0,0 +1,1227 @@
 +load("@rules_mx//graal:nativebridge.bzl", "nativebridge_launcher")
 +load("@rules_mx//graal:sdk_llvm.bzl", "sdk_llvm_distributions", "sdk_toolchain_descriptors")
 +load("@rules_mx//graal:toolchain_test.bzl", "sdk_toolchain_test")
 +load("@rules_mx//mx:graph.bzl", "mx_jar_dist", "mx_processed_java", "mx_processor", "mx_project", "mx_resource_layout", "mx_shaded_java", "mx_test_class", "mx_whole_java")
++
++exports_files(glob(["src/org.graalvm.launcher.native/src/*.cc"]))
 +
 +sdk_toolchain_test(
 +    name = "org.graalvm.toolchain.test",

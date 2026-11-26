@@ -2,10 +2,11 @@ diff --git a/espresso/BUILD.bazel b/espresso/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/espresso/BUILD.bazel
-@@ -0,0 +1,717 @@
+@@ -0,0 +1,750 @@
 +load("@rules_mx//mx:graph.bzl", "mx_jar_dist", "mx_jvmci_library", "mx_pom_dist", "mx_processed_java", "mx_processor", "mx_project", "mx_shaded_java", "mx_whole_java")
 +load("@rules_mx//mx:jvmci.bzl", "mx_patch_module")
 +load("@rules_mx//mx:project_files.bzl", "mx_project_files")
++load("@rules_mx//mx:thin_launcher.bzl", "mx_thin_launcher")
 +
 +filegroup(
 +    name = "all_distributions",
@@ -45,6 +46,7 @@ new file mode 100644
 +        ":com.oracle.truffle.espresso.resources.libs",
 +        ":com.oracle.truffle.espresso.shadowed.asm",
 +        ":com.oracle.truffle.espresso.vmaccess.guest",
++        ":espresso",
 +        ":espresso-license-files",
 +        ":org.graalvm.continuations",
 +    ],
@@ -677,6 +679,37 @@ new file mode 100644
 +    testonly = False,
 +    members = {
 +        "LICENSE": "3rd_party_licenses.txt",
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_thin_launcher(
++    name = "espresso",
++    srcs = ["//sdk:src/org.graalvm.launcher.native/src/launcher.cc"],
++    platform_copts = {
++        "linux": [
++            "-DGRAALVM_VERSION=25.6.0-dev",
++            "-DLAUNCHER_MAIN_MODULE=org.graalvm.espresso.launcher",
++            "-DLAUNCHER_CLASS=com.oracle.truffle.espresso.launcher.EspressoLauncher",
++            "-DLAUNCHER_MODULE_PATH={\"../languages/java/espresso\"}",
++            "-DLAUNCHER_LANG_HOME_NAMES={\"java\"}",
++            "-DLAUNCHER_LANG_HOME_PATHS={\"../languages/java\"}",
++            "-DLAUNCHER_EXTRACTED_LIB_NAMES={\"truffle.attach.library\", \"truffle.nfi.library\"}",
++            "-DLAUNCHER_EXTRACTED_LIB_PATHS={\"../languages/java/jvmlibs/libtruffleattach.so\", \"../languages/java/jvmlibs/libtrufflenfi.so\"}",
++            "-DLIBJVM_RELPATH=../languages/java/jvm/lib/server/libjvm.so",
++        ],
++        "macos": [
++            "-DGRAALVM_VERSION=25.6.0-dev",
++            "-DLAUNCHER_MAIN_MODULE=org.graalvm.espresso.launcher",
++            "-DLAUNCHER_CLASS=com.oracle.truffle.espresso.launcher.EspressoLauncher",
++            "-DLAUNCHER_MODULE_PATH={\"../languages/java/espresso\"}",
++            "-DLAUNCHER_LANG_HOME_NAMES={\"java\"}",
++            "-DLAUNCHER_LANG_HOME_PATHS={\"../languages/java\"}",
++            "-DLAUNCHER_EXTRACTED_LIB_NAMES={\"truffle.attach.library\", \"truffle.nfi.library\"}",
++            "-DLAUNCHER_EXTRACTED_LIB_PATHS={\"../languages/java/jvmlibs/libtruffleattach.dylib\", \"../languages/java/jvmlibs/libtrufflenfi.dylib\"}",
++            "-DLIBJVM_RELPATH=../languages/java/jvm/lib/server/libjvm.dylib",
++            "-DLIBJLI_RELPATH=../languages/java/jvm/lib/libjli.dylib",
++        ],
 +    },
 +    visibility = ["//visibility:public"],
 +)

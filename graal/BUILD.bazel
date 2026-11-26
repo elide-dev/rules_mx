@@ -37,6 +37,30 @@ exports_files([
     "toolchain_test.py",
 ])
 
+filegroup(
+    name = "wasm_standalone_jars",
+    srcs = ["@graal//wasm:GRAALWASM_STANDALONE_DEPENDENCIES"],
+    output_group = "runtime_jars",
+    tags = ["manual"],
+)
+
+java_test(
+    name = "wasm_thin_launcher_test",
+    size = "small",
+    srcs = ["WasmThinLauncherTest.java"],
+    data = [
+        ":wasm_standalone_jars",
+        "@graal//wasm:graalwasm_thin_launcher",
+    ],
+    env = {
+        "WASM_LAUNCHER": "$(rootpath @graal//wasm:graalwasm_thin_launcher)",
+        "MODULE_JARS": "$(rootpaths :wasm_standalone_jars)",
+    },
+    tags = ["manual"],
+    test_class = "graal.WasmThinLauncherTest",
+    deps = ["@contrib_rules_jvm_deps//:junit_junit"],
+)
+
 pom_classpath_test(
     name = "espresso_pom_classpath_test",
     compile_deps = ["@graal//espresso:ESPRESSO"],

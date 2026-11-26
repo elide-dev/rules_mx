@@ -2,13 +2,14 @@ diff --git a/wasm/BUILD.bazel b/wasm/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/wasm/BUILD.bazel
-@@ -0,0 +1,1834 @@
+@@ -0,0 +1,1869 @@
 +load("@rules_java//java:java_import.bzl", "java_import")
 +
 +# gazelle:resolve java org.openjdk.jol.info //wasm:JOL
 +load("@rules_java//java:java_plugin.bzl", "java_plugin")
 +load("@rules_mx//mx:graph.bzl", "mx_exported_tar", "mx_jar_dist", "mx_jvmci_library", "mx_pom_dist", "mx_processed_java", "mx_project", "mx_test_class", "mx_whole_java")
 +load("@rules_mx//mx:project_files.bzl", "mx_project_files", "mx_wat_project")
++load("@rules_mx//mx:thin_launcher.bzl", "mx_thin_launcher")
 +load("@rules_mx//mx:wasm_programs.bzl", "mx_wasm_programs")
 +
 +java_import(
@@ -41,6 +42,7 @@ new file mode 100644
 +    testonly = True,
 +    srcs = [
 +        ":graalwasm_licenses",
++        ":graalwasm_thin_launcher",
 +        ":org.graalvm.wasm",
 +        ":org.graalvm.wasm.benchcases",
 +        ":org.graalvm.wasm.benchcases.bench",
@@ -1560,6 +1562,39 @@ new file mode 100644
 +    members = {
 +        "LICENSE": "LICENSE.txt",
 +        "THIRD_PARTY_LICENSE.txt": "3rd_party_licenses.txt",
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_thin_launcher(
++    name = "graalwasm_thin_launcher",
++    srcs = ["//sdk:src/org.graalvm.launcher.native/src/launcher.cc"],
++    platform_copts = {
++        "linux": [
++            "-DGRAALVM_VERSION=25.6.0-dev",
++            "-DLAUNCHER_MAIN_MODULE=org.graalvm.wasm.launcher",
++            "-DLAUNCHER_CLASS=org.graalvm.wasm.launcher.WasmLauncher",
++            "-DLAUNCHER_MODULE_PATH={\"../modules\"}",
++            "-DLIBLANG_RELPATH=../lib/libwasmvm.so",
++            "-DLAUNCHER_LANG_HOME_NAMES={\"wasm\"}",
++            "-DLAUNCHER_LANG_HOME_PATHS={\"..\"}",
++            "-DLAUNCHER_EXTRACTED_LIB_NAMES={\"truffle.attach.library\"}",
++            "-DLAUNCHER_EXTRACTED_LIB_PATHS={\"../jvmlibs/libtruffleattach.so\"}",
++            "-DLIBJVM_RELPATH=../jvm/lib/server/libjvm.so",
++        ],
++        "macos": [
++            "-DGRAALVM_VERSION=25.6.0-dev",
++            "-DLAUNCHER_MAIN_MODULE=org.graalvm.wasm.launcher",
++            "-DLAUNCHER_CLASS=org.graalvm.wasm.launcher.WasmLauncher",
++            "-DLAUNCHER_MODULE_PATH={\"../modules\"}",
++            "-DLIBLANG_RELPATH=../lib/libwasmvm.dylib",
++            "-DLAUNCHER_LANG_HOME_NAMES={\"wasm\"}",
++            "-DLAUNCHER_LANG_HOME_PATHS={\"..\"}",
++            "-DLAUNCHER_EXTRACTED_LIB_NAMES={\"truffle.attach.library\"}",
++            "-DLAUNCHER_EXTRACTED_LIB_PATHS={\"../jvmlibs/libtruffleattach.dylib\"}",
++            "-DLIBJVM_RELPATH=../jvm/lib/server/libjvm.dylib",
++            "-DLIBJLI_RELPATH=../jvm/lib/libjli.dylib",
++        ],
 +    },
 +    visibility = ["//visibility:public"],
 +)
