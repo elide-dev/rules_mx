@@ -93,3 +93,9 @@ py_binary(
     name = "release_file",
     srcs = ["release_file.py"],
 )
+
+py_binary(
+    name = "netbeans",
+    srcs = ["netbeans.py"],
+    visibility = ["//visibility:public"],
+)

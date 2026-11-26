@@ -5,6 +5,7 @@ import fnmatch
 from functools import cache
 import json
 import os
+from xml.etree import ElementTree
 import re
 import shlex
 import textwrap
@@ -1884,6 +1885,57 @@ def _release_archive(dist, pending):
     return {"name": dist.name, "install": ":" + source.name, "prefix": prefix}
 
 
+def _netbeans_project(dep):
+    return (type(dep).__module__, type(dep).__name__) == ("mx_visualizer", "NetBeansProject")
+
+
+def _netbeans_archive(dep):
+    return type(dep).__name__ == "NativeTARDistribution" and len(dep.deps) == 1 and _netbeans_project(dep.deps[0])
+
+
+def _netbeans_recipe(project):
+    root = Path(project.baseDir)
+    if project.mxLibs or project.build_commands != ["package", "-DskipTests"] or len(project.output_dirs) != 1:
+        raise _UnsupportedLowering(f"{project.name}: unsupported NetBeans build commands or outputs")
+    ns = {"m": "http://maven.apache.org/POM/4.0.0"}
+    pom = ElementTree.parse(root / "pom.xml").getroot()
+    group = pom.findtext("m:groupId", namespaces=ns)
+    version = pom.findtext("m:version", namespaces=ns)
+    parent = pom.findtext("m:artifactId", namespaces=ns)
+    modules = {}
+    dependencies = {}
+    by_artifact = {}
+    for module in pom.findall("m:modules/m:module", ns):
+        directory = module.text
+        if not _resource_path(directory):
+            raise _UnsupportedLowering(f"{project.name}: invalid Maven module {directory}")
+        child = ElementTree.parse(root / directory / "pom.xml").getroot()
+        artifact = child.findtext("m:artifactId", namespaces=ns)
+        kind = child.findtext("m:packaging", default="jar", namespaces=ns)
+        if (kind not in ("jar", "nbm", "nbm-application") or artifact in by_artifact
+                or child.findtext("m:groupId", default=group, namespaces=ns) != group
+                or child.findtext("m:version", default=version, namespaces=ns) != version):
+            raise _UnsupportedLowering(f"{project.name}: unsupported reactor coordinates in {directory}")
+        modules[directory] = {"artifact": artifact, "kind": kind}
+        for plugin in child.findall("m:build/m:plugins/m:plugin", ns):
+            if plugin.findtext("m:artifactId", namespaces=ns) == "maven-jar-plugin" and any(
+                goal.text == "test-jar" for goal in plugin.findall("m:executions/m:execution/m:goals/m:goal", ns)
+            ):
+                modules[directory]["test_jar"] = True
+        by_artifact[artifact] = directory
+        dependencies[directory] = [dep.findtext("m:artifactId", namespaces=ns).strip()
+            for dep in child.findall("m:dependencies/m:dependency", ns)
+            if dep.findtext("m:groupId", namespaces=ns) in (group, "${project.groupId}")]
+    if sum(spec["kind"] == "nbm-application" for spec in modules.values()) != 1:
+        raise _UnsupportedLowering(f"{project.name}: expected one NetBeans application")
+    for module, deps in dependencies.items():
+        if set(deps) - by_artifact.keys():
+            raise _UnsupportedLowering(f"{project.name}: unresolved reactor dependency in {module}")
+        modules[module]["deps"] = sorted({by_artifact[a] for a in deps})
+    return {"name": project.name, "root": root.relative_to(project.suite.dir).as_posix(), "group": group,
+            "parent_artifact": parent, "version": version, "install": project.output_dirs[0], "modules": modules}
+
+
 def _can_lower_root(dep):
     return (
         type(dep).__name__
@@ -1893,6 +1945,7 @@ def _can_lower_root(dep):
             "LayoutTARDistribution",
             "LayoutJARDistribution",
         )
+        or _netbeans_project(dep) or _netbeans_archive(dep)
         or _espresso_runtime_project(dep)
         or _standalone_archive(dep)
         or _native_tool_layout(dep)
@@ -3322,6 +3375,8 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
     image_projects = {}
     bitcode_suites = {}
     native_shared = {}
+    netbeans_projects = {}
+    netbeans_archives = {}
     source_projects = {}
     wasm_programs = {}
     wat_projects = {}
@@ -3339,6 +3394,8 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
         project = pending.pop()
         if (
             project.name in rules
+            or project.name in netbeans_projects
+            or project.name in netbeans_archives
             or project.name in distributions
             or project.name in layouts
             or project.name in release_archives
@@ -3354,6 +3411,16 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             or project.name in wat_projects
             or project.name in cmake_suites
         ):
+            continue
+        if options.gazelle and _netbeans_project(project):
+            netbeans_projects[project.name] = _netbeans_recipe(project)
+            continue
+        if options.gazelle and _netbeans_archive(project):
+            dep, = project.deps
+            if not project.relpath or project.auto_prefix or dep.archive_prefix():
+                raise _UnsupportedLowering(f"{project.name}: unsupported NetBeans archive prefix")
+            pending.append(dep)
+            netbeans_archives[project.name] = {"name": project.name, "installation": ":" + dep.name, "prefix": dep.output_dirs[0]}
             continue
         if options.classpath_dists and project.suite == suite:
             if _standalone_archive(project):
@@ -3891,6 +3958,8 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             | thin_launchers.keys()
             | image_projects.keys()
             | native_shared.keys()
+            | netbeans_projects.keys()
+            | netbeans_archives.keys()
             | source_projects.keys()
             | wasm_programs.keys()
             | wat_projects.keys()
@@ -3982,6 +4051,10 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             result["source_exports"] = {name: _source_archive_groups(suite.dependency(name)) for name in sorted(options.export_source_archive)}
         if native_shared:
             result["native_shared"] = [native_shared[n] for n in sorted(native_shared)]
+        if netbeans_projects:
+            result["netbeans_projects"] = [netbeans_projects[n] for n in sorted(netbeans_projects)]
+        if netbeans_archives:
+            result["netbeans_archives"] = [netbeans_archives[n] for n in sorted(netbeans_archives)]
         if source_projects:
             result["source_projects"] = [
                 source_projects[n] for n in sorted(source_projects)

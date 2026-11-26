@@ -4,12 +4,14 @@ load("@rules_java//java:java_library.bzl", "java_library")
 load("@rules_java//java:java_test.bzl", "java_test")
 load("@rules_python//python:py_binary.bzl", "py_binary")
 load("@rules_python//python:py_test.bzl", "py_test")
+load("//mx:netbeans.bzl", "netbeans_test_java")
 load(":automatic_module.bzl", "automatic_module")
 load(":layout.bzl", "mx_archive_layout")
 load(":pom_classpath_test.bzl", "pom_classpath_test")
 load(":sdk_llvm.bzl", "sdk_llvm_link", "sulong_fixture_sdk")
 
 exports_files([
+    "netbeans_maven.json",
     "benchmark_timer.patch",
     "jfr_allocation_samples.patch",
     "wasm_exports_test.patch",
@@ -344,7 +346,10 @@ py_test(
         "@graal//sulong:parserTorture/gcc-5.2.0/gcc/testsuite/gcc.c-torture/compile/20031023-2.c.bitcode-O0",
     ],
     tags = ["manual"],
-    target_compatible_with = ["@platforms//os:linux", "@platforms//cpu:x86_64"],
+    target_compatible_with = [
+        "@platforms//os:linux",
+        "@platforms//cpu:x86_64",
+    ],
 )
 
 py_test(
@@ -360,11 +365,14 @@ py_test(
     data = [
         ":sulong_fixture_sdk",
         "@graal//sulong:SULONG_NWCC_TEST_SUITE",
-        "@graal//sulong:nwcc/nwcc_0.8.3/tests/hello.c.ref.out",
         "@graal//sulong:nwcc/nwcc_0.8.3/tests/hello.c.bitcode-O0",
+        "@graal//sulong:nwcc/nwcc_0.8.3/tests/hello.c.ref.out",
     ],
     tags = ["manual"],
-    target_compatible_with = ["@platforms//os:linux", "@platforms//cpu:x86_64"],
+    target_compatible_with = [
+        "@platforms//os:linux",
+        "@platforms//cpu:x86_64",
+    ],
 )
 
 py_test(
@@ -790,4 +798,26 @@ sulong_fixture_sdk(
     archive = "@graal//sdk:LLVM_TOOLCHAIN_FULL",
     tags = ["manual"],
     visibility = ["//visibility:public"],
+)
+
+netbeans_test_java(
+    name = "netbeans_test_java",
+    jdk = "//tools:espresso_jdk21_runtime",
+)
+
+py_test(
+    name = "visualizer_install_test",
+    size = "medium",
+    srcs = ["visualizer_install_test.py"],
+    args = [
+        "$(rootpath :netbeans_test_java)",
+        "$(rootpath @graal//visualizer:C1VISUALIZER)",
+        "$(rootpath @graal//visualizer:IDEALGRAPHVISUALIZER)",
+    ],
+    data = [
+        ":netbeans_test_java",
+        "@graal//visualizer:C1VISUALIZER",
+        "@graal//visualizer:IDEALGRAPHVISUALIZER",
+    ],
+    tags = ["manual"],
 )
