@@ -2486,7 +2486,7 @@ diff --git a/sdk/src/org.graalvm.resourcecopy/src/org/graalvm/resourcecopy/BUILD
 new file mode 100644
 --- /dev/null
 +++ b/sdk/src/org.graalvm.resourcecopy/src/org/graalvm/resourcecopy/BUILD.bazel
-@@ -0,0 +1,26 @@
+@@ -0,0 +1,25 @@
 +load("@rules_java//java:defs.bzl", "java_binary")
 +load("@rules_mx//mx:java.bzl", "elide_java_library")
 +
@@ -2501,7 +2501,6 @@ new file mode 100644
 +    unified_release = 21,
 +    visibility = ["//:__subpackages__"],
 +    deps = [
-+        "//espresso:com.oracle.truffle.espresso.io",
 +        "//sdk:POLYGLOT",
 +        "//sdk:org.graalvm.polyglot",
 +    ],

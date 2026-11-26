@@ -2342,7 +2342,7 @@ diff --git a/wasm/src/org.graalvm.wasm.launcher/src/org/graalvm/wasm/launcher/BU
 new file mode 100644
 --- /dev/null
 +++ b/wasm/src/org.graalvm.wasm.launcher/src/org/graalvm/wasm/launcher/BUILD.bazel
-@@ -0,0 +1,27 @@
+@@ -0,0 +1,26 @@
 +load("@rules_java//java:defs.bzl", "java_binary")
 +load("@rules_mx//mx:java.bzl", "elide_java_library")
 +
@@ -2358,7 +2358,6 @@ new file mode 100644
 +    visibility = ["//:__subpackages__"],
 +    exports = ["//sdk:POLYGLOT"],
 +    deps = [
-+        "//espresso:com.oracle.truffle.espresso.io",
 +        "//sdk:LAUNCHER_COMMON",
 +        "//sdk:POLYGLOT",
 +    ],
@@ -2374,7 +2373,7 @@ diff --git a/wasm/src/org.graalvm.wasm.memory/src/org/graalvm/wasm/memory/BUILD.
 new file mode 100644
 --- /dev/null
 +++ b/wasm/src/org.graalvm.wasm.memory/src/org/graalvm/wasm/memory/BUILD.bazel
-@@ -0,0 +1,31 @@
+@@ -0,0 +1,30 @@
 +load("@rules_java//java:defs.bzl", "java_binary")
 +load("@rules_mx//mx:java.bzl", "elide_java_library")
 +
@@ -2393,7 +2392,6 @@ new file mode 100644
 +    unified_release = 21,
 +    visibility = ["//:__subpackages__"],
 +    deps = [
-+        "//espresso:com.oracle.truffle.espresso.io",
 +        "//sdk:POLYGLOT",
 +        "//wasm:JOL",
 +        "//wasm:org.graalvm.wasm",
