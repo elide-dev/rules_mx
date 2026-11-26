@@ -104,12 +104,20 @@ _jar_dist = rule(
     provides = [JavaInfo],
 )
 
-def mx_jar_dist(name, directives = [], **kwargs):
-    """Use the Labs system image for descriptors that read JVMCI."""
+def mx_jar_dist(name, directives = [], platform_directives = [], **kwargs):
+    """Use the Labs system image for descriptors that read JVMCI.
+
+    Args:
+      name: distribution name.
+      directives: module directives.
+      platform_directives: a select() of further directives that depend on the target platform,
+        such as `requires` of a library whose module name mx resolves for the host.
+      **kwargs: the remaining _jar_dist attributes.
+    """
     jvmci = any([d.split(" ")[-1] in ["jdk.internal.vm.ci", "jdk.graal.compiler"] for d in directives if d.startswith("requires ")])
     _jar_dist(
         name = name,
-        directives = directives,
+        directives = directives + platform_directives,
         requires_jvmci = jvmci,
         **kwargs
     )

@@ -19,6 +19,12 @@ def read_members(inputs, args):
             for name in src.namelist():
                 if name.endswith("/") or name.upper() == "META-INF/MANIFEST.MF":
                     continue
+                if name == ".mxkeep" or name.endswith("/.mxkeep"):
+                    # mx archives a directory that contains .mxkeep as a directory entry,
+                    # so that the directory exists as a resource even when it is empty.
+                    if directory := name.removesuffix(".mxkeep"):
+                        entries[directory] = b""
+                    continue
                 if (
                     snippets
                     and jar not in args.archived_library
@@ -91,7 +97,9 @@ def write_jar(path, entries):
             content = entries[name]
             info = ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
             info.create_system = 3
-            info.external_attr = 0o100644 << 16
+            info.external_attr = (
+                (0o40755 << 16) | 0x10 if name.endswith("/") else 0o100644 << 16
+            )
             archive.writestr(info, content, compress_type=ZIP_DEFLATED)
 
 

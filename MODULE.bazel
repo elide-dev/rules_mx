@@ -120,6 +120,20 @@ use_repo(
     "visualvm_windows_amd64",
 )
 
+svm_inputs = use_extension("//graal:svm_inputs.bzl", "svm_inputs", dev_dependency = True)
+use_repo(
+    svm_inputs,
+    "graal_svm_javacpp_platform_specific_shadowed_darwin_aarch64",
+    "graal_svm_javacpp_platform_specific_shadowed_linux_aarch64",
+    "graal_svm_javacpp_platform_specific_shadowed_linux_amd64",
+    "graal_svm_javacpp_shadowed",
+    "graal_svm_llvm_lld_standalone_darwin_aarch64",
+    "graal_svm_llvm_platform_specific_shadowed_darwin_aarch64",
+    "graal_svm_llvm_platform_specific_shadowed_linux_aarch64",
+    "graal_svm_llvm_platform_specific_shadowed_linux_amd64",
+    "graal_svm_llvm_wrapper_shadowed",
+)
+
 shaded_inputs = use_repo_rule("//graal:shaded_inputs.bzl", "shaded_inputs")
 
 shaded_inputs(

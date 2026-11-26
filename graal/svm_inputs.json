@@ -1,0 +1,66 @@
+{
+  "javacpp_platform_specific_shadowed_darwin_aarch64": {
+    "file": "javacpp-shadowed-1.5.7-macosx-arm64.jar",
+    "integrity": "sha512-fIYxE3YW9KKdSmkqmWc8VRE3sP8vJRkJoqtkaEhKzLyPHM+m6tLDCwxCX4JLN9aOCjUKwjiC+fzHXZ7X3UsIpg==",
+    "urls": [
+      "https://lafo.ssw.uni-linz.ac.at/pub/graal-external-deps/native-image/javacpp-shadowed-1.5.7-macosx-arm64.jar"
+    ]
+  },
+  "javacpp_platform_specific_shadowed_linux_aarch64": {
+    "file": "javacpp-shadowed-1.5.7_2-linux-arm64.jar",
+    "integrity": "sha512-YheZ+ETTJxFKKh46r4DqKslykUriyvU+jptHvrhxLeMWT8Psg7Cj6DUtzaTiaE0yU6qbuMF3K8ptuiSM+8KrHg==",
+    "urls": [
+      "https://lafo.ssw.uni-linz.ac.at/pub/graal-external-deps/native-image/javacpp-shadowed-1.5.7_2-linux-arm64.jar"
+    ]
+  },
+  "javacpp_platform_specific_shadowed_linux_amd64": {
+    "file": "javacpp-shadowed-1.5.7_1-linux-x86_64.jar",
+    "integrity": "sha512-B7bkDiVszZkFg0yM+tD70b81GUQzLRWq6jCagwR1xI9N2yEzu9TOnAMi/ZUerQl7mqxu3kxreY9Kce7n5pgyAg==",
+    "urls": [
+      "https://lafo.ssw.uni-linz.ac.at/pub/graal-external-deps/native-image/javacpp-shadowed-1.5.7_1-linux-x86_64.jar"
+    ]
+  },
+  "javacpp_shadowed": {
+    "file": "javacpp-shadowed-1.5.7.jar",
+    "integrity": "sha512-Kx0j9MAPHuBFRq7kRnYi94sMyo0jHpvLd+UHrWo6+4va0xqVbXqL7YAerkTG9wIVv4+JEVZSF2jZ7pcms/2GDw==",
+    "urls": [
+      "https://lafo.ssw.uni-linz.ac.at/pub/graal-external-deps/native-image/javacpp-shadowed-1.5.7.jar"
+    ]
+  },
+  "llvm_lld_standalone_darwin_aarch64": {
+    "archive": true,
+    "file": "llvm-lldonly-22.1.8-4-g1d96596a53-bg6891668b1e-darwin-aarch64.tar.gz",
+    "integrity": "sha512-wKsl1bCQ3BqDEFdR2ctEdyBEOSVSO3k8BUf+IEBKxF2TVfm5cfc8bPXuc+xAG2oHvgvllxg9GXs3UN0zHHDmTw==",
+    "urls": [
+      "https://lafo.ssw.uni-linz.ac.at/pub/llvm/llvm-lldonly-22.1.8-4-g1d96596a53-bg6891668b1e-darwin-aarch64.tar.gz"
+    ]
+  },
+  "llvm_platform_specific_shadowed_darwin_aarch64": {
+    "file": "llvm-shadowed-13.0.1-1.5.7-macosx-arm64.jar",
+    "integrity": "sha512-wWsRKtRBjgIzaED9O4eYOjDdHd8kpFprrEDUulxHHCg3x1VrAUwGVkqjicCUq6EDDa6kQYH7NA7qHzUv+xEcKg==",
+    "urls": [
+      "https://lafo.ssw.uni-linz.ac.at/pub/graal-external-deps/native-image/llvm-shadowed-13.0.1-1.5.7-macosx-arm64.jar"
+    ]
+  },
+  "llvm_platform_specific_shadowed_linux_aarch64": {
+    "file": "llvm-shadowed-13.0.1-1.5.7_2-linux-arm64.jar",
+    "integrity": "sha512-6jGZEVHCGit0+I76l3zeTz/wahUBvpmYtCThij6V1vcI+5WxvEEgUKeISjBOy5YGY9W9UmW67moYtR2G0tmUDQ==",
+    "urls": [
+      "https://lafo.ssw.uni-linz.ac.at/pub/graal-external-deps/native-image/llvm-shadowed-13.0.1-1.5.7_2-linux-arm64.jar"
+    ]
+  },
+  "llvm_platform_specific_shadowed_linux_amd64": {
+    "file": "llvm-shadowed-13.0.1-1.5.7_1-linux-x86_64.jar",
+    "integrity": "sha512-XLWT/pjXP6fkDxDUtPs9ywqG3CMkgIlmDqSLsvq1u5BcpoJurDs6nRq6pBVntVyoCeRGbysDch7MYRCrRg1a4w==",
+    "urls": [
+      "https://lafo.ssw.uni-linz.ac.at/pub/graal-external-deps/native-image/llvm-shadowed-13.0.1-1.5.7_1-linux-x86_64.jar"
+    ]
+  },
+  "llvm_wrapper_shadowed": {
+    "file": "llvm-shadowed-13.0.1-1.5.7.jar",
+    "integrity": "sha512-vLc/7SSe8U5ht75BU87eiJ3nq6Q0SISlSoT8LXj1mgtWtQRfOQw3j/tyf0VPJuSPktL21LrYqU/wWtOUkzXH9g==",
+    "urls": [
+      "https://lafo.ssw.uni-linz.ac.at/pub/graal-external-deps/native-image/llvm-shadowed-13.0.1-1.5.7.jar"
+    ]
+  }
+}

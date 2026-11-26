@@ -30,6 +30,8 @@ SVM_SUPPORT_JARS = (
     "TRUFFLE_RUNTIME_SVM",
     "SVM_TRUFFLE_TCK",
     "SVM_GRAALOS_SUPPORT",
+    "JUNIT_SUPPORT",
+    "SVM_LLVM",
 )
 
 SVM_TEST_JARS = (
@@ -37,7 +39,44 @@ SVM_TEST_JARS = (
     "SVM_TEST_TERMINUS",
     "SVM_TRUFFLE_TESTS",
     "SVM_TESTS WITH SPACE",
+    "SVM_TESTS",
+    "SVM_HOSTED_TESTS",
+    "STANDALONE_POINTSTO_TESTS",
 )
+
+# Projects that no distribution contains: the tutorial and benchmark sources.
+SVM_STANDALONE_PROJECTS = (
+    "com.oracle.svm.tutorial",
+    "com.oracle.svm.bench",
+)
+
+# `mx native-unittest` without arguments selects the test classes whose names contain one
+# of these strings and builds the ones without custom @NativeImageBuildArgs into one image.
+# mx_substratevm also ignores URLProtocolTraceProcessorTest there: it applies module exports
+# that an image cannot.
+SVM_NATIVE_UNITTEST_SELECTORS = ("com.oracle.svm.test", "com.oracle.svm.configure.test")
+SVM_NATIVE_UNITTEST_IGNORED = (
+    "com.oracle.svm.configure.test.config.URLProtocolTraceProcessorTest",
+    # testVM expects `jcmd VM.version` to name GraalVM. The source-built Native Image root is
+    # the Labs JDK, not a GraalVM distribution, so images report the Labs JDK version.
+    "com.oracle.svm.test.jcmd.JCmdTest",
+)
+
+# SubstrateVM libraries that mx downloads by URL rather than from Maven, and the target
+# platforms whose platform-specific variants rules_mx pins (the same platforms as the native
+# builder helpers). Each pin becomes an http_file repository, fetched only when used.
+SVM_URL_LIBRARIES = (
+    "JAVACPP_SHADOWED",
+    "LLVM_WRAPPER_SHADOWED",
+    "JAVACPP_PLATFORM_SPECIFIC_SHADOWED",
+    "LLVM_PLATFORM_SPECIFIC_SHADOWED",
+    "LLVM_LLD_STANDALONE",
+)
+SVM_INPUT_PLATFORMS = {
+    "darwin_aarch64": ("darwin", "aarch64", "svm.darwin-aarch64"),
+    "linux_aarch64": ("linux", "aarch64", "svm.linux-aarch64"),
+    "linux_amd64": ("linux", "amd64", "svm.linux-amd64"),
+}
 
 # Selections that only some Graal revisions use, mapped to the declaration they need.
 # The generator drops each one, together with an option that names it, when the
@@ -48,8 +87,6 @@ OPTIONAL = {
         "SVM_TEST_TERMINUS": "SVM_TEST_TERMINUS",
         "SVM_TRUFFLE_TESTS": "SVM_TRUFFLE_TESTS",
         "com.oracle.svm.truffle.test": "SVM_TRUFFLE_TESTS",
-        "com.oracle.svm.test": "SVM_TRUFFLE_TESTS",
-        "SVM_TESTS": "SVM_TRUFFLE_TESTS",
         "ZSTD_JNI": "ZSTD_JNI",
     },
 }
@@ -487,6 +524,14 @@ SUITES = {
         "substratevm:com.oracle.svm.driver.test=:svm_driver_junit",
         "--test-launcher",
         "substratevm:com.oracle.svm.with.space.test=@rules_mx//graal:svm_native_resource_guest",
+        # JVM unit tests: mx's svm-invariants-tests and standalone-pointsto-unittest
+        # configurations and the Graal unit test configuration.
+        "--test-launcher",
+        "substratevm:com.oracle.svm.hosted.test=:svm_hosted_junit",
+        "--test-launcher",
+        "substratevm:com.oracle.graal.pointsto.standalone.test=:svm_pointsto_junit",
+        "--test-launcher",
+        "substratevm:com.oracle.svm.graal.test=:svm_graal_junit",
         "--manual-test-project",
         "com.oracle.svm.with.space.test",
         # elide-dev/graal elide-25.6.x: ShenandoahOptions.<clinit> resolves
@@ -495,18 +540,27 @@ SUITES = {
         # descriptors first, as it does on this test's classpath.
         "--manual-test-class",
         "com.oracle.svm.driver.BundlePathMapTest",
+        # No mx gate runs this JVM test. With Labs JDK 25.0.5.1 (JVMCI 25.6-b27), JVMCI's
+        # speculation reason encoding differs from IsolatedSpeculationLog's from the first byte.
+        "--manual-test-class",
+        "com.oracle.svm.graal.test.IsolatedSpeculationLogEncodingTest",
+        # elide-dev/graal elide-25.6.x: five reflection calls added on the fork are missing from
+        # VerifyReflectionUsage's exclude list (ZstdJni, ShenandoahFeature,
+        # MethodHandleInterpreterUtils and HostedPLTGOTConfiguration), so the mx gate's
+        # "SVM invariants" task fails the same way.
+        "--manual-test-class",
+        "com.oracle.svm.hosted.test.CheckSVMInvariants",
         # These tests run inside a Native Image (mx svmjunit), not on the JVM.
         "--manual-test-project",
         "com.oracle.svm.test",
         "--manual-test-project",
         "com.oracle.svm.truffle.test",
-        # SVM_TRUFFLE_TESTS compiles against SVM_TESTS for com.oracle.svm.test, its only
-        # member that it uses. The rest of SVM_TESTS is not migrated yet.
-        "--java-dep",
-        "substratevm:SVM_TESTS=:com.oracle.svm.test",
         # The image test corpus deliberately exercises unusual and invalid API use.
         "--javac-opt",
         "com.oracle.svm.test=-XepDisableAllChecks",
+        # The debug info test helpers evaluate pretty-printer callbacks for their side effects.
+        "--javac-opt",
+        "com.oracle.svm.test.debug=-Xep:ReturnValueIgnored:WARN",
         "--generated-dep",
         "substratevm:com.oracle.svm.test=@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
         "--java-dep",
@@ -540,6 +594,8 @@ SUITES = {
                 "GRAAL_PROCESSOR",
                 "VMACCESS",
                 "HOSTVMACCESS",
+                # SVM_HOSTED_TESTS extends the compiler test harness.
+                "GRAAL_TEST",
             )
             for arg in ("--java-dep", f"compiler:{name}=//compiler:{name}")
         ],
@@ -555,8 +611,9 @@ SUITES = {
             )
             for arg in ("--java-dep", f"sdk:{name}=//sdk:{name}")
         ],
+        # The mx JUnit harness; JUNIT_SUPPORT drives it inside the test image.
         "--java-dep",
-        "mx:JUNIT_TOOL=@contrib_rules_jvm_deps//:junit_junit",
+        "mx:JUNIT_TOOL=@rules_mx//graal:mx_junit_tool",
         "--java-dep",
         "mx:HAMCREST=@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
         "--whole-project",
@@ -633,6 +690,7 @@ SUITES = {
         "POINTSTO",
         "OBJECTFILE",
         "com.oracle.svm.configure.test",
+        *SVM_STANDALONE_PROJECTS,
     ],
 }
 
@@ -788,6 +846,7 @@ def harness_options(directory):
         pending = [
             *present(directory, SVM_SUPPORT_JARS),
             *present(directory, SVM_TEST_JARS),
+            *SVM_STANDALONE_PROJECTS,
             "SVM",
             "SVM_DRIVER",
             "LIBRARY_SUPPORT",
@@ -875,6 +934,8 @@ def shading_inputs(directory):
         lib = suite["libraries"][name]
         inputs[f"{directory.name}_{name}.jar"] = maven_pin(lib)
         flags.extend(["--java-dep", f"{directory.name}:{name}=:{name}"])
+    if directory.name == "substratevm":
+        flags.extend(svm_url_library_rules(directory)[1])
     return inputs, flags
 
 
@@ -1030,6 +1091,88 @@ def hsdis_inputs(directory):
             output=output.replace("<arch>", arch),
         )
     return pins
+
+
+def svm_url_inputs(directory):
+    """Pins for SVM_URL_LIBRARIES, keyed by repository name suffix."""
+    suite = runpy.run_path(str(directory / "mx.substratevm/suite.py"))["suite"]
+    libraries = suite["libraries"]
+    pins = {}
+
+    def pin(key, library, config):
+        algo, digest = config["digest"].split(":")
+        (url,) = config["urls"]
+        url = url.format(**{**library, **config})
+        pins[key] = dict(
+            urls=[url],
+            integrity=algo + "-" + base64.b64encode(bytes.fromhex(digest)).decode(),
+            file=url.rsplit("/", 1)[1],
+        )
+        if url.endswith((".tar.gz", ".tgz")):
+            pins[key]["archive"] = True
+
+    for name in SVM_URL_LIBRARIES:
+        if not (library := libraries.get(name)):
+            continue
+        if "os_arch" not in library:
+            pin(name.lower(), library, library)
+            continue
+        for platform, (os_name, arch, _) in SVM_INPUT_PLATFORMS.items():
+            config = library["os_arch"].get(os_name, {}).get(arch)
+            if config and not config.get("optional"):
+                pin(f"{name.lower()}_{platform}", library, config)
+    return pins
+
+
+def svm_url_library_rules(directory):
+    """java_import targets for the URL-pinned and checked-in SubstrateVM JAR libraries."""
+    suite = runpy.run_path(str(directory / "mx.substratevm/suite.py"))["suite"]
+    pins = svm_url_inputs(directory)
+    rules = []
+    flags = []
+    for name in SVM_URL_LIBRARIES:
+        library = suite["libraries"].get(name)
+        if not library or name == "LLVM_LLD_STANDALONE":
+            continue
+        deps = [":" + dep for dep in library.get("dependencies", [])]
+        if "os_arch" in library:
+            jars = {
+                f":{setting}": [f"@graal_svm_{name.lower()}_{platform}//file"]
+                for platform, (_, _, setting) in SVM_INPUT_PLATFORMS.items()
+                if f"{name.lower()}_{platform}" in pins
+            }
+            jars_expr = f"select({json.dumps(jars)})"
+            compatible = (
+                "select("
+                + json.dumps(
+                    {setting: [] for setting in jars}
+                    | {"//conditions:default": ["@platforms//:incompatible"]}
+                )
+                + ")"
+            )
+        else:
+            jars_expr = json.dumps([f"@graal_svm_{name.lower()}//file"])
+            compatible = "[]"
+        rules.append(
+            # mx puts library dependencies on the classpath of every user, as exports do.
+            f'java_import(name = "{name}", jars = {jars_expr}, exports = {json.dumps(deps)}, '
+            f'target_compatible_with = {compatible}, visibility = ["//visibility:public"])\n'
+        )
+        flags.extend(["--java-dep", f"substratevm:{name}=:{name}"])
+        if "os_arch" in library:
+            # svm_platform_requires adds the module names for each platform.
+            flags.extend(["--platform-library", f"substratevm:{name}"])
+    # Libraries checked into the suite, such as a JAR whose resource path contains a space.
+    for name, library in sorted(suite["libraries"].items()):
+        if "path" in library and library["path"].endswith(".jar"):
+            rules.append(
+                f'java_import(name = "{name}", jars = [{json.dumps(library["path"])}], testonly = True, '
+                'visibility = ["//visibility:public"])\n'
+            )
+            flags.extend(["--java-dep", f"substratevm:{name}=:{name}"])
+    if rules:
+        rules.insert(0, 'load("@rules_java//java:java_import.bzl", "java_import")\n')
+    return "".join(rules), flags
 
 
 # CI runs independent upstream tests from each newly imported project. All other
@@ -1479,17 +1622,23 @@ def svm_native_rules(directory):
         "reporterchelper",
         # The heap-blob decoder that images link statically, on revisions that declare it.
         "libzstd",
+        # The Windows libjvm replacement, which only Windows targets build.
+        "jvm.windows",
     ):
         key = "com.oracle.svm.native." + name
         if key not in suite["projects"]:
             continue
         project = suite["projects"][key]
         options = project.get("os") or {
-            os: arches["<others>"] for os, arches in project["os_arch"].items()
+            os: arches.get("<others>", arches.get("amd64", {}))
+            for os, arches in project["os_arch"].items()
         }
         flags = {}
         includes = set()
-        for system in ("linux", "darwin"):
+        # The Windows builds of the shared helpers are not migrated, so only the Windows-only
+        # libjvm replacement takes its Windows flags.
+        systems = ("windows",) if name == "jvm.windows" else ("linux", "darwin")
+        for system in systems:
             target = options.get(system, options.get("<others>", {}))
             if "cflags" in target:
                 flags[system] = []
@@ -1519,6 +1668,234 @@ def svm_native_rules(directory):
         'svm_launcher(name = "native-image"'
         + (f", builder_libs = {json.dumps(builder_libs)}" if builder_libs else "")
         + ")\n"
+        + svm_graalvm_support(directory)
+    )
+
+
+def svm_test_runners(directory):
+    """Launchers for the JVM unit tests, with the flags of their mx unit test configurations."""
+    suite = runpy.run_path(str(directory / "mx.substratevm/suite.py"))["suite"]
+    distributions = suite["distributions"]
+    # SVMInvariantsUnittestConfig checks every non-test JAR distribution of the suite.
+    checked = [
+        ":" + name
+        for name, dist in distributions.items()
+        if not dist.get("native") and "layout" not in dist and not dist.get("testDistribution")
+    ]
+    # mx exports the concealed packages that classpath projects require to ALL-UNNAMED.
+    concealed = sorted(
+        {
+            f"--add-exports={module}/{package}=ALL-UNNAMED"
+            for project in suite["projects"].values()
+            for module, packages in project.get("requiresConcealed", {}).items()
+            if module != "jdk.internal.vm.ci"
+            for package in packages
+        }
+    )
+    # The invariant checks trust interfaces of the named jdk.graal.compiler.vmaccess module
+    # and load the host VM access through its service. mx puts both modules on the module
+    # path, with the concealed packages they require.
+    compiler = runpy.run_path(str(directory.parent / "compiler/mx.compiler/suite.py"))["suite"]
+    vm_access = {}
+    vmaccess_exports = set()
+    for name in ("VMACCESS", "HOSTVMACCESS"):
+        dist = compiler["distributions"][name]
+        module = dist["moduleInfo"]["name"]
+        vm_access[module] = name
+        for concealed_packages in [dist["moduleInfo"].get("requiresConcealed", {})] + [
+            compiler["projects"][project].get("requiresConcealed", {})
+            for project in dist["dependencies"]
+            if project in compiler["projects"]
+        ]:
+            vmaccess_exports.update(
+                f"--add-exports={owner}/{package}={module}"
+                for owner, packages in concealed_packages.items()
+                for package in packages
+            )
+    hosted_flags = [
+        "-XX:-UseJVMCICompiler",
+        # The mode of the mx gate's "SVM invariants" task.
+        "-Dsvm.invariants.VerifyReflectionUsage.mode=check_exclude_list",
+        *concealed,
+        *sorted(vmaccess_exports),
+    ]
+    pointsto_flags = [
+        "-Djava.util.concurrent.ForkJoinPool.common.threadFactory=com.oracle.graal.pointsto.standalone.StandaloneCommonPoolWorkerThreadFactory",
+        # The host VM access; the Espresso variant needs the espresso-compiler-stub suite.
+        "-Dcom.oracle.graal.pointsto.standalone.vmaccess.name=host",
+        "-Dcom.oracle.graal.pointsto.standalone.test.analysis.option.count=0",
+        "--add-exports=jdk.graal.compiler/jdk.graal.compiler.phases.util=ALL-UNNAMED",
+        *concealed,
+    ]
+    return (
+        'load("@rules_mx//graal:simplelanguage.bzl", "svm_test_runner")\n'
+        f'svm_test_runner(name = "svm_hosted_junit", test_classpath = [":SVM_HOSTED_TESTS"], jvm_flags = {json.dumps(hosted_flags)}, '
+        f'modules = {json.dumps(["//compiler:" + name for name in vm_access.values()])}, root_modules = {json.dumps(sorted(vm_access))}, '
+        f'jar_property = "svm.test.CheckSVMInvariants.jars", property_jars = {json.dumps(checked)})\n'
+        f'svm_test_runner(name = "svm_pointsto_junit", test_classpath = [":STANDALONE_POINTSTO_TESTS"], jvm_flags = {json.dumps(pointsto_flags)})\n'
+        f'svm_test_runner(name = "svm_graal_junit", test_classpath = [":com.oracle.svm.graal.test"], jvm_flags = {json.dumps(["-XX:-UseJVMCICompiler", *concealed])})\n'
+    )
+
+
+def svm_native_unittests(directory):
+    """In-image JUnit tests over SVM_TESTS, as `mx native-unittest` runs them."""
+    graph = json.loads((directory / "mx-graph.json").read_text())
+    suite = runpy.run_path(str(directory / "mx.substratevm/suite.py"))["suite"]
+    members = suite["distributions"]["SVM_TESTS"]["dependencies"]
+    discovered = sorted(
+        test
+        for project in graph["projects"]
+        if project["name"] in members
+        for test in project.get("tests", [])
+        if any(selector in test for selector in SVM_NATIVE_UNITTEST_SELECTORS)
+        and test not in SVM_NATIVE_UNITTEST_IGNORED
+    )
+    return (
+        'load("@rules_mx//graal:svm.bzl", "svm_native_unittest")\n'
+        # The image build uses every core; cpu:4 keeps other tests from competing with it.
+        # GitHub1398 needs a multicast-capable network interface, which BuildBuddy's remote
+        # executors lack, so the test runs on the host even under the rbe profile.
+        f'svm_native_unittest(name = "native_unittest", tests = {json.dumps(discovered)}, deps = [":SVM_TESTS"], default_group = True, tags = ["cpu:4", "no-remote-exec"])\n'
+    )
+
+
+def svm_platform_requires(directory):
+    """Require the modules of platform-specific libraries per target platform.
+
+    mx names the module of a platform-specific library, such as the LLVM backend's shadowed
+    JavaCPP natives, for the host it runs on, and on some platforms the suite names none.
+    The exporter leaves these libraries out of module descriptors (--platform-library). This
+    adds the `requires` that mx would emit on each pinned platform as a select().
+    """
+    suite = runpy.run_path(str(directory / "mx.substratevm/suite.py"))["suite"]
+    modules = {}
+    for name in SVM_URL_LIBRARIES:
+        library = suite["libraries"].get(name, {})
+        if "os_arch" not in library:
+            continue
+        modules[name] = {
+            setting: config["moduleName"]
+            for os_name, arch, setting in SVM_INPUT_PLATFORMS.values()
+            if "moduleName" in (config := library["os_arch"].get(os_name, {}).get(arch, {}))
+        }
+    build = directory / "BUILD.bazel"
+    blocks = re.split(r"(?m)^(?=\S)", build.read_text())
+    for index, block in enumerate(blocks):
+        used = [name for name in modules if f'        ":{name}",\n' in block]
+        if not block.startswith("mx_jar_dist(") or not used:
+            continue
+        entries = []
+        for _, _, setting in sorted(SVM_INPUT_PLATFORMS.values(), key=lambda v: v[2]):
+            directives = sorted(
+                f'            "requires {modules[name][setting]}",\n'
+                for name in used
+                if setting in modules[name]
+            )
+            entries.append(
+                f'        ":{setting}": [\n' + "".join(directives) + "        ],\n"
+                if directives
+                else f'        ":{setting}": [],\n'
+            )
+        select = (
+            "    platform_directives = select({\n"
+            + "".join(entries)
+            + '        "//conditions:default": [],\n'
+            + "    }),\n"
+        )
+        head, marker, tail = block.partition("    directives = [\n")
+        if not marker:
+            raise ValueError("Expected module directives in " + block.splitlines()[1])
+        listing, end, rest = tail.partition("    ],\n")
+        blocks[index] = head + marker + listing + end + select + rest
+    build.write_text("".join(blocks))
+
+
+def svm_graalvm_support(directory):
+    """The platform-specific SVM_GRAALVM_SUPPORT layout, for the platforms SVM_HOSTED_NATIVE supports."""
+    name = "SVM_GRAALVM_SUPPORT"
+    suite = runpy.run_path(str(directory / "mx.substratevm/suite.py"))["suite"]
+    if name not in suite["distributions"]:
+        return ""
+    pins = svm_url_inputs(directory)
+    members = {}
+    platform_members = {setting: {} for _, _, setting in SVM_INPUT_PLATFORMS.values()}
+    imports = {}
+
+    def destination_path(destination, filename):
+        return destination + filename if destination.endswith("/") else destination
+
+    for destination, sources in suite["distributions"][name]["layout"].items():
+        for source in [sources] if isinstance(sources, str) else sources:
+            kind, _, value = source.partition(":")
+            if kind == "file":
+                # mx copies a matching directory with its contents.
+                matches = {}
+                for path in directory.glob(value) if "*" in value else [Path(value)]:
+                    if not path.is_absolute() or path.is_file():
+                        matches[path] = path.name
+                    else:
+                        for file in path.rglob("*"):
+                            if file.is_file():
+                                matches[file] = (
+                                    path.name + "/" + file.relative_to(path).as_posix()
+                                )
+                if not matches:
+                    raise ValueError(f"{name}: no files match {value}")
+                for path, relative in sorted(matches.items()):
+                    source_path = (
+                        path.relative_to(directory).as_posix()
+                        if path.is_absolute()
+                        else value
+                    )
+                    members.setdefault(source_path, []).append(
+                        destination_path(destination, relative)
+                    )
+                continue
+            qualified, _, member = value.partition("/")
+            owner, colon, dep = qualified.partition(":")
+            if not colon:
+                owner, dep = "substratevm", owner
+            if owner != "substratevm":
+                raise ValueError(f"Unsupported {name} dependency {source}")
+            library = suite["libraries"].get(dep)
+            if kind == "extracted-dependency" and library and member:
+                # A platform-specific archive; absent where mx marks it optional.
+                for platform, (_, _, setting) in SVM_INPUT_PLATFORMS.items():
+                    if (key := f"{dep.lower()}_{platform}") in pins:
+                        platform_members[setting][f"@graal_svm_{key}//:{member}"] = [
+                            destination_path(destination, Path(member).name)
+                        ]
+            elif kind == "extracted-dependency" and not member:
+                imports.setdefault(":" + dep, []).append("=" + destination)
+            elif kind == "dependency" and library and "maven" in library:
+                maven = library["maven"]
+                filename = f"{maven['artifactId']}-{maven['version']}.jar"
+                members.setdefault(":" + dep, []).append(
+                    destination_path(destination, filename)
+                )
+            elif kind == "dependency" and dep in suite["projects"]:
+                members.setdefault(":" + dep, []).append(
+                    destination_path(destination, "{basename}")
+                )
+            else:
+                raise ValueError(f"Unsupported {name} layout {source}")
+    joined = {label: "\n".join(paths) for label, paths in members.items()}
+    selected = {
+        ":" + setting: {label: "\n".join(paths) for label, paths in entries.items()}
+        for setting, entries in platform_members.items()
+    } | {"//conditions:default": {}}
+    compatible = {":" + setting: [] for setting in platform_members} | {
+        "//conditions:default": ["@platforms//:incompatible"]
+    }
+    return (
+        "mx_archive_layout(\n"
+        f'    name = "{name}",\n'
+        '    format = "tar",\n'
+        f"    members = {json.dumps(joined)} | select({json.dumps(selected)}),\n"
+        f"    archive_imports = {json.dumps({k: chr(10).join(v) for k, v in imports.items()})},\n"
+        f"    target_compatible_with = select({json.dumps(compatible)}),\n"
+        '    visibility = ["//visibility:public"],\n'
+        ")\n"
     )
 
 
@@ -1595,6 +1972,8 @@ def svm_support_layouts(directory):
         ":" + name
         for name in (*names, *present(directory, SVM_SUPPORT_JARS), version_name)
     ]
+    if "SVM_GRAALVM_SUPPORT" in metadata["distributions"]:
+        targets.append(":SVM_GRAALVM_SUPPORT")
     tests = [":" + name for name in present(directory, SVM_TEST_JARS)]
     return support_layout_rules(directory, names) + (
         'load("@rules_mx//mx:graph.bzl", "mx_resource_layout")\n'
@@ -1714,6 +2093,7 @@ def prepare_suite(suite, stage):
     elif suite == "substratevm":
         (directory / "BUILD.bazel").write_text(
             library_rules(directory)
+            + svm_url_library_rules(directory)[0]
             + 'load("@rules_mx//graal:svm.bzl", "svm_compiler_flags")\n'
             'svm_compiler_flags(name = "svm-compiler-flags-builder", builder = ":SVM", '
             'linux = select({"@platforms//os:linux": True, "//conditions:default": False}))\n'
@@ -1721,6 +2101,8 @@ def prepare_suite(suite, stage):
             'svm_driver_test_runner(name = "svm_driver_junit")\n'
             + svm_support_layouts(directory)
             + svm_native_rules(directory)
+            + svm_native_unittests(directory)
+            + svm_test_runners(directory)
         )
 
 
@@ -1918,6 +2300,9 @@ def main():
         shutil.copytree(
             source / "substratevm/debug/include", stage / "substratevm/debug/include"
         )
+        # SVM_GRAALVM_SUPPORT packages every file that matches skills/*.
+        if (source / "substratevm/skills").is_dir():
+            shutil.copytree(source / "substratevm/skills", stage / "substratevm/skills")
         lib = runpy.run_path(str(stage / "truffle/mx.truffle/suite.py"))["suite"][
             "libraries"
         ]["LIBFFI_SOURCES"]
@@ -1984,6 +2369,14 @@ def main():
             args.check,
             "Regenerate the VisualVM pins with tools/generate-graal",
         )
+        svm_inputs = output / "svm_inputs.json"
+        emit(
+            svm_inputs,
+            json.dumps(svm_url_inputs(stage / "substratevm"), indent=2, sort_keys=True)
+            + "\n",
+            args.check,
+            "Regenerate the SubstrateVM input pins with tools/generate-graal",
+        )
         lock = output / "shaded_inputs.json"
         lock_text = (
             json.dumps(
@@ -2007,6 +2400,8 @@ def main():
         for suite in selected:
             prepare_suite(suite, stage)
         generate_build_files(selected, stage)
+        if "substratevm" in selected:
+            svm_platform_requires(stage / "substratevm")
         for suite in selected:
             emit(
                 output / f"{suite}.patch",

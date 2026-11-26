@@ -26,7 +26,8 @@ build:rbe --cpu=k8
 build:rbe --host_cpu=k8
 build:rbe --platforms=//tools:linux_x86_64
 build:rbe --extra_execution_platforms=//tools:linux_x86_64
-build:rbe --spawn_strategy=remote
+# Actions tagged no-remote-exec, such as tests that need host networking, run on the host.
+build:rbe --spawn_strategy=remote,local
 build:rbe --remote_local_fallback=false
 build:rbe --remote_download_outputs=minimal
 

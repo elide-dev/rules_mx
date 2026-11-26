@@ -358,6 +358,10 @@ def _module_directives(dist, members, external, archives, mappings, library_modu
                 visit(child)
 
     for dep in external:
+        if dep.isLibrary() and library_modules.get(dep.qualifiedName(), "") is None:
+            if dep.qualifiedName() not in mappings:
+                mx.abort(f"{dep.qualifiedName()}: --platform-library needs a --java-dep mapping")
+            continue
         module = getattr(dep, "moduleName", None) or library_modules.get(
             dep.qualifiedName()
         )
@@ -447,7 +451,8 @@ def _jar_archive(dist, suite, mappings, pending, release, archives, library_modu
             for d in dist.optionalDependencies
         )
         or dist.manifestEntries
-        or getattr(dist, "javaProperties", None)
+        # mx passes javaProperties on the command line of a JVM that uses the
+        # distribution; they do not change the JAR, so they do not block assembly.
         or dist.module_info_compilation_participants
     ):
         mx.abort(f"{dist.name}: unsupported JAR archive configuration: {participants}")
@@ -469,7 +474,19 @@ def _jar_archive(dist, suite, mappings, pending, release, archives, library_modu
         if dep.isJARDistribution()
         for member in dep.archived_deps()
     }
-    external = [d for d in external if not (d.isJavaProject() and d in packaged)]
+    # An unmapped native distribution of another suite, such as an LLVM toolchain that a
+    # Java property locates, is neither a classpath entry nor a module.
+    external = [
+        d
+        for d in external
+        if not (d.isJavaProject() and d in packaged)
+        and not (
+            d.isDistribution()
+            and not d.isJARDistribution()
+            and d.suite != dist.suite
+            and d.qualifiedName() not in mappings
+        )
+    ]
     base = [d for d in members if not getattr(d, "multiReleaseJarVersion", None)]
     overlays = {
         ":" + d.name: str(d.multiReleaseJarVersion) for d in members if d not in base
@@ -815,6 +832,13 @@ def bazel_buildfile(args):
         help="JPMS name of a mapped automatic module",
     )
     parser.add_argument(
+        "--platform-library",
+        action="append",
+        default=[],
+        metavar="SUITE:LIB",
+        help="mapped library whose module name mx resolves for the host: depend on it without a requires directive",
+    )
+    parser.add_argument(
         "--suite-package",
         action="append",
         default=[],
@@ -970,6 +994,11 @@ def bazel_buildfile(args):
         if name in library_modules:
             parser.error(f"duplicate --library-module mapping for {name}")
         library_modules[name] = module
+    for name in options.platform_library:
+        if ":" not in name or name in library_modules:
+            parser.error(f"expected one --platform-library SUITE:LIB for {name}")
+        # None marks a module that the generated descriptor must not name.
+        library_modules[name] = None
     test_launchers = _mappings(parser, options.test_launcher, "--test-launcher")
     test_runtimes = _mappings(parser, options.test_runtime, "--test-runtime")
     test_paths = _mappings(parser, options.test_path, "--test-path")

@@ -49,6 +49,22 @@ class PackJarTest(unittest.TestCase):
                     jar.read("META-INF/services/p.Service"), b"p.Bridge\np.Guest\n"
                 )
 
+    def test_mxkeep_becomes_a_directory_entry(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with ZipFile(root / "project.jar", "w") as jar:
+                jar.writestr("resources/empty/.mxkeep", b"keep")
+                jar.writestr("resources/file.txt", b"text")
+            subprocess.run(
+                [PACKER, "--input", root / "project.jar", "--output", root / "out.jar"],
+                check=True,
+            )
+            with ZipFile(root / "out.jar") as jar:
+                self.assertEqual(
+                    jar.namelist(), ["resources/empty/", "resources/file.txt"]
+                )
+                self.assertTrue(jar.getinfo("resources/empty/").is_dir())
+
     def test_jmh_participant_combines_registry_and_hints(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

@@ -2,16 +2,73 @@ diff --git a/substratevm/BUILD.bazel b/substratevm/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/substratevm/BUILD.bazel
-@@ -0,0 +1,5901 @@
+@@ -0,0 +1,7187 @@
 +load("@rules_java//java:java_import.bzl", "java_import")
 +load("@rules_mx//graal:layout.bzl", "mx_archive_layout")
-+load("@rules_mx//graal:simplelanguage.bzl", "svm_driver_test_runner")
-+load("@rules_mx//graal:svm.bzl", "svm_compiler_flags", "svm_launcher", "svm_native_projects")
++load("@rules_mx//graal:simplelanguage.bzl", "svm_driver_test_runner", "svm_test_runner")
++load("@rules_mx//graal:svm.bzl", "svm_compiler_flags", "svm_launcher", "svm_native_projects", "svm_native_unittest")
 +load("@rules_mx//mx:graph.bzl", "mx_jar_dist", "mx_jvmci_library", "mx_processed_java", "mx_processor", "mx_project", "mx_resource_layout", "mx_shaded_java", "mx_test_class", "mx_whole_java")
 +
 +java_import(
 +    name = "ZSTD_JNI",
 +    jars = ["@graal_shaded_inputs//:substratevm_ZSTD_JNI.jar"],
++    visibility = ["//visibility:public"],
++)
++
++java_import(
++    name = "JAVACPP_SHADOWED",
++    jars = ["@graal_svm_javacpp_shadowed//file"],
++    target_compatible_with = [],
++    visibility = ["//visibility:public"],
++    exports = [],
++)
++
++java_import(
++    name = "LLVM_WRAPPER_SHADOWED",
++    jars = ["@graal_svm_llvm_wrapper_shadowed//file"],
++    target_compatible_with = [],
++    visibility = ["//visibility:public"],
++    exports = [":JAVACPP_SHADOWED"],
++)
++
++java_import(
++    name = "JAVACPP_PLATFORM_SPECIFIC_SHADOWED",
++    jars = select({
++        ":svm.darwin-aarch64": ["@graal_svm_javacpp_platform_specific_shadowed_darwin_aarch64//file"],
++        ":svm.linux-aarch64": ["@graal_svm_javacpp_platform_specific_shadowed_linux_aarch64//file"],
++        ":svm.linux-amd64": ["@graal_svm_javacpp_platform_specific_shadowed_linux_amd64//file"],
++    }),
++    target_compatible_with = select({
++        ":svm.darwin-aarch64": [],
++        ":svm.linux-aarch64": [],
++        ":svm.linux-amd64": [],
++        "//conditions:default": ["@platforms//:incompatible"],
++    }),
++    visibility = ["//visibility:public"],
++    exports = [],
++)
++
++java_import(
++    name = "LLVM_PLATFORM_SPECIFIC_SHADOWED",
++    jars = select({
++        ":svm.darwin-aarch64": ["@graal_svm_llvm_platform_specific_shadowed_darwin_aarch64//file"],
++        ":svm.linux-aarch64": ["@graal_svm_llvm_platform_specific_shadowed_linux_aarch64//file"],
++        ":svm.linux-amd64": ["@graal_svm_llvm_platform_specific_shadowed_linux_amd64//file"],
++    }),
++    target_compatible_with = select({
++        ":svm.darwin-aarch64": [],
++        ":svm.linux-aarch64": [],
++        ":svm.linux-amd64": [],
++        "//conditions:default": ["@platforms//:incompatible"],
++    }),
++    visibility = ["//visibility:public"],
++    exports = [],
++)
++
++java_import(
++    name = "SVM_TEST_RESOURCE_WITH_SPACE",
++    testonly = True,
++    jars = ["mx.substratevm/jar-with-space-in-resource-dir.jar"],
 +    visibility = ["//visibility:public"],
 +)
 +
@@ -113,6 +170,7 @@ new file mode 100644
 +filegroup(
 +    name = "support_distributions",
 +    srcs = [
++        ":JUNIT_SUPPORT",
 +        ":JVMTI_AGENT_BASE",
 +        ":NATIVE_IMAGE_JUNIT_SUPPORT",
 +        ":NATIVE_IMAGE_LICENSE_GRAALVM_SUPPORT",
@@ -121,8 +179,10 @@ new file mode 100644
 +        ":SVM_DIAGNOSTICS_AGENT",
 +        ":SVM_FOREIGN",
 +        ":SVM_GRAALOS_SUPPORT",
++        ":SVM_GRAALVM_SUPPORT",
 +        ":SVM_JDWP_SERVER",
 +        ":SVM_LIBJVM",
++        ":SVM_LLVM",
 +        ":SVM_LLVM_GRAALVM_SUPPORT",
 +        ":SVM_NFI_GRAALVM_SUPPORT",
 +        ":SVM_NFI_NONE_JAR",
@@ -141,7 +201,10 @@ new file mode 100644
 +    name = "test_distributions",
 +    testonly = True,
 +    srcs = [
++        ":STANDALONE_POINTSTO_TESTS",
 +        ":SVM_DRIVER_TESTS",
++        ":SVM_HOSTED_TESTS",
++        ":SVM_TESTS",
 +        ":SVM_TESTS WITH SPACE",
 +        ":SVM_TRUFFLE_TESTS",
 +    ],
@@ -308,11 +371,521 @@ new file mode 100644
 +        "includes": [],
 +        "jni": False,
 +    },
++    "jvm.windows": {
++        "deliverable": "jvm",
++        "cflags": {"windows": [
++            "-MD",
++            "-Zi",
++            "-O2",
++            "-DJNIEXPORT=",
++        ]},
++        "includes": [],
++        "jni": True,
++    },
 +})
 +
 +svm_launcher(
 +    name = "native-image",
 +    builder_libs = {":ZSTD_JNI": "zstd-jni-1.5.7-23.jar"},
++)
++
++mx_archive_layout(
++    name = "SVM_GRAALVM_SUPPORT",
++    archive_imports = {":SVM_HOSTED_NATIVE": "=clibraries/\n=builder/clibraries/"},
++    format = "tar",
++    members = {
++        "debug/gdbpy/gdb-debughelpers.py": "debug/gdb-debughelpers.py",
++        ":com.oracle.svm.native.reporterchelper": "builder/lib/{basename}",
++        ":ZSTD_JNI": "builder/lib/zstd-jni-1.5.7-23.jar",
++        "schemas/reachability-metadata-schema-v1.2.0.json": "schemas/reachability-metadata-schema.json",
++        "skills/build-native-image-gradle/SKILL.md": "skills/build-native-image-gradle/SKILL.md",
++        "skills/build-native-image-gradle/references/native-image-build-gradle-options.md": "skills/build-native-image-gradle/references/native-image-build-gradle-options.md",
++        "skills/build-native-image-gradle/references/reachability-metadata.md": "skills/build-native-image-gradle/references/reachability-metadata.md",
++        "skills/build-native-image-gradle/references/testing.md": "skills/build-native-image-gradle/references/testing.md",
++        "skills/build-native-image-maven/SKILL.md": "skills/build-native-image-maven/SKILL.md",
++        "skills/build-native-image-maven/references/maven-plugin-options.md": "skills/build-native-image-maven/references/maven-plugin-options.md",
++        "skills/build-native-image-maven/references/reachability-metadata.md": "skills/build-native-image-maven/references/reachability-metadata.md",
++        "skills/build-native-image-maven/references/testing.md": "skills/build-native-image-maven/references/testing.md",
++        "skills/building-native-image/SKILL.md": "skills/building-native-image/SKILL.md",
++        "skills/building-native-image/references/native-image-options.md": "skills/building-native-image/references/native-image-options.md",
++        "skills/building-native-image/references/reachability-metadata.md": "skills/building-native-image/references/reachability-metadata.md",
++    } | select({
++        ":svm.darwin-aarch64": {"@graal_svm_llvm_lld_standalone_darwin_aarch64//:bin/ld64.lld": "bin/ld64.lld"},
++        ":svm.linux-aarch64": {},
++        ":svm.linux-amd64": {},
++        "//conditions:default": {},
++    }),
++    target_compatible_with = select({
++        ":svm.darwin-aarch64": [],
++        ":svm.linux-aarch64": [],
++        ":svm.linux-amd64": [],
++        "//conditions:default": ["@platforms//:incompatible"],
++    }),
++    visibility = ["//visibility:public"],
++)
++
++svm_native_unittest(
++    name = "native_unittest",
++    default_group = True,
++    tags = [
++        "cpu:4",
++        "no-remote-exec",
++    ],
++    tests = [
++        "com.oracle.svm.configure.test.command.ConfigurationGenerateFiltersCommandTest",
++        "com.oracle.svm.configure.test.conditionalconfig.ConfigurationGenerator",
++        "com.oracle.svm.configure.test.conditionalconfig.ConfigurationVerifier",
++        "com.oracle.svm.configure.test.conditionalconfig.PartialConfigurationGenerator",
++        "com.oracle.svm.configure.test.config.ClassNameSupportTest",
++        "com.oracle.svm.configure.test.config.ClassPathJarResourceAgentTest",
++        "com.oracle.svm.configure.test.config.ClassPathJarResourceAgentVerifierTest",
++        "com.oracle.svm.configure.test.config.ConfigurationParserTest",
++        "com.oracle.svm.configure.test.config.ConfigurationSetTest",
++        "com.oracle.svm.configure.test.config.ForeignConfigurationTest",
++        "com.oracle.svm.configure.test.config.OmitPreviousConfigTests",
++        "com.oracle.svm.configure.test.config.ResourceConfigurationTest",
++        "com.oracle.svm.test.AbstractClassSerializationTest",
++        "com.oracle.svm.test.AllURLProtocolTest",
++        "com.oracle.svm.test.ArrayMetadataTracingTest",
++        "com.oracle.svm.test.ArraySetTest",
++        "com.oracle.svm.test.BigIntegerMontgomeryIntrinsicTest",
++        "com.oracle.svm.test.BootstrapMethodTest",
++        "com.oracle.svm.test.CallerClassMetadataTest",
++        "com.oracle.svm.test.DisabledURLProtocolTest",
++        "com.oracle.svm.test.FeatureSingletonCompatibilityTest",
++        "com.oracle.svm.test.FeatureSingletonFutureDefaultTest",
++        "com.oracle.svm.test.FinishedDefaultThreadTest",
++        "com.oracle.svm.test.FinishedThreadTest",
++        "com.oracle.svm.test.ForkJoinTest",
++        "com.oracle.svm.test.GetPackageRuntimeClassLoadingTest",
++        "com.oracle.svm.test.GetPackageTest",
++        "com.oracle.svm.test.GitHub1087",
++        "com.oracle.svm.test.GitHub1398",
++        "com.oracle.svm.test.HeapBlobProfileRecordingTest",
++        "com.oracle.svm.test.HeapBlobProfileTest",
++        "com.oracle.svm.test.ImageInfoTest",
++        "com.oracle.svm.test.IntrospectorInitializationTest",
++        "com.oracle.svm.test.JVMFuncFallbackTest",
++        "com.oracle.svm.test.LambdaClassDeserializationTest",
++        "com.oracle.svm.test.LambdaClassSerializationTest",
++        "com.oracle.svm.test.MethodHandleFieldSetterTest",
++        "com.oracle.svm.test.NativeImageResourceFileSystemProviderTest",
++        "com.oracle.svm.test.NativeImageResourceTest",
++        "com.oracle.svm.test.NativeImageRuntimeClassPathResourceTest",
++        "com.oracle.svm.test.NetworkInterfaceTest",
++        "com.oracle.svm.test.NoHostedAnnotationsTest",
++        "com.oracle.svm.test.PackedCompressedReferenceTest",
++        "com.oracle.svm.test.ProcessPropertiesTest",
++        "com.oracle.svm.test.ReflectionRegistrationTest",
++        "com.oracle.svm.test.ReusePortAvailableTest",
++        "com.oracle.svm.test.RuntimeClassLoadingDispatchTableTest",
++        "com.oracle.svm.test.RuntimeClassLoadingNoClassDefFoundErrorTest",
++        "com.oracle.svm.test.RuntimeClassLoadingReflectionEntryPointsTest",
++        "com.oracle.svm.test.RuntimeClassLoadingUncompiledAOTMethodTest",
++        "com.oracle.svm.test.RuntimeCodeMemoryUsageTest",
++        "com.oracle.svm.test.RuntimeURLProtocolDisableTest",
++        "com.oracle.svm.test.SerializationRegistrationTest",
++        "com.oracle.svm.test.ShenandoahRuntimeCompilationTest",
++        "com.oracle.svm.test.SocketSetOptionTest",
++        "com.oracle.svm.test.StackTraceTests",
++        "com.oracle.svm.test.TestInetAddress",
++        "com.oracle.svm.test.TimeZoneNamesOrderTest",
++        "com.oracle.svm.test.URLProtocolFailureTypeTest",
++        "com.oracle.svm.test.UninterruptibleUtilsIntrinsicTest",
++        "com.oracle.svm.test.continuations.ContinuationStackWalkerTest",
++        "com.oracle.svm.test.continuations.ContinuationsWithRuntimeCompilationTest",
++        "com.oracle.svm.test.continuations.VirtualThreadMountListenerTest",
++        "com.oracle.svm.test.foreign.ForeignTests",
++        "com.oracle.svm.test.foreign.SharedArenaBulkCopyTest",
++        "com.oracle.svm.test.foreign.SharedArenaVectorAPITest",
++        "com.oracle.svm.test.jfr.TestAllocationRequiringGCEvent",
++        "com.oracle.svm.test.jfr.TestClassEvent",
++        "com.oracle.svm.test.jfr.TestConstantPoolClearing",
++        "com.oracle.svm.test.jfr.TestContainerEvent",
++        "com.oracle.svm.test.jfr.TestEmergencyDump",
++        "com.oracle.svm.test.jfr.TestEmergencyDumpConstantPool",
++        "com.oracle.svm.test.jfr.TestEmergencyDumpMetadataOnly",
++        "com.oracle.svm.test.jfr.TestEmergencyDumpRepositoryFallback",
++        "com.oracle.svm.test.jfr.TestEmergencyDumpSupportLifecycle",
++        "com.oracle.svm.test.jfr.TestEveryChunkNativePeriodicEvents",
++        "com.oracle.svm.test.jfr.TestExecutionSampleTopFrame",
++        "com.oracle.svm.test.jfr.TestFlightRecorderEvents",
++        "com.oracle.svm.test.jfr.TestGCEvents",
++        "com.oracle.svm.test.jfr.TestGCHeapSummaryEvent",
++        "com.oracle.svm.test.jfr.TestGarbageCollectionEvents",
++        "com.oracle.svm.test.jfr.TestGrowableWordArrayQuickSort",
++        "com.oracle.svm.test.jfr.TestJavaLevelVirtualThreadChunkRotation",
++        "com.oracle.svm.test.jfr.TestJavaLevelVirtualThreadEvents",
++        "com.oracle.svm.test.jfr.TestJavaMonitorEnterEvent",
++        "com.oracle.svm.test.jfr.TestJavaMonitorInflateEvent",
++        "com.oracle.svm.test.jfr.TestJavaMonitorWaitEvent",
++        "com.oracle.svm.test.jfr.TestJavaMonitorWaitInterruptEvent",
++        "com.oracle.svm.test.jfr.TestJavaMonitorWaitNotifyAllEvent",
++        "com.oracle.svm.test.jfr.TestJavaMonitorWaitTimeoutEvent",
++        "com.oracle.svm.test.jfr.TestJdkContainerEvents",
++        "com.oracle.svm.test.jfr.TestJfrStreamingBasic",
++        "com.oracle.svm.test.jfr.TestJfrStreamingCount",
++        "com.oracle.svm.test.jfr.TestJfrStreamingStress",
++        "com.oracle.svm.test.jfr.TestJfrSymbolRepository",
++        "com.oracle.svm.test.jfr.TestJfrTypeRepository",
++        "com.oracle.svm.test.jfr.TestMirrorEvents",
++        "com.oracle.svm.test.jfr.TestNativeGCAllocationSampleEvent",
++        "com.oracle.svm.test.jfr.TestNmtEvents",
++        "com.oracle.svm.test.jfr.TestObjectAllocationInNewTLABEvent",
++        "com.oracle.svm.test.jfr.TestObjectAllocationOutsideTLABEvent",
++        "com.oracle.svm.test.jfr.TestObjectAllocationSampleEvent",
++        "com.oracle.svm.test.jfr.TestOmitInternalParkEvents",
++        "com.oracle.svm.test.jfr.TestRecordingDestinationPath",
++        "com.oracle.svm.test.jfr.TestRuntimeLoadedClassEvents",
++        "com.oracle.svm.test.jfr.TestShutdownEvent",
++        "com.oracle.svm.test.jfr.TestSocketChannelEvents",
++        "com.oracle.svm.test.jfr.TestSocketEvents",
++        "com.oracle.svm.test.jfr.TestStackTraceEvent",
++        "com.oracle.svm.test.jfr.TestStringEvent",
++        "com.oracle.svm.test.jfr.TestSymbolTraceIdUniqueness",
++        "com.oracle.svm.test.jfr.TestSystemGCEvent",
++        "com.oracle.svm.test.jfr.TestThreadAllocationStatisticsEvent",
++        "com.oracle.svm.test.jfr.TestThreadCPULoadEvent",
++        "com.oracle.svm.test.jfr.TestThreadEvent",
++        "com.oracle.svm.test.jfr.TestThreadParkEvents",
++        "com.oracle.svm.test.jfr.TestThreadSleepEvent",
++        "com.oracle.svm.test.jfr.TestThreadStartEvents",
++        "com.oracle.svm.test.jfr.TestThreshold",
++        "com.oracle.svm.test.jfr.TestThrottler",
++        "com.oracle.svm.test.jfr.TestVirtualThreadsBasic",
++        "com.oracle.svm.test.jfr.TestVirtualThreadsChunkRotation",
++        "com.oracle.svm.test.jfr.TestVirtualThreadsDelayedThreadReferences",
++        "com.oracle.svm.test.jfr.TestVirtualThreadsExecutionSample",
++        "com.oracle.svm.test.jfr.TestVirtualThreadsJfrStreaming",
++        "com.oracle.svm.test.jfr.TestVirtualThreadsUnreferencedStreaming",
++        "com.oracle.svm.test.jfr.oldobject.TestOldObjectProfiler",
++        "com.oracle.svm.test.jfr.oldobject.TestOldObjectSampleEvent",
++        "com.oracle.svm.test.jfr.oldobject.TestOldObjectVirtualThreadSampleEvent",
++        "com.oracle.svm.test.jfr.oldobject.TestRecordingObjectDescription",
++        "com.oracle.svm.test.jmx.GetInputArgumentsTest",
++        "com.oracle.svm.test.jmx.JmxTest",
++        "com.oracle.svm.test.jni.JNIGlobalHandlesTest",
++        "com.oracle.svm.test.lambda.SerializableLambdaReachabilityMetadataTest",
++        "com.oracle.svm.test.logger.PlatformLoggerReconstructionDisabledTest",
++        "com.oracle.svm.test.logger.PlatformLoggerReconstructionTest",
++        "com.oracle.svm.test.nmt.IsolatedRuntimeCompilationNmtTest",
++        "com.oracle.svm.test.nmt.NativeMemoryTrackingTests",
++        "com.oracle.svm.test.preserve.PreserveLambdaProxyClassesTest",
++        "com.oracle.svm.test.preserve.incomplete.PreserveIncompleteExternalizableTest",
++        "com.oracle.svm.test.proxy.ProxyClassSerializationTest",
++        "com.oracle.svm.test.proxy.ProxyExceptionTest",
++        "com.oracle.svm.test.recordannotations.RecordAnnotationsTest",
++        "com.oracle.svm.test.reflect.SubstrateConstructorAccessorTest",
++        "com.oracle.svm.test.ristretto.RistrettoCallerClassTest",
++        "com.oracle.svm.test.ristretto.RistrettoDeoptimizationTest",
++        "com.oracle.svm.test.ristretto.RistrettoDispatchTest",
++        "com.oracle.svm.test.ristretto.RistrettoHubExtensionTest",
++        "com.oracle.svm.test.ristretto.RistrettoMethodHandleTest",
++        "com.oracle.svm.test.ristretto.RistrettoVarHandleTest",
++        "com.oracle.svm.test.services.AbstractServiceLoaderTest",
++        "com.oracle.svm.test.services.DeletedServiceTest",
++        "com.oracle.svm.test.services.NoProviderConstructorServiceLoaderTest",
++        "com.oracle.svm.test.services.SecurityServiceTest",
++        "com.oracle.svm.test.services.ServiceLoaderTest",
++        "com.oracle.svm.test.thread.RunMainInNewThreadTest",
++        "com.oracle.svm.test.thread.ThreadCpuTimeTest",
++        "com.oracle.svm.test.thread.VirtualThreadMonitorInterruptTest",
++        "com.oracle.svm.test.xml.RuntimeClassLoadingXmlApiReachabilityTest",
++        "com.oracle.svm.test.xml.RuntimeClassLoadingXmlImplementationReachabilityTest",
++    ],
++    deps = [":SVM_TESTS"],
++)
++
++svm_test_runner(
++    name = "svm_hosted_junit",
++    jar_property = "svm.test.CheckSVMInvariants.jars",
++    jvm_flags = [
++        "-XX:-UseJVMCICompiler",
++        "-Dsvm.invariants.VerifyReflectionUsage.mode=check_exclude_list",
++        "--add-exports=java.base/com.sun.crypto.provider=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.access.foreign=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.access=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.event=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.foreign.abi.aarch64.linux=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.foreign.abi.aarch64.macos=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.foreign.abi.aarch64=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.foreign.abi.x64.sysv=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.foreign.abi.x64.windows=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.foreign.abi.x64=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.foreign.abi=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.foreign.layout=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.foreign=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.jimage=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.loader=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.logger=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.module=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.perf=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.platform=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.ref=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.reflect=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.util=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.vm.annotation=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.vm.vector=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.vm=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal=ALL-UNNAMED",
++        "--add-exports=java.base/sun.invoke.util=ALL-UNNAMED",
++        "--add-exports=java.base/sun.net.www.protocol.file=ALL-UNNAMED",
++        "--add-exports=java.base/sun.net.www.protocol.ftp=ALL-UNNAMED",
++        "--add-exports=java.base/sun.net.www.protocol.http=ALL-UNNAMED",
++        "--add-exports=java.base/sun.net.www.protocol.https=ALL-UNNAMED",
++        "--add-exports=java.base/sun.net.www.protocol.jar=ALL-UNNAMED",
++        "--add-exports=java.base/sun.net.www.protocol.jmod=ALL-UNNAMED",
++        "--add-exports=java.base/sun.net.www.protocol.jrt=ALL-UNNAMED",
++        "--add-exports=java.base/sun.net.www.protocol.mailto=ALL-UNNAMED",
++        "--add-exports=java.base/sun.net.www=ALL-UNNAMED",
++        "--add-exports=java.base/sun.net=ALL-UNNAMED",
++        "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
++        "--add-exports=java.base/sun.nio.fs=ALL-UNNAMED",
++        "--add-exports=java.base/sun.reflect.annotation=ALL-UNNAMED",
++        "--add-exports=java.base/sun.reflect.generics.factory=ALL-UNNAMED",
++        "--add-exports=java.base/sun.reflect.generics.reflectiveObjects=ALL-UNNAMED",
++        "--add-exports=java.base/sun.reflect.generics.repository=ALL-UNNAMED",
++        "--add-exports=java.base/sun.reflect.generics.tree=ALL-UNNAMED",
++        "--add-exports=java.base/sun.security.jca=ALL-UNNAMED",
++        "--add-exports=java.base/sun.security.provider=ALL-UNNAMED",
++        "--add-exports=java.base/sun.security.rsa=ALL-UNNAMED",
++        "--add-exports=java.base/sun.security.ssl=ALL-UNNAMED",
++        "--add-exports=java.base/sun.security.util=ALL-UNNAMED",
++        "--add-exports=java.base/sun.security.x509=ALL-UNNAMED",
++        "--add-exports=java.base/sun.text.spi=ALL-UNNAMED",
++        "--add-exports=java.base/sun.util.calendar=ALL-UNNAMED",
++        "--add-exports=java.base/sun.util.cldr=ALL-UNNAMED",
++        "--add-exports=java.base/sun.util.locale.provider=ALL-UNNAMED",
++        "--add-exports=java.base/sun.util.locale=ALL-UNNAMED",
++        "--add-exports=java.base/sun.util.resources=ALL-UNNAMED",
++        "--add-exports=java.base/sun.util.spi=ALL-UNNAMED",
++        "--add-exports=java.base/sun.util=ALL-UNNAMED",
++        "--add-exports=java.management/com.sun.jmx.mbeanserver=ALL-UNNAMED",
++        "--add-exports=java.management/sun.management=ALL-UNNAMED",
++        "--add-exports=jdk.jfr/jdk.jfr.events=ALL-UNNAMED",
++        "--add-exports=jdk.jfr/jdk.jfr.internal.event=ALL-UNNAMED",
++        "--add-exports=jdk.jfr/jdk.jfr.internal.jfc=ALL-UNNAMED",
++        "--add-exports=jdk.jfr/jdk.jfr.internal.settings=ALL-UNNAMED",
++        "--add-exports=jdk.jfr/jdk.jfr.internal.tracing=ALL-UNNAMED",
++        "--add-exports=jdk.jfr/jdk.jfr.internal=ALL-UNNAMED",
++        "--add-exports=jdk.management/com.sun.management.internal=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.access=jdk.graal.compiler.hostvmaccess",
++        "--add-exports=java.base/jdk.internal.loader=jdk.graal.compiler.hostvmaccess",
++        "--add-exports=java.base/jdk.internal.misc=jdk.graal.compiler.hostvmaccess",
++        "--add-exports=java.base/jdk.internal.module=jdk.graal.compiler.hostvmaccess",
++        "--add-exports=java.base/jdk.internal.module=jdk.graal.compiler.vmaccess",
++        "--add-exports=java.base/sun.reflect.annotation=jdk.graal.compiler.vmaccess",
++        "--add-exports=jdk.graal.compiler/jdk.graal.compiler.annotation=jdk.graal.compiler.hostvmaccess",
++        "--add-exports=jdk.graal.compiler/jdk.graal.compiler.annotation=jdk.graal.compiler.vmaccess",
++        "--add-exports=jdk.graal.compiler/jdk.graal.compiler.api.replacements=jdk.graal.compiler.hostvmaccess",
++        "--add-exports=jdk.graal.compiler/jdk.graal.compiler.api.runtime=jdk.graal.compiler.hostvmaccess",
++        "--add-exports=jdk.graal.compiler/jdk.graal.compiler.core.target=jdk.graal.compiler.hostvmaccess",
++        "--add-exports=jdk.graal.compiler/jdk.graal.compiler.phases.util=jdk.graal.compiler.hostvmaccess",
++        "--add-exports=jdk.graal.compiler/jdk.graal.compiler.phases.util=jdk.graal.compiler.vmaccess",
++        "--add-exports=jdk.graal.compiler/jdk.graal.compiler.runtime=jdk.graal.compiler.hostvmaccess",
++        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.code=jdk.graal.compiler.hostvmaccess",
++        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.code=jdk.graal.compiler.vmaccess",
++        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta.annotation=jdk.graal.compiler.hostvmaccess",
++        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta.annotation=jdk.graal.compiler.vmaccess",
++        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=jdk.graal.compiler.hostvmaccess",
++        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.meta=jdk.graal.compiler.vmaccess",
++        "--add-exports=jdk.internal.vm.ci/jdk.vm.ci.runtime=jdk.graal.compiler.hostvmaccess",
++    ],
++    modules = [
++        "//compiler:VMACCESS",
++        "//compiler:HOSTVMACCESS",
++    ],
++    property_jars = [
++        ":SVM_PROCESSOR",
++        ":SVM",
++        ":SVM_GRAALOS_SUPPORT",
++        ":SVM_SHARED",
++        ":SVM_JVMCI_SHARED",
++        ":SVM_JVMCI_GUEST_STAGING",
++        ":SVM_GUEST_STAGING",
++        ":SVM_GUEST",
++        ":SVM_JVMCI_GUEST",
++        ":SVM_CAPNPROTO_RUNTIME",
++        ":JVMTI_AGENT_BASE",
++        ":LIBRARY_SUPPORT",
++        ":JUNIT_SUPPORT",
++        ":OBJECTFILE",
++        ":TRUFFLE_RUNTIME_SVM",
++        ":SVM_DRIVER",
++        ":SVM_AGENT",
++        ":SVM_DIAGNOSTICS_AGENT",
++        ":SVM_CONFIGURE",
++        ":SVM_LIBJVM",
++        ":NATIVE_IMAGE_BASE",
++        ":POINTSTO",
++        ":STANDALONE_POINTSTO",
++        ":SVM_NFI_NONE_JAR",
++        ":SVM_FOREIGN",
++        ":SVM_LLVM",
++        ":SVM_TRUFFLE_TCK",
++        ":SVM_JDWP_SERVER",
++    ],
++    root_modules = [
++        "jdk.graal.compiler.hostvmaccess",
++        "jdk.graal.compiler.vmaccess",
++    ],
++    test_classpath = [":SVM_HOSTED_TESTS"],
++)
++
++svm_test_runner(
++    name = "svm_pointsto_junit",
++    jvm_flags = [
++        "-Djava.util.concurrent.ForkJoinPool.common.threadFactory=com.oracle.graal.pointsto.standalone.StandaloneCommonPoolWorkerThreadFactory",
++        "-Dcom.oracle.graal.pointsto.standalone.vmaccess.name=host",
++        "-Dcom.oracle.graal.pointsto.standalone.test.analysis.option.count=0",
++        "--add-exports=jdk.graal.compiler/jdk.graal.compiler.phases.util=ALL-UNNAMED",
++        "--add-exports=java.base/com.sun.crypto.provider=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.access.foreign=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.access=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.event=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.foreign.abi.aarch64.linux=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.foreign.abi.aarch64.macos=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.foreign.abi.aarch64=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.foreign.abi.x64.sysv=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.foreign.abi.x64.windows=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.foreign.abi.x64=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.foreign.abi=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.foreign.layout=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.foreign=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.jimage=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.loader=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.logger=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.module=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.perf=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.platform=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.ref=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.reflect=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.util=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.vm.annotation=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.vm.vector=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.vm=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal=ALL-UNNAMED",
++        "--add-exports=java.base/sun.invoke.util=ALL-UNNAMED",
++        "--add-exports=java.base/sun.net.www.protocol.file=ALL-UNNAMED",
++        "--add-exports=java.base/sun.net.www.protocol.ftp=ALL-UNNAMED",
++        "--add-exports=java.base/sun.net.www.protocol.http=ALL-UNNAMED",
++        "--add-exports=java.base/sun.net.www.protocol.https=ALL-UNNAMED",
++        "--add-exports=java.base/sun.net.www.protocol.jar=ALL-UNNAMED",
++        "--add-exports=java.base/sun.net.www.protocol.jmod=ALL-UNNAMED",
++        "--add-exports=java.base/sun.net.www.protocol.jrt=ALL-UNNAMED",
++        "--add-exports=java.base/sun.net.www.protocol.mailto=ALL-UNNAMED",
++        "--add-exports=java.base/sun.net.www=ALL-UNNAMED",
++        "--add-exports=java.base/sun.net=ALL-UNNAMED",
++        "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
++        "--add-exports=java.base/sun.nio.fs=ALL-UNNAMED",
++        "--add-exports=java.base/sun.reflect.annotation=ALL-UNNAMED",
++        "--add-exports=java.base/sun.reflect.generics.factory=ALL-UNNAMED",
++        "--add-exports=java.base/sun.reflect.generics.reflectiveObjects=ALL-UNNAMED",
++        "--add-exports=java.base/sun.reflect.generics.repository=ALL-UNNAMED",
++        "--add-exports=java.base/sun.reflect.generics.tree=ALL-UNNAMED",
++        "--add-exports=java.base/sun.security.jca=ALL-UNNAMED",
++        "--add-exports=java.base/sun.security.provider=ALL-UNNAMED",
++        "--add-exports=java.base/sun.security.rsa=ALL-UNNAMED",
++        "--add-exports=java.base/sun.security.ssl=ALL-UNNAMED",
++        "--add-exports=java.base/sun.security.util=ALL-UNNAMED",
++        "--add-exports=java.base/sun.security.x509=ALL-UNNAMED",
++        "--add-exports=java.base/sun.text.spi=ALL-UNNAMED",
++        "--add-exports=java.base/sun.util.calendar=ALL-UNNAMED",
++        "--add-exports=java.base/sun.util.cldr=ALL-UNNAMED",
++        "--add-exports=java.base/sun.util.locale.provider=ALL-UNNAMED",
++        "--add-exports=java.base/sun.util.locale=ALL-UNNAMED",
++        "--add-exports=java.base/sun.util.resources=ALL-UNNAMED",
++        "--add-exports=java.base/sun.util.spi=ALL-UNNAMED",
++        "--add-exports=java.base/sun.util=ALL-UNNAMED",
++        "--add-exports=java.management/com.sun.jmx.mbeanserver=ALL-UNNAMED",
++        "--add-exports=java.management/sun.management=ALL-UNNAMED",
++        "--add-exports=jdk.jfr/jdk.jfr.events=ALL-UNNAMED",
++        "--add-exports=jdk.jfr/jdk.jfr.internal.event=ALL-UNNAMED",
++        "--add-exports=jdk.jfr/jdk.jfr.internal.jfc=ALL-UNNAMED",
++        "--add-exports=jdk.jfr/jdk.jfr.internal.settings=ALL-UNNAMED",
++        "--add-exports=jdk.jfr/jdk.jfr.internal.tracing=ALL-UNNAMED",
++        "--add-exports=jdk.jfr/jdk.jfr.internal=ALL-UNNAMED",
++        "--add-exports=jdk.management/com.sun.management.internal=ALL-UNNAMED",
++    ],
++    test_classpath = [":STANDALONE_POINTSTO_TESTS"],
++)
++
++svm_test_runner(
++    name = "svm_graal_junit",
++    jvm_flags = [
++        "-XX:-UseJVMCICompiler",
++        "--add-exports=java.base/com.sun.crypto.provider=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.access.foreign=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.access=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.event=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.foreign.abi.aarch64.linux=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.foreign.abi.aarch64.macos=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.foreign.abi.aarch64=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.foreign.abi.x64.sysv=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.foreign.abi.x64.windows=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.foreign.abi.x64=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.foreign.abi=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.foreign.layout=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.foreign=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.jimage=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.loader=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.logger=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.misc=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.module=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.perf=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.platform=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.ref=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.reflect=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.util=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.vm.annotation=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.vm.vector=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal.vm=ALL-UNNAMED",
++        "--add-exports=java.base/jdk.internal=ALL-UNNAMED",
++        "--add-exports=java.base/sun.invoke.util=ALL-UNNAMED",
++        "--add-exports=java.base/sun.net.www.protocol.file=ALL-UNNAMED",
++        "--add-exports=java.base/sun.net.www.protocol.ftp=ALL-UNNAMED",
++        "--add-exports=java.base/sun.net.www.protocol.http=ALL-UNNAMED",
++        "--add-exports=java.base/sun.net.www.protocol.https=ALL-UNNAMED",
++        "--add-exports=java.base/sun.net.www.protocol.jar=ALL-UNNAMED",
++        "--add-exports=java.base/sun.net.www.protocol.jmod=ALL-UNNAMED",
++        "--add-exports=java.base/sun.net.www.protocol.jrt=ALL-UNNAMED",
++        "--add-exports=java.base/sun.net.www.protocol.mailto=ALL-UNNAMED",
++        "--add-exports=java.base/sun.net.www=ALL-UNNAMED",
++        "--add-exports=java.base/sun.net=ALL-UNNAMED",
++        "--add-exports=java.base/sun.nio.ch=ALL-UNNAMED",
++        "--add-exports=java.base/sun.nio.fs=ALL-UNNAMED",
++        "--add-exports=java.base/sun.reflect.annotation=ALL-UNNAMED",
++        "--add-exports=java.base/sun.reflect.generics.factory=ALL-UNNAMED",
++        "--add-exports=java.base/sun.reflect.generics.reflectiveObjects=ALL-UNNAMED",
++        "--add-exports=java.base/sun.reflect.generics.repository=ALL-UNNAMED",
++        "--add-exports=java.base/sun.reflect.generics.tree=ALL-UNNAMED",
++        "--add-exports=java.base/sun.security.jca=ALL-UNNAMED",
++        "--add-exports=java.base/sun.security.provider=ALL-UNNAMED",
++        "--add-exports=java.base/sun.security.rsa=ALL-UNNAMED",
++        "--add-exports=java.base/sun.security.ssl=ALL-UNNAMED",
++        "--add-exports=java.base/sun.security.util=ALL-UNNAMED",
++        "--add-exports=java.base/sun.security.x509=ALL-UNNAMED",
++        "--add-exports=java.base/sun.text.spi=ALL-UNNAMED",
++        "--add-exports=java.base/sun.util.calendar=ALL-UNNAMED",
++        "--add-exports=java.base/sun.util.cldr=ALL-UNNAMED",
++        "--add-exports=java.base/sun.util.locale.provider=ALL-UNNAMED",
++        "--add-exports=java.base/sun.util.locale=ALL-UNNAMED",
++        "--add-exports=java.base/sun.util.resources=ALL-UNNAMED",
++        "--add-exports=java.base/sun.util.spi=ALL-UNNAMED",
++        "--add-exports=java.base/sun.util=ALL-UNNAMED",
++        "--add-exports=java.management/com.sun.jmx.mbeanserver=ALL-UNNAMED",
++        "--add-exports=java.management/sun.management=ALL-UNNAMED",
++        "--add-exports=jdk.jfr/jdk.jfr.events=ALL-UNNAMED",
++        "--add-exports=jdk.jfr/jdk.jfr.internal.event=ALL-UNNAMED",
++        "--add-exports=jdk.jfr/jdk.jfr.internal.jfc=ALL-UNNAMED",
++        "--add-exports=jdk.jfr/jdk.jfr.internal.settings=ALL-UNNAMED",
++        "--add-exports=jdk.jfr/jdk.jfr.internal.tracing=ALL-UNNAMED",
++        "--add-exports=jdk.jfr/jdk.jfr.internal=ALL-UNNAMED",
++        "--add-exports=jdk.management/com.sun.management.internal=ALL-UNNAMED",
++    ],
++    test_classpath = [":com.oracle.svm.graal.test"],
 +)
 +
 +mx_jvmci_library(
@@ -431,6 +1004,187 @@ new file mode 100644
 +        "//sdk:COLLECTIONS",
 +        "//sdk:NATIVEIMAGE",
 +    ],
++)
++
++mx_jvmci_library(
++    name = "com.oracle.graal.pointsto.standalone.test",
++    testonly = True,
++    srcs = ["//substratevm/src/com.oracle.graal.pointsto.standalone.test/src/com/oracle/graal/pointsto/standalone/test:com.oracle.graal.pointsto.standalone.test.srcs"],
++    add_exports = [
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta.annotation",
++    ],
++    javacopts = [
++        "-source",
++        "21",
++        "-target",
++        "21",
++        "-parameters",
++        "--add-modules",
++        "jdk.unsupported,java.compiler",
++    ],
++    mx_resource_root = "src/com.oracle.graal.pointsto.standalone.test/src",
++    plugins = [
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.replacements.processor.ReplacementsAnnotationProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.nodeinfo.processor.GraphNodeProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.IntrinsicStubProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.SyncPortProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.core.match.processor.MatchProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.options.processor.OptionProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.serviceprovider.processor.ServiceProviderProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.libgraal.truffle.TruffleFromLibGraalProcessor",
++    ],
++    resources = [
++        "//substratevm/src/com.oracle.graal.pointsto.standalone.test/src/resources:com.oracle.graal.pointsto.standalone.test.resources",
++        "//substratevm/src/com.oracle.graal.pointsto.standalone.test/src/resources/large-reachability:com.oracle.graal.pointsto.standalone.test.resources",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":POINTSTO",
++        ":STANDALONE_POINTSTO",
++        ":SVM_GUEST_STAGING",
++        ":com.oracle.graal.pointsto.standalone.test.classes",
++        "//compiler:GRAAL",
++        "//sdk:NATIVEIMAGE",
++        "@rules_mx//graal:mx_junit_tool",
++    ],
++)
++
++mx_test_class(
++    name = "com.oracle.graal.pointsto.standalone.test.com.oracle.graal.pointsto.standalone.test.AnalysisEntryPointsFileTest",
++    launcher = ":svm_pointsto_junit",
++    test_class = "com.oracle.graal.pointsto.standalone.test.AnalysisEntryPointsFileTest",
++)
++
++mx_test_class(
++    name = "com.oracle.graal.pointsto.standalone.test.com.oracle.graal.pointsto.standalone.test.ClassEqualityTest",
++    launcher = ":svm_pointsto_junit",
++    test_class = "com.oracle.graal.pointsto.standalone.test.ClassEqualityTest",
++)
++
++mx_test_class(
++    name = "com.oracle.graal.pointsto.standalone.test.com.oracle.graal.pointsto.standalone.test.ClassInitializationPolicyTest",
++    launcher = ":svm_pointsto_junit",
++    test_class = "com.oracle.graal.pointsto.standalone.test.ClassInitializationPolicyTest",
++)
++
++mx_test_class(
++    name = "com.oracle.graal.pointsto.standalone.test.com.oracle.graal.pointsto.standalone.test.ConstantFieldTest",
++    launcher = ":svm_pointsto_junit",
++    test_class = "com.oracle.graal.pointsto.standalone.test.ConstantFieldTest",
++)
++
++mx_test_class(
++    name = "com.oracle.graal.pointsto.standalone.test.com.oracle.graal.pointsto.standalone.test.LargeReachabilityTest",
++    launcher = ":svm_pointsto_junit",
++    test_class = "com.oracle.graal.pointsto.standalone.test.LargeReachabilityTest",
++)
++
++mx_test_class(
++    name = "com.oracle.graal.pointsto.standalone.test.com.oracle.graal.pointsto.standalone.test.MissingPermittedSubclassTest",
++    launcher = ":svm_pointsto_junit",
++    test_class = "com.oracle.graal.pointsto.standalone.test.MissingPermittedSubclassTest",
++)
++
++mx_test_class(
++    name = "com.oracle.graal.pointsto.standalone.test.com.oracle.graal.pointsto.standalone.test.RuntimeInitializedStaticFieldTest",
++    launcher = ":svm_pointsto_junit",
++    test_class = "com.oracle.graal.pointsto.standalone.test.RuntimeInitializedStaticFieldTest",
++)
++
++mx_test_class(
++    name = "com.oracle.graal.pointsto.standalone.test.com.oracle.graal.pointsto.standalone.test.StandaloneAnalysisAssertionsTest",
++    launcher = ":svm_pointsto_junit",
++    test_class = "com.oracle.graal.pointsto.standalone.test.StandaloneAnalysisAssertionsTest",
++)
++
++mx_test_class(
++    name = "com.oracle.graal.pointsto.standalone.test.com.oracle.graal.pointsto.standalone.test.StandaloneAnalysisReportTest",
++    launcher = ":svm_pointsto_junit",
++    test_class = "com.oracle.graal.pointsto.standalone.test.StandaloneAnalysisReportTest",
++)
++
++mx_test_class(
++    name = "com.oracle.graal.pointsto.standalone.test.com.oracle.graal.pointsto.standalone.test.StandaloneAnalyzerReachabilityTest",
++    launcher = ":svm_pointsto_junit",
++    test_class = "com.oracle.graal.pointsto.standalone.test.StandaloneAnalyzerReachabilityTest",
++)
++
++mx_test_class(
++    name = "com.oracle.graal.pointsto.standalone.test.com.oracle.graal.pointsto.standalone.test.StandaloneArrayAndContainerFlowTest",
++    launcher = ":svm_pointsto_junit",
++    test_class = "com.oracle.graal.pointsto.standalone.test.StandaloneArrayAndContainerFlowTest",
++)
++
++mx_test_class(
++    name = "com.oracle.graal.pointsto.standalone.test.com.oracle.graal.pointsto.standalone.test.StandaloneConstantPropagationTest",
++    launcher = ":svm_pointsto_junit",
++    test_class = "com.oracle.graal.pointsto.standalone.test.StandaloneConstantPropagationTest",
++)
++
++mx_test_class(
++    name = "com.oracle.graal.pointsto.standalone.test.com.oracle.graal.pointsto.standalone.test.StandaloneConstantScanDynamicTest",
++    launcher = ":svm_pointsto_junit",
++    test_class = "com.oracle.graal.pointsto.standalone.test.StandaloneConstantScanDynamicTest",
++)
++
++mx_test_class(
++    name = "com.oracle.graal.pointsto.standalone.test.com.oracle.graal.pointsto.standalone.test.StandaloneContextSensitiveReturnTest",
++    launcher = ":svm_pointsto_junit",
++    test_class = "com.oracle.graal.pointsto.standalone.test.StandaloneContextSensitiveReturnTest",
++)
++
++mx_test_class(
++    name = "com.oracle.graal.pointsto.standalone.test.com.oracle.graal.pointsto.standalone.test.StandaloneDispatchPrecisionTest",
++    launcher = ":svm_pointsto_junit",
++    test_class = "com.oracle.graal.pointsto.standalone.test.StandaloneDispatchPrecisionTest",
++)
++
++mx_test_class(
++    name = "com.oracle.graal.pointsto.standalone.test.com.oracle.graal.pointsto.standalone.test.StandaloneExceptionAndRecursionTest",
++    launcher = ":svm_pointsto_junit",
++    test_class = "com.oracle.graal.pointsto.standalone.test.StandaloneExceptionAndRecursionTest",
++)
++
++mx_test_class(
++    name = "com.oracle.graal.pointsto.standalone.test.com.oracle.graal.pointsto.standalone.test.StandaloneFieldAndAllocationFlowTest",
++    launcher = ":svm_pointsto_junit",
++    test_class = "com.oracle.graal.pointsto.standalone.test.StandaloneFieldAndAllocationFlowTest",
++)
++
++mx_test_class(
++    name = "com.oracle.graal.pointsto.standalone.test.com.oracle.graal.pointsto.standalone.test.StandalonePrimitivePredicateTest",
++    launcher = ":svm_pointsto_junit",
++    test_class = "com.oracle.graal.pointsto.standalone.test.StandalonePrimitivePredicateTest",
++)
++
++mx_test_class(
++    name = "com.oracle.graal.pointsto.standalone.test.com.oracle.graal.pointsto.standalone.test.StandaloneReturnedParameterOptimizationTest",
++    launcher = ":svm_pointsto_junit",
++    test_class = "com.oracle.graal.pointsto.standalone.test.StandaloneReturnedParameterOptimizationTest",
++)
++
++mx_test_class(
++    name = "com.oracle.graal.pointsto.standalone.test.com.oracle.graal.pointsto.standalone.test.StandardGraphPluginTest",
++    launcher = ":svm_pointsto_junit",
++    test_class = "com.oracle.graal.pointsto.standalone.test.StandardGraphPluginTest",
++)
++
++mx_whole_java(
++    name = "com.oracle.graal.pointsto.standalone.test.classes",
++    testonly = True,
++    srcs = [
++        "//substratevm/src/com.oracle.graal.pointsto.standalone.test.classes/src/com/oracle/graal/pointsto/standalone/test/classes:com.oracle.graal.pointsto.standalone.test.classes.srcs",
++        "//substratevm/src/com.oracle.graal.pointsto.standalone.test.classes/src/com/oracle/graal/pointsto/standalone/test/classes/classinitpolicy:com.oracle.graal.pointsto.standalone.test.classes.srcs",
++    ],
++    javac_opts = [
++        "--release",
++        "21",
++        "-parameters",
++    ],
++    unified_release = 21,
++    visibility = ["//visibility:public"],
++    deps = ["//compiler:GRAAL"],
 +)
 +
 +mx_jvmci_library(
@@ -580,6 +1334,33 @@ new file mode 100644
 +    ],
 +)
 +
++mx_processed_java(
++    name = "com.oracle.svm.bench",
++    srcs = ["//substratevm/src/com.oracle.svm.bench/src/com/oracle/svm/bench/scaladacapo:com.oracle.svm.bench.srcs"],
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++    ],
++    plugins = [
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.replacements.processor.ReplacementsAnnotationProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.nodeinfo.processor.GraphNodeProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.IntrinsicStubProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.SyncPortProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.core.match.processor.MatchProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.options.processor.OptionProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.serviceprovider.processor.ServiceProviderProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.libgraal.truffle.TruffleFromLibGraalProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredFeatureProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredImageSingletonProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.BasedOnJDKFileProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.LayeredAnnotationProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.GenerateAnnotationWrapperProcessor",
++    ],
++    visibility = ["//visibility:public"],
++    deps = ["//sdk:NATIVEIMAGE"],
++)
++
 +mx_jvmci_library(
 +    name = "com.oracle.svm.common",
 +    srcs = [
@@ -701,7 +1482,7 @@ new file mode 100644
 +        "//compiler:GRAAL",
 +        "//sdk:COLLECTIONS",
 +        "//sdk:NATIVEIMAGE",
-+        "@contrib_rules_jvm_deps//:junit_junit",
++        "@rules_mx//graal:mx_junit_tool",
 +    ],
 +)
 +
@@ -1467,6 +2248,70 @@ new file mode 100644
 +)
 +
 +mx_jvmci_library(
++    name = "com.oracle.svm.core.graal.llvm",
++    srcs = [
++        "//substratevm/src/com.oracle.svm.core.graal.llvm/src/com/oracle/svm/core/graal/llvm:com.oracle.svm.core.graal.llvm.srcs",
++        "//substratevm/src/com.oracle.svm.core.graal.llvm/src/com/oracle/svm/core/graal/llvm/image:com.oracle.svm.core.graal.llvm.srcs",
++        "//substratevm/src/com.oracle.svm.core.graal.llvm/src/com/oracle/svm/core/graal/llvm/lowering:com.oracle.svm.core.graal.llvm.srcs",
++        "//substratevm/src/com.oracle.svm.core.graal.llvm/src/com/oracle/svm/core/graal/llvm/objectfile:com.oracle.svm.core.graal.llvm.srcs",
++        "//substratevm/src/com.oracle.svm.core.graal.llvm/src/com/oracle/svm/core/graal/llvm/replacements:com.oracle.svm.core.graal.llvm.srcs",
++        "//substratevm/src/com.oracle.svm.core.graal.llvm/src/com/oracle/svm/core/graal/llvm/runtime:com.oracle.svm.core.graal.llvm.srcs",
++        "//substratevm/src/com.oracle.svm.core.graal.llvm/src/com/oracle/svm/core/graal/llvm/util:com.oracle.svm.core.graal.llvm.srcs",
++    ],
++    add_exports = [
++        "java.base/jdk.internal.misc",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta.annotation",
++        "jdk.internal.vm.ci/jdk.vm.ci.code",
++        "jdk.internal.vm.ci/jdk.vm.ci.code.site",
++    ],
++    javacopts = [
++        "-source",
++        "24",
++        "-target",
++        "24",
++        "-parameters",
++    ],
++    mx_resource_root = "src/com.oracle.svm.core.graal.llvm/src",
++    plugins = [
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.replacements.processor.ReplacementsAnnotationProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.nodeinfo.processor.GraphNodeProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.IntrinsicStubProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.SyncPortProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.core.match.processor.MatchProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.options.processor.OptionProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.serviceprovider.processor.ServiceProviderProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.libgraal.truffle.TruffleFromLibGraalProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredFeatureProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredImageSingletonProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.BasedOnJDKFileProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.LayeredAnnotationProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.GenerateAnnotationWrapperProcessor",
++    ],
++    resources = ["//substratevm/src/com.oracle.svm.core.graal.llvm/src/com/oracle/svm/core/graal/llvm:com.oracle.svm.core.graal.llvm.resources"],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":JAVACPP_PLATFORM_SPECIFIC_SHADOWED",
++        ":LLVM_PLATFORM_SPECIFIC_SHADOWED",
++        ":LLVM_WRAPPER_SHADOWED",
++        ":NATIVE_IMAGE_BASE",
++        ":SVM_GUEST_STAGING",
++        ":SVM_JVMCI_SHARED",
++        ":SVM_SHARED",
++        ":com.oracle.graal.pointsto",
++        ":com.oracle.objectfile",
++        ":com.oracle.svm.core",
++        ":com.oracle.svm.hosted",
++        ":com.oracle.svm.util",
++        "//compiler:GRAAL",
++        "//compiler:GRAAL_OPTIONS",
++        "//sdk:COLLECTIONS",
++        "//sdk:NATIVEIMAGE",
++        "//sdk:WORD",
++    ],
++)
++
++mx_jvmci_library(
 +    name = "com.oracle.svm.core.graal.riscv64",
 +    srcs = ["//substratevm/src/com.oracle.svm.core.graal.riscv64/src/com/oracle/svm/core/graal/riscv64:com.oracle.svm.core.graal.riscv64.srcs"],
 +    add_exports = [
@@ -1788,7 +2633,7 @@ new file mode 100644
 +        ":com.oracle.svm.driver",
 +        ":com.oracle.svm.driver.launcher",
 +        "//compiler:GRAAL",
-+        "@contrib_rules_jvm_deps//:junit_junit",
++        "@rules_mx//graal:mx_junit_tool",
 +    ],
 +)
 +
@@ -1886,6 +2731,59 @@ new file mode 100644
 +        "//sdk:NATIVEIMAGE",
 +        "//sdk:WORD",
 +    ],
++)
++
++mx_jvmci_library(
++    name = "com.oracle.svm.graal.test",
++    testonly = True,
++    srcs = ["//substratevm/src/com.oracle.svm.graal.test/src/com/oracle/svm/graal/test:com.oracle.svm.graal.test.srcs"],
++    add_exports = [
++        "jdk.internal.vm.ci/jdk.vm.ci.code.stack",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta.annotation",
++    ],
++    javacopts = [
++        "-source",
++        "24",
++        "-target",
++        "24",
++        "-parameters",
++    ],
++    plugins = [
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.replacements.processor.ReplacementsAnnotationProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.nodeinfo.processor.GraphNodeProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.IntrinsicStubProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.SyncPortProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.core.match.processor.MatchProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.options.processor.OptionProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.serviceprovider.processor.ServiceProviderProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.libgraal.truffle.TruffleFromLibGraalProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredFeatureProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredImageSingletonProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.BasedOnJDKFileProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.LayeredAnnotationProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.GenerateAnnotationWrapperProcessor",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":com.oracle.svm.graal",
++        "//compiler:GRAAL",
++        "//sdk:NATIVEIMAGE",
++        "@rules_mx//graal:mx_junit_tool",
++    ],
++)
++
++mx_test_class(
++    name = "com.oracle.svm.graal.test.com.oracle.svm.graal.test.IsolatedSpeculationLogEncodingNativeTest",
++    launcher = ":svm_graal_junit",
++    test_class = "com.oracle.svm.graal.test.IsolatedSpeculationLogEncodingNativeTest",
++)
++
++mx_test_class(
++    name = "com.oracle.svm.graal.test.com.oracle.svm.graal.test.IsolatedSpeculationLogEncodingTest",
++    launcher = ":svm_graal_junit",
++    tags = ["manual"],
++    test_class = "com.oracle.svm.graal.test.IsolatedSpeculationLogEncodingTest",
 +)
 +
 +mx_processed_java(
@@ -2296,6 +3194,110 @@ new file mode 100644
 +)
 +
 +mx_jvmci_library(
++    name = "com.oracle.svm.hosted.test",
++    testonly = True,
++    srcs = [
++        "//substratevm/src/com.oracle.svm.hosted.test/src/com/oracle/svm/core/code:com.oracle.svm.hosted.test.srcs",
++        "//substratevm/src/com.oracle.svm.hosted.test/src/com/oracle/svm/hosted:com.oracle.svm.hosted.test.srcs",
++        "//substratevm/src/com.oracle.svm.hosted.test/src/com/oracle/svm/hosted/code:com.oracle.svm.hosted.test.srcs",
++        "//substratevm/src/com.oracle.svm.hosted.test/src/com/oracle/svm/hosted/lambda:com.oracle.svm.hosted.test.srcs",
++        "//substratevm/src/com.oracle.svm.hosted.test/src/com/oracle/svm/hosted/test:com.oracle.svm.hosted.test.srcs",
++    ],
++    add_exports = [
++        "java.base/jdk.internal.module",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta.annotation",
++    ],
++    javacopts = [
++        "-source",
++        "24",
++        "-target",
++        "24",
++        "-parameters",
++    ],
++    mx_resource_root = "src/com.oracle.svm.hosted.test/src",
++    plugins = [
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.replacements.processor.ReplacementsAnnotationProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.nodeinfo.processor.GraphNodeProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.IntrinsicStubProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.SyncPortProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.core.match.processor.MatchProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.options.processor.OptionProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.serviceprovider.processor.ServiceProviderProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.libgraal.truffle.TruffleFromLibGraalProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredFeatureProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredImageSingletonProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.BasedOnJDKFileProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.LayeredAnnotationProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.GenerateAnnotationWrapperProcessor",
++    ],
++    resources = ["//substratevm/src/com.oracle.svm.hosted.test/src/com/oracle/svm/hosted/test:com.oracle.svm.hosted.test.resources"],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":NATIVE_IMAGE_BASE",
++        ":POINTSTO",
++        ":SVM",
++        ":SVM_SHARED",
++        "//compiler:GRAAL",
++        "//compiler:GRAAL_OPTIONS",
++        "//compiler:GRAAL_TEST",
++        "//compiler:VMACCESS",
++        "//sdk:COLLECTIONS",
++        "//sdk:NATIVEIMAGE",
++        "@rules_mx//graal:mx_junit_tool",
++    ],
++)
++
++mx_test_class(
++    name = "com.oracle.svm.hosted.test.com.oracle.svm.core.code.FrameInfoDecoderTest",
++    launcher = ":svm_hosted_junit",
++    test_class = "com.oracle.svm.core.code.FrameInfoDecoderTest",
++)
++
++mx_test_class(
++    name = "com.oracle.svm.hosted.test.com.oracle.svm.hosted.DeadlockWatchdogTest",
++    launcher = ":svm_hosted_junit",
++    test_class = "com.oracle.svm.hosted.DeadlockWatchdogTest",
++)
++
++mx_test_class(
++    name = "com.oracle.svm.hosted.test.com.oracle.svm.hosted.NativeImageClassLoaderSupportTest",
++    launcher = ":svm_hosted_junit",
++    test_class = "com.oracle.svm.hosted.NativeImageClassLoaderSupportTest",
++)
++
++mx_test_class(
++    name = "com.oracle.svm.hosted.test.com.oracle.svm.hosted.code.CompileQueueConfigurationTest",
++    launcher = ":svm_hosted_junit",
++    test_class = "com.oracle.svm.hosted.code.CompileQueueConfigurationTest",
++)
++
++mx_test_class(
++    name = "com.oracle.svm.hosted.test.com.oracle.svm.hosted.lambda.LambdaParserTest",
++    launcher = ":svm_hosted_junit",
++    test_class = "com.oracle.svm.hosted.lambda.LambdaParserTest",
++)
++
++mx_test_class(
++    name = "com.oracle.svm.hosted.test.com.oracle.svm.hosted.test.CheckSVMInvariants",
++    launcher = ":svm_hosted_junit",
++    tags = ["manual"],
++    test_class = "com.oracle.svm.hosted.test.CheckSVMInvariants",
++)
++
++mx_test_class(
++    name = "com.oracle.svm.hosted.test.com.oracle.svm.hosted.test.HeapBlobProfileFormatTest",
++    launcher = ":svm_hosted_junit",
++    test_class = "com.oracle.svm.hosted.test.HeapBlobProfileFormatTest",
++)
++
++mx_test_class(
++    name = "com.oracle.svm.hosted.test.com.oracle.svm.hosted.test.VerifyReflectionUsageBaseTest",
++    launcher = ":svm_hosted_junit",
++    test_class = "com.oracle.svm.hosted.test.VerifyReflectionUsageBaseTest",
++)
++
++mx_jvmci_library(
 +    name = "com.oracle.svm.interpreter",
 +    srcs = [
 +        "//substratevm/src/com.oracle.svm.interpreter/src/com/oracle/svm/interpreter:com.oracle.svm.interpreter.srcs",
@@ -2600,6 +3602,41 @@ new file mode 100644
 +        ":com.oracle.svm.jdwp.bridge",
 +        "//sdk:COLLECTIONS",
 +        "//sdk:NATIVEIMAGE",
++    ],
++)
++
++mx_processed_java(
++    name = "com.oracle.svm.junit",
++    srcs = ["//substratevm/src/com.oracle.svm.junit/src/com/oracle/svm/junit:com.oracle.svm.junit.srcs"],
++    javacopts = [
++        "--release",
++        "24",
++        "-parameters",
++    ],
++    mx_resource_root = "src/com.oracle.svm.junit/resources",
++    plugins = [
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.replacements.processor.ReplacementsAnnotationProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.nodeinfo.processor.GraphNodeProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.IntrinsicStubProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.SyncPortProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.core.match.processor.MatchProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.options.processor.OptionProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.serviceprovider.processor.ServiceProviderProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.libgraal.truffle.TruffleFromLibGraalProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredFeatureProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredImageSingletonProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.BasedOnJDKFileProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.LayeredAnnotationProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.GenerateAnnotationWrapperProcessor",
++    ],
++    resources = ["//substratevm/src/com.oracle.svm.junit/resources/META-INF/native-image/org.graalvm.nativeimage.junitsupport/com.oracle.svm.junit:com.oracle.svm.junit.resources"],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":SVM_SHARED",
++        "//compiler:GRAAL_OPTIONS",
++        "//sdk:COLLECTIONS",
++        "//sdk:NATIVEIMAGE",
++        "@rules_mx//graal:mx_junit_tool",
 +    ],
 +)
 +
@@ -2997,8 +4034,8 @@ new file mode 100644
 +        "//sdk:COLLECTIONS",
 +        "//sdk:NATIVEIMAGE",
 +        "//sdk:WORD",
-+        "@contrib_rules_jvm_deps//:junit_junit",
 +        "@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
++        "@rules_mx//graal:mx_junit_tool",
 +    ],
 +)
 +
@@ -4081,6 +5118,84 @@ new file mode 100644
 +)
 +
 +mx_jvmci_library(
++    name = "com.oracle.svm.test.debug",
++    testonly = True,
++    srcs = [
++        "//substratevm/src/com.oracle.svm.test.debug/src/com/oracle/svm/test/debug:com.oracle.svm.test.debug.srcs",
++        "//substratevm/src/com.oracle.svm.test.debug/src/com/oracle/svm/test/debug/helper:com.oracle.svm.test.debug.srcs",
++        "//substratevm/src/com.oracle.svm.test.debug/src/hello:com.oracle.svm.test.debug.srcs",
++    ],
++    add_exports = [
++        "jdk.internal.vm.ci/jdk.vm.ci.code",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta.annotation",
++    ],
++    javacopts = [
++        "-source",
++        "21",
++        "-target",
++        "21",
++        "-parameters",
++        "-Xep:ReturnValueIgnored:WARN",
++    ],
++    mx_resource_root = "src/com.oracle.svm.test.debug/src",
++    plugins = [
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.replacements.processor.ReplacementsAnnotationProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.nodeinfo.processor.GraphNodeProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.IntrinsicStubProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.SyncPortProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.core.match.processor.MatchProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.options.processor.OptionProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.serviceprovider.processor.ServiceProviderProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.libgraal.truffle.TruffleFromLibGraalProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredFeatureProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredImageSingletonProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.BasedOnJDKFileProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.LayeredAnnotationProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.GenerateAnnotationWrapperProcessor",
++    ],
++    resources = [
++        "//substratevm/src/com.oracle.svm.test.debug/src:com.oracle.svm.test.debug.resources",
++        "//substratevm/src/com.oracle.svm.test.debug/src/gdb-tests:com.oracle.svm.test.debug.resources",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":SVM",
++        ":SVM_GUEST_STAGING",
++        ":SVM_SHARED",
++        "//sdk:NATIVEIMAGE",
++        "//sdk:WORD",
++    ],
++)
++
++mx_processed_java(
++    name = "com.oracle.svm.test.debug.missing.classes",
++    testonly = True,
++    srcs = ["//substratevm/src/com.oracle.svm.test.debug.missing.classes/src/com/oracle/svm/test/debug/missing/classes:com.oracle.svm.test.debug.missing.classes.srcs"],
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++    ],
++    plugins = [
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.replacements.processor.ReplacementsAnnotationProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.nodeinfo.processor.GraphNodeProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.IntrinsicStubProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.lir.processor.SyncPortProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.core.match.processor.MatchProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.options.processor.OptionProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.serviceprovider.processor.ServiceProviderProcessor",
++        "//compiler:mx_plugin.GRAAL_PROCESSOR.jdk.graal.compiler.libgraal.truffle.TruffleFromLibGraalProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredFeatureProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.AutomaticallyRegisteredImageSingletonProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.BasedOnJDKFileProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.LayeredAnnotationProcessor",
++        ":mx_plugin.SVM_PROCESSOR.com.oracle.svm.processor.GenerateAnnotationWrapperProcessor",
++    ],
++    visibility = ["//visibility:public"],
++)
++
++mx_jvmci_library(
 +    name = "com.oracle.svm.truffle",
 +    srcs = [
 +        "//substratevm/src/com.oracle.svm.truffle/src/com/oracle/svm/truffle:com.oracle.svm.truffle.srcs",
@@ -4393,6 +5508,13 @@ new file mode 100644
 +    test_class = "com.oracle.svm.truffle.test.SimulatedClassInitializerRuntimeCompilationTest",
 +)
 +
++mx_project(
++    name = "com.oracle.svm.tutorial",
++    packages = ["//substratevm/src/com.oracle.svm.tutorial/src/com/oracle/svm/tutorial"],
++    visibility = ["//visibility:public"],
++    deps = ["//sdk:NATIVEIMAGE"],
++)
++
 +mx_jvmci_library(
 +    name = "com.oracle.svm.util",
 +    srcs = [
@@ -4471,7 +5593,7 @@ new file mode 100644
 +    visibility = ["//visibility:public"],
 +    deps = [
 +        "//sdk:NATIVEIMAGE",
-+        "@contrib_rules_jvm_deps//:junit_junit",
++        "@rules_mx//graal:mx_junit_tool",
 +    ],
 +)
 +
@@ -4480,6 +5602,39 @@ new file mode 100644
 +    launcher = "@rules_mx//graal:svm_native_resource_guest",
 +    tags = ["manual"],
 +    test_class = "com.oracle.svm.with.space.test.NativeImageResourceTest",
++)
++
++mx_jar_dist(
++    name = "JUNIT_SUPPORT",
++    contents = [":com.oracle.svm.junit"],
++    directives = [
++        "exports com.oracle.svm.junit to org.graalvm.nativeimage.builder, org.graalvm.nativeimage.base, org.graalvm.nativeimage.pointsto",
++        "requires jdk.graal.compiler",
++        "requires org.graalvm.collections",
++        "requires org.graalvm.nativeimage.builder",
++        "requires static com.oracle.mxtool.junit",
++        "requires static hamcrest",
++        "requires static junit",
++        "requires transitive jdk.graal.compiler.options",
++        "requires transitive org.graalvm.nativeimage",
++        "requires transitive org.graalvm.nativeimage.base",
++        "requires transitive org.graalvm.nativeimage.guest.staging",
++        "requires transitive org.graalvm.nativeimage.jvmci.shared",
++        "requires transitive org.graalvm.nativeimage.objectfile",
++        "requires transitive org.graalvm.nativeimage.pointsto",
++        "requires transitive org.graalvm.nativeimage.shared",
++        "requires transitive org.graalvm.word",
++    ],
++    graal_services = True,
++    module_name = "org.graalvm.nativeimage.junitsupport",
++    release = 21,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":SVM",
++        "//compiler:GRAAL",
++        "//sdk:NATIVEIMAGE",
++        "@rules_mx//graal:mx_junit_tool",
++    ],
 +)
 +
 +mx_jar_dist(
@@ -4728,6 +5883,30 @@ new file mode 100644
 +        ":SVM_SHARED",
 +        "//compiler:GRAAL",
 +        "//compiler:HOSTVMACCESS",
++    ],
++)
++
++mx_jar_dist(
++    name = "STANDALONE_POINTSTO_TESTS",
++    testonly = True,
++    contents = [
++        ":com.oracle.graal.pointsto.standalone.test.classes",
++        ":com.oracle.graal.pointsto.standalone.test",
++    ],
++    graal_services = True,
++    manifest = {
++        "Implementation-Vendor": "Oracle Corporation",
++        "Implementation-Version": "25.6.0-dev",
++        "Name": "standalone-pointsto-tests",
++        "Specification-Vendor": "Oracle Corporation",
++        "Specification-Version": "25.6.0-dev",
++    },
++    visibility = ["//visibility:public"],
++    deps = [
++        ":STANDALONE_POINTSTO",
++        ":SVM_GUEST_STAGING",
++        "//sdk:NATIVEIMAGE",
++        "@rules_mx//graal:mx_junit_tool",
 +    ],
 +)
 +
@@ -5380,7 +6559,7 @@ new file mode 100644
 +    deps = [
 +        ":SVM_DRIVER",
 +        "//sdk:NATIVEIMAGE",
-+        "@contrib_rules_jvm_deps//:junit_junit",
++        "@rules_mx//graal:mx_junit_tool",
 +    ],
 +)
 +
@@ -5548,6 +6727,28 @@ new file mode 100644
 +)
 +
 +mx_jar_dist(
++    name = "SVM_HOSTED_TESTS",
++    testonly = True,
++    contents = [":com.oracle.svm.hosted.test"],
++    graal_services = True,
++    jni_services = True,
++    manifest = {
++        "Implementation-Vendor": "Oracle Corporation",
++        "Implementation-Version": "25.6.0-dev",
++        "Name": "svm-hosted-tests",
++        "Specification-Vendor": "Oracle Corporation",
++        "Specification-Version": "25.6.0-dev",
++    },
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":SVM",
++        "//compiler:GRAAL_TEST",
++        "@rules_mx//graal:mx_junit_tool",
++    ],
++)
++
++mx_jar_dist(
 +    name = "SVM_JDWP_SERVER",
 +    contents = [":com.oracle.svm.jdwp.server"],
 +    directives = [
@@ -5680,6 +6881,63 @@ new file mode 100644
 +)
 +
 +mx_jar_dist(
++    name = "SVM_LLVM",
++    contents = [":com.oracle.svm.core.graal.llvm"],
++    directives = [
++        "exports com.oracle.svm.core.graal.llvm to org.graalvm.nativeimage.builder, org.graalvm.nativeimage.base",
++        "exports com.oracle.svm.core.graal.llvm.image to org.graalvm.nativeimage.builder, org.graalvm.nativeimage.base",
++        "exports com.oracle.svm.core.graal.llvm.lowering to org.graalvm.nativeimage.builder, org.graalvm.nativeimage.base",
++        "exports com.oracle.svm.core.graal.llvm.objectfile to org.graalvm.nativeimage.builder, org.graalvm.nativeimage.base",
++        "exports com.oracle.svm.core.graal.llvm.replacements to org.graalvm.nativeimage.builder, org.graalvm.nativeimage.base",
++        "exports com.oracle.svm.core.graal.llvm.runtime to org.graalvm.nativeimage.builder, org.graalvm.nativeimage.base",
++        "exports com.oracle.svm.core.graal.llvm.util to org.graalvm.nativeimage.builder, org.graalvm.nativeimage.base",
++        "requires com.oracle.svm.shadowed.org.bytedeco.llvm",
++        "requires jdk.internal.vm.ci",
++        "requires transitive jdk.graal.compiler",
++        "requires transitive jdk.graal.compiler.options",
++        "requires transitive org.graalvm.collections",
++        "requires transitive org.graalvm.nativeimage",
++        "requires transitive org.graalvm.nativeimage.base",
++        "requires transitive org.graalvm.nativeimage.builder",
++        "requires transitive org.graalvm.nativeimage.guest.staging",
++        "requires transitive org.graalvm.nativeimage.jvmci.shared",
++        "requires transitive org.graalvm.nativeimage.objectfile",
++        "requires transitive org.graalvm.nativeimage.pointsto",
++        "requires transitive org.graalvm.nativeimage.shared",
++        "requires transitive org.graalvm.word",
++    ],
++    platform_directives = select({
++        ":svm.darwin-aarch64": [],
++        ":svm.linux-aarch64": [
++            "requires com.oracle.svm.shadowed.org.bytedeco.javacpp.linux.arm64",
++            "requires com.oracle.svm.shadowed.org.bytedeco.llvm.linux.arm64",
++        ],
++        ":svm.linux-amd64": [
++            "requires com.oracle.svm.shadowed.org.bytedeco.javacpp.linux.x86_64",
++            "requires com.oracle.svm.shadowed.org.bytedeco.llvm.linux.x86_64",
++        ],
++        "//conditions:default": [],
++    }),
++    graal_services = True,
++    module_exports = [
++        "java.base/jdk.internal.misc",
++        "jdk.internal.vm.ci/jdk.vm.ci.code",
++        "jdk.internal.vm.ci/jdk.vm.ci.code.site",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta",
++        "jdk.internal.vm.ci/jdk.vm.ci.meta.annotation",
++    ],
++    module_name = "org.graalvm.nativeimage.llvm",
++    release = 21,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":JAVACPP_PLATFORM_SPECIFIC_SHADOWED",
++        ":LLVM_PLATFORM_SPECIFIC_SHADOWED",
++        ":LLVM_WRAPPER_SHADOWED",
++        ":SVM",
++    ],
++)
++
++mx_jar_dist(
 +    name = "SVM_NFI_NONE_JAR",
 +    contents = [":com.oracle.svm.truffle.nfi.none"],
 +    graal_services = True,
@@ -5728,6 +6986,34 @@ new file mode 100644
 +)
 +
 +mx_jar_dist(
++    name = "SVM_TESTS",
++    testonly = True,
++    contents = [
++        ":com.oracle.svm.test",
++        ":com.oracle.svm.configure.test",
++        ":com.oracle.svm.graal.test",
++        ":com.oracle.svm.test.debug",
++        ":com.oracle.svm.test.debug.missing.classes",
++        ":SVM_TEST_RESOURCE_WITH_SPACE",
++    ],
++    graal_services = True,
++    manifest = {
++        "Implementation-Vendor": "Oracle Corporation",
++        "Implementation-Version": "25.6.0-dev",
++        "Name": "svm-tests",
++        "Specification-Vendor": "Oracle Corporation",
++        "Specification-Version": "25.6.0-dev",
++    },
++    visibility = ["//visibility:public"],
++    deps = [
++        ":SVM",
++        ":SVM_CONFIGURE",
++        "//sdk:NATIVEIMAGE",
++        "@rules_mx//graal:mx_junit_tool",
++    ],
++)
++
++mx_jar_dist(
 +    name = "SVM_TESTS WITH SPACE",
 +    testonly = True,
 +    contents = [":com.oracle.svm.with.space.test"],
@@ -5742,7 +7028,7 @@ new file mode 100644
 +    visibility = ["//visibility:public"],
 +    deps = [
 +        "//sdk:NATIVEIMAGE",
-+        "@contrib_rules_jvm_deps//:junit_junit",
++        "@rules_mx//graal:mx_junit_tool",
 +    ],
 +)
 +
@@ -5777,10 +7063,10 @@ new file mode 100644
 +    visibility = ["//visibility:public"],
 +    deps = [
 +        ":SVM",
-+        ":com.oracle.svm.test",
++        ":SVM_TESTS",
 +        "//sdk:NATIVEIMAGE",
 +        "//truffle:TRUFFLE_API",
-+        "@contrib_rules_jvm_deps//:junit_junit",
++        "@rules_mx//graal:mx_junit_tool",
 +    ],
 +)
 +
@@ -6455,6 +7741,112 @@ new file mode 100644
 +    srcs = ["Timer.java"],
 +    visibility = ["//substratevm:__pkg__"],
 +)
+diff --git a/substratevm/src/com.oracle.graal.pointsto.standalone.test/src/com/oracle/graal/pointsto/standalone/test/BUILD.bazel b/substratevm/src/com.oracle.graal.pointsto.standalone.test/src/com/oracle/graal/pointsto/standalone/test/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.graal.pointsto.standalone.test/src/com/oracle/graal/pointsto/standalone/test/BUILD.bazel
+@@ -0,0 +1,29 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.graal.pointsto.standalone.test.srcs",
++    srcs = [
++        "AnalysisEntryPointsFileTest.java",
++        "ClassEqualityTest.java",
++        "ClassInitializationPolicyTest.java",
++        "ConstantFieldTest.java",
++        "LargeReachabilityTest.java",
++        "MissingPermittedSubclassTest.java",
++        "RuntimeInitializedStaticFieldTest.java",
++        "StandaloneAnalysisAssertionsTest.java",
++        "StandaloneAnalysisReportTest.java",
++        "StandaloneAnalysisTest.java",
++        "StandaloneAnalyzerReachabilityTest.java",
++        "StandaloneArrayAndContainerFlowTest.java",
++        "StandaloneConstantPropagationTest.java",
++        "StandaloneConstantScanDynamicTest.java",
++        "StandaloneContextSensitiveReturnTest.java",
++        "StandaloneDispatchPrecisionTest.java",
++        "StandaloneExceptionAndRecursionTest.java",
++        "StandaloneFieldAndAllocationFlowTest.java",
++        "StandalonePrimitivePredicateTest.java",
++        "StandaloneReturnedParameterOptimizationTest.java",
++        "StandardGraphPluginTest.java",
++    ],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.graal.pointsto.standalone.test/src/resources/BUILD.bazel b/substratevm/src/com.oracle.graal.pointsto.standalone.test/src/resources/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.graal.pointsto.standalone.test/src/resources/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.graal.pointsto.standalone.test.resources",
++    srcs = ["entrypoints"],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.graal.pointsto.standalone.test/src/resources/large-reachability/BUILD.bazel b/substratevm/src/com.oracle.graal.pointsto.standalone.test/src/resources/large-reachability/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.graal.pointsto.standalone.test/src/resources/large-reachability/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.graal.pointsto.standalone.test.resources",
++    srcs = [
++        "reach-10000-entrypoints.txt",
++        "reach-20000-entrypoints.txt",
++        "reach-5000-entrypoints.txt",
++    ],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.graal.pointsto.standalone.test.classes/src/com/oracle/graal/pointsto/standalone/test/classes/BUILD.bazel b/substratevm/src/com.oracle.graal.pointsto.standalone.test.classes/src/com/oracle/graal/pointsto/standalone/test/classes/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.graal.pointsto.standalone.test.classes/src/com/oracle/graal/pointsto/standalone/test/classes/BUILD.bazel
+@@ -0,0 +1,27 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.graal.pointsto.standalone.test.classes.srcs",
++    srcs = [
++        "AnalysisEntryPointsFileCase.java",
++        "ArrayNewInstancePluginCase.java",
++        "ClassEqualityCase.java",
++        "ClassInitializationPolicyCase.java",
++        "ConstantFieldCase.java",
++        "MissingPermittedSubclassCase.java",
++        "RuntimeInitializedStaticFieldCase.java",
++        "SmallReachabilityCase.java",
++        "StandaloneAnalysisAssertionsCase.java",
++        "StandaloneAnalyzerReachabilityCase.java",
++        "StandaloneArrayAndContainerCase.java",
++        "StandaloneConstantPropagationCase.java",
++        "StandaloneConstantScanDynamicCase.java",
++        "StandaloneContextSensitiveReturnCase.java",
++        "StandaloneDispatchPrecisionCase.java",
++        "StandaloneExceptionAndRecursionCase.java",
++        "StandaloneFieldAndAllocationCase.java",
++        "StandalonePrimitivePredicateCase.java",
++        "StandaloneReturnedParameterCase.java",
++    ],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.graal.pointsto.standalone.test.classes/src/com/oracle/graal/pointsto/standalone/test/classes/classinitpolicy/BUILD.bazel b/substratevm/src/com.oracle.graal.pointsto.standalone.test.classes/src/com/oracle/graal/pointsto/standalone/test/classes/classinitpolicy/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.graal.pointsto.standalone.test.classes/src/com/oracle/graal/pointsto/standalone/test/classes/classinitpolicy/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.graal.pointsto.standalone.test.classes.srcs",
++    srcs = ["PackageRuntimeOnlyCase.java"],
++    visibility = ["//substratevm:__pkg__"],
++)
 diff --git a/substratevm/src/com.oracle.graal.reachability/src/com/oracle/graal/reachability/BUILD.bazel b/substratevm/src/com.oracle.graal.reachability/src/com/oracle/graal/reachability/BUILD.bazel
 new file mode 100644
 --- /dev/null
@@ -6862,6 +8254,18 @@ new file mode 100644
 +        "Tracer.java",
 +        "TracingResultWriter.java",
 +    ],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.bench/src/com/oracle/svm/bench/scaladacapo/BUILD.bazel b/substratevm/src/com.oracle.svm.bench/src/com/oracle/svm/bench/scaladacapo/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.bench/src/com/oracle/svm/bench/scaladacapo/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.bench.srcs",
++    srcs = ["Target_org_dacapo_harness_CommandLineArgs.java"],
 +    visibility = ["//substratevm:__pkg__"],
 +)
 diff --git a/substratevm/src/com.oracle.svm.common/src/com/oracle/svm/common/annotation/BUILD.bazel b/substratevm/src/com.oracle.svm.common/src/com/oracle/svm/common/annotation/BUILD.bazel
@@ -11123,6 +12527,138 @@ new file mode 100644
 +    ],
 +    visibility = ["//substratevm:__pkg__"],
 +)
+diff --git a/substratevm/src/com.oracle.svm.core.graal.llvm/src/com/oracle/svm/core/graal/llvm/BUILD.bazel b/substratevm/src/com.oracle.svm.core.graal.llvm/src/com/oracle/svm/core/graal/llvm/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.core.graal.llvm/src/com/oracle/svm/core/graal/llvm/BUILD.bazel
+@@ -0,0 +1,20 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.core.graal.llvm.srcs",
++    srcs = [
++        "LLVMFeature.java",
++        "LLVMGenerator.java",
++        "LLVMNativeImageCodeCache.java",
++        "LLVMToolchainUtils.java",
++        "NodeLLVMBuilder.java",
++        "SubstrateLLVMBackend.java",
++    ],
++    visibility = ["//substratevm:__pkg__"],
++)
++
++mx_files(
++    name = "com.oracle.svm.core.graal.llvm.resources",
++    srcs = ["LLVMBackend.md"],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.core.graal.llvm/src/com/oracle/svm/core/graal/llvm/image/BUILD.bazel b/substratevm/src/com.oracle.svm.core.graal.llvm/src/com/oracle/svm/core/graal/llvm/image/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.core.graal.llvm/src/com/oracle/svm/core/graal/llvm/image/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.core.graal.llvm.srcs",
++    srcs = ["LLVMCCompilerInvoker.java"],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.core.graal.llvm/src/com/oracle/svm/core/graal/llvm/lowering/BUILD.bazel b/substratevm/src/com.oracle.svm.core.graal.llvm/src/com/oracle/svm/core/graal/llvm/lowering/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.core.graal.llvm/src/com/oracle/svm/core/graal/llvm/lowering/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.core.graal.llvm.srcs",
++    srcs = [
++        "LLVMAddressLowering.java",
++        "LLVMLoadExceptionObjectLowering.java",
++        "SubstrateLLVMLoweringProvider.java",
++    ],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.core.graal.llvm/src/com/oracle/svm/core/graal/llvm/objectfile/BUILD.bazel b/substratevm/src/com.oracle.svm.core.graal.llvm/src/com/oracle/svm/core/graal/llvm/objectfile/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.core.graal.llvm/src/com/oracle/svm/core/graal/llvm/objectfile/BUILD.bazel
+@@ -0,0 +1,13 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.core.graal.llvm.srcs",
++    srcs = [
++        "LLVMDataSectionPart.java",
++        "LLVMObjectFile.java",
++        "LLVMRegularSection.java",
++        "LLVMSymtab.java",
++        "LLVMUserDefinedSection.java",
++    ],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.core.graal.llvm/src/com/oracle/svm/core/graal/llvm/replacements/BUILD.bazel b/substratevm/src/com.oracle.svm.core.graal.llvm/src/com/oracle/svm/core/graal/llvm/replacements/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.core.graal.llvm/src/com/oracle/svm/core/graal/llvm/replacements/BUILD.bazel
+@@ -0,0 +1,20 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.core.graal.llvm.srcs",
++    srcs = [
++        "LLVMBinaryIntrinsicNode.java",
++        "LLVMCeilNode.java",
++        "LLVMCopySignNode.java",
++        "LLVMCountLeadingZerosNode.java",
++        "LLVMCountTrailingZerosNode.java",
++        "LLVMFloorNode.java",
++        "LLVMGraphBuilderPlugins.java",
++        "LLVMIntrinsicGenerator.java",
++        "LLVMIntrinsicNode.java",
++        "LLVMMaxNode.java",
++        "LLVMMinNode.java",
++        "LLVMUnaryIntrinsicNode.java",
++    ],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.core.graal.llvm/src/com/oracle/svm/core/graal/llvm/runtime/BUILD.bazel b/substratevm/src/com.oracle.svm.core.graal.llvm/src/com/oracle/svm/core/graal/llvm/runtime/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.core.graal.llvm/src/com/oracle/svm/core/graal/llvm/runtime/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.core.graal.llvm.srcs",
++    srcs = [
++        "GCCExceptionTable.java",
++        "LLVMExceptionUnwind.java",
++    ],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.core.graal.llvm/src/com/oracle/svm/core/graal/llvm/util/BUILD.bazel b/substratevm/src/com.oracle.svm.core.graal.llvm/src/com/oracle/svm/core/graal/llvm/util/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.core.graal.llvm/src/com/oracle/svm/core/graal/llvm/util/BUILD.bazel
+@@ -0,0 +1,16 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.core.graal.llvm.srcs",
++    srcs = [
++        "LLVMDirectives.java",
++        "LLVMHelperFunctions.java",
++        "LLVMIRBuilder.java",
++        "LLVMObjectFileReader.java",
++        "LLVMOptions.java",
++        "LLVMStackMapInfo.java",
++        "LLVMTargetSpecific.java",
++        "LLVMUtils.java",
++    ],
++    visibility = ["//substratevm:__pkg__"],
++)
 diff --git a/substratevm/src/com.oracle.svm.core.graal.riscv64/src/com/oracle/svm/core/graal/riscv64/BUILD.bazel b/substratevm/src/com.oracle.svm.core.graal.riscv64/src/com/oracle/svm/core/graal/riscv64/BUILD.bazel
 new file mode 100644
 --- /dev/null
@@ -11992,6 +13528,21 @@ new file mode 100644
 +mx_files(
 +    name = "com.oracle.svm.graal.srcs",
 +    srcs = ["GraalSubstitutions.java"],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.graal.test/src/com/oracle/svm/graal/test/BUILD.bazel b/substratevm/src/com.oracle.svm.graal.test/src/com/oracle/svm/graal/test/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.graal.test/src/com/oracle/svm/graal/test/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.graal.test.srcs",
++    srcs = [
++        "IsolatedSpeculationLogEncodingNativeTest.java",
++        "IsolatedSpeculationLogEncodingTest.java",
++    ],
 +    visibility = ["//substratevm:__pkg__"],
 +)
 diff --git a/substratevm/src/com.oracle.svm.graalos/src/META-INF/native-image/com.oracle.svm.graalos/BUILD.bazel b/substratevm/src/com.oracle.svm.graalos/src/META-INF/native-image/com.oracle.svm.graalos/BUILD.bazel
@@ -14550,6 +16101,87 @@ new file mode 100644
 +    ],
 +    visibility = ["//substratevm:__pkg__"],
 +)
+diff --git a/substratevm/src/com.oracle.svm.hosted.test/src/com/oracle/svm/core/code/BUILD.bazel b/substratevm/src/com.oracle.svm.hosted.test/src/com/oracle/svm/core/code/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.hosted.test/src/com/oracle/svm/core/code/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.test.srcs",
++    srcs = ["FrameInfoDecoderTest.java"],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.hosted.test/src/com/oracle/svm/hosted/BUILD.bazel b/substratevm/src/com.oracle.svm.hosted.test/src/com/oracle/svm/hosted/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.hosted.test/src/com/oracle/svm/hosted/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.test.srcs",
++    srcs = [
++        "DeadlockWatchdogTest.java",
++        "NativeImageClassLoaderSupportTest.java",
++    ],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.hosted.test/src/com/oracle/svm/hosted/code/BUILD.bazel b/substratevm/src/com.oracle.svm.hosted.test/src/com/oracle/svm/hosted/code/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.hosted.test/src/com/oracle/svm/hosted/code/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.test.srcs",
++    srcs = ["CompileQueueConfigurationTest.java"],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.hosted.test/src/com/oracle/svm/hosted/lambda/BUILD.bazel b/substratevm/src/com.oracle.svm.hosted.test/src/com/oracle/svm/hosted/lambda/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.hosted.test/src/com/oracle/svm/hosted/lambda/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.test.srcs",
++    srcs = ["LambdaParserTest.java"],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.hosted.test/src/com/oracle/svm/hosted/test/BUILD.bazel b/substratevm/src/com.oracle.svm.hosted.test/src/com/oracle/svm/hosted/test/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.hosted.test/src/com/oracle/svm/hosted/test/BUILD.bazel
+@@ -0,0 +1,25 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.hosted.test.srcs",
++    srcs = [
++        "CheckSVMInvariants.java",
++        "HeapBlobProfileFormatTest.java",
++        "VerifyJavaTypeGetNameUsage.java",
++        "VerifyReflectionUsage.java",
++        "VerifyReflectionUsageBase.java",
++        "VerifyReflectionUsageBaseTest.java",
++        "VerifyRistrettoInvariants.java",
++        "VerifyRuntimeCompilationInvariants.java",
++        "VerifyRuntimeVersionFeature.java",
++        "VerifySafeCCalls.java",
++        "VerifyUserErrorUsage.java",
++    ],
++    visibility = ["//substratevm:__pkg__"],
++)
++
++mx_files(
++    name = "com.oracle.svm.hosted.test.resources",
++    srcs = ["OWNERS.toml"],
++    visibility = ["//substratevm:__pkg__"],
++)
 diff --git a/substratevm/src/com.oracle.svm.interpreter/src/com/oracle/svm/interpreter/BUILD.bazel b/substratevm/src/com.oracle.svm.interpreter/src/com/oracle/svm/interpreter/BUILD.bazel
 new file mode 100644
 --- /dev/null
@@ -15108,6 +16740,36 @@ new file mode 100644
 +        "ThreadsCollector.java",
 +        "UnknownLocationException.java",
 +        "VMEventListenerImpl.java",
++    ],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.junit/resources/META-INF/native-image/org.graalvm.nativeimage.junitsupport/com.oracle.svm.junit/BUILD.bazel b/substratevm/src/com.oracle.svm.junit/resources/META-INF/native-image/org.graalvm.nativeimage.junitsupport/com.oracle.svm.junit/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.junit/resources/META-INF/native-image/org.graalvm.nativeimage.junitsupport/com.oracle.svm.junit/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.junit.resources",
++    srcs = ["native-image.properties"],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.junit/src/com/oracle/svm/junit/BUILD.bazel b/substratevm/src/com.oracle.svm.junit/src/com/oracle/svm/junit/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.junit/src/com/oracle/svm/junit/BUILD.bazel
+@@ -0,0 +1,13 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.junit.srcs",
++    srcs = [
++        "JUnitFeature.java",
++        "NativeImageBuildArgsSupport.java",
++        "SVMJUnitRunner.java",
++        "Target_org_hamcrest_internal_ReflectiveTypeFinder.java",
++        "Target_org_junit_runners_model_TestClass.java",
 +    ],
 +    visibility = ["//substratevm:__pkg__"],
 +)
@@ -16307,6 +17969,100 @@ new file mode 100644
 +    srcs = ["MANIFEST.MF"],
 +    visibility = ["//substratevm:__pkg__"],
 +)
+diff --git a/substratevm/src/com.oracle.svm.test.debug/src/BUILD.bazel b/substratevm/src/com.oracle.svm.test.debug/src/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.test.debug/src/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.test.debug.resources",
++    srcs = ["systemjava_debugtest.h"],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.test.debug/src/com/oracle/svm/test/debug/BUILD.bazel b/substratevm/src/com.oracle.svm.test.debug/src/com/oracle/svm/test/debug/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.test.debug/src/com/oracle/svm/test/debug/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.test.debug.srcs",
++    srcs = [
++        "CInterfaceDebugTestDirectives.java",
++        "CStructTests.java",
++    ],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.test.debug/src/com/oracle/svm/test/debug/helper/BUILD.bazel b/substratevm/src/com.oracle.svm.test.debug/src/com/oracle/svm/test/debug/helper/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.test.debug/src/com/oracle/svm/test/debug/helper/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.test.debug.srcs",
++    srcs = [
++        "ClassLoaderTest.java",
++        "PrettyPrinterTest.java",
++        "RuntimeCompileDebugInfoTest.java",
++    ],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.test.debug/src/gdb-tests/BUILD.bazel b/substratevm/src/com.oracle.svm.test.debug/src/gdb-tests/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.test.debug/src/gdb-tests/BUILD.bazel
+@@ -0,0 +1,19 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.test.debug.resources",
++    srcs = [
++        "gdb_helper.py",
++        "gdb_utils.py",
++        "test_cinterface.py",
++        "test_class_loader.py",
++        "test_pretty_printer.py",
++        "test_runtime_compilation.py",
++        "test_runtime_deopt.py",
++        "test_settings.py",
++        "test_svm_util.py",
++        "testdeopt.js",
++        "testhello.py",
++    ],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.test.debug/src/hello/BUILD.bazel b/substratevm/src/com.oracle.svm.test.debug/src/hello/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.test.debug/src/hello/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.test.debug.srcs",
++    srcs = [
++        "Hello.java",
++        "Target_hello_Hello_DefaultGreeter.java",
++    ],
++    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.test.debug.missing.classes/src/com/oracle/svm/test/debug/missing/classes/BUILD.bazel b/substratevm/src/com.oracle.svm.test.debug.missing.classes/src/com/oracle/svm/test/debug/missing/classes/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.test.debug.missing.classes/src/com/oracle/svm/test/debug/missing/classes/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.svm.test.debug.missing.classes.srcs",
++    srcs = ["TestClass.java"],
++    visibility = ["//substratevm:__pkg__"],
++)
 diff --git a/substratevm/src/com.oracle.svm.truffle/src/META-INF/native-image/org.graalvm.truffle.runtime.svm/BUILD.bazel b/substratevm/src/com.oracle.svm.truffle/src/META-INF/native-image/org.graalvm.truffle.runtime.svm/BUILD.bazel
 new file mode 100644
 --- /dev/null
@@ -16601,6 +18357,33 @@ new file mode 100644
 +        "SimulatedHolder.java",
 +    ],
 +    visibility = ["//substratevm:__pkg__"],
++)
+diff --git a/substratevm/src/com.oracle.svm.tutorial/src/com/oracle/svm/tutorial/BUILD.bazel b/substratevm/src/com.oracle.svm.tutorial/src/com/oracle/svm/tutorial/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/substratevm/src/com.oracle.svm.tutorial/src/com/oracle/svm/tutorial/BUILD.bazel
+@@ -0,0 +1,22 @@
++load("@rules_mx//mx:java.bzl", "elide_java_library")
++
++elide_java_library(
++    name = "tutorial",
++    srcs = ["CInterfaceTutorial.java"],
++    javac_opts = [
++        "--release",
++        "21",
++        "-parameters",
++    ],
++    unified_release = 21,
++    visibility = ["//:__subpackages__"],
++    exports = [
++        "//sdk:org.graalvm.nativeimage",
++        "//sdk:org.graalvm.word",
++    ],
++    deps = [
++        "//sdk:NATIVEIMAGE",
++        "//sdk:org.graalvm.nativeimage",
++        "//sdk:org.graalvm.word",
++    ],
 +)
 diff --git a/substratevm/src/com.oracle.svm.util/src/com/oracle/svm/util/BUILD.bazel b/substratevm/src/com.oracle.svm.util/src/com/oracle/svm/util/BUILD.bazel
 new file mode 100644
