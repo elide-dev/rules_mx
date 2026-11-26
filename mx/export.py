@@ -2746,6 +2746,9 @@ def _install_layout(dist, pending, mappings, options, bindings):
                 raise _UnsupportedLowering(f"{dist.name}: duplicate JDK home {dest}")
             homes.append({"directory": dest, "exclude": source.get("exclude", [])})
             continue
+        if (source.get("dereference") == "never" and directory
+                and ((kind == "extracted-dependency" and path is None) or (kind == "dependency" and path == "*"))):
+            allowed.add("dereference")
         if source.keys() - allowed:
             raise _UnsupportedLowering(
                 f"{dist.name}: unsupported install attributes for {source['_str_']}"
@@ -2854,8 +2857,7 @@ def _install_layout(dist, pending, mappings, options, bindings):
             if (
                 _thin_launcher(dep)
                 and kind == "dependency"
-                and path
-                == ("<os>-<arch>/<multitarget_libc_selection>/<exe:" + dep.name + ">")
+                and path in (None, "<os>-<arch>/<multitarget_libc_selection>/<exe:" + dep.name + ">")
             ):
                 # Linux and macOS use the unadorned executable name.
                 dest = re.sub(r"<exe:([A-Za-z0-9_.+-]+)>", r"\1", dest)

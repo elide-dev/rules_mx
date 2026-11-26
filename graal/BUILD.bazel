@@ -473,6 +473,23 @@ mx_bitcode_suite(
     root = "fixtures/sulong",
 )
 
+py_test(
+    name = "sulong_standalone_install_test",
+    size = "large",
+    srcs = ["sulong_standalone_install_test.py"],
+    args = [
+        "$(rootpath :sulong_runtime_fixture)",
+        "$(rootpath @graal//sulong:SULONG_JVM_STANDALONE_RELEASE_ARCHIVE)",
+        "$(rootpath @graal//sulong:SULONG_NATIVE_STANDALONE_RELEASE_ARCHIVE)",
+    ],
+    data = [
+        ":sulong_runtime_fixture",
+        "@graal//sulong:SULONG_JVM_STANDALONE_RELEASE_ARCHIVE",
+        "@graal//sulong:SULONG_NATIVE_STANDALONE_RELEASE_ARCHIVE",
+    ],
+    tags = ["manual"],
+)
+
 java_test(
     name = "sulong_runtime_test",
     srcs = ["SulongRuntimeTest.java"],

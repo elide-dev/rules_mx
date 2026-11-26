@@ -2,12 +2,12 @@ diff --git a/sulong/BUILD.bazel b/sulong/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/sulong/BUILD.bazel
-@@ -0,0 +1,5471 @@
+@@ -0,0 +1,5581 @@
 +load("@rules_mx//graal:layout.bzl", "mx_os_layout")
 +load("@rules_mx//graal:sulong_fixture_check.bzl", "sulong_fixture_check")
 +load("@rules_mx//mx:bitcode.bzl", "mx_bitcode_suite")
 +load("@rules_mx//mx:cmake_project.bzl", "mx_cmake_project")
-+load("@rules_mx//mx:graph.bzl", "mx_exported_tar", "mx_jar_dist", "mx_pom_dist", "mx_processed_java", "mx_project", "mx_test_class", "mx_whole_java")
++load("@rules_mx//mx:graph.bzl", "mx_distribution_alias", "mx_exported_tar", "mx_jar_dist", "mx_pom_dist", "mx_processed_java", "mx_project", "mx_release_archive", "mx_test_class", "mx_whole_java")
 +load("@rules_mx//mx:native_image.bzl", "mx_bootstrap_launchers", "mx_native_image_executable", "mx_native_image_library", "mx_toolchain_tool_layout")
 +load("@rules_mx//mx:native_project.bzl", "mx_native_shared_project")
 +load("@rules_mx//mx:project_files.bzl", "mx_project_files")
@@ -30,19 +30,25 @@ new file mode 100644
 +        ":SULONG_GRAALVM_DOCS",
 +        ":SULONG_GRAALVM_LICENSES",
 +        ":SULONG_HOME_NATIVEMODE",
++        ":SULONG_JVM_STANDALONE",
++        ":SULONG_JVM_STANDALONE_RELEASE_ARCHIVE",
 +        ":SULONG_LAUNCHER",
 +        ":SULONG_LEGACY",
 +        ":SULONG_LIBCXX_COMPILER_WRAPPER",
 +        ":SULONG_LIBLLVMVM",
 +        ":SULONG_NATIVE",
++        ":SULONG_NATIVE_AND_LLVM_TOOLCHAIN",
 +        ":SULONG_NATIVE_BITCODE_RESOURCES",
 +        ":SULONG_NATIVE_HOME",
 +        ":SULONG_NATIVE_LIB_RESOURCES",
 +        ":SULONG_NATIVE_RESOURCES",
++        ":SULONG_NATIVE_STANDALONE",
++        ":SULONG_NATIVE_STANDALONE_RELEASE_ARCHIVE",
 +        ":SULONG_NATIVE_TOOLS",
 +        ":SULONG_NFI",
 +        ":SULONG_NWCC_TEST_SUITE",
 +        ":SULONG_PARSER_TORTURE",
++        ":SULONG_STANDALONE_COMMON",
 +        ":SULONG_STANDALONE_DEPENDENCIES",
 +        ":SULONG_TOOLCHAIN_LAUNCHERS",
 +    ],
@@ -5028,6 +5034,32 @@ new file mode 100644
 +    visibility = ["//visibility:public"],
 +)
 +
++mx_distribution_alias(
++    name = "SULONG_JVM_STANDALONE_RELEASE_ARCHIVE",
++    actual = ":LLVM_JAVA_STANDALONE_SVM_JAVA25",
++    visibility = ["//visibility:public"],
++)
++
++mx_distribution_alias(
++    name = "SULONG_NATIVE_STANDALONE_RELEASE_ARCHIVE",
++    actual = ":LLVM_NATIVE_STANDALONE_SVM_JAVA25",
++    visibility = ["//visibility:public"],
++)
++
++mx_release_archive(
++    name = "LLVM_JAVA_STANDALONE_SVM_JAVA25",
++    install = ":SULONG_JVM_STANDALONE",
++    prefix = "llvm-community-jvm-25.6.0-dev-<graalvm_os>-<arch>",
++    visibility = ["//visibility:public"],
++)
++
++mx_release_archive(
++    name = "LLVM_NATIVE_STANDALONE_SVM_JAVA25",
++    install = ":SULONG_NATIVE_STANDALONE",
++    prefix = "llvm-community-25.6.0-dev-<graalvm_os>-<arch>",
++    visibility = ["//visibility:public"],
++)
++
 +mx_os_layout(
 +    name = "SULONG_BITCODE_HOME",
 +    format = "tar",
@@ -5208,6 +5240,42 @@ new file mode 100644
 +)
 +
 +mx_exported_tar(
++    name = "SULONG_JVM_STANDALONE",
++    archive_imports = {
++        "//truffle:TRUFFLE_ATTACH_GRAALVM_SUPPORT": "=jvmlibs/",
++        "//truffle:TRUFFLE_NFI_NATIVE_GRAALVM_SUPPORT": "=jvmlibs/",
++        ":SULONG_STANDALONE_COMMON": "=",
++    },
++    format = "dir",
++    jdk_homes = {
++        "@rules_mx//graal:standalone_jdk_archive": "{\"directory\": \"jvm/\", \"exclude\": [\"bin/native-image*\", \"lib/static\", \"lib/svm\", \"lib/<lib:native-image-agent>\", \"lib/<lib:native-image-diagnostics-agent>\", \"lib/src.zip\", \"jmods\"]}",
++    },
++    members = {
++        "//sdk:COLLECTIONS": "modules/collections.jar",
++        "//sdk:JLINE3": "modules/jline3.jar",
++        "//sdk:JNIUTILS": "modules/jniutils.jar",
++        "//sdk:LAUNCHER_COMMON": "modules/launcher-common.jar",
++        "//sdk:NATIVEIMAGE": "modules/nativeimage.jar",
++        "//sdk:POLYGLOT": "modules/polyglot.jar",
++        "//sdk:WORD": "modules/word.jar",
++        "//truffle:TRUFFLE_ANTLR4": "modules/truffle-antlr4.jar",
++        "//truffle:TRUFFLE_API": "modules/truffle-api.jar",
++        "//truffle:TRUFFLE_COMPILER": "modules/truffle-compiler.jar",
++        "//truffle:TRUFFLE_NFI": "modules/truffle-nfi.jar",
++        "//truffle:TRUFFLE_NFI_LIBFFI": "modules/truffle-nfi-libffi.jar",
++        "//truffle:TRUFFLE_NFI_PANAMA": "modules/truffle-nfi-panama.jar",
++        "//truffle:TRUFFLE_RUNTIME": "modules/truffle-runtime.jar",
++        ":SULONG_API": "modules/sulong-api.jar",
++        ":SULONG_CORE": "modules/sulong-core.jar",
++        ":SULONG_LAUNCHER": "modules/sulong-launcher.jar",
++        ":SULONG_NATIVE": "modules/sulong-native.jar",
++        ":SULONG_NFI": "modules/sulong-nfi.jar",
++        ":SULONG_TOOLCHAIN_LAUNCHERS": "modules/sulong-toolchain-launchers.jar",
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_exported_tar(
 +    name = "SULONG_LEGACY",
 +    format = "tar",
 +    members = {
@@ -5230,6 +5298,22 @@ new file mode 100644
 +    format = "dir",
 +    members = {
 +        ":libllvmvm": "lib/{basename}",
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_exported_tar(
++    name = "SULONG_NATIVE_AND_LLVM_TOOLCHAIN",
++    archive_imports = {
++        "//sdk:LLVM_TOOLCHAIN": "=lib/llvm-toolchain/",
++        ":SULONG_BITCODE_HOME": "=lib/sulong/",
++        ":SULONG_CORE_HOME": "=lib/sulong/",
++        ":SULONG_GRAALVM_DOCS": "=lib/sulong/",
++        ":SULONG_NATIVE_HOME": "=lib/sulong/",
++        ":SULONG_NATIVE_TOOLS": "=lib/sulong/native/bin/",
++    },
++    format = "dir",
++    members = {
 +    },
 +    visibility = ["//visibility:public"],
 +)
@@ -5452,6 +5536,18 @@ new file mode 100644
 +)
 +
 +mx_exported_tar(
++    name = "SULONG_NATIVE_STANDALONE",
++    archive_imports = {
++        ":SULONG_LIBLLVMVM": "=",
++        ":SULONG_STANDALONE_COMMON": "=",
++    },
++    format = "dir",
++    members = {
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_exported_tar(
 +    name = "SULONG_NWCC_TEST_SUITE",
 +    testonly = True,
 +    archive_imports = {
@@ -5471,6 +5567,20 @@ new file mode 100644
 +    },
 +    format = "tar",
 +    members = {
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_exported_tar(
++    name = "SULONG_STANDALONE_COMMON",
++    archive_imports = {
++        ":SULONG_NATIVE_AND_LLVM_TOOLCHAIN": "=",
++        ":sulong_licenses": "=",
++    },
++    format = "dir",
++    members = {
++        ":sulong_thin_launcher": "bin/lli",
++        "@rules_mx//graal:standalone_jdk_release": "release",
 +    },
 +    visibility = ["//visibility:public"],
 +)

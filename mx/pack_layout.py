@@ -273,12 +273,18 @@ def main():
             for image, kinds, mount in image_groups:
                 _install_image_group(tree, image, kinds, mount)
             for filename, mount in tar_trees:
-                destination = tree / _relative(mount.rstrip("/"))
-                if destination.exists():
-                    raise ValueError(f"Archive mount already populated: {mount}")
-                destination.mkdir(parents=True)
+                destination = tree / _relative(mount.rstrip("/")) if mount else tree
+                destination.mkdir(parents=True, exist_ok=True)
+
+                def install_member(member, path):
+                    safe = tarfile.data_filter(member, path)
+                    target = destination / _relative(safe.name)
+                    if (target.exists() or target.is_symlink()) and not (safe.isdir() and target.is_dir()):
+                        raise ValueError(f"Duplicate archive member at {target.relative_to(tree)}")
+                    return safe
+
                 with tarfile.open(filename) as archive:
-                    archive.extractall(destination, filter="data")
+                    archive.extractall(destination, filter=install_member)
             for home in homes:
                 _install_jdk(tree, home, {name for name, _ in entries})
             if directory:
