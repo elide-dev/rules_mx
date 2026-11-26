@@ -154,6 +154,10 @@ def main():
     if args[:1] == ["--jdk-homes"]:
         homes = json.loads(args[1])
         args = args[2:]
+    tar_trees = []
+    if args[:1] == ["--tar-trees"]:
+        tar_trees = json.loads(args[1])
+        args = args[2:]
     tree = output if directory else None
     if args[:1] == ["--source-tree"]:
         tree = Path(args[1])
@@ -163,7 +167,7 @@ def main():
         _relative(name)
 
     with ExitStack() as stack:
-        if (homes or prefix) and not tree:
+        if (homes or tar_trees or prefix) and not tree:
             tree = Path(stack.enter_context(tempfile.TemporaryDirectory()))
         if tree:
             tree.mkdir(parents=True, exist_ok=True)
@@ -180,11 +184,18 @@ def main():
                                 name, 0o755 if source.stat().st_mode & 0o111 else 0o644
                             )
                         )
+            for filename, mount in tar_trees:
+                destination = tree / _relative(mount.rstrip("/"))
+                if destination.exists():
+                    raise ValueError(f"Archive mount already populated: {mount}")
+                destination.mkdir(parents=True)
+                with tarfile.open(filename) as archive:
+                    archive.extractall(destination, filter="data")
             for home in homes:
                 _install_jdk(tree, home, {name for name, _ in entries})
             if directory:
                 return
-            if homes or prefix:
+            if homes or tar_trees or prefix:
                 _write_tree_archive(tree, output, prefix)
                 return
 

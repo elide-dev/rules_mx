@@ -24,7 +24,7 @@ static_archive = rule(
 
 MxArchiveLayoutInfo = provider(
     doc = "Mapping of packaged archive paths to their declared Bazel files.",
-    fields = ["archive", "entries", "links", "jdk_homes", "primary", "resource_jar", "modes"],
+    fields = ["archive", "entries", "links", "jdk_homes", "primary", "resource_jar", "modes", "tar_trees"],
 )
 
 def _add_entry(entries, path, file):
@@ -43,6 +43,7 @@ def _layout_impl(ctx):
     modes = {}
     links = {}
     homes = []
+    tar_trees = [(target.files.to_list()[0], dest) for target, dest in ctx.attr.tar_trees.items()]
     for target, encoded in ctx.attr.jdk_homes.items():
         [bundle] = target.files.to_list()
         spec = json.decode(encoded)
@@ -99,6 +100,8 @@ def _layout_impl(ctx):
             else:
                 if destination and not destination.endswith("/"):
                     fail("Expected a destination directory: " + destination)
+                for bundle, mount in getattr(target[MxArchiveLayoutInfo], "tar_trees", []):
+                    tar_trees.append((bundle, destination + mount))
                 for home in getattr(target[MxArchiveLayoutInfo], "jdk_homes", []):
                     homes.append(struct(bundle = home.bundle, directory = destination + home.directory, exclude = home.exclude))
                 for path, artifact in sources.items():
@@ -109,7 +112,7 @@ def _layout_impl(ctx):
                         links[destination + path] = source_links[path]
     resource_jar = None
     if ctx.attr.file_list_entry:
-        if links or homes or not directory or not ctx.attr.hash_entry:
+        if links or homes or tar_trees or not directory or not ctx.attr.hash_entry:
             fail("Resource metadata requires a directory of regular files")
         manifest = ctx.actions.declare_file(ctx.label.name + ".metadata/files")
         digest = ctx.actions.declare_file(ctx.label.name + ".metadata/sha256")
@@ -149,13 +152,18 @@ def _layout_impl(ctx):
     if homes:
         args.add("--jdk-homes")
         args.add(json.encode([{"bundle": h.bundle.path, "directory": h.directory, "exclude": h.exclude} for h in homes]))
+    if tar_trees:
+        if ctx.attr.format == "jar":
+            fail("A mounted tar tree requires a directory or tar layout")
+        args.add("--tar-trees")
+        args.add(json.encode([[bundle.path, mount] for bundle, mount in tar_trees]))
     for path in sorted(entries):
         args.add(path)
         args.add(entries[path])
     ctx.actions.run(
         executable = ctx.executable._pack,
         arguments = [args],
-        inputs = entries.values() + [h.bundle for h in homes],
+        inputs = ctx.files.build_inputs + entries.values() + [h.bundle for h in homes] + [bundle for bundle, _ in tar_trees],
         outputs = [output],
         mnemonic = "MxReleaseArchive" if release_prefix else "MxArchiveLayout",
     )
@@ -168,7 +176,7 @@ def _layout_impl(ctx):
         files.append(file_list)
     return [
         DefaultInfo(files = depset(files)),
-        MxArchiveLayoutInfo(archive = None if directory else output, entries = entries, links = links, jdk_homes = homes, resource_jar = resource_jar, modes = modes),
+        MxArchiveLayoutInfo(archive = None if directory else output, entries = entries, links = links, jdk_homes = homes, resource_jar = resource_jar, modes = modes, tar_trees = tar_trees),
     ] + ([JavaInfo(output_jar = resource_jar, compile_jar = None)] if resource_jar else [])
 
 mx_archive_layout = rule(
@@ -178,6 +186,8 @@ mx_archive_layout = rule(
         "members": attr.label_keyed_string_dict(allow_files = True, mandatory = True),
         # Map a member to a new path, or use an empty selector to import an entire layout.
         "archive_imports": attr.label_keyed_string_dict(providers = [MxArchiveLayoutInfo]),
+        "build_inputs": attr.label_list(allow_files = True),
+        "tar_trees": attr.label_keyed_string_dict(allow_files = [".tar", ".gz"]),
         "jdk_homes": attr.label_keyed_string_dict(allow_files = [".gz"]),
         "file_list": attr.string_list(),
         "file_list_entry": attr.string(),

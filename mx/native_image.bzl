@@ -150,3 +150,54 @@ def mx_toolchain_tool_layout(name, tool, links, windows_command, launcher = None
             archive_imports = {":" + name + ".aliases": "="},
             visibility = visibility,
         )
+
+def _bootstrap_scripts_impl(ctx):
+    entries = {}
+    flags = []
+    for flag, jars in [("-cp", ctx.files.classpath), ("-p", ctx.files.modulepath)]:
+        paths = []
+        for i, jar in enumerate(jars):
+            path = ".bootstrap/%s/%d/%s" % (flag[1:], i, jar.basename)
+            entries[path] = jar
+            paths.append('"$root"/' + shell.quote(path))
+        if paths:
+            flags.extend([flag, ":".join(paths)])
+    flags.extend([shell.quote(arg) for arg in ctx.attr.java_args])
+    flags.extend(['"-Dllvm.bin.dir=$root/.bootstrap/llvm/bin"', '"-Dorg.graalvm.language.llvm.home=$root/.bootstrap/' + ctx.attr.home + '"', "-Xlog:disable"])
+    for alias, main in ctx.attr.aliases.items():
+        script = ctx.actions.declare_file(ctx.label.name + "/bin/" + alias)
+        content = """#!/bin/sh
+root=${0%%/*}/..
+exec "$root/.bootstrap/jdk/bin/java" %s %s %s "$@"
+""" % (" ".join(flags), shell.quote("-Dorg.graalvm.launcher.executablename=" + alias), shell.quote(main))
+        ctx.actions.write(script, content, is_executable = True)
+        entries["bin/" + alias] = script
+    ninja = ctx.actions.declare_file(ctx.label.name + "/toolchain.ninja")
+    ctx.actions.write(ninja, ctx.attr.ninja)
+    entries["toolchain.ninja"] = ninja
+    return [DefaultInfo(files = depset(entries.values())), MxArchiveLayoutInfo(archive = None, entries = entries)]
+
+_bootstrap_scripts = rule(
+    implementation = _bootstrap_scripts_impl,
+    attrs = {
+        "aliases": attr.string_dict(),
+        "java_args": attr.string_list(),
+        "classpath": attr.label_list(allow_files = [".jar"]),
+        "modulepath": attr.label_list(allow_files = [".jar"]),
+        "ninja": attr.string(),
+        "home": attr.string(),
+    },
+)
+
+def mx_bootstrap_launchers(name, aliases, ninja, sdk, jdk_archive, java_args = [], classpath = [], modulepath = [], home = None, **kwargs):
+    """Package the Java compiler drivers with a relocatable LLVM SDK and JDK."""
+    _bootstrap_scripts(name = name + ".scripts", aliases = aliases, ninja = ninja, classpath = classpath, modulepath = modulepath, java_args = java_args, home = "home" if home else "nonexistent")
+    mx_archive_layout(
+        name = name,
+        format = "dir",
+        members = {},
+        archive_imports = {":" + name + ".scripts": "="} | ({home: "=.bootstrap/home/"} if home else {}),
+        jdk_homes = {jdk_archive: json.encode({"directory": ".bootstrap/jdk", "exclude": []})},
+        tar_trees = {sdk: ".bootstrap/llvm"},
+        **kwargs
+    )

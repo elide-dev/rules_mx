@@ -1383,6 +1383,127 @@ def _bash_launcher_recipe(project, mappings, pending, jdk_archive):
     return result
 
 
+def _bootstrap_launcher(project):
+    return (type(project).__module__, type(project).__name__) == (
+        "mx_sulong_suite_constituents",
+        "BootstrapToolchainLauncherProject",
+    )
+
+
+def _bootstrap_recipe(project, options, pending, mappings):
+    if not options.sulong_bootstrap_ninja or not options.standalone_jdk_archive:
+        raise _UnsupportedLowering(
+            f"{project.name}: bind the GCC Ninja template and target JDK archive"
+        )
+    tools = project.suite.toolchain
+    aliases = {
+        alias: tools._tool_to_main(tool) for _, tool, alias in project.launchers()
+    }
+    if not aliases or any(
+        not _resource_path(alias) or "/" in alias for alias in aliases
+    ):
+        raise _UnsupportedLowering(f"{project.name}: invalid compiler aliases")
+    java = [dep for dep in project.buildDependencies if dep.isJavaProject()]
+    others = {
+        dep.qualifiedName() for dep in project.buildDependencies if dep not in java
+    }
+    if len(java) != 1 or others != {"mx:GCC_NINJA_TOOLCHAIN", "sdk:LLVM_TOOLCHAIN"}:
+        raise _UnsupportedLowering(
+            f"{project.name}: unexpected bootstrap inputs {others}"
+        )
+    # Bind all paths used by the upstream compiler drivers to the relocated toolchain.
+    props = dict(java[0]._orig_attrs["javaProperties"]) | project._orig_attrs.get(
+        "javaProperties", {}
+    )
+    llvm_home = props.pop("org.graalvm.language.llvm.home")
+    if props != {"llvm.bin.dir": "<path:LLVM_TOOLCHAIN>/bin"}:
+        raise _UnsupportedLowering(f"{project.name}: unbound launcher properties")
+    if llvm_home == "<path:SULONG_HOME>":
+        pending.append(mx.distribution("SULONG_HOME"))
+        home = ":SULONG_HOME"
+    elif re.fullmatch(r"<path:[\w-]+>/nonexistent", llvm_home):
+        home = ""
+    else:
+        raise _UnsupportedLowering(
+            f"{project.name}: unknown LLVM language home {llvm_home}"
+        )
+    groups = {}
+
+    def render(entries, cp_prefix=None, cp_suffix=None, jdk=None):
+        if cp_prefix or cp_suffix:
+            raise _UnsupportedLowering(f"{project.name}: external JVM search path")
+        marker = f"MX_BAZEL_PATH_{len(groups)}"
+        groups[marker] = _dependency_labels(
+            entries, project.suite, mappings, pending, True
+        )
+        return marker
+
+    with mx.runtime_classpath_formatter(render):
+        args = iter(mx.get_runtime_jvm_args(java, include_system_properties=False))
+    recipe = {
+        "name": project.name,
+        "aliases": aliases,
+        "home": home,
+        "sdk": "//sdk:LLVM_TOOLCHAIN",
+        "jdk_archive": options.standalone_jdk_archive,
+        "java_args": [],
+    }
+    for arg in args:
+        if arg in ("-cp", "-p"):
+            recipe["classpath" if arg == "-cp" else "modulepath"] = groups[next(args)]
+        else:
+            recipe["java_args"].append(arg)
+    ninja = Path(options.sulong_bootstrap_ninja).read_text()
+    ninja = re.sub(r"<[a-z]+:([^>]+)>", r"\1", ninja)
+    for variable in ("CC", "CXX", "AR"):
+        alias = Path(tools.get_toolchain_tool(variable, allow_bootstrap=True)).name
+        if alias not in aliases:
+            raise _UnsupportedLowering(
+                f"{project.name}: no bootstrap {variable} launcher"
+            )
+        ninja += f"\n{variable} = bin/{alias}"
+    recipe["ninja"] = ninja + "\n"
+    return recipe
+
+
+def _bootstrap_distribution(dist, pending):
+    members = {}
+    inputs = set()
+    for dest, source in dist._walk_layout():
+        if dest != "./" or source.get("path") != "*" or source.get("optional"):
+            raise _UnsupportedLowering(
+                f"{dist.name}: unexpected bootstrap distribution layout"
+            )
+        dep = mx.dependency(source["dependency"], context=dist)
+        if dep.suite != dist.suite or not (
+            (_bootstrap_launcher(dep) and source["source_type"] == "dependency")
+            or (
+                type(dep).__name__ == "LayoutTARDistribution"
+                and source["source_type"] == "extracted-dependency"
+            )
+        ):
+            raise _UnsupportedLowering(
+                f"{dist.name}: unsupported bootstrap input {dep.name}"
+            )
+        inputs.add(dep)
+        members[":" + dep.name] = "="
+    build_only = set(dist.buildDependencies) - inputs
+    if any(
+        not dep.isJARDistribution() or dep.suite != dist.suite for dep in build_only
+    ):
+        raise _UnsupportedLowering(
+            f"{dist.name}: unsupported bootstrap build dependencies"
+        )
+    pending.extend(inputs | build_only)
+    return {
+        "name": dist.name,
+        "members": {},
+        "archive_imports": members,
+        "build_inputs": sorted(":" + dep.name for dep in build_only),
+        "testonly": dist.is_test_distribution(),
+    }
+
+
 def _tool_links(dist, pending):
     tool = dist.tool_project
     if (
@@ -1551,6 +1672,7 @@ def _can_lower_root(dep):
         or _native_tool_layout(dep)
         or _thin_launcher(dep)
         or _bash_launcher(dep)
+        or _bootstrap_launcher(dep)
         or _native_image_executable(dep)
         or _language_library(dep)
         or _default_native(dep)
@@ -1779,7 +1901,7 @@ def _tar_layout(dist, pending, mappings, archives):
         type(dist.deps[0]).__name__,
     ) == ("mx_web_image", "WebImageMacroBuilder"):
         return _web_image_macro_layout(dist, pending, mappings)
-    declaration = dist._orig_attrs
+    declaration = getattr(dist, "_orig_attrs", {"layout": dist.layout})
     if dist.isPlatformDependent() and "<multitarget_libc_selection>" in str(declaration.get("layout", {})):
         return _platform_native_layout(dist, pending)
     # mx also uses platformDependent to choose the staging directory. A fixed
@@ -2497,6 +2619,7 @@ def bazel_buildfile(args):
         action="store_true",
         help="expose same-suite source JAR distributions as Java classpaths in Gazelle",
     )
+    parser.add_argument("--sulong-bootstrap-ninja", metavar="FILE", help="mx GCC Ninja rule template for the bootstrap launchers")
     parser.add_argument(
         "--standalone-source-provenance", metavar="LABEL",
         help="source archive manifest for installed release metadata",
@@ -2990,6 +3113,9 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
                     "pom_filename": project.maven_artifact_id() + ".pom",
                 }
                 continue
+            if type(project).__name__ == "LayoutTARDistribution" and any(_bootstrap_launcher(dep) for dep in project.buildDependencies):
+                tar_layouts[project.name] = _bootstrap_distribution(project, pending)
+                continue
             if type(project).__name__ == "LayoutTARDistribution":
                 tar_layouts[project.name] = _tar_layout(project, pending, java_deps, archives)
                 continue
@@ -3036,6 +3162,9 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             continue
         if options.gazelle and project.suite == suite and _thin_launcher(project):
             thin_launchers[project.name] = _thin_launcher_recipe(project)
+            continue
+        if options.gazelle and project.suite == suite and _bootstrap_launcher(project):
+            bash_launchers[project.name] = _bootstrap_recipe(project, options, pending, java_deps)
             continue
         if options.gazelle and project.suite == suite and _default_native(project):
             native_shared[project.name] = _native_shared_recipe(project, pending)
