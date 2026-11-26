@@ -549,7 +549,8 @@ func (g *importer) loadGraph(root, filename string, seen map[label.Label]bool) e
 			return err
 		}
 	}
-	for name, actual := range graph.DistributionAliases {
+	for _, name := range slices.Sorted(maps.Keys(graph.DistributionAliases)) {
+		actual := graph.DistributionAliases[name]
 		r := rule.NewRule("mx_distribution_alias", name)
 		r.SetAttr("actual", ":"+actual)
 		r.SetAttr("visibility", []string{"//visibility:public"})
@@ -576,7 +577,8 @@ func (g *importer) loadGraph(root, filename string, seen map[label.Label]bool) e
 				return err
 			}
 		}
-		for name, files := range layout.SourceArchives {
+		for _, name := range slices.Sorted(maps.Keys(layout.SourceArchives)) {
+			files := layout.SourceArchives[name]
 			byDir := map[string][]string{}
 			for src, dest := range files {
 				if !filepath.IsLocal(src) || !filepath.IsLocal(dest) || path.Base(src) != path.Base(dest) {
