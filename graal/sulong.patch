@@ -2,7 +2,7 @@ diff --git a/sulong/BUILD.bazel b/sulong/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/sulong/BUILD.bazel
-@@ -0,0 +1,4847 @@
+@@ -0,0 +1,4956 @@
 +load("@rules_mx//graal:layout.bzl", "mx_os_layout")
 +load("@rules_mx//graal:sulong_fixture_check.bzl", "sulong_fixture_check")
 +load("@rules_mx//mx:bitcode.bzl", "mx_bitcode_suite")
@@ -51,6 +51,7 @@ new file mode 100644
 +        ":com.oracle.truffle.llvm.asm.amd64",
 +        ":com.oracle.truffle.llvm.docs",
 +        ":com.oracle.truffle.llvm.launcher",
++        ":com.oracle.truffle.llvm.libraries.bitcode.libcxx",
 +        ":com.oracle.truffle.llvm.libraries.graalvm.llvm",
 +        ":com.oracle.truffle.llvm.libraries.graalvm.llvm.libs",
 +        ":com.oracle.truffle.llvm.libraries.native",
@@ -1274,6 +1275,114 @@ new file mode 100644
 +    ],
 +    output = "llvmvm",
 +    visibility = ["//visibility:public"],
++)
++
++mx_cmake_project(
++    name = "com.oracle.truffle.llvm.libraries.bitcode.libcxx",
++    testonly = False,
++    srcs = ["@graal_sdk_llvm_org_src//:runtimes_sources"],
++    compiler = ":bootstrap-toolchain-launchers-no-home",
++    config = {
++    },
++    include_dirs = {
++    },
++    max_jobs = 8,
++    profiles = {
++        "linux_amd64": {
++            "config": {
++                "CMAKE_ASM_FLAGS": "@SOURCE_PREFIX_MAP@",
++                "CMAKE_BUILD_WITH_INSTALL_RPATH": "YES",
++                "CMAKE_CXX_COMPILER_LAUNCHER": "@WRAPPER@",
++                "CMAKE_CXX_FLAGS": "@SOURCE_PREFIX_MAP@",
++                "CMAKE_C_FLAGS": "@SOURCE_PREFIX_MAP@",
++                "CMAKE_INSTALL_RPATH": "$ORIGIN",
++                "LIBCXXABI_ENABLE_STATIC": "NO",
++                "LIBCXXABI_INCLUDE_TESTS": "NO",
++                "LIBCXX_ENABLE_STATIC": "NO",
++                "LIBCXX_INCLUDE_BENCHMARKS": "NO",
++                "LIBCXX_INCLUDE_TESTS": "NO",
++                "LIBUNWIND_ENABLE_STATIC": "NO",
++                "LLVM_ENABLE_RUNTIMES": "libcxx;libcxxabi;libunwind",
++            },
++            "directories": [
++                "native",
++            ],
++            "members": [
++            ],
++            "targets": [
++                "cxx",
++                "cxxabi",
++                "unwind",
++                "install-cxx",
++                "install-cxxabi",
++                "install-unwind",
++            ],
++        },
++        "linux_arm64": {
++            "config": {
++                "CMAKE_ASM_FLAGS": "@SOURCE_PREFIX_MAP@",
++                "CMAKE_BUILD_WITH_INSTALL_RPATH": "YES",
++                "CMAKE_CXX_COMPILER_LAUNCHER": "@WRAPPER@",
++                "CMAKE_CXX_FLAGS": "@SOURCE_PREFIX_MAP@",
++                "CMAKE_C_FLAGS": "@SOURCE_PREFIX_MAP@",
++                "CMAKE_INSTALL_RPATH": "$ORIGIN",
++                "LIBCXXABI_ENABLE_STATIC": "NO",
++                "LIBCXXABI_INCLUDE_TESTS": "NO",
++                "LIBCXX_ENABLE_STATIC": "NO",
++                "LIBCXX_INCLUDE_BENCHMARKS": "NO",
++                "LIBCXX_INCLUDE_TESTS": "NO",
++                "LIBUNWIND_ENABLE_STATIC": "NO",
++                "LLVM_ENABLE_RUNTIMES": "libcxx;libcxxabi;libunwind",
++            },
++            "directories": [
++                "native",
++            ],
++            "members": [
++            ],
++            "targets": [
++                "cxx",
++                "cxxabi",
++                "unwind",
++                "install-cxx",
++                "install-cxxabi",
++                "install-unwind",
++            ],
++        },
++        "macos_arm64": {
++            "config": {
++                "CMAKE_ASM_FLAGS": "@SOURCE_PREFIX_MAP@",
++                "CMAKE_BUILD_WITH_INSTALL_RPATH": "YES",
++                "CMAKE_CXX_COMPILER_LAUNCHER": "@WRAPPER@",
++                "CMAKE_CXX_FLAGS": "@SOURCE_PREFIX_MAP@",
++                "CMAKE_C_FLAGS": "@SOURCE_PREFIX_MAP@",
++                "CMAKE_INSTALL_RPATH": "@loader_path/",
++                "CMAKE_LIBTOOL": "@COMPILER@/.bootstrap/llvm/bin/llvm-libtool-darwin",
++                "LIBCXXABI_ENABLE_STATIC": "NO",
++                "LIBCXXABI_INCLUDE_TESTS": "NO",
++                "LIBCXX_ENABLE_STATIC": "NO",
++                "LIBCXX_INCLUDE_BENCHMARKS": "NO",
++                "LIBCXX_INCLUDE_TESTS": "NO",
++                "LIBUNWIND_ENABLE_STATIC": "NO",
++                "LLVM_ENABLE_RUNTIMES": "libcxx;libcxxabi;libunwind",
++            },
++            "directories": [
++                "native",
++            ],
++            "members": [
++            ],
++            "targets": [
++                "cxx",
++                "cxxabi",
++                "unwind",
++                "install-cxx",
++                "install-cxxabi",
++                "install-unwind",
++            ],
++        },
++    },
++    source_subdir = "runtimes",
++    visibility = ["//visibility:public"],
++    wrapper = "projects/com.oracle.truffle.llvm.libraries.bitcode.libcxx.compiler-wrapper/compiler-wrapper.py",
 +)
 +
 +mx_cmake_project(

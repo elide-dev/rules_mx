@@ -1445,8 +1445,70 @@ def _cmake_native_project(project):
     )
 
 
-def _cmake_project_recipe(project, pending, layout_bindings):
+def _external_cmake_recipe(project, source_name, bindings, pending):
     attrs = project._orig_attrs
+    unsupported = attrs.keys() - {
+        "subDir", "vpath", "sourceDir", "cmakeSubdir", "symlinkSource", "class", "toolchain",
+        "max_jobs", "cmakeConfig", "ninja_targets", "ninja_install_targets", "os", "buildDependencies",
+        "clangFormat", "license", "testProject",
+    }
+    if unsupported or not str(attrs.get("max_jobs", 1)).isdecimal():
+        raise _UnsupportedLowering(f"{project.name}: unsupported external CMake settings {sorted(unsupported)}")
+    compiler = mx.dependency(attrs["toolchain"], context=project)
+    launchers = [dep for dep in compiler.buildDependencies if _bootstrap_launcher(dep)]
+    source = mx.dependency(source_name, context=project)
+    labels = bindings.get(source.qualifiedName(), [])
+    if len(labels) != 1 or len(launchers) != 1 or not _resource_path(attrs["cmakeSubdir"]):
+        raise _UnsupportedLowering(f"{project.name}: bind the external CMake source and compiler")
+    accounted = {compiler.qualifiedName(), source.qualifiedName(), "sdk:LLVM_TOOLCHAIN", "mx:NINJA_SYNTAX"}
+    pending.append(compiler)
+    profiles = {}
+    wrapper = None
+    for os_name, profile in (("linux", "linux_amd64"), ("linux", "linux_arm64"), ("darwin", "macos_arm64")):
+        branches = attrs.get("os", {})
+        branch = branches.get(os_name, branches.get("<others>", {}))
+        config = dict(attrs["cmakeConfig"]) | branch.get("cmakeConfig", {})
+        prefix = config.pop("CMAKE_INSTALL_PREFIX")
+        if branch.get("results") != [prefix] or not _resource_path(prefix):
+            raise _UnsupportedLowering(f"{project.name}: expected an installed CMake directory")
+        for key, value in list(config.items()):
+            expression = f"<sulong_prefix:{project.name}>"
+            if expression in value:
+                if value != "-ffile-prefix-map=" + expression + "=llvm-project":
+                    raise _UnsupportedLowering(f"{project.name}: unsupported compiler path mapping {value}")
+                config[key] = "@SOURCE_PREFIX_MAP@"
+            elif key == "CMAKE_CXX_COMPILER_LAUNCHER":
+                match = re.fullmatch(r"<path:([^>]+)>/([^/]+[.]py)", value)
+                if not match:
+                    raise _UnsupportedLowering(f"{project.name}: unsupported CMake launcher {value}")
+                distribution = mx.dependency(match[1], context=project)
+                files = [entry.get("path") for dest, entry in distribution._walk_layout()
+                         if dest == "./" and entry["source_type"] == "file" and Path(entry["path"]).name == match[2]]
+                if len(files) != 1 or not _resource_path(files[0]) or wrapper not in (None, files[0]):
+                    raise _UnsupportedLowering(f"{project.name}: expected a single Python compiler wrapper")
+                wrapper = files[0]
+                accounted.add(distribution.qualifiedName())
+                config[key] = "@WRAPPER@"
+            elif value == "<path:LLVM_TOOLCHAIN>/bin/llvm-libtool-darwin":
+                config[key] = "@COMPILER@/.bootstrap/llvm/bin/llvm-libtool-darwin"
+            elif "<" in value:
+                raise _UnsupportedLowering(f"{project.name}: unresolved CMake setting {key}={value}")
+        targets = [t for k in ("ninja_targets", "ninja_install_targets")
+                   for t in attrs.get(k, []) + branch.get(k, [])]
+        profiles[profile] = {"config": config, "directories": [prefix], "members": [], "targets": targets}
+    remaining = {dep.qualifiedName() for dep in project.buildDependencies} - accounted
+    if remaining:
+        raise _UnsupportedLowering(f"{project.name}: unbound CMake build inputs {sorted(remaining)}")
+    return {"name": project.name, "compiler": ":" + launchers[0].name, "srcs": labels,
+            "source_subdir": attrs["cmakeSubdir"], "wrapper": wrapper, "profiles": profiles, "max_jobs": int(attrs.get("max_jobs", 1)),
+            "config": {}, "include_dirs": {}, "testonly": project.is_test_project()}
+
+
+def _cmake_project_recipe(project, pending, layout_bindings, source_bindings):
+    attrs = project._orig_attrs
+    external = re.fullmatch(r"<path:([^>]+)>", attrs.get("sourceDir", ""))
+    if external and attrs.get("symlinkSource") and attrs.get("cmakeSubdir"):
+        return _external_cmake_recipe(project, external[1], source_bindings, pending)
     if attrs.keys() - {
         "class",
         "subDir",
@@ -2939,6 +3001,7 @@ def bazel_buildfile(args):
         action="store_true",
         help="expose same-suite source JAR distributions as Java classpaths in Gazelle",
     )
+    parser.add_argument("--cmake-source", action="append", default=[], metavar="SUITE:NAME=LABEL", help="bind an external CMake source archive to its Bazel source filegroup")
     parser.add_argument("--sulong-bootstrap-ninja", metavar="FILE", help="mx GCC Ninja rule template for the bootstrap launchers")
     parser.add_argument(
         "--standalone-source-provenance", metavar="LABEL",
@@ -3296,6 +3359,7 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
         parser.error("--classpath-dists requires --gazelle")
     mappings = _mappings(parser, options.processor_plugin, "--processor-plugin")
     java_deps = _mappings(parser, options.java_dep, "--java-dep")
+    cmake_sources = _mappings(parser, options.cmake_source, "--cmake-source")
     layout_deps = _mappings(parser, options.layout_dep, "--layout-dep")
     if options.suite_package and not options.classpath_dists:
         parser.error("--suite-package requires --classpath-dists or --all")
@@ -3517,7 +3581,7 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             thin_launchers[project.name] = _thin_launcher_recipe(project)
             continue
         if options.gazelle and project.suite == suite and _cmake_native_project(project):
-            cmake_suites[project.name] = _cmake_project_recipe(project, pending, layout_deps)
+            cmake_suites[project.name] = _cmake_project_recipe(project, pending, layout_deps, cmake_sources)
             continue
         if options.gazelle and project.suite == suite and _bootstrap_launcher(project):
             bash_launchers[project.name] = _bootstrap_recipe(project, options, pending, java_deps)

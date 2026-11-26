@@ -376,6 +376,23 @@ py_test(
 )
 
 py_test(
+    name = "sulong_cxx_runtime_test",
+    size = "small",
+    srcs = ["sulong_cxx_runtime_test.py"],
+    args = [
+        "$(rootpath @graal//sulong:com.oracle.truffle.llvm.libraries.bitcode.libcxx)",
+        "$(rootpath //tools/cc:llvm_nm)",
+        "$(rootpath //tools/cc:llvm_objdump)",
+    ],
+    data = [
+        "//tools/cc:llvm_nm",
+        "//tools/cc:llvm_objdump",
+        "@graal//sulong:com.oracle.truffle.llvm.libraries.bitcode.libcxx",
+    ],
+    tags = ["manual"],
+)
+
+py_test(
     name = "sulong_cmake_libraries_test",
     size = "small",
     srcs = ["sulong_cmake_libraries_test.py"],

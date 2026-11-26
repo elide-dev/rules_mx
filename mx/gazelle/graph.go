@@ -202,13 +202,16 @@ func (g *importer) loadGraph(root, filename string, seen map[label.Label]bool) e
 			Testonly                   bool
 		} `json:"cmake_suites"`
 		CMakeProjects []struct {
-			Name        string
-			Config      map[string]string
-			Testonly    bool
-			Compiler    string
-			Srcs        []string
-			IncludeDirs map[string][]string `json:"include_dirs"`
-			Profiles    map[string]map[string]interface{}
+			SourceSubdir string `json:"source_subdir"`
+			MaxJobs      int    `json:"max_jobs"`
+			Wrapper      string
+			Name         string
+			Config       map[string]string
+			Testonly     bool
+			Compiler     string
+			Srcs         []string
+			IncludeDirs  map[string][]string `json:"include_dirs"`
+			Profiles     map[string]map[string]interface{}
 		} `json:"cmake_projects"`
 		BitcodeSuites []struct {
 			Name, Root, Linker string
@@ -669,6 +672,13 @@ func (g *importer) loadGraph(root, filename string, seen map[label.Label]bool) e
 	}
 	for _, p := range graph.CMakeProjects {
 		r := rule.NewRule("mx_cmake_project", p.Name)
+		if p.SourceSubdir != "" {
+			r.SetAttr("source_subdir", p.SourceSubdir)
+			r.SetAttr("max_jobs", p.MaxJobs)
+		}
+		if p.Wrapper != "" {
+			r.SetAttr("wrapper", p.Wrapper)
+		}
 		r.SetAttr("compiler", p.Compiler)
 		r.SetAttr("srcs", p.Srcs)
 		r.SetAttr("config", p.Config)

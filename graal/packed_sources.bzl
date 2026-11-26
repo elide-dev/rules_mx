@@ -9,12 +9,18 @@ def _packed_sources(ctx):
             urls = pin["urls"],
             integrity = pin["integrity"],
             strip_prefix = pin.get("subtree", ""),
-            add_prefix = pin.get("subtree", ""),
-            build_file_content = """
+            add_prefix = "src" if name == "graal_sdk_llvm_org_src" else pin.get("subtree", ""),
+            build_file_content = ("""
+package(default_visibility = ["//visibility:public"])
+filegroup(name = "runtimes_sources", srcs = ["BUILD.bazel"] + glob([
+    "src/runtimes/**", "src/cmake/**", "src/libcxx/**", "src/libcxxabi/**", "src/libunwind/**",
+    "src/llvm/cmake/**", "src/llvm/include/**", "src/llvm/utils/llvm-lit/**", "src/llvm/utils/lit/**",
+], exclude = ["**/test/**", "**/benchmarks/**"]))
+""" if name == "graal_sdk_llvm_org_src" else """
 package(default_visibility = ["//visibility:public"])
 exports_files(["BUILD.bazel"] + glob(["**/*.c", "**/*.cpp", "**/*.cc", "**/*.C", "**/*.ll"], allow_empty = True))
 filegroup(name = "headers", srcs = glob(["**/*.h", "**/*.hpp", "**/*.inc", "**/*.def"], allow_empty = True))
-""",
+"""),
         )
     return ctx.extension_metadata(reproducible = True)
 
