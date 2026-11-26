@@ -1383,6 +1383,152 @@ def _bash_launcher_recipe(project, mappings, pending, jdk_archive):
     return result
 
 
+def _cmake_native_project(project):
+    return (type(project).__module__, type(project).__name__) == (
+        "mx._impl.mx_cmake",
+        "CMakeNinjaProject",
+    )
+
+
+def _cmake_project_recipe(project, pending, layout_bindings):
+    attrs = project._orig_attrs
+    if attrs.keys() - {
+        "class",
+        "subDir",
+        "toolchain",
+        "max_jobs",
+        "vpath",
+        "license",
+        "buildDependencies",
+        "ninja_targets",
+        "ninja_install_targets",
+        "results",
+        "os",
+        "cmakeConfig",
+        "testProject",
+    }:
+        raise _UnsupportedLowering(
+            f"{project.name}: CMake needs additional source or configuration inputs"
+        )
+    compiler = (
+        mx.dependency(attrs.get("toolchain"), context=project)
+        if attrs.get("toolchain")
+        else None
+    )
+    if not compiler or not any(
+        _bootstrap_launcher(dep) for dep in compiler.buildDependencies
+    ):
+        raise _UnsupportedLowering(
+            f"{project.name}: CMake compiler requires an available bootstrap distribution"
+        )
+    launchers = [d for d in compiler.buildDependencies if _bootstrap_launcher(d)]
+    if len(launchers) != 1:
+        raise _UnsupportedLowering(
+            f"{project.name}: CMake requires one bootstrap compiler"
+        )
+    pending.append(compiler)
+    directory = Path(project.dir)
+    root = Path(project.suite.dir)
+    if not (directory / "CMakeLists.txt").is_file():
+        raise _UnsupportedLowering(
+            f"{project.name}: CMake needs an external source tree"
+        )
+    srcs = sorted(
+        f.relative_to(root).as_posix() for f in directory.rglob("*") if f.is_file()
+    )
+    config, includes = {}, {}
+    accounted = {compiler.qualifiedName()}
+    for key, value in attrs.get("cmakeConfig", {}).items():
+        ref = re.fullmatch(r"<path:([^>]+)>/([\w./-]+)", value)
+        if ref:
+            dep = mx.dependency(ref[1], context=project)
+            if dep.suite == project.suite and _source_project(dep):
+                pending.append(dep)
+                label = ":" + dep.name
+            elif dep.qualifiedName() in layout_bindings:
+                (label,) = layout_bindings[dep.qualifiedName()]
+            else:
+                raise _UnsupportedLowering(
+                    f"{project.name}: bind CMake input {dep.qualifiedName()}"
+                )
+            accounted.add(dep.qualifiedName())
+            includes[key] = [label, ref[2]]
+        elif "<" in value:
+            raise _UnsupportedLowering(
+                f"{project.name}: unsupported CMake setting {key}={value}"
+            )
+        else:
+            config[key] = value
+    # The selected bootstrap compiler installs the exact sdk:LLVM_TOOLCHAIN archive.
+    # rules_foreign_cc supplies Ninja; mx uses NINJA_SYNTAX to write its build file.
+    remaining = (
+        {dep.qualifiedName() for dep in project.buildDependencies}
+        - accounted
+        - {"sdk:LLVM_TOOLCHAIN", "mx:NINJA_SYNTAX"}
+    )
+    if remaining:
+        raise _UnsupportedLowering(
+            f"{project.name}: CMake build inputs {sorted(remaining)}"
+        )
+    profiles = {}
+    for os_name, profile in (
+        ("linux", "linux_amd64"),
+        ("linux", "linux_arm64"),
+        ("darwin", "macos_arm64"),
+    ):
+        branches = attrs.get("os", {})
+        branch = branches.get(os_name, branches.get("<others>", {}))
+        if branch.keys() - {"cmakeConfig", "ninja_targets", "results"}:
+            raise _UnsupportedLowering(
+                f"{project.name}: unsupported CMake platform options"
+            )
+
+        def member(path):
+            ext = ".dylib" if os_name == "darwin" else ".so"
+            path = re.sub(r"<lib:([\w.+-]+)>", lambda m: "lib" + m[1] + ext, path)
+            path = re.sub(
+                r"<libv:([\w+-]+)\.([0-9.]+)>",
+                lambda m: (
+                    "lib"
+                    + m[1]
+                    + ("." + m[2] + ext if os_name == "darwin" else ext + "." + m[2])
+                ),
+                path,
+            )
+            if not _resource_path(path):
+                raise _UnsupportedLowering(
+                    f"{project.name}: unsupported CMake result {path}"
+                )
+            return path
+
+        members = list(map(member, branch.get("results", attrs.get("results", []))))
+        targets = list(
+            map(member, branch.get("ninja_targets", attrs.get("ninja_targets", [])))
+        )
+        if (
+            not members
+            or not targets
+            or attrs.get("ninja_install_targets") != ["install"]
+        ):
+            raise _UnsupportedLowering(
+                f"{project.name}: CMake needs an explicit install plan"
+            )
+        profiles[profile] = {
+            "config": branch.get("cmakeConfig", {}),
+            "members": members,
+            "targets": targets + ["install"],
+        }
+    return {
+        "name": project.name,
+        "srcs": srcs,
+        "compiler": ":" + launchers[0].name,
+        "config": config,
+        "include_dirs": includes,
+        "profiles": profiles,
+        "testonly": project.is_test_project(),
+    }
+
+
 def _bootstrap_launcher(project):
     return (type(project).__module__, type(project).__name__) == (
         "mx_sulong_suite_constituents",
@@ -1674,6 +1820,7 @@ def _can_lower_root(dep):
         or _thin_launcher(dep)
         or _bash_launcher(dep)
         or _bootstrap_launcher(dep)
+        or _cmake_native_project(dep)
         or _native_image_executable(dep)
         or _language_library(dep)
         or _default_native(dep)
@@ -3164,6 +3311,9 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
         if options.gazelle and project.suite == suite and _thin_launcher(project):
             thin_launchers[project.name] = _thin_launcher_recipe(project)
             continue
+        if options.gazelle and project.suite == suite and _cmake_native_project(project):
+            cmake_suites[project.name] = _cmake_project_recipe(project, pending, layout_deps)
+            continue
         if options.gazelle and project.suite == suite and _bootstrap_launcher(project):
             bash_launchers[project.name] = _bootstrap_recipe(project, options, pending, java_deps)
             continue
@@ -3689,7 +3839,14 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
         if wat_projects:
             result["wat_projects"] = [wat_projects[n] for n in sorted(wat_projects)]
         if cmake_suites:
-            result["cmake_suites"] = [cmake_suites[n] for n in sorted(cmake_suites)]
+            for key, entries in (("cmake_projects", True), ("cmake_suites", False)):
+                recipes = [
+                    cmake_suites[n]
+                    for n in sorted(cmake_suites)
+                    if ("compiler" in cmake_suites[n]) == entries
+                ]
+                if recipes:
+                    result[key] = recipes
         if bitcode_suites:
             result["bitcode_suites"] = [
                 bitcode_suites[n] for n in sorted(bitcode_suites)

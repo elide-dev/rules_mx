@@ -311,6 +311,25 @@ java_test(
 )
 
 py_test(
+    name = "sulong_cmake_libraries_test",
+    size = "small",
+    srcs = ["sulong_cmake_libraries_test.py"],
+    args = [
+        "$(rootpath //tools/cc:llvm_nm)",
+        "$(rootpath //tools/cc:llvm_objdump)",
+        "$(rootpath @graal//sulong:com.oracle.truffle.llvm.libraries.graalvm.llvm.libs)",
+        "$(rootpath @graal//sulong:com.oracle.truffle.llvm.libraries.native)",
+    ],
+    data = [
+        "//tools/cc:llvm_nm",
+        "//tools/cc:llvm_objdump",
+        "@graal//sulong:com.oracle.truffle.llvm.libraries.graalvm.llvm.libs",
+        "@graal//sulong:com.oracle.truffle.llvm.libraries.native",
+    ],
+    tags = ["manual"],
+)
+
+py_test(
     name = "sulong_bootstrap_test",
     size = "large",
     srcs = ["sulong_bootstrap_test.py"],
