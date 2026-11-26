@@ -2715,10 +2715,13 @@ def main():
                     source / suite / f"mx.{suite}", stage / suite / f"mx.{suite}"
                 )
         if "espresso" in (*selected, *providers):
-            # The exporter and the native mx task use the same JDK archive selection.
-            patch = ROOT / "graal/espresso_static_libraries.patch"
-            if subprocess.run(["git", "apply", "--reverse", "--check", str(patch)], cwd=stage, stderr=subprocess.DEVNULL).returncode:
-                subprocess.run(["git", "apply", str(patch)], cwd=stage, check=True)
+            for filename in ("espresso_static_libraries.patch", "espresso_platform_properties.patch"):
+                patch = ROOT / "graal" / filename
+                if subprocess.run(
+                    ["git", "apply", "--reverse", "--check", str(patch)],
+                    cwd=stage, stderr=subprocess.DEVNULL,
+                ).returncode:
+                    subprocess.run(["git", "apply", str(patch)], cwd=stage, check=True)
         for suite in SUITES:
             for directory in (f"mx.{suite}", "src"):
                 rel = Path(suite) / directory

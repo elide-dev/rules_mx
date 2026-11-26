@@ -78,3 +78,25 @@ mx_source_archive = rule(
         "_pack": attr.label(default = Label("//mx:pack_layout"), executable = True, cfg = "exec"),
     },
 )
+
+def _platform_file_impl(ctx):
+    out = ctx.actions.declare_file(ctx.label.name + "/" + ctx.attr.filename)
+    ctx.actions.write(out, ctx.attr.content)
+    return [
+        DefaultInfo(files = depset([out])),
+        MxArchiveLayoutInfo(archive = None, entries = {out.basename: out}, modes = {out.basename: "644"}),
+    ]
+
+_generated_file = rule(
+    implementation = _platform_file_impl,
+    attrs = {"filename": attr.string(mandatory = True), "content": attr.string(mandatory = True)},
+)
+
+def mx_platform_file(name, filename, variants, **kwargs):
+    """Materialize the content supplied by the mx project for the target OS and libc."""
+    _generated_file(
+        name = name,
+        filename = filename,
+        content = select({Label("//tools/cc:linux_musl") if os == "linux-musl" else "@platforms//os:" + os: content for os, content in variants.items()}),
+        **kwargs
+    )

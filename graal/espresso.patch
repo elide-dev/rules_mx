@@ -2,12 +2,12 @@ diff --git a/espresso/BUILD.bazel b/espresso/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/espresso/BUILD.bazel
-@@ -0,0 +1,1419 @@
+@@ -0,0 +1,1498 @@
 +load("@rules_mx//graal:layout.bzl", "mx_os_layout")
 +load("@rules_mx//mx:graph.bzl", "mx_exported_tar", "mx_jar_dist", "mx_jvmci_library", "mx_pom_dist", "mx_processed_java", "mx_processor", "mx_project", "mx_shaded_java", "mx_whole_java")
 +load("@rules_mx//mx:jvmci.bzl", "mx_patch_module")
 +load("@rules_mx//mx:native_project.bzl", "mx_native_shared_project")
-+load("@rules_mx//mx:project_files.bzl", "mx_project_files", "mx_source_archive")
++load("@rules_mx//mx:project_files.bzl", "mx_platform_file", "mx_project_files", "mx_source_archive")
 +load("@rules_mx//mx:thin_launcher.bzl", "mx_thin_launcher")
 +
 +filegroup(
@@ -16,10 +16,12 @@ new file mode 100644
 +    srcs = [
 +        ":CONTINUATIONS",
 +        ":ESPRESSO",
++        ":ESPRESSO_GRAALVM_SUPPORT",
 +        ":ESPRESSO_IO",
 +        ":ESPRESSO_JVMCI",
 +        ":ESPRESSO_JVM_STANDALONE_JAVA_LINKS",
 +        ":ESPRESSO_JVM_STANDALONE_MOKAPOT_SUPPORT",
++        ":ESPRESSO_JVM_SUPPORT",
 +        ":ESPRESSO_LAUNCHER",
 +        ":ESPRESSO_LIBS_DIR",
 +        ":ESPRESSO_LIBS_RESOURCES",
@@ -56,6 +58,7 @@ new file mode 100644
 +        ":com.oracle.truffle.espresso.shadowed.asm",
 +        ":com.oracle.truffle.espresso.vmaccess.guest",
 +        ":espresso",
++        ":espresso-legacy-nativeimage-properties",
 +        ":espresso-license-files",
 +        ":org.graalvm.continuations",
 +    ] + select({
@@ -1109,6 +1112,19 @@ new file mode 100644
 +    deps = [":com.oracle.truffle.espresso.mokapot"],
 +)
 +
++mx_platform_file(
++    name = "espresso-legacy-nativeimage-properties",
++    testonly = False,
++    filename = "native-image.properties",
++    variants = {
++        "linux": "Requires = language:nfi\n\nJavaArgs = -Dpolyglot.image-build-time.PreinitializeContexts=java \\\n      -Dpolyglot.image-build-time.PreinitializeContextsWithNative=true\n",
++        "linux-musl": "Requires = language:nfi",
++        "macos": "Requires = language:nfi",
++        "windows": "Requires = language:nfi",
++    },
++    visibility = ["//visibility:public"],
++)
++
 +mx_project_files(
 +    name = "espresso-license-files",
 +    testonly = False,
@@ -1145,6 +1161,45 @@ new file mode 100644
 +            "-DLIBJVM_RELPATH=../languages/java/jvm/lib/server/libjvm.dylib",
 +            "-DLIBJLI_RELPATH=../languages/java/jvm/lib/libjli.dylib",
 +        ],
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_os_layout(
++    name = "ESPRESSO_GRAALVM_SUPPORT",
++    format = "tar",
++    os_layouts = {
++        "linux_amd64": {
++            "archive_imports": {
++                ":ESPRESSO_SUPPORT": "=",
++                ":com.oracle.truffle.espresso.mokapot": "{primary}=lib/{basename}",
++            },
++            "members": {
++                ":espresso-legacy-nativeimage-properties": "native-image.properties",
++                "LICENSE": "LICENSE_JAVAONTRUFFLE",
++            },
++        },
++        "linux_arm64": {
++            "archive_imports": {
++                ":ESPRESSO_SUPPORT": "=",
++                ":com.oracle.truffle.espresso.mokapot": "{primary}=lib/{basename}",
++            },
++            "members": {
++                ":espresso-legacy-nativeimage-properties": "native-image.properties",
++                "LICENSE": "LICENSE_JAVAONTRUFFLE",
++            },
++        },
++        "macos_arm64": {
++            "archive_imports": {
++                ":ESPRESSO_SUPPORT": "=",
++                ":com.oracle.truffle.espresso.fatpot": "{primary}=lib/fatpot/{basename}",
++                ":com.oracle.truffle.espresso.mokapot": "{primary}=lib/{basename}",
++            },
++            "members": {
++                ":espresso-legacy-nativeimage-properties": "native-image.properties",
++                "LICENSE": "LICENSE_JAVAONTRUFFLE",
++            },
++        },
 +    },
 +    visibility = ["//visibility:public"],
 +)
@@ -1207,6 +1262,30 @@ new file mode 100644
 +            "file_list": [
 +            ],
 +            "members": {
++            },
++        },
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_os_layout(
++    name = "ESPRESSO_JVM_SUPPORT",
++    format = "tar",
++    os_layouts = {
++        "linux_amd64": {
++            "archive_imports": {
++                ":com.oracle.truffle.espresso.mokapot": "{primary}=truffle/{basename}",
++            },
++        },
++        "linux_arm64": {
++            "archive_imports": {
++                ":com.oracle.truffle.espresso.mokapot": "{primary}=truffle/{basename}",
++            },
++        },
++        "macos_arm64": {
++            "archive_imports": {
++                ":com.oracle.truffle.espresso.fatpot": "{primary}=truffle/fatpot/{basename}",
++                ":com.oracle.truffle.espresso.mokapot": "{primary}=truffle/{basename}",
 +            },
 +        },
 +    },
