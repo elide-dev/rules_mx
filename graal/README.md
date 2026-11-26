@@ -19,9 +19,10 @@ tools/buildbuddy test --config=buildbuddy-rbe --config=elide-processors //graal/
 | Compiler | All 17 projects and all 20 distributions, including VM access, management, libgraal and its loader, and both JMH suites. | 21 compiler-tool JUnit classes, 19 shared-harness classes, four previously qualified compiler regressions and the last-tier compiled guest probe run by default. |
 | Regex | All three projects and all five distributions, including Native Image metadata archives. | All 20 discovered upstream JUnit classes. |
 | Tools | All 18 projects and all 29 distributions, including the Maven POMs, Native Image support TARs and platform-specific VisualVM support archive. The upstream warmup test project declares dependencies and has an empty source tree. | All 60 discovered JUnit classes. |
-| Sulong | 30 of 77 projects and 11 of 51 distributions on Linux x86-64, including the Sulong core, native-mode and NFI JARs. | CI builds ten LLVM IR fixtures and 4,731 bitcode or native reference outputs from 1,086 additional cases. A separate test runs three reference programs and their bitcode against an upstream CMake build. The Polyglot discovery test reads the installed LLVM language options. |
-| Wasm | 13 of 15 projects and 10 of 16 distributions, including the language, launcher, test case and benchmark JARs. | Gazelle emits 55 JUnit targets. The 45 classes in `@graal//wasm:qualified_tests` include the C and WAT suites. Bazel builds each fixture with Emscripten or WABT and packages the upstream sidecars and test index. |
-| Espresso | 17 of 25 projects and 10 of 24 distributions, including the language, JVMCI and the versioned Java I/O module patches. | The packaging test checks release-specific class entries. |
+| Sandbox Toolchains | 5 of 31 projects and 8 of 31 distributions. The three native musl launchers, their tool aliases, the Rust tool aliases and the Java distributions build from source. | A packaged compiler alias invokes the pinned SDK clang and compiles a C object for stock x86-64 musl. |
+| Sulong | 31 of 77 projects and 13 of 51 distributions on Linux x86-64, including the Sulong core, native-mode and NFI JARs. | CI builds ten LLVM IR fixtures and 4,731 bitcode or native reference outputs from 1,086 additional cases. A separate test runs three reference programs and their bitcode against an upstream CMake build. The Polyglot discovery test reads the installed LLVM language options. |
+| Wasm | 13 of 15 projects and 11 of 16 distributions, including the language, launcher, test case and benchmark JARs. | Gazelle emits 55 JUnit targets. The 45 classes in `@graal//wasm:qualified_tests` include the C and WAT suites. Bazel builds each fixture with Emscripten or WABT and packages the upstream sidecars and test index. |
+| Espresso | 17 of 25 projects and 11 of 24 distributions, including the language, JVMCI and the versioned Java I/O module patches. | The packaging test checks release-specific class entries. |
 | Espresso Compiler Stub | Both projects and all three distributions. | The packaging test opens the compiler support TAR and checks corresponding classes and sources. |
 | Web Image | All eight projects and all 12 distributions, including both Native Image macros. | `@graal//web-image:unit_tests` selects the four unit classes. The integration suites need an installed Web Image toolchain. |
 | Espresso Shared | Both named modules, including the source-relocated `ESPRESSO_SVM` used by SubstrateVM. | The SubstrateVM compile exercises the relocated source API. |
@@ -35,6 +36,16 @@ The SDK and Truffle slice generally targets Java 21. Shaded libraries compile at
 `--classpath-dists` follows same-suite distribution dependencies during Gazelle export. `mx_classpath_dist` exposes their constituent jars and combined JavaInfo. Platform-independent file layouts support literal contents and exact file references to another layout. The SDK version layouts exercise both operations. Select individual distributions for JAR assembly and JPMS descriptors with `--archive-dist DIST`. The Native Bridge closure uses this path. JAR assembly supports release-specific class overlays and compiles their JPMS descriptors against the classes visible at each release. Signing and publication remain separate migration work.
 
 Truffle's eight declared processors run on the execution platform. Its DSL processor inspects javac internals that Turbine does not implement. The generator selects `--javac-only-processor truffle:TRUFFLE_DSL_PROCESSOR` for that distribution. Bazel runs javac once on affected projects, then extracts an interface jar containing the generated types for downstream compilation. Eligible Elide compilations keep their worker and ABI settings. For selected pinned Truffle projects the generator sets individual Error Prone checks to warning severity. Stock JavaBuilder reports the upstream diagnostics, including an unconditional recursive call in instrumentation’s `NearestNodesCollector`.
+
+## Build the native toolchain launchers
+
+Gazelle gets the Native Image main class, ordered classpath, module path and image options from the mx build task. Each image has its own Bazel target. The Bazel compilation mode controls debug information, so Linux and macOS generate the same overlay. Tool distributions expose individual files and preserve the aliases specified by mx when embedded in another archive. For discovery, Bazel fetches the LLVM and musl suite definitions at the revisions imported by Sandbox Toolchains. The patched LLVM, musl and Rust bootstraps still need build rules.
+
+```sh
+bazelisk query 'deps(@graal//sandbox-toolchains:SANDBOXED_MUSL_TOOLS_SWCFI, 2)'
+tools/buildbuddy build --config=buildbuddy-rbe --config=source-native-image @graal//sulong:SULONG_NATIVE_TOOLS
+tools/buildbuddy test --config=buildbuddy-rbe --config=source-native-image //graal:sandbox_launcher_test
+```
 
 ## Build a Sulong fixture
 

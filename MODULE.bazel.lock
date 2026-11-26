@@ -586,7 +586,7 @@
     },
     "//mx:extensions.bzl%mx_sources": {
       "general": {
-        "bzlTransitiveDigest": "SqPCxyR+FXtZgdxTDKAZTXtRf3GWZucLe7RTyTjAwig=",
+        "bzlTransitiveDigest": "DwXG+ckvydxy93y8bvF07lwytlGEbMWiKNZkKUmXnwc=",
         "usagesDigest": "dxCJDfVKOZaNXO+n+nKHCOz1xnXb/8TY9y22raU6kQc=",
         "recordedInputs": [
           "REPO_MAPPING:,bazel_tools bazel_tools"
@@ -607,7 +607,8 @@
               },
               "patches": [
                 "@@//mx:register.patch",
-                "@@//mx:module_descriptor.patch"
+                "@@//mx:module_descriptor.patch",
+                "@@//mx:symbolic_classpath.patch"
               ],
               "patch_args": [
                 "-p1"

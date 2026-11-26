@@ -8,6 +8,7 @@ import os
 import re
 import textwrap
 from pathlib import Path
+from types import SimpleNamespace
 
 import mx
 from mx._impl.mx_maven import _genPom
@@ -332,6 +333,9 @@ def _write_bindings(path, graph):
     suite = mx.primary_suite() or mx.suite("mx")
     for record in graph.get("distributions", []):
         dist = mx.dependency(f"{suite.name}:{record['name']}")
+        if dist.isPOMDistribution():
+            java[dist.name] = []
+            continue
         if not dist.isJARDistribution():
             continue
         artifacts.append(dist.name)
@@ -407,6 +411,7 @@ def _dependency_labels(deps, suite, mappings, pending, classpath_dists=False):
                 classpath_dists
                 and (
                     dep.isJARDistribution()
+                    or dep.isPOMDistribution()
                     or type(dep).__name__ == "LayoutDirDistribution"
                 )
             )
@@ -418,6 +423,33 @@ def _dependency_labels(deps, suite, mappings, pending, classpath_dists=False):
                 f"{name}: supply --java-dep {name}=LABEL for this dependency"
             )
     return list(dict.fromkeys(labels))
+
+
+def _pom_edges(dist, suite, mappings, pending):
+    compile_labels = []
+    runtime_labels = []
+
+    def visit(group, runtime_only):
+        for dep in group.deps:
+            runtime = runtime_only or group.is_runtime_dependency(dep)
+            if (
+                dep.suite != suite
+                and dep.qualifiedName() not in mappings
+                and dep.isPOMDistribution()
+                and dep.name not in dep.suite.suiteDict.get("distributions", {})
+                and not getattr(dep, "maven", False)
+            ):
+                # Private groups registered by suite extensions depend on which
+                # optional suites mx loaded. Use the resolved edges and their scopes.
+                visit(dep, runtime)
+            else:
+                labels = runtime_labels if runtime else compile_labels
+                labels.extend(_dependency_labels([dep], suite, mappings, pending, True))
+
+    visit(dist, False)
+    compiled = list(dict.fromkeys(compile_labels))
+    runtime = list(dict.fromkeys(label for label in runtime_labels if label not in compiled))
+    return {"deps": compiled, **({"runtime_deps": runtime} if runtime else {})}
 
 
 @cache
@@ -790,7 +822,11 @@ def _jar_archive(dist, suite, mappings, pending, release, archives, library_modu
     ):
         result["graal_test_services"] = True
     libraries = _dependency_labels(
-        [d for d in base if d.isLibrary()], suite, mappings, pending, True
+        [d for d in base if d.isLibrary() or d.isJARDistribution()],
+        suite,
+        mappings,
+        pending,
+        True,
     )
     if libraries:
         result["archived_libraries"] = libraries
@@ -960,6 +996,124 @@ def _project_files(project):
     }
 
 
+def _native_image_executable(dep):
+    return (type(dep).__module__, type(dep).__name__) == (
+        "mx_sdk_vm_ng",
+        "NativeImageExecutableProject",
+    )
+
+
+def _native_tool_layout(dist):
+    return (type(dist).__module__, type(dist).__name__) == (
+        "mx_sdk_vm_ng",
+        "ToolchainToolDistribution",
+    )
+
+
+def _tool_links(dist, pending):
+    tool = dist.tool_project
+    if not _native_image_executable(tool) or tool.suite != dist.suite:
+        raise _UnsupportedLowering(
+            f"{dist.name}: needs the packaged launcher {tool.qualifiedName()}"
+        )
+    aliases = {}
+    main = tool.base_file_name()
+    if not _resource_path(main) or "/" in main:
+        raise _UnsupportedLowering(f"{dist.name}: invalid executable name {main}")
+    for name, alternates in dist.tool_links.items():
+        for alias, target in [(name, main), *((alt, name) for alt in alternates)]:
+            if (
+                not _resource_path(alias)
+                or "/" in alias
+                or alias in aliases
+                or alias == main
+            ):
+                raise _UnsupportedLowering(
+                    f"{dist.name}: invalid or duplicate tool alias {alias}"
+                )
+            aliases[alias] = target
+    pending.append(tool)
+    # mx's Windows wrappers forward argv[0] directly to the executable.
+    import mx_sdk_vm_ng
+
+    return {
+        "name": dist.name,
+        "tool": ":" + tool.name,
+        "links": aliases,
+        "windows_command": mx_sdk_vm_ng._make_windows_link(main + ".exe"),
+    }
+
+
+def _image_recipe(project, suite, mappings, pending):
+    unsupported = project._orig_attrs.keys() - {
+        "class",
+        "dependencies",
+        "defaultBuild",
+        "build_args",
+        "deliverable",
+    }
+    if unsupported:
+        raise _UnsupportedLowering(
+            f"{project.name}: unsupported native image settings {sorted(unsupported)}"
+        )
+    groups = {}
+
+    def render(entries, cp_prefix=None, cp_suffix=None, jdk=None):
+        if (
+            cp_prefix
+            or cp_suffix
+            or not all(dep.isJARDistribution() or dep.isLibrary() for dep in entries)
+        ):
+            raise _UnsupportedLowering(
+                f"{project.name}: undeclared native image classpath input"
+            )
+        marker = f"MX_BAZEL_CLASSPATH_{len(groups)}"
+        groups[marker] = _dependency_labels(entries, suite, mappings, pending, True)
+        return marker
+
+    # Ask the same mx task that builds the image for its effective flags. Only
+    # artifact locations and executor parallelism belong to Bazel.
+    args = SimpleNamespace(
+        alt_cc=None,
+        alt_cl=None,
+        alt_cflags=None,
+        alt_ldflags=None,
+        disable_debuginfo_stripping=False,
+    )
+    with mx.runtime_classpath_formatter(render):
+        command = project.getBuildTask(args).get_build_args()
+    if not command or not re.fullmatch(
+        r"(?:[A-Za-z_$][\w$]*\.)+[A-Za-z_$][\w$]*", command[-1]
+    ):
+        raise _UnsupportedLowering(
+            f"{project.name}: expected a Java main class for the native image"
+        )
+    recipe = {
+        "name": project.name,
+        "main": command[-1],
+        "output": project.base_file_name(),
+        "flags": [],
+    }
+    tokens = iter(command[:-1])
+    for arg in tokens:
+        if arg in ("-cp", "-p"):
+            marker = next(tokens, None)
+            if marker not in groups:
+                raise _UnsupportedLowering(
+                    f"{project.name}: unbound native image search path"
+                )
+            recipe["classpath" if arg == "-cp" else "modulepath"] = groups[marker]
+        elif arg.startswith("--parallelism="):
+            continue
+        elif arg.startswith("@") or re.search(r"(?:^|=)(?:/|[A-Za-z]:[\\/])", arg):
+            raise _UnsupportedLowering(
+                f"{project.name}: native image option needs a declared input: {arg}"
+            )
+        else:
+            recipe["flags"].append(arg)
+    return recipe
+
+
 def _can_lower_root(dep):
     return (
         type(dep).__name__
@@ -969,6 +1123,8 @@ def _can_lower_root(dep):
             "LayoutTARDistribution",
             "LayoutJARDistribution",
         )
+        or _native_tool_layout(dep)
+        or _native_image_executable(dep)
         or _source_project(dep)
         or _wat_project(dep)
         or _emscripten_project(dep)
@@ -1784,6 +1940,8 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
     distributions = {}
     layouts = {}
     tar_layouts = {}
+    tool_layouts = {}
+    image_projects = {}
     bitcode_suites = {}
     source_projects = {}
     wasm_programs = {}
@@ -1800,6 +1958,8 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             or project.name in distributions
             or project.name in layouts
             or project.name in tar_layouts
+            or project.name in tool_layouts
+            or project.name in image_projects
             or project.name in bitcode_suites
             or project.name in source_projects
             or project.name in wasm_programs
@@ -1808,6 +1968,9 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
         ):
             continue
         if options.classpath_dists and project.suite == suite:
+            if _native_tool_layout(project):
+                tool_layouts[project.name] = _tool_links(project, pending)
+                continue
             if type(project).__name__ == "LayoutJARDistribution":
                 tar_layouts[project.name] = _tar_layout(project, pending, java_deps)
                 continue
@@ -1830,9 +1993,7 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             if project.isPOMDistribution():
                 distributions[project.name] = {
                     "name": project.name,
-                    "deps": _dependency_labels(
-                        project.deps, suite, java_deps, pending, True
-                    ),
+                    **_pom_edges(project, suite, java_deps, pending),
                     "pom": _genPom(
                         project, lambda owner: owner.release_version_from_suite()
                     ),
@@ -1860,6 +2021,15 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
                 cmake_suites[project.name] = _cmake_fixture_suite(
                     project, options.sulong_fixture_sdk
                 )
+            continue
+        if (
+            options.gazelle
+            and project.suite == suite
+            and _native_image_executable(project)
+        ):
+            image_projects[project.name] = _image_recipe(
+                project, suite, java_deps, pending
+            )
             continue
         if options.gazelle and project.suite == suite and _source_project(project):
             source_projects[project.name] = _project_files(project)
@@ -2257,6 +2427,8 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             | rules.keys()
             | layouts.keys()
             | distributions.keys()
+            | tool_layouts.keys()
+            | image_projects.keys()
             | source_projects.keys()
             | wasm_programs.keys()
             | wat_projects.keys()
@@ -2324,6 +2496,12 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             result["distributions"] = [distributions[n] for n in sorted(distributions)]
         if layouts:
             result["layouts"] = [layouts[n] for n in sorted(layouts)]
+        if tool_layouts:
+            result["tool_layouts"] = [tool_layouts[n] for n in sorted(tool_layouts)]
+        if image_projects:
+            result["image_projects"] = [
+                image_projects[n] for n in sorted(image_projects)
+            ]
         if source_projects:
             result["source_projects"] = [
                 source_projects[n] for n in sorted(source_projects)

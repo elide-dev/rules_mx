@@ -6,6 +6,7 @@ exports_files([
     "launcher.py.tpl",
     "module_descriptor.patch",
     "register.patch",
+    "symbolic_classpath.patch",
     "upstream.BUILD",
 ])
 

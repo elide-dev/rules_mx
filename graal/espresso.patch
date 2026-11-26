@@ -2,8 +2,8 @@ diff --git a/espresso/BUILD.bazel b/espresso/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/espresso/BUILD.bazel
-@@ -0,0 +1,694 @@
-+load("@rules_mx//mx:graph.bzl", "mx_jar_dist", "mx_jvmci_library", "mx_processed_java", "mx_processor", "mx_project", "mx_shaded_java", "mx_whole_java")
+@@ -0,0 +1,717 @@
++load("@rules_mx//mx:graph.bzl", "mx_jar_dist", "mx_jvmci_library", "mx_pom_dist", "mx_processed_java", "mx_processor", "mx_project", "mx_shaded_java", "mx_whole_java")
 +load("@rules_mx//mx:jvmci.bzl", "mx_patch_module")
 +load("@rules_mx//mx:project_files.bzl", "mx_project_files")
 +
@@ -20,6 +20,7 @@ new file mode 100644
 +        ":ESPRESSO_PROCESSOR",
 +        ":ESPRESSO_VMACCESS_GUEST",
 +        ":HOTSWAP",
++        ":JVM_STANDALONE_JARS",
 +        ":LIB_JAVAVM",
 +    ],
 +    visibility = ["//visibility:public"],
@@ -637,6 +638,28 @@ new file mode 100644
 +    module_name = "espresso.hotswap",
 +    release = 21,
 +    visibility = ["//visibility:public"],
++)
++
++mx_pom_dist(
++    name = "JVM_STANDALONE_JARS",
++    out = "jvm-standalone-jars.pom",
++    content = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project xmlns=\"http://maven.apache.org/POM/4.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\">\n  <modelVersion>4.0.0</modelVersion>\n  <groupId>org.graalvm.espresso</groupId>\n  <artifactId>jvm-standalone-jars</artifactId>\n  <version>25.6.0-dev</version>\n  <packaging>pom</packaging>\n  <url>https://www.graalvm.org/reference-manual/java-on-truffle/</url>\n  <name>Jvm Standalone Jars</name>\n  <developers>\n    <developer>\n      <name>GraalVM Development</name>\n      <email>graalvm-dev@oss.oracle.com</email>\n      <organization>Oracle Corporation</organization>\n      <organizationUrl>http://www.graalvm.org/</organizationUrl>\n    </developer>\n  </developers>\n  <licenses>\n    <license>\n      <name>GNU General Public License, version 2</name>\n      <url>http://www.gnu.org/licenses/old-licenses/gpl-2.0.html</url>\n    </license>\n  </licenses>\n  <dependencies>\n    <dependency>\n      <groupId>org.graalvm.espresso</groupId>\n      <artifactId>espresso-language</artifactId>\n      <version>25.6.0-dev</version>\n    </dependency>\n    <dependency>\n      <groupId>org.graalvm.truffle</groupId>\n      <artifactId>truffle-nfi-libffi</artifactId>\n      <version>25.6.0-dev</version>\n    </dependency>\n    <dependency>\n      <groupId>org.graalvm.truffle</groupId>\n      <artifactId>truffle-runtime</artifactId>\n      <version>25.6.0-dev</version>\n    </dependency>\n    <dependency>\n      <groupId>org.graalvm.sdk</groupId>\n      <artifactId>tools-for-standalone</artifactId>\n      <version>25.6.0-dev</version>\n      <type>pom</type>\n    </dependency>\n  </dependencies>\n</project>\n",
++    visibility = ["//visibility:public"],
++    runtime_deps = [
++        "//tools:CHROMEINSPECTOR",
++        "//tools:DAP",
++        "//tools:INSIGHT",
++        "//tools:INSIGHT_HEAP",
++        "//tools:LSP",
++        "//tools:LSP_API",
++        "//tools:TRUFFLE_COVERAGE",
++        "//tools:TRUFFLE_PROFILER",
++    ],
++    deps = [
++        ":ESPRESSO",
++        "//truffle:TRUFFLE_NFI_LIBFFI",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
 +)
 +
 +mx_jar_dist(

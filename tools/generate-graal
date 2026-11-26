@@ -696,7 +696,14 @@ SUITES = {
 
 
 # These suites publish every closure that the exporter can lower.
-PARTIAL_SUITES = ("sulong", "wasm", "espresso", "espresso-compiler-stub", "web-image")
+PARTIAL_SUITES = (
+    "sulong",
+    "wasm",
+    "espresso",
+    "espresso-compiler-stub",
+    "web-image",
+    "sandbox-toolchains",
+)
 
 # These targets remain individually runnable. New classes join CI on regeneration.
 WASM_OPEN_TESTS = {
@@ -2082,6 +2089,45 @@ def binding_providers(suite, source):
     return found
 
 
+def stage_external_suites(source, stage, suites):
+    """Stage only the pinned discovery metadata for external imports of selected suites."""
+    imports = {}
+    for suite in suites:
+        metadata = runpy.run_path(str(source / suite / f"mx.{suite}/suite.py"))["suite"]
+        for dep in metadata.get("imports", {}).get("suites", []):
+            if (
+                dep.get("version")
+                and dep.get("urls")
+                and not (source / dep["name"]).is_dir()
+                and not dep.get("dynamic")
+            ):
+                previous = imports.setdefault(dep["name"], dep)
+                if previous["version"] != dep["version"]:
+                    raise ValueError(
+                        f"Conflicting versions for external suite {dep['name']}"
+                    )
+    if not imports:
+        return
+    manifest = bazel_source("@graal_suite_metadata//:imports.json")
+    pins = json.loads(manifest.read_text())
+    for name, dep in imports.items():
+        pin = pins.get(name, {})
+        if pin.get("revision") != dep["version"] or pin.get("repository") not in [
+            item["url"] for item in dep["urls"]
+        ]:
+            raise ValueError(
+                f"Pin discovery metadata for {name} at {dep['version']} in graal/suite_imports.json"
+            )
+        checkout = stage.parent / pin["repository"].rsplit("/", 1)[-1].removesuffix(
+            ".git"
+        )
+        for path in pin["files"]:
+            dest = checkout / path
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(manifest.parent / name / path, dest)
+        (checkout / ".mx_vcs_root").touch()
+
+
 def prepare_suite(suite, stage):
     directory = stage / suite
     if suite == "vm":
@@ -2257,7 +2303,14 @@ def prepare_suite(suite, stage):
             cwd=ROOT,
             check=True,
             stdout=graph,
-            env={**os.environ, "MX_CACHE_DIR": str(stage / ".mx-cache")},
+            env={
+                **os.environ,
+                "MX_CACHE_DIR": str(stage / ".mx-cache"),
+                # mx otherwise bakes the discovery host's debug default into the image
+                # flags. rules_graalvm applies the Bazel compilation mode at analysis.
+                "GENERATE_DEBUGINFO": "false",
+                "DEBUG_IMAGES": "false",
+            },
         )
     if (stage / ".mx-cache").exists() and any(
         p.is_file() for p in (stage / ".mx-cache").rglob("*")
@@ -2470,7 +2523,14 @@ def bazel_source(label):
 
 def emit(path, text, check, message):
     if check:
-        if not path.exists() or path.read_text() != text:
+        if not path.exists():
+            sys.exit(message)
+        current = path.read_text()
+        if current != text:
+            sys.stderr.writelines(difflib.unified_diff(
+                current.splitlines(True), text.splitlines(True),
+                fromfile=str(path), tofile=str(path) + " (regenerated)", n=2,
+            ))
             sys.exit(message)
     else:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -2582,7 +2642,8 @@ def main():
         tempfile.TemporaryDirectory() as temp,
         tempfile.TemporaryDirectory() as fetched,
     ):
-        stage = Path(temp).resolve()
+        stage = Path(temp).resolve() / "graal"
+        stage.mkdir()
         source = args.graal.resolve() if args.graal else None
         if source is None:
             pin_path = ROOT / "graal/source.json"
@@ -2635,6 +2696,7 @@ def main():
                 for owner in binding_providers(suite, source)
             )
         )
+        stage_external_suites(source, stage, [*selected, *providers])
         for suite in PARTIAL_SUITES:
             if suite in selected or suite in providers:
                 shutil.copytree(

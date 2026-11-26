@@ -1177,7 +1177,7 @@ new file mode 100644
 +    out = "coverage.pom",
 +    content = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project xmlns=\"http://maven.apache.org/POM/4.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\">\n  <modelVersion>4.0.0</modelVersion>\n  <groupId>org.graalvm.polyglot</groupId>\n  <artifactId>coverage</artifactId>\n  <version>25.6.0-dev</version>\n  <packaging>pom</packaging>\n  <url>http://openjdk.java.net/projects/graal</url>\n  <name>Coverage Pom</name>\n  <description>The Truffle code coverage tool</description>\n  <developers>\n    <developer>\n      <name>GraalVM Development</name>\n      <email>graalvm-dev@oss.oracle.com</email>\n      <organization>Oracle Corporation</organization>\n      <organizationUrl>http://www.graalvm.org/</organizationUrl>\n    </developer>\n  </developers>\n  <licenses>\n    <license>\n      <name>GNU General Public License, version 2, with the Classpath Exception</name>\n      <url>http://openjdk.java.net/legal/gplv2+ce.html</url>\n    </license>\n  </licenses>\n  <dependencies>\n    <dependency>\n      <groupId>org.graalvm.tools</groupId>\n      <artifactId>coverage-tool</artifactId>\n      <version>25.6.0-dev</version>\n      <scope>runtime</scope>\n    </dependency>\n    <dependency>\n      <groupId>org.graalvm.truffle</groupId>\n      <artifactId>truffle-runtime</artifactId>\n      <version>25.6.0-dev</version>\n      <scope>runtime</scope>\n    </dependency>\n  </dependencies>\n</project>\n",
 +    visibility = ["//visibility:public"],
-+    deps = [
++    runtime_deps = [
 +        ":TRUFFLE_COVERAGE",
 +        "//truffle:TRUFFLE_RUNTIME",
 +    ],
@@ -1217,7 +1217,7 @@ new file mode 100644
 +    out = "dap.pom",
 +    content = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project xmlns=\"http://maven.apache.org/POM/4.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\">\n  <modelVersion>4.0.0</modelVersion>\n  <groupId>org.graalvm.polyglot</groupId>\n  <artifactId>dap</artifactId>\n  <version>25.6.0-dev</version>\n  <packaging>pom</packaging>\n  <url>http://openjdk.java.net/projects/graal</url>\n  <name>Dap Pom</name>\n  <description>The polyglot debugging backend for the Debug Adapter Protocol</description>\n  <developers>\n    <developer>\n      <name>GraalVM Development</name>\n      <email>graalvm-dev@oss.oracle.com</email>\n      <organization>Oracle Corporation</organization>\n      <organizationUrl>http://www.graalvm.org/</organizationUrl>\n    </developer>\n  </developers>\n  <licenses>\n    <license>\n      <name>GNU General Public License, version 2, with the Classpath Exception</name>\n      <url>http://openjdk.java.net/legal/gplv2+ce.html</url>\n    </license>\n  </licenses>\n  <dependencies>\n    <dependency>\n      <groupId>org.graalvm.tools</groupId>\n      <artifactId>dap-tool</artifactId>\n      <version>25.6.0-dev</version>\n      <scope>runtime</scope>\n    </dependency>\n    <dependency>\n      <groupId>org.graalvm.truffle</groupId>\n      <artifactId>truffle-runtime</artifactId>\n      <version>25.6.0-dev</version>\n      <scope>runtime</scope>\n    </dependency>\n  </dependencies>\n</project>\n",
 +    visibility = ["//visibility:public"],
-+    deps = [
++    runtime_deps = [
 +        ":DAP",
 +        "//truffle:TRUFFLE_RUNTIME",
 +    ],
@@ -1243,7 +1243,7 @@ new file mode 100644
 +    out = "heap.pom",
 +    content = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project xmlns=\"http://maven.apache.org/POM/4.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\">\n  <modelVersion>4.0.0</modelVersion>\n  <groupId>org.graalvm.polyglot</groupId>\n  <artifactId>heap</artifactId>\n  <version>25.6.0-dev</version>\n  <packaging>pom</packaging>\n  <url>http://openjdk.java.net/projects/graal</url>\n  <name>Heap Pom</name>\n  <description>The Heap Dump for the Insights Gathering Platform</description>\n  <developers>\n    <developer>\n      <name>GraalVM Development</name>\n      <email>graalvm-dev@oss.oracle.com</email>\n      <organization>Oracle Corporation</organization>\n      <organizationUrl>http://www.graalvm.org/</organizationUrl>\n    </developer>\n  </developers>\n  <licenses>\n    <license>\n      <name>GNU General Public License, version 2, with the Classpath Exception</name>\n      <url>http://openjdk.java.net/legal/gplv2+ce.html</url>\n    </license>\n  </licenses>\n  <dependencies>\n    <dependency>\n      <groupId>org.graalvm.tools</groupId>\n      <artifactId>insight-heap-tool</artifactId>\n      <version>25.6.0-dev</version>\n      <scope>runtime</scope>\n    </dependency>\n    <dependency>\n      <groupId>org.graalvm.truffle</groupId>\n      <artifactId>truffle-runtime</artifactId>\n      <version>25.6.0-dev</version>\n      <scope>runtime</scope>\n    </dependency>\n  </dependencies>\n</project>\n",
 +    visibility = ["//visibility:public"],
-+    deps = [
++    runtime_deps = [
 +        ":INSIGHT_HEAP",
 +        "//truffle:TRUFFLE_RUNTIME",
 +    ],
@@ -1311,7 +1311,7 @@ new file mode 100644
 +    out = "insight.pom",
 +    content = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project xmlns=\"http://maven.apache.org/POM/4.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\">\n  <modelVersion>4.0.0</modelVersion>\n  <groupId>org.graalvm.polyglot</groupId>\n  <artifactId>insight</artifactId>\n  <version>25.6.0-dev</version>\n  <packaging>pom</packaging>\n  <url>http://openjdk.java.net/projects/graal</url>\n  <name>Insight Pom</name>\n  <description>The Ultimate Insights Gathering Platform</description>\n  <developers>\n    <developer>\n      <name>GraalVM Development</name>\n      <email>graalvm-dev@oss.oracle.com</email>\n      <organization>Oracle Corporation</organization>\n      <organizationUrl>http://www.graalvm.org/</organizationUrl>\n    </developer>\n  </developers>\n  <licenses>\n    <license>\n      <name>GNU General Public License, version 2, with the Classpath Exception</name>\n      <url>http://openjdk.java.net/legal/gplv2+ce.html</url>\n    </license>\n  </licenses>\n  <dependencies>\n    <dependency>\n      <groupId>org.graalvm.tools</groupId>\n      <artifactId>insight-tool</artifactId>\n      <version>25.6.0-dev</version>\n      <scope>runtime</scope>\n    </dependency>\n    <dependency>\n      <groupId>org.graalvm.truffle</groupId>\n      <artifactId>truffle-runtime</artifactId>\n      <version>25.6.0-dev</version>\n      <scope>runtime</scope>\n    </dependency>\n  </dependencies>\n</project>\n",
 +    visibility = ["//visibility:public"],
-+    deps = [
++    runtime_deps = [
 +        ":INSIGHT",
 +        "//truffle:TRUFFLE_RUNTIME",
 +    ],
@@ -1338,7 +1338,7 @@ new file mode 100644
 +    out = "inspect.pom",
 +    content = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project xmlns=\"http://maven.apache.org/POM/4.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\">\n  <modelVersion>4.0.0</modelVersion>\n  <groupId>org.graalvm.polyglot</groupId>\n  <artifactId>inspect</artifactId>\n  <version>25.6.0-dev</version>\n  <packaging>pom</packaging>\n  <url>http://openjdk.java.net/projects/graal</url>\n  <name>Inspect Pom</name>\n  <description>The polyglot debugging backend for chrome inspector.</description>\n  <developers>\n    <developer>\n      <name>GraalVM Development</name>\n      <email>graalvm-dev@oss.oracle.com</email>\n      <organization>Oracle Corporation</organization>\n      <organizationUrl>http://www.graalvm.org/</organizationUrl>\n    </developer>\n  </developers>\n  <licenses>\n    <license>\n      <name>GNU General Public License, version 2, with the Classpath Exception</name>\n      <url>http://openjdk.java.net/legal/gplv2+ce.html</url>\n    </license>\n  </licenses>\n  <dependencies>\n    <dependency>\n      <groupId>org.graalvm.tools</groupId>\n      <artifactId>chromeinspector-tool</artifactId>\n      <version>25.6.0-dev</version>\n      <scope>runtime</scope>\n    </dependency>\n    <dependency>\n      <groupId>org.graalvm.truffle</groupId>\n      <artifactId>truffle-runtime</artifactId>\n      <version>25.6.0-dev</version>\n      <scope>runtime</scope>\n    </dependency>\n  </dependencies>\n</project>\n",
 +    visibility = ["//visibility:public"],
-+    deps = [
++    runtime_deps = [
 +        ":CHROMEINSPECTOR",
 +        "//truffle:TRUFFLE_RUNTIME",
 +    ],
@@ -1403,7 +1403,7 @@ new file mode 100644
 +    out = "lsp.pom",
 +    content = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project xmlns=\"http://maven.apache.org/POM/4.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\">\n  <modelVersion>4.0.0</modelVersion>\n  <groupId>org.graalvm.polyglot</groupId>\n  <artifactId>lsp</artifactId>\n  <version>25.6.0-dev</version>\n  <packaging>pom</packaging>\n  <url>http://openjdk.java.net/projects/graal</url>\n  <name>Lsp Pom</name>\n  <description>The polyglot Language Server backend</description>\n  <developers>\n    <developer>\n      <name>GraalVM Development</name>\n      <email>graalvm-dev@oss.oracle.com</email>\n      <organization>Oracle Corporation</organization>\n      <organizationUrl>http://www.graalvm.org/</organizationUrl>\n    </developer>\n  </developers>\n  <licenses>\n    <license>\n      <name>GNU General Public License, version 2, with the Classpath Exception</name>\n      <url>http://openjdk.java.net/legal/gplv2+ce.html</url>\n    </license>\n  </licenses>\n  <dependencies>\n    <dependency>\n      <groupId>org.graalvm.tools</groupId>\n      <artifactId>lsp-tool</artifactId>\n      <version>25.6.0-dev</version>\n      <scope>runtime</scope>\n    </dependency>\n    <dependency>\n      <groupId>org.graalvm.truffle</groupId>\n      <artifactId>truffle-runtime</artifactId>\n      <version>25.6.0-dev</version>\n      <scope>runtime</scope>\n    </dependency>\n  </dependencies>\n</project>\n",
 +    visibility = ["//visibility:public"],
-+    deps = [
++    runtime_deps = [
 +        ":LSP",
 +        "//truffle:TRUFFLE_RUNTIME",
 +    ],
@@ -1430,7 +1430,7 @@ new file mode 100644
 +    out = "profiler.pom",
 +    content = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project xmlns=\"http://maven.apache.org/POM/4.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\">\n  <modelVersion>4.0.0</modelVersion>\n  <groupId>org.graalvm.polyglot</groupId>\n  <artifactId>profiler</artifactId>\n  <version>25.6.0-dev</version>\n  <packaging>pom</packaging>\n  <url>http://openjdk.java.net/projects/graal</url>\n  <name>Profiler Pom</name>\n  <description>The truffle profiler, supporting CPU sampling and tracing. Memory tracing support is experimental</description>\n  <developers>\n    <developer>\n      <name>GraalVM Development</name>\n      <email>graalvm-dev@oss.oracle.com</email>\n      <organization>Oracle Corporation</organization>\n      <organizationUrl>http://www.graalvm.org/</organizationUrl>\n    </developer>\n  </developers>\n  <licenses>\n    <license>\n      <name>GNU General Public License, version 2, with the Classpath Exception</name>\n      <url>http://openjdk.java.net/legal/gplv2+ce.html</url>\n    </license>\n  </licenses>\n  <dependencies>\n    <dependency>\n      <groupId>org.graalvm.tools</groupId>\n      <artifactId>profiler-tool</artifactId>\n      <version>25.6.0-dev</version>\n      <scope>runtime</scope>\n    </dependency>\n    <dependency>\n      <groupId>org.graalvm.truffle</groupId>\n      <artifactId>truffle-runtime</artifactId>\n      <version>25.6.0-dev</version>\n      <scope>runtime</scope>\n    </dependency>\n  </dependencies>\n</project>\n",
 +    visibility = ["//visibility:public"],
-+    deps = [
++    runtime_deps = [
 +        ":TRUFFLE_PROFILER",
 +        "//truffle:TRUFFLE_RUNTIME",
 +    ],

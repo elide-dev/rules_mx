@@ -89,7 +89,7 @@ register_toolchains(
     dev_dependency = True,
 )
 
-bazel_dep(name = "rules_graalvm", version = "0.12.0", dev_dependency = True)
+bazel_dep(name = "rules_graalvm", version = "0.12.0")
 archive_override(
     module_name = "rules_graalvm",
     integrity = "sha256-KN+4Pwe4X81JnQNLnxDXYfhUwGHAgrULmu2Pt8pTISE=",
@@ -116,6 +116,9 @@ use_repo(maven, "contrib_rules_jvm_deps")
 # another archive with graal.source(); see graal/README.md.
 graal = use_extension("//graal:extensions.bzl", "graal", dev_dependency = True)
 use_repo(graal, "graal")
+
+suite_imports = use_extension("//graal:suite_imports.bzl", "suite_imports", dev_dependency = True)
+use_repo(suite_imports, "graal_suite_metadata")
 
 sdk_llvm = use_extension("//graal:sdk_llvm.bzl", "sdk_llvm_inputs", dev_dependency = True)
 use_repo(

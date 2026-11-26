@@ -2,7 +2,7 @@ diff --git a/wasm/BUILD.bazel b/wasm/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/wasm/BUILD.bazel
-@@ -0,0 +1,1821 @@
+@@ -0,0 +1,1834 @@
 +load("@rules_java//java:java_import.bzl", "java_import")
 +
 +# gazelle:resolve java org.openjdk.jol.info //wasm:JOL
@@ -21,6 +21,7 @@ new file mode 100644
 +    name = "all_distributions",
 +    testonly = True,
 +    srcs = [
++        ":GRAALWASM_STANDALONE_DEPENDENCIES",
 +        ":WASM",
 +        ":WASM_BENCHMARKCASES",
 +        ":WASM_BENCHMARKS",
@@ -1325,6 +1326,18 @@ new file mode 100644
 +    ],
 +)
 +
++mx_pom_dist(
++    name = "GRAALWASM_STANDALONE_DEPENDENCIES",
++    out = "graalwasm-standalone-dependencies.pom",
++    content = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project xmlns=\"http://maven.apache.org/POM/4.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\">\n  <modelVersion>4.0.0</modelVersion>\n  <groupId>org.graalvm.wasm</groupId>\n  <artifactId>graalwasm-standalone-dependencies</artifactId>\n  <version>25.6.0-dev</version>\n  <packaging>pom</packaging>\n  <url>http://graalvm.org/webassembly</url>\n  <name>Graalwasm Standalone Dependencies</name>\n  <description>GraalWasm standalone dependencies</description>\n  <developers>\n    <developer>\n      <name>GraalVM Development</name>\n      <email>graalvm-dev@oss.oracle.com</email>\n      <organization>Oracle Corporation</organization>\n      <organizationUrl>http://www.graalvm.org/</organizationUrl>\n    </developer>\n  </developers>\n  <licenses>\n    <license>\n      <name>Universal Permissive License, Version 1.0</name>\n      <url>http://opensource.org/licenses/UPL</url>\n    </license>\n  </licenses>\n  <dependencies>\n    <dependency>\n      <groupId>org.graalvm.wasm</groupId>\n      <artifactId>wasm-launcher</artifactId>\n      <version>25.6.0-dev</version>\n    </dependency>\n    <dependency>\n      <groupId>org.graalvm.wasm</groupId>\n      <artifactId>wasm-language</artifactId>\n      <version>25.6.0-dev</version>\n    </dependency>\n    <dependency>\n      <groupId>org.graalvm.sdk</groupId>\n      <artifactId>tools-for-standalone</artifactId>\n      <version>25.6.0-dev</version>\n      <type>pom</type>\n    </dependency>\n    <dependency>\n      <groupId>org.graalvm.truffle</groupId>\n      <artifactId>truffle-runtime</artifactId>\n      <version>25.6.0-dev</version>\n    </dependency>\n  </dependencies>\n</project>\n",
++    visibility = ["//visibility:public"],
++    deps = [
++        ":WASM",
++        ":WASM_LAUNCHER",
++        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
 +mx_jar_dist(
 +    name = "WASM",
 +    contents = [":org.graalvm.wasm"],
@@ -1459,7 +1472,7 @@ new file mode 100644
 +    out = "wasm.pom",
 +    content = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project xmlns=\"http://maven.apache.org/POM/4.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\">\n  <modelVersion>4.0.0</modelVersion>\n  <groupId>org.graalvm.wasm</groupId>\n  <artifactId>wasm</artifactId>\n  <version>25.6.0-dev</version>\n  <packaging>pom</packaging>\n  <url>http://graalvm.org/webassembly</url>\n  <name>Wasm Pom</name>\n  <description>GraalWasm, a high-performance embeddable WebAssembly runtime for Java. This POM dependency includes GraalWasm dependencies and Truffle.</description>\n  <developers>\n    <developer>\n      <name>GraalVM Development</name>\n      <email>graalvm-dev@oss.oracle.com</email>\n      <organization>Oracle Corporation</organization>\n      <organizationUrl>http://www.graalvm.org/</organizationUrl>\n    </developer>\n  </developers>\n  <licenses>\n    <license>\n      <name>Universal Permissive License, Version 1.0</name>\n      <url>http://opensource.org/licenses/UPL</url>\n    </license>\n  </licenses>\n  <dependencies>\n    <dependency>\n      <groupId>org.graalvm.wasm</groupId>\n      <artifactId>wasm-language</artifactId>\n      <version>25.6.0-dev</version>\n      <scope>runtime</scope>\n    </dependency>\n    <dependency>\n      <groupId>org.graalvm.truffle</groupId>\n      <artifactId>truffle-runtime</artifactId>\n      <version>25.6.0-dev</version>\n      <scope>runtime</scope>\n    </dependency>\n  </dependencies>\n</project>\n",
 +    visibility = ["//visibility:public"],
-+    deps = [
++    runtime_deps = [
 +        ":WASM",
 +        "//truffle:TRUFFLE_RUNTIME",
 +    ],
