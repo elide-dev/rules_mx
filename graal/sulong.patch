@@ -2,7 +2,7 @@ diff --git a/sulong/BUILD.bazel b/sulong/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/sulong/BUILD.bazel
-@@ -0,0 +1,2699 @@
+@@ -0,0 +1,2700 @@
 +load("@rules_mx//graal:layout.bzl", "mx_os_layout")
 +load("@rules_mx//graal:sulong_fixture_check.bzl", "sulong_fixture_check")
 +load("@rules_mx//mx:bitcode.bzl", "mx_bitcode_suite")
@@ -2591,6 +2591,7 @@ new file mode 100644
 +        ":SULONG_CMAKE_TOOLCHAIN": "=",
 +        ":bootstrap-toolchain-launchers-no-home": "=",
 +    },
++    build_inputs = [":SULONG_TOOLCHAIN_LAUNCHERS"],
 +    format = "tar",
 +    members = {
 +    },

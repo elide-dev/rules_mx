@@ -1487,7 +1487,8 @@ def _bootstrap_distribution(dist, pending):
             )
         inputs.add(dep)
         members[":" + dep.name] = "="
-    build_only = set(dist.buildDependencies) - inputs
+    declared = [mx.dependency(name, context=dist) for name in dist._orig_attrs.get("buildDependencies", [])]
+    build_only = (set(dist.buildDependencies) | set(declared)) - inputs
     if any(
         not dep.isJARDistribution() or dep.suite != dist.suite for dep in build_only
     ):
