@@ -470,7 +470,7 @@ mx_bitcode_suite(
     testonly = True,
     cases = ["answer.ll"],
     llvm_link = ":sdk_llvm_link",
-    root = ".",
+    root = "fixtures/sulong",
 )
 
 java_test(
