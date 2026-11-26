@@ -161,12 +161,12 @@ def _pom_dist_impl(ctx):
     return [
         DefaultInfo(
             files = depset([ctx.outputs.out]),
-            runfiles = ctx.runfiles(transitive_files = depset(transitive = [dep.files for dep in deps])),
+            runfiles = ctx.runfiles(transitive_files = depset(transitive = [dep.files for dep in deps])).merge_all([dep[DefaultInfo].default_runfiles for dep in deps]),
         ),
         java_common.merge([dep[JavaInfo] for dep in deps]),
     ]
 
-mx_pom_dist = rule(
+_pom_dist = rule(
     implementation = _pom_dist_impl,
     attrs = {
         "content": attr.string(mandatory = True),
@@ -174,3 +174,16 @@ mx_pom_dist = rule(
         "out": attr.output(mandatory = True),
     },
 )
+
+def mx_pom_dist(name, out, content, deps = [], runtime_deps = [], **kwargs):
+    """Expose the Maven descriptor and preserve its compile and runtime classpaths."""
+    if runtime_deps:
+        runtime = name + ".runtime"
+        java_library(
+            name = runtime,
+            runtime_deps = runtime_deps,
+            testonly = kwargs.get("testonly", False),
+            visibility = ["//visibility:private"],
+        )
+        deps = deps + [":" + runtime]
+    _pom_dist(name = name, out = out, content = content, deps = deps, **kwargs)

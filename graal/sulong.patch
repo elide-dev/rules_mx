@@ -2,10 +2,10 @@ diff --git a/sulong/BUILD.bazel b/sulong/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/sulong/BUILD.bazel
-@@ -0,0 +1,2309 @@
+@@ -0,0 +1,2326 @@
 +load("@rules_mx//graal:sulong_fixture_check.bzl", "sulong_fixture_check")
 +load("@rules_mx//mx:bitcode.bzl", "mx_bitcode_suite")
-+load("@rules_mx//mx:graph.bzl", "mx_exported_tar", "mx_jar_dist", "mx_processed_java", "mx_project", "mx_whole_java")
++load("@rules_mx//mx:graph.bzl", "mx_exported_tar", "mx_jar_dist", "mx_pom_dist", "mx_processed_java", "mx_project", "mx_whole_java")
 +load("@rules_mx//mx:native_image.bzl", "mx_native_image_executable", "mx_toolchain_tool_layout")
 +load("@rules_mx//mx:project_files.bzl", "mx_project_files")
 +load("@rules_mx//mx:sulong_cmake.bzl", "mx_sulong_cmake_suite")
@@ -25,6 +25,7 @@ new file mode 100644
 +        ":SULONG_NATIVE",
 +        ":SULONG_NATIVE_TOOLS",
 +        ":SULONG_NFI",
++        ":SULONG_STANDALONE_DEPENDENCIES",
 +        ":SULONG_TOOLCHAIN_LAUNCHERS",
 +    ],
 +    visibility = ["//visibility:public"],
@@ -776,6 +777,22 @@ new file mode 100644
 +    deps = [
 +        ":SULONG_CORE",
 +        "//truffle:TRUFFLE_NFI",
++    ],
++)
++
++mx_pom_dist(
++    name = "SULONG_STANDALONE_DEPENDENCIES",
++    out = "sulong-standalone-dependencies.pom",
++    content = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project xmlns=\"http://maven.apache.org/POM/4.0.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd\">\n  <modelVersion>4.0.0</modelVersion>\n  <groupId>org.graalvm.llvm</groupId>\n  <artifactId>sulong-standalone-dependencies</artifactId>\n  <version>25.6.0-dev</version>\n  <packaging>pom</packaging>\n  <url>http://www.graalvm.org/</url>\n  <name>Sulong Standalone Dependencies</name>\n  <description>Sulong standalone dependencies</description>\n  <developers>\n    <developer>\n      <name>GraalVM Development</name>\n      <email>graalvm-dev@oss.oracle.com</email>\n      <organization>Oracle Corporation</organization>\n      <organizationUrl>http://www.graalvm.org/</organizationUrl>\n    </developer>\n  </developers>\n  <dependencies>\n    <dependency>\n      <groupId>org.graalvm.llvm</groupId>\n      <artifactId>sulong-launcher</artifactId>\n      <version>25.6.0-dev</version>\n    </dependency>\n    <dependency>\n      <groupId>org.graalvm.llvm</groupId>\n      <artifactId>llvm-language</artifactId>\n      <version>25.6.0-dev</version>\n    </dependency>\n    <dependency>\n      <groupId>org.graalvm.llvm</groupId>\n      <artifactId>llvm-api</artifactId>\n      <version>25.6.0-dev</version>\n    </dependency>\n    <dependency>\n      <groupId>org.graalvm.llvm</groupId>\n      <artifactId>llvm-language-nfi</artifactId>\n      <version>25.6.0-dev</version>\n    </dependency>\n    <dependency>\n      <groupId>org.graalvm.llvm</groupId>\n      <artifactId>llvm-language-native</artifactId>\n      <version>25.6.0-dev</version>\n    </dependency>\n    <dependency>\n      <groupId>org.graalvm.llvm</groupId>\n      <artifactId>sulong-toolchain-launchers</artifactId>\n      <version>25.6.0-dev</version>\n    </dependency>\n    <dependency>\n      <groupId>org.graalvm.sdk</groupId>\n      <artifactId>tools-for-standalone</artifactId>\n      <version>25.6.0-dev</version>\n      <type>pom</type>\n    </dependency>\n    <dependency>\n      <groupId>org.graalvm.truffle</groupId>\n      <artifactId>truffle-runtime</artifactId>\n      <version>25.6.0-dev</version>\n    </dependency>\n  </dependencies>\n</project>\n",
++    visibility = ["//visibility:public"],
++    deps = [
++        ":SULONG_API",
++        ":SULONG_CORE",
++        ":SULONG_LAUNCHER",
++        ":SULONG_NATIVE",
++        ":SULONG_NFI",
++        ":SULONG_TOOLCHAIN_LAUNCHERS",
++        "//truffle:TRUFFLE_RUNTIME",
 +    ],
 +)
 +

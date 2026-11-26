@@ -333,6 +333,9 @@ def _write_bindings(path, graph):
     suite = mx.primary_suite() or mx.suite("mx")
     for record in graph.get("distributions", []):
         dist = mx.dependency(f"{suite.name}:{record['name']}")
+        if dist.isPOMDistribution():
+            java[dist.name] = []
+            continue
         if not dist.isJARDistribution():
             continue
         artifacts.append(dist.name)
@@ -408,6 +411,7 @@ def _dependency_labels(deps, suite, mappings, pending, classpath_dists=False):
                 classpath_dists
                 and (
                     dep.isJARDistribution()
+                    or dep.isPOMDistribution()
                     or type(dep).__name__ == "LayoutDirDistribution"
                 )
             )
@@ -419,6 +423,33 @@ def _dependency_labels(deps, suite, mappings, pending, classpath_dists=False):
                 f"{name}: supply --java-dep {name}=LABEL for this dependency"
             )
     return list(dict.fromkeys(labels))
+
+
+def _pom_edges(dist, suite, mappings, pending):
+    compile_labels = []
+    runtime_labels = []
+
+    def visit(group, runtime_only):
+        for dep in group.deps:
+            runtime = runtime_only or group.is_runtime_dependency(dep)
+            if (
+                dep.suite != suite
+                and dep.qualifiedName() not in mappings
+                and dep.isPOMDistribution()
+                and dep.name not in dep.suite.suiteDict.get("distributions", {})
+                and not getattr(dep, "maven", False)
+            ):
+                # Private groups registered by suite extensions depend on which
+                # optional suites mx loaded. Use the resolved edges and their scopes.
+                visit(dep, runtime)
+            else:
+                labels = runtime_labels if runtime else compile_labels
+                labels.extend(_dependency_labels([dep], suite, mappings, pending, True))
+
+    visit(dist, False)
+    compiled = list(dict.fromkeys(compile_labels))
+    runtime = list(dict.fromkeys(label for label in runtime_labels if label not in compiled))
+    return {"deps": compiled, **({"runtime_deps": runtime} if runtime else {})}
 
 
 @cache
@@ -1962,9 +1993,7 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             if project.isPOMDistribution():
                 distributions[project.name] = {
                     "name": project.name,
-                    "deps": _dependency_labels(
-                        project.deps, suite, java_deps, pending, True
-                    ),
+                    **_pom_edges(project, suite, java_deps, pending),
                     "pom": _genPom(
                         project, lambda owner: owner.release_version_from_suite()
                     ),

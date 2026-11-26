@@ -108,7 +108,8 @@ func (g *importer) loadGraph(root, filename string, seen map[label.Label]bool) e
 		Distributions []struct {
 			Manifest, Overlays         map[string]string
 			Name, Module, Pom          string
-			PomFilename                string `json:"pom_filename"`
+			PomFilename                string   `json:"pom_filename"`
+			RuntimeDeps                []string `json:"runtime_deps"`
 			Deps, Contents, Directives []string
 			AddExports                 []string `json:"add_exports"`
 			ModuleExports              []string `json:"module_exports"`
@@ -350,6 +351,9 @@ func (g *importer) loadGraph(root, filename string, seen map[label.Label]bool) e
 			r.SetKind("mx_pom_dist")
 			r.SetAttr("content", dist.Pom)
 			r.SetAttr("out", dist.PomFilename)
+			if len(dist.RuntimeDeps) > 0 {
+				r.SetAttr("runtime_deps", dist.RuntimeDeps)
+			}
 		} else if len(dist.Contents) > 0 {
 			r.SetKind("mx_jar_dist")
 			r.SetAttr("contents", dist.Contents)
