@@ -2,7 +2,7 @@ diff --git a/wasm/BUILD.bazel b/wasm/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/wasm/BUILD.bazel
-@@ -0,0 +1,1233 @@
+@@ -0,0 +1,1232 @@
 +load("@rules_mx//mx:graph.bzl", "mx_exported_tar", "mx_jar_dist", "mx_jvmci_library", "mx_pom_dist", "mx_processed_java", "mx_project", "mx_test_class")
 +
 +filegroup(
@@ -51,7 +51,6 @@ new file mode 100644
 +        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.arithmetic.ReferenceTypeSuite",
 +        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.bytecode.BranchHintSuite",
 +        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.bytecode.BytecodeSuite",
-+        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.bytecode.WasmBranchTargetSuite",
 +        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.compiler.CompilationSuite",
 +        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.control.BlockWithLocalsSuite",
 +        ":org.graalvm.wasm.test.org.graalvm.wasm.test.suites.control.BranchBlockSuite",

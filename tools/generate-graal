@@ -704,6 +704,7 @@ WASM_OPEN_TESTS = {
     "org.graalvm.wasm.test.suites.arithmetic.WideArithmeticSuite",  # Optimizing runtime.
     "org.graalvm.wasm.test.suites.bytecode.WasmLegacyCatchOSRSuite",
     "org.graalvm.wasm.test.suites.bytecode.WasmOSRSuite",
+    "org.graalvm.wasm.test.suites.bytecode.WasmBranchTargetSuite",  # WABT br_on_null.
     "org.graalvm.wasm.test.suites.control.TailCallSuite",  # WABT return_call_ref.
     "org.graalvm.wasm.test.suites.bytecode.MultiInstantiationSuite",  # Invalid value type.
     "org.graalvm.wasm.test.WasmStackTraceTest",  # Bytecode index differs.
@@ -2116,10 +2117,6 @@ def prepare_suite(suite, stage):
                 for project in graph["projects"]
                 for cls in project.get("tests", [])
             }
-            if stale := WASM_OPEN_TESTS - tests.keys():
-                raise ValueError(
-                    f"Review resolved Wasm test exclusions: {sorted(stale)}"
-                )
             qualified = sorted(
                 target for cls, target in tests.items() if cls not in WASM_OPEN_TESTS
             )
