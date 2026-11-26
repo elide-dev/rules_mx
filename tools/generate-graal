@@ -2139,12 +2139,18 @@ def prepare_suite(suite, stage):
         )
         return
     if suite in PARTIAL_SUITES:
+        truffle = runpy.run_path(str(stage / "truffle/mx.truffle/suite.py"))["suite"]
         export_options = [
             "--all",
-            "--standalone-jdk-release", "@rules_mx//graal:standalone_jdk_release",
-            "--standalone-jdk-archive", "@rules_mx//graal:standalone_jdk_archive",
-            *(arg for name in truffle_layout_distributions(runpy.run_path(str(stage / "truffle/mx.truffle/suite.py"))["suite"])
-              for arg in ("--layout-dep", f"truffle:{name}=//truffle:{name}")),
+            "--standalone-jdk-release",
+            "@rules_mx//graal:standalone_jdk_release",
+            "--standalone-jdk-archive",
+            "@rules_mx//graal:standalone_jdk_archive",
+            *(
+                arg
+                for name in truffle_layout_distributions(truffle)
+                for arg in ("--layout-dep", f"truffle:{name}=//truffle:{name}")
+            ),
             "--declared-only",
             "--partial",
             *(

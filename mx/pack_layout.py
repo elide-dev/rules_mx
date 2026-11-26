@@ -26,15 +26,20 @@ def _install_jdk(tree, spec):
     with tarfile.open(spec["bundle"]) as bundle:
         contents = bundle.getmembers()
         roots = [
-            PurePosixPath(member.name).parent for member in contents
-            if member.isfile() and PurePosixPath(member.name).name == "release"
+            PurePosixPath(member.name).parent
+            for member in contents
+            if member.isfile()
+            and PurePosixPath(member.name).name == "release"
             and len(PurePosixPath(member.name).parts) in (2, 4)
         ]
         if len(roots) != 1:
             raise ValueError(f"Expected one Java home in {spec['bundle']}")
         root = roots[0]
         extension = ".dylib" if root.parts[-2:] == ("Contents", "Home") else ".so"
-        excludes = [re.sub(r"<lib:([\w.-]+)>", r"lib\1" + extension, expr) for expr in spec["exclude"]]
+        excludes = [
+            re.sub(r"<lib:([\w.-]+)>", r"lib\1" + extension, expr)
+            for expr in spec["exclude"]
+        ]
 
         def select(member, directory):
             path = PurePosixPath(member.name)
@@ -42,28 +47,41 @@ def _install_jdk(tree, spec):
                 return None
             relative = path.relative_to(root)
             _relative(str(relative))
-            if any(fnmatch.fnmatchcase(str(part), pattern)
-                   for part in (relative, *relative.parents) for pattern in excludes):
+            if any(
+                fnmatch.fnmatchcase(str(part), pattern)
+                for part in (relative, *relative.parents)
+                for pattern in excludes
+            ):
                 return None
-            if (destination / relative).exists() and not member.isdir():
+            target = destination / relative
+            if (target.is_symlink() or target.exists()) and not member.isdir():
                 raise ValueError(f"Duplicate JDK member {relative}")
             link = member.linkname
             if member.islnk():
                 link = str(PurePosixPath(link).relative_to(root))
                 _relative(link)
-            return tarfile.data_filter(member.replace(name=str(relative), linkname=link), directory)
+            return tarfile.data_filter(
+                member.replace(name=str(relative), linkname=link), directory
+            )
 
         bundle.extractall(destination, members=contents, filter=select)
 
 
-def _write_tree_archive(tree, output):
+def _write_tree_archive(tree, output, prefix=None):
     with ExitStack() as stack:
         stream = stack.enter_context(output.open("wb"))
         if output.name.endswith(".tar.gz"):
-            stream = stack.enter_context(gzip.GzipFile(filename="", fileobj=stream, mode="wb", mtime=0))
+            stream = stack.enter_context(
+                gzip.GzipFile(filename="", fileobj=stream, mode="wb", mtime=0)
+            )
         archive = stack.enter_context(tarfile.open(fileobj=stream, mode="w"))
-        for path in sorted(tree.rglob("*")):
-            member = archive.gettarinfo(str(path), arcname=path.relative_to(tree).as_posix())
+        paths = sorted(tree.rglob("*"))
+        if prefix:
+            paths.insert(0, tree)
+        for path in paths:
+            relative = path.relative_to(tree)
+            name = prefix / relative if prefix else relative
+            member = archive.gettarinfo(str(path), arcname=name.as_posix())
             member.uid = member.gid = member.mtime = 0
             member.uname = member.gname = ""
             if member.isfile():
@@ -81,6 +99,10 @@ def main():
     directory = args[:1] == ["--directory"]
     if directory:
         args = args[1:]
+    prefix = None
+    if args[:1] == ["--archive-prefix"]:
+        prefix = _relative(args[1])
+        args = args[2:]
     links = {}
     if args[:1] == ["--links"]:
         links = json.loads(args[1])
@@ -98,7 +120,7 @@ def main():
         _relative(name)
 
     with ExitStack() as stack:
-        if homes and not tree:
+        if (homes or prefix) and not tree:
             tree = Path(stack.enter_context(tempfile.TemporaryDirectory()))
         if tree:
             for name, source in entries:
@@ -108,14 +130,16 @@ def main():
                     destination.symlink_to(links[name])
                 else:
                     shutil.copyfile(source, destination)
-                    if directory or homes:
-                        destination.chmod(0o755 if source.stat().st_mode & 0o111 else 0o644)
+                    if directory or homes or prefix:
+                        destination.chmod(
+                            0o755 if source.stat().st_mode & 0o111 else 0o644
+                        )
             for home in homes:
                 _install_jdk(tree, home)
             if directory:
                 return
-            if homes:
-                _write_tree_archive(tree, output)
+            if homes or prefix:
+                _write_tree_archive(tree, output, prefix)
                 return
 
     if output.suffix in (".jar", ".zip"):

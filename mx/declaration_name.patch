@@ -1,0 +1,8 @@
+--- a/src/mx/_impl/mx.py
++++ b/src/mx/_impl/mx.py
+@@ -2394,4 +2394,5 @@
+         d.deploy = deploy
+         d._orig_attrs = orig_attrs
++        d.declaration_name = name
+         self.dists.append(d)
+         return d

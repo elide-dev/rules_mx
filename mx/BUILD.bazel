@@ -8,6 +8,7 @@ exports_files([
     "module_descriptor.patch",
     "register.patch",
     "symbolic_classpath.patch",
+    "declaration_name.patch",
     "upstream.BUILD",
 ])
 

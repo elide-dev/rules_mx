@@ -100,6 +100,25 @@ java_test(
     deps = ["@contrib_rules_jvm_deps//:junit_junit"],
 )
 
+[
+    py_test(
+        name = "wasm_" + mode + "_release_test",
+        size = "medium",
+        srcs = ["wasm_release_test.py"],
+        args = [
+            "$(rootpath " + archive + ")",
+            mode,
+        ],
+        data = [archive],
+        main = "wasm_release_test.py",
+        tags = ["manual"],
+    )
+    for mode, archive in [
+        ("jvm", "@graal//wasm:GRAALWASM_JVM_STANDALONE_RELEASE_ARCHIVE"),
+        ("native", "@graal//wasm:GRAALWASM_NATIVE_STANDALONE_RELEASE_ARCHIVE"),
+    ]
+]
+
 pom_classpath_test(
     name = "espresso_pom_classpath_test",
     compile_deps = ["@graal//espresso:ESPRESSO"],

@@ -6,7 +6,7 @@ load("@rules_java//java:java_plugin.bzl", "java_plugin")
 load("@rules_java//java:java_test.bzl", "java_test")
 load("@rules_java//java/common:java_common.bzl", "java_common")
 load("@rules_java//java/common:java_info.bzl", "JavaInfo")
-load("//graal:layout.bzl", "mx_archive_layout")
+load("//graal:layout.bzl", "mx_archive_layout", _mx_release_archive = "mx_release_archive")
 load(":jar.bzl", _mx_jar_dist = "mx_jar_dist")
 load(":java.bzl", "elide_java_library", "mx_resource_prefix")
 load(":jvmci.bzl", _mx_jvmci_library = "mx_jvmci_library")
@@ -17,6 +17,10 @@ mx_shaded_java = _mx_shaded_java
 mx_jar_dist = _mx_jar_dist
 
 mx_processor = java_plugin
+
+mx_release_archive = _mx_release_archive
+
+mx_distribution_alias = native.alias
 
 mx_exported_tar = mx_archive_layout
 
