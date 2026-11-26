@@ -160,6 +160,34 @@ py_test(
     ],
 )
 
+mx_archive_layout(
+    name = "sandbox_bash_launcher_tar",
+    archive_imports = {"@graal//sandbox-toolchains:SANDBOXED_MUSL_TOOLS_SWCFI_BASH": "=musl/bin/"},
+    format = "tar",
+    members = {},
+    tags = ["manual"],
+)
+
+py_test(
+    name = "sandbox_bash_launcher_test",
+    main = "sandbox_launcher_test.py",
+    size = "medium",
+    srcs = ["sandbox_launcher_test.py"],
+    args = [
+        "$(rootpath :sandbox_bash_launcher_tar)",
+        "$(rootpath :sulong_fixture_sdk)",
+    ],
+    data = [
+        ":sandbox_bash_launcher_tar",
+        ":sulong_fixture_sdk",
+    ],
+    tags = ["manual"],
+    target_compatible_with = [
+        "@platforms//os:linux",
+        "@platforms//cpu:x86_64",
+    ],
+)
+
 test_suite(
     name = "sdk_tests",
     tests = ["@graal//sdk:tests"],
@@ -228,9 +256,13 @@ py_test(
     args = [
         "$(rootpath @graal//espresso-compiler-stub:ESPRESSO_COMPILER_SUPPORT)",
         "$(rootpath @graal//espresso:ESPRESSO_IO)",
+        "$(rootpath @graal//espresso:ESPRESSO_JVM_STANDALONE_JAVA_LINKS)",
+        "$(rootpath @graal//espresso:ESPRESSO_POLYBENCH_BENCHMARKS)",
     ],
     data = [
         "@graal//espresso:ESPRESSO_IO",
+        "@graal//espresso:ESPRESSO_JVM_STANDALONE_JAVA_LINKS",
+        "@graal//espresso:ESPRESSO_POLYBENCH_BENCHMARKS",
         "@graal//espresso-compiler-stub:ESPRESSO_COMPILER_SUPPORT",
     ],
     tags = ["manual"],

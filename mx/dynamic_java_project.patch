@@ -1,0 +1,9 @@
+--- a/src/mx/_impl/mx.py
++++ b/src/mx/_impl/mx.py
+@@ -6766,3 +6766,6 @@
+         Project.__init__(self, suite, name, subDir, srcDirs, deps, workingSets, d, theLicense, testProject=testProject, **kwArgs)
+         ClasspathDependency.__init__(self, **kwArgs)
++        # Suite-loaded projects receive the full declaration from _load_projects.
++        # Dynamic registrations have only their constructor settings.
++        self._orig_attrs = dict(kwArgs)
+         if javaCompliance is None:

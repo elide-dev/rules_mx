@@ -1,7 +1,8 @@
 """Generate mx Native Image executables with the registered rules_graalvm toolchain."""
 
+load("@bazel_skylib//lib:shell.bzl", "shell")
 load("@rules_graalvm//graalvm:defs.bzl", "native_image")
-load("//graal:layout.bzl", "MxArchiveLayoutInfo")
+load("//graal:layout.bzl", "MxArchiveLayoutInfo", "mx_archive_layout")
 
 def _search_path(labels):
     paths = ["$(execpath " + label + ")" for label in labels]
@@ -46,10 +47,62 @@ def mx_native_image_library(name, output, image_args, classpath = [], modulepath
         }),
     )
 
-def _tool_layout_impl(ctx):
-    tool = ctx.file.tool
-    root = ctx.label.name + ".files/"
+def _launcher_script_impl(ctx):
     entries = {}
+    support = "." + ctx.attr.output
+    args = []
+    for flag, files in [("-cp", ctx.files.classpath), ("-p", ctx.files.modulepath)]:
+        paths = []
+        for i, jar in enumerate(files):
+            path = "%s/%s/%d/%s" % (support, flag[1:], i, jar.basename)
+            entries[path] = jar
+            paths.append('"$dir"/' + shell.quote(path))
+        if paths:
+            args.extend([flag, ":".join(paths)])
+    for arg in ctx.attr.java_args:
+        if arg == "-Dorg.graalvm.launcher.executablePath={argv0}":
+            args.append('"-Dorg.graalvm.launcher.executablePath=$0"')
+        else:
+            args.append(shell.quote(arg))
+    script = ctx.actions.declare_file(ctx.label.name + "/" + ctx.attr.output)
+    ctx.actions.write(script, """#!/bin/sh
+case "$0" in
+    */*) dir=${0%%/*} ;;
+    *) dir=. ;;
+esac
+if [ "${VERBOSE_GRAALVM_LAUNCHERS:-}" = true ]; then set -x; fi
+exec "$dir"/%s %s "$@"
+""" % (shell.quote(support + "/jdk/bin/java"), " ".join(args)), is_executable = True)
+    entries[ctx.attr.output] = script
+    return [DefaultInfo(files = depset(entries.values())), MxArchiveLayoutInfo(archive = None, entries = entries)]
+
+_launcher_script = rule(
+    implementation = _launcher_script_impl,
+    attrs = {
+        "output": attr.string(mandatory = True),
+        "java_args": attr.string_list(mandatory = True),
+        "classpath": attr.label_list(allow_files = [".jar"]),
+        "modulepath": attr.label_list(allow_files = [".jar"]),
+    },
+)
+
+def mx_jvm_tool_launcher(name, output, java_args, jdk_archive, classpath = [], modulepath = [], visibility = None):
+    """Install the Java tool and its ordered search paths relative to its entry point."""
+    _launcher_script(name = name + ".script", output = output, java_args = java_args, classpath = classpath, modulepath = modulepath)
+    mx_archive_layout(
+        name = name,
+        format = "dir",
+        members = {},
+        archive_imports = {":" + name + ".script": "="},
+        jdk_homes = {jdk_archive: json.encode({"directory": "." + output + "/jdk", "exclude": []})},
+        visibility = visibility,
+    )
+
+def _tool_layout_impl(ctx):
+    layout = ctx.attr.tool[MxArchiveLayoutInfo] if ctx.attr.launcher else None
+    tool = layout.entries[ctx.attr.launcher] if layout else ctx.file.tool
+    root = ctx.label.name + ".files/"
+    entries = dict(layout.entries) if layout else {}
     links = {}
     executable = ctx.actions.declare_file(root + tool.basename)
     ctx.actions.symlink(output = executable, target_file = tool, is_executable = True)
@@ -65,15 +118,35 @@ def _tool_layout_impl(ctx):
         entries[file.basename] = file
     return [
         DefaultInfo(files = depset(entries.values()), runfiles = ctx.runfiles(files = entries.values())),
-        MxArchiveLayoutInfo(archive = None, entries = entries, links = links),
+        MxArchiveLayoutInfo(archive = None, entries = entries, links = links, jdk_homes = layout.jdk_homes if layout else []),
     ]
 
-mx_toolchain_tool_layout = rule(
+_tool_layout = rule(
     implementation = _tool_layout_impl,
     attrs = {
+        "launcher": attr.string(),
         "tool": attr.label(mandatory = True, allow_single_file = True),
         "links": attr.string_dict(mandatory = True),
         "windows_command": attr.string(mandatory = True),
         "_windows": attr.label(default = "@platforms//os:windows"),
     },
 )
+
+def mx_toolchain_tool_layout(name, tool, links, windows_command, launcher = None, visibility = None):
+    """Expose the upstream tool aliases and packaged runtime dependencies."""
+    _tool_layout(
+        name = name + ".aliases" if launcher else name,
+        tool = tool,
+        links = links,
+        windows_command = windows_command,
+        launcher = launcher,
+        visibility = visibility,
+    )
+    if launcher:
+        mx_archive_layout(
+            name = name,
+            format = "dir",
+            members = {},
+            archive_imports = {":" + name + ".aliases": "="},
+            visibility = visibility,
+        )

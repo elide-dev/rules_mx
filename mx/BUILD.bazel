@@ -9,6 +9,7 @@ exports_files([
     "register.patch",
     "symbolic_classpath.patch",
     "declaration_name.patch",
+    "dynamic_java_project.patch",
     "upstream.BUILD",
 ])
 

@@ -2,8 +2,9 @@ diff --git a/espresso/BUILD.bazel b/espresso/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/espresso/BUILD.bazel
-@@ -0,0 +1,750 @@
-+load("@rules_mx//mx:graph.bzl", "mx_jar_dist", "mx_jvmci_library", "mx_pom_dist", "mx_processed_java", "mx_processor", "mx_project", "mx_shaded_java", "mx_whole_java")
+@@ -0,0 +1,896 @@
++load("@rules_mx//graal:layout.bzl", "mx_os_layout")
++load("@rules_mx//mx:graph.bzl", "mx_exported_tar", "mx_jar_dist", "mx_jvmci_library", "mx_pom_dist", "mx_processed_java", "mx_processor", "mx_project", "mx_shaded_java", "mx_whole_java")
 +load("@rules_mx//mx:jvmci.bzl", "mx_patch_module")
 +load("@rules_mx//mx:project_files.bzl", "mx_project_files")
 +load("@rules_mx//mx:thin_launcher.bzl", "mx_thin_launcher")
@@ -16,7 +17,9 @@ new file mode 100644
 +        ":ESPRESSO",
 +        ":ESPRESSO_IO",
 +        ":ESPRESSO_JVMCI",
++        ":ESPRESSO_JVM_STANDALONE_JAVA_LINKS",
 +        ":ESPRESSO_LAUNCHER",
++        ":ESPRESSO_POLYBENCH_BENCHMARKS",
 +        ":ESPRESSO_POLYGLOT",
 +        ":ESPRESSO_PROCESSOR",
 +        ":ESPRESSO_VMACCESS_GUEST",
@@ -49,6 +52,58 @@ new file mode 100644
 +        ":espresso",
 +        ":espresso-license-files",
 +        ":org.graalvm.continuations",
++    ],
++    visibility = ["//visibility:public"],
++)
++
++mx_jvmci_library(
++    name = "benchmarks.interpreter.espresso.deltablue",
++    testonly = True,
++    srcs = ["//espresso/benchmarks/interpreter/DeltaBlue:benchmarks.interpreter.espresso.deltablue.srcs"],
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++        "-Xlint:none",
++    ],
++    visibility = ["//visibility:public"],
++)
++
++mx_jvmci_library(
++    name = "benchmarks.interpreter.espresso.fibonacci",
++    testonly = True,
++    srcs = ["//espresso/benchmarks/interpreter/Fibonacci:benchmarks.interpreter.espresso.fibonacci.srcs"],
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++        "-Xlint:none",
++    ],
++    visibility = ["//visibility:public"],
++)
++
++mx_jvmci_library(
++    name = "benchmarks.interpreter.espresso.richards",
++    testonly = True,
++    srcs = ["//espresso/benchmarks/interpreter/Richards:benchmarks.interpreter.espresso.richards.srcs"],
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++        "-Xlint:none",
++    ],
++    visibility = ["//visibility:public"],
++)
++
++mx_jvmci_library(
++    name = "benchmarks.interpreter.espresso.sieve",
++    testonly = True,
++    srcs = ["//espresso/benchmarks/interpreter/Sieve:benchmarks.interpreter.espresso.sieve.srcs"],
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++        "-Xlint:none",
 +    ],
 +    visibility = ["//visibility:public"],
 +)
@@ -594,6 +649,46 @@ new file mode 100644
 +)
 +
 +mx_jar_dist(
++    name = "ESPRESSO_POLYBENCH_BENCHMARK_DELTABLUE",
++    testonly = True,
++    contents = [":benchmarks.interpreter.espresso.deltablue"],
++    manifest = {
++        "Main-Class": "DeltaBlue",
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_jar_dist(
++    name = "ESPRESSO_POLYBENCH_BENCHMARK_FIBONACCI",
++    testonly = True,
++    contents = [":benchmarks.interpreter.espresso.fibonacci"],
++    manifest = {
++        "Main-Class": "Fibonacci",
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_jar_dist(
++    name = "ESPRESSO_POLYBENCH_BENCHMARK_RICHARDS",
++    testonly = True,
++    contents = [":benchmarks.interpreter.espresso.richards"],
++    manifest = {
++        "Main-Class": "Richards",
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_jar_dist(
++    name = "ESPRESSO_POLYBENCH_BENCHMARK_SIEVE",
++    testonly = True,
++    contents = [":benchmarks.interpreter.espresso.sieve"],
++    manifest = {
++        "Main-Class": "Sieve",
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_jar_dist(
 +    name = "ESPRESSO_POLYGLOT",
 +    contents = [":com.oracle.truffle.espresso.polyglot"],
 +    directives = ["exports com.oracle.truffle.espresso.polyglot"],
@@ -714,6 +809,57 @@ new file mode 100644
 +    visibility = ["//visibility:public"],
 +)
 +
++mx_os_layout(
++    name = "ESPRESSO_JVM_STANDALONE_JAVA_LINKS",
++    format = "dir",
++    os_layouts = {
++        "linux": {
++            "archive_imports": {
++            },
++            "file_list": [
++            ],
++            "members": {
++                "mx.espresso/launchers/java.sh": "bin/java",
++                "mx.espresso/launchers/javac.sh": "bin/javac",
++            },
++        },
++        "macos": {
++            "archive_imports": {
++            },
++            "file_list": [
++            ],
++            "members": {
++                "mx.espresso/launchers/java.sh": "bin/java",
++                "mx.espresso/launchers/javac.sh": "bin/javac",
++            },
++        },
++        "windows": {
++            "archive_imports": {
++            },
++            "file_list": [
++            ],
++            "members": {
++                "mx.espresso/launchers/java.cmd": "bin/java.cmd",
++                "mx.espresso/launchers/javac.cmd": "bin/javac.cmd",
++            },
++        },
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_exported_tar(
++    name = "ESPRESSO_POLYBENCH_BENCHMARKS",
++    testonly = True,
++    format = "jar",
++    members = {
++        ":ESPRESSO_POLYBENCH_BENCHMARK_DELTABLUE": "interpreter/DeltaBlue.jar",
++        ":ESPRESSO_POLYBENCH_BENCHMARK_FIBONACCI": "interpreter/Fibonacci.jar",
++        ":ESPRESSO_POLYBENCH_BENCHMARK_RICHARDS": "interpreter/Richards.jar",
++        ":ESPRESSO_POLYBENCH_BENCHMARK_SIEVE": "interpreter/Sieve.jar",
++    },
++    visibility = ["//visibility:public"],
++)
++
 +mx_processor(
 +    name = "mx_plugin.ESPRESSO_PROCESSOR.com.oracle.truffle.espresso.processor.CollectProcessor",
 +    generates_api = True,
@@ -752,6 +898,54 @@ new file mode 100644
 +    processor_class = "com.oracle.truffle.espresso.processor.SubstitutionProcessor",
 +    visibility = ["//visibility:public"],
 +    deps = [":com.oracle.truffle.espresso.processor"],
++)
+diff --git a/espresso/benchmarks/interpreter/DeltaBlue/BUILD.bazel b/espresso/benchmarks/interpreter/DeltaBlue/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/espresso/benchmarks/interpreter/DeltaBlue/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "benchmarks.interpreter.espresso.deltablue.srcs",
++    srcs = ["DeltaBlue.java"],
++    visibility = ["//espresso:__pkg__"],
++)
+diff --git a/espresso/benchmarks/interpreter/Fibonacci/BUILD.bazel b/espresso/benchmarks/interpreter/Fibonacci/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/espresso/benchmarks/interpreter/Fibonacci/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "benchmarks.interpreter.espresso.fibonacci.srcs",
++    srcs = ["Fibonacci.java"],
++    visibility = ["//espresso:__pkg__"],
++)
+diff --git a/espresso/benchmarks/interpreter/Richards/BUILD.bazel b/espresso/benchmarks/interpreter/Richards/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/espresso/benchmarks/interpreter/Richards/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "benchmarks.interpreter.espresso.richards.srcs",
++    srcs = ["Richards.java"],
++    visibility = ["//espresso:__pkg__"],
++)
+diff --git a/espresso/benchmarks/interpreter/Sieve/BUILD.bazel b/espresso/benchmarks/interpreter/Sieve/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/espresso/benchmarks/interpreter/Sieve/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "benchmarks.interpreter.espresso.sieve.srcs",
++    srcs = ["Sieve.java"],
++    visibility = ["//espresso:__pkg__"],
 +)
 diff --git a/espresso/src/com.oracle.truffle.espresso/src/META-INF/native-image/com.oracle.truffle.espresso/BUILD.bazel b/espresso/src/com.oracle.truffle.espresso/src/META-INF/native-image/com.oracle.truffle.espresso/BUILD.bazel
 new file mode 100644

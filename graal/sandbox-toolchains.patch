@@ -2,9 +2,9 @@ diff --git a/sandbox-toolchains/BUILD.bazel b/sandbox-toolchains/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/sandbox-toolchains/BUILD.bazel
-@@ -0,0 +1,386 @@
+@@ -0,0 +1,611 @@
 +load("@rules_mx//mx:graph.bzl", "mx_exported_tar", "mx_jar_dist", "mx_project", "mx_whole_java")
-+load("@rules_mx//mx:native_image.bzl", "mx_native_image_executable", "mx_toolchain_tool_layout")
++load("@rules_mx//mx:native_image.bzl", "mx_jvm_tool_launcher", "mx_native_image_executable", "mx_toolchain_tool_layout")
 +
 +filegroup(
 +    name = "all_distributions",
@@ -12,8 +12,11 @@ new file mode 100644
 +    srcs = [
 +        ":GRAALOS_SUPPORT",
 +        ":SANDBOXED_MUSL_TOOLS_HWCFI",
++        ":SANDBOXED_MUSL_TOOLS_HWCFI_BASH",
 +        ":SANDBOXED_MUSL_TOOLS_NOCFI",
++        ":SANDBOXED_MUSL_TOOLS_NOCFI_BASH",
 +        ":SANDBOXED_MUSL_TOOLS_SWCFI",
++        ":SANDBOXED_MUSL_TOOLS_SWCFI_BASH",
 +        ":SANDBOXED_RUST_TOOLS_HWCFI",
 +        ":SANDBOXED_RUST_TOOLS_SWCFI",
 +        ":SANDBOXED_TOOLCHAIN_LAUNCHERS",
@@ -29,8 +32,11 @@ new file mode 100644
 +        ":com.oracle.graal.sandbox.libc",
 +        ":com.oracle.truffle.llvm.toolchain.launchers.sandboxed",
 +        ":graalvm-musl-hwcfi-tool",
++        ":graalvm-musl-hwcfi-tool-bash",
 +        ":graalvm-musl-nocfi-tool",
++        ":graalvm-musl-nocfi-tool-bash",
 +        ":graalvm-musl-swcfi-tool",
++        ":graalvm-musl-swcfi-tool-bash",
 +    ],
 +    visibility = ["//visibility:public"],
 +)
@@ -143,6 +149,56 @@ new file mode 100644
 +)
 +
 +mx_toolchain_tool_layout(
++    name = "SANDBOXED_MUSL_TOOLS_HWCFI_BASH",
++    launcher = "graalvm-musl-hwcfi-tool",
++    links = {
++        "ar": "llvm-ar",
++        "c++": "graalvm-musl-hwcfi-clang++",
++        "c++filt": "llvm-cxxfilt",
++        "cc": "graalvm-musl-hwcfi-clang",
++        "clang": "graalvm-musl-hwcfi-clang",
++        "clang++": "graalvm-musl-hwcfi-clang++",
++        "flang": "graalvm-musl-hwcfi-flang",
++        "flang-new": "graalvm-musl-hwcfi-flang",
++        "g++": "graalvm-musl-hwcfi-clang++",
++        "gcc": "graalvm-musl-hwcfi-clang",
++        "graalvm-clang": "graalvm-musl-hwcfi-clang",
++        "graalvm-clang++": "graalvm-musl-hwcfi-clang++",
++        "graalvm-flang": "graalvm-musl-hwcfi-flang",
++        "graalvm-musl-hwcfi-clang": "graalvm-musl-hwcfi-tool",
++        "graalvm-musl-hwcfi-clang++": "graalvm-musl-hwcfi-tool",
++        "graalvm-musl-hwcfi-flang": "graalvm-musl-hwcfi-tool",
++        "graalvm-musl-hwcfi-ld": "graalvm-musl-hwcfi-tool",
++        "ld": "graalvm-musl-hwcfi-ld",
++        "ld.lld": "graalvm-musl-hwcfi-ld",
++        "ld64": "graalvm-musl-hwcfi-ld",
++        "lld": "graalvm-musl-hwcfi-ld",
++        "lld-link": "graalvm-musl-hwcfi-ld",
++        "llvm-ar": "graalvm-musl-hwcfi-tool",
++        "llvm-cxxfilt": "graalvm-musl-hwcfi-tool",
++        "llvm-nm": "graalvm-musl-hwcfi-tool",
++        "llvm-objcopy": "graalvm-musl-hwcfi-tool",
++        "llvm-objdump": "graalvm-musl-hwcfi-tool",
++        "llvm-ranlib": "graalvm-musl-hwcfi-tool",
++        "llvm-readelf": "graalvm-musl-hwcfi-tool",
++        "llvm-readobj": "graalvm-musl-hwcfi-tool",
++        "llvm-strip": "graalvm-musl-hwcfi-tool",
++        "nm": "llvm-nm",
++        "objcopy": "llvm-objcopy",
++        "objdump": "llvm-objdump",
++        "ranlib": "llvm-ranlib",
++        "readelf": "llvm-readelf",
++        "readobj": "llvm-readobj",
++        "strip": "llvm-strip",
++        "x86_64-linux-musl-g++": "graalvm-musl-hwcfi-clang++",
++        "x86_64-linux-musl-gcc": "graalvm-musl-hwcfi-clang",
++    },
++    tool = ":graalvm-musl-hwcfi-tool-bash",
++    visibility = ["//visibility:public"],
++    windows_command = "@echo off\n\ncall :getScriptLocation location\nset \"GRAALVM_ARGUMENT_VECTOR_PROGRAM_NAME=%~0\"\n\"%location%graalvm-musl-hwcfi-tool.exe\" %*\nexit /b %errorlevel%\n\n:: If this script is in `%PATH%` and called quoted without a full path (e.g., `\"js\"`), `%~dp0` is expanded to `cwd`\n:: rather than the path to the script.\n:: This does not happen if `%~dp0` is accessed in a subroutine.\n:getScriptLocation variableName\n    set \"%~1=%~dp0\"\n    exit /b 0",
++)
++
++mx_toolchain_tool_layout(
 +    name = "SANDBOXED_MUSL_TOOLS_NOCFI",
 +    links = {
 +        "ar": "llvm-ar",
@@ -187,6 +243,56 @@ new file mode 100644
 +        "x86_64-linux-musl-gcc": "graalvm-musl-nocfi-clang",
 +    },
 +    tool = ":graalvm-musl-nocfi-tool",
++    visibility = ["//visibility:public"],
++    windows_command = "@echo off\n\ncall :getScriptLocation location\nset \"GRAALVM_ARGUMENT_VECTOR_PROGRAM_NAME=%~0\"\n\"%location%graalvm-musl-nocfi-tool.exe\" %*\nexit /b %errorlevel%\n\n:: If this script is in `%PATH%` and called quoted without a full path (e.g., `\"js\"`), `%~dp0` is expanded to `cwd`\n:: rather than the path to the script.\n:: This does not happen if `%~dp0` is accessed in a subroutine.\n:getScriptLocation variableName\n    set \"%~1=%~dp0\"\n    exit /b 0",
++)
++
++mx_toolchain_tool_layout(
++    name = "SANDBOXED_MUSL_TOOLS_NOCFI_BASH",
++    launcher = "graalvm-musl-nocfi-tool",
++    links = {
++        "ar": "llvm-ar",
++        "c++": "graalvm-musl-nocfi-clang++",
++        "c++filt": "llvm-cxxfilt",
++        "cc": "graalvm-musl-nocfi-clang",
++        "clang": "graalvm-musl-nocfi-clang",
++        "clang++": "graalvm-musl-nocfi-clang++",
++        "flang": "graalvm-musl-nocfi-flang",
++        "flang-new": "graalvm-musl-nocfi-flang",
++        "g++": "graalvm-musl-nocfi-clang++",
++        "gcc": "graalvm-musl-nocfi-clang",
++        "graalvm-clang": "graalvm-musl-nocfi-clang",
++        "graalvm-clang++": "graalvm-musl-nocfi-clang++",
++        "graalvm-flang": "graalvm-musl-nocfi-flang",
++        "graalvm-musl-nocfi-clang": "graalvm-musl-nocfi-tool",
++        "graalvm-musl-nocfi-clang++": "graalvm-musl-nocfi-tool",
++        "graalvm-musl-nocfi-flang": "graalvm-musl-nocfi-tool",
++        "graalvm-musl-nocfi-ld": "graalvm-musl-nocfi-tool",
++        "ld": "graalvm-musl-nocfi-ld",
++        "ld.lld": "graalvm-musl-nocfi-ld",
++        "ld64": "graalvm-musl-nocfi-ld",
++        "lld": "graalvm-musl-nocfi-ld",
++        "lld-link": "graalvm-musl-nocfi-ld",
++        "llvm-ar": "graalvm-musl-nocfi-tool",
++        "llvm-cxxfilt": "graalvm-musl-nocfi-tool",
++        "llvm-nm": "graalvm-musl-nocfi-tool",
++        "llvm-objcopy": "graalvm-musl-nocfi-tool",
++        "llvm-objdump": "graalvm-musl-nocfi-tool",
++        "llvm-ranlib": "graalvm-musl-nocfi-tool",
++        "llvm-readelf": "graalvm-musl-nocfi-tool",
++        "llvm-readobj": "graalvm-musl-nocfi-tool",
++        "llvm-strip": "graalvm-musl-nocfi-tool",
++        "nm": "llvm-nm",
++        "objcopy": "llvm-objcopy",
++        "objdump": "llvm-objdump",
++        "ranlib": "llvm-ranlib",
++        "readelf": "llvm-readelf",
++        "readobj": "llvm-readobj",
++        "strip": "llvm-strip",
++        "x86_64-linux-musl-g++": "graalvm-musl-nocfi-clang++",
++        "x86_64-linux-musl-gcc": "graalvm-musl-nocfi-clang",
++    },
++    tool = ":graalvm-musl-nocfi-tool-bash",
 +    visibility = ["//visibility:public"],
 +    windows_command = "@echo off\n\ncall :getScriptLocation location\nset \"GRAALVM_ARGUMENT_VECTOR_PROGRAM_NAME=%~0\"\n\"%location%graalvm-musl-nocfi-tool.exe\" %*\nexit /b %errorlevel%\n\n:: If this script is in `%PATH%` and called quoted without a full path (e.g., `\"js\"`), `%~dp0` is expanded to `cwd`\n:: rather than the path to the script.\n:: This does not happen if `%~dp0` is accessed in a subroutine.\n:getScriptLocation variableName\n    set \"%~1=%~dp0\"\n    exit /b 0",
 +)
@@ -241,6 +347,56 @@ new file mode 100644
 +)
 +
 +mx_toolchain_tool_layout(
++    name = "SANDBOXED_MUSL_TOOLS_SWCFI_BASH",
++    launcher = "graalvm-musl-swcfi-tool",
++    links = {
++        "ar": "llvm-ar",
++        "c++": "graalvm-musl-swcfi-clang++",
++        "c++filt": "llvm-cxxfilt",
++        "cc": "graalvm-musl-swcfi-clang",
++        "clang": "graalvm-musl-swcfi-clang",
++        "clang++": "graalvm-musl-swcfi-clang++",
++        "flang": "graalvm-musl-swcfi-flang",
++        "flang-new": "graalvm-musl-swcfi-flang",
++        "g++": "graalvm-musl-swcfi-clang++",
++        "gcc": "graalvm-musl-swcfi-clang",
++        "graalvm-clang": "graalvm-musl-swcfi-clang",
++        "graalvm-clang++": "graalvm-musl-swcfi-clang++",
++        "graalvm-flang": "graalvm-musl-swcfi-flang",
++        "graalvm-musl-swcfi-clang": "graalvm-musl-swcfi-tool",
++        "graalvm-musl-swcfi-clang++": "graalvm-musl-swcfi-tool",
++        "graalvm-musl-swcfi-flang": "graalvm-musl-swcfi-tool",
++        "graalvm-musl-swcfi-ld": "graalvm-musl-swcfi-tool",
++        "ld": "graalvm-musl-swcfi-ld",
++        "ld.lld": "graalvm-musl-swcfi-ld",
++        "ld64": "graalvm-musl-swcfi-ld",
++        "lld": "graalvm-musl-swcfi-ld",
++        "lld-link": "graalvm-musl-swcfi-ld",
++        "llvm-ar": "graalvm-musl-swcfi-tool",
++        "llvm-cxxfilt": "graalvm-musl-swcfi-tool",
++        "llvm-nm": "graalvm-musl-swcfi-tool",
++        "llvm-objcopy": "graalvm-musl-swcfi-tool",
++        "llvm-objdump": "graalvm-musl-swcfi-tool",
++        "llvm-ranlib": "graalvm-musl-swcfi-tool",
++        "llvm-readelf": "graalvm-musl-swcfi-tool",
++        "llvm-readobj": "graalvm-musl-swcfi-tool",
++        "llvm-strip": "graalvm-musl-swcfi-tool",
++        "nm": "llvm-nm",
++        "objcopy": "llvm-objcopy",
++        "objdump": "llvm-objdump",
++        "ranlib": "llvm-ranlib",
++        "readelf": "llvm-readelf",
++        "readobj": "llvm-readobj",
++        "strip": "llvm-strip",
++        "x86_64-linux-musl-g++": "graalvm-musl-swcfi-clang++",
++        "x86_64-linux-musl-gcc": "graalvm-musl-swcfi-clang",
++    },
++    tool = ":graalvm-musl-swcfi-tool-bash",
++    visibility = ["//visibility:public"],
++    windows_command = "@echo off\n\ncall :getScriptLocation location\nset \"GRAALVM_ARGUMENT_VECTOR_PROGRAM_NAME=%~0\"\n\"%location%graalvm-musl-swcfi-tool.exe\" %*\nexit /b %errorlevel%\n\n:: If this script is in `%PATH%` and called quoted without a full path (e.g., `\"js\"`), `%~dp0` is expanded to `cwd`\n:: rather than the path to the script.\n:: This does not happen if `%~dp0` is accessed in a subroutine.\n:getScriptLocation variableName\n    set \"%~1=%~dp0\"\n    exit /b 0",
++)
++
++mx_toolchain_tool_layout(
 +    name = "SANDBOXED_RUST_TOOLS_HWCFI",
 +    links = {
 +        "cargo": "graalvm-musl-hwcfi-cargo",
@@ -264,6 +420,75 @@ new file mode 100644
 +    tool = ":graalvm-musl-swcfi-tool",
 +    visibility = ["//visibility:public"],
 +    windows_command = "@echo off\n\ncall :getScriptLocation location\nset \"GRAALVM_ARGUMENT_VECTOR_PROGRAM_NAME=%~0\"\n\"%location%graalvm-musl-swcfi-tool.exe\" %*\nexit /b %errorlevel%\n\n:: If this script is in `%PATH%` and called quoted without a full path (e.g., `\"js\"`), `%~dp0` is expanded to `cwd`\n:: rather than the path to the script.\n:: This does not happen if `%~dp0` is accessed in a subroutine.\n:getScriptLocation variableName\n    set \"%~1=%~dp0\"\n    exit /b 0",
++)
++
++mx_jvm_tool_launcher(
++    name = "graalvm-musl-hwcfi-tool-bash",
++    classpath = [
++        "//sdk:COLLECTIONS",
++        "//sdk:WORD",
++        "//sdk:NATIVEIMAGE",
++        "//sdk:POLYGLOT",
++        "//sdk:JLINE3",
++        "//sdk:LAUNCHER_COMMON",
++        ":SANDBOXED_TOOLCHAIN_LAUNCHERS",
++    ],
++    java_args = [
++        "-Dorg.graalvm.launcher.executablePath={argv0}",
++        "-Dorg.graalvm.llvm.relative.path=../llvm",
++        "-Dorg.graalos.targetTriple=x86_64-unknown-linux-musl_hwcfi",
++        "-Dorg.graalos.rustTargetTriple=x86_64-graalos_hwcfi-linux-musl",
++        "com.oracle.truffle.llvm.toolchain.launchers.sandboxed.SandboxedTool",
++    ],
++    jdk_archive = "@rules_mx//graal:standalone_jdk_archive",
++    output = "graalvm-musl-hwcfi-tool",
++    visibility = ["//visibility:public"],
++)
++
++mx_jvm_tool_launcher(
++    name = "graalvm-musl-nocfi-tool-bash",
++    classpath = [
++        "//sdk:COLLECTIONS",
++        "//sdk:WORD",
++        "//sdk:NATIVEIMAGE",
++        "//sdk:POLYGLOT",
++        "//sdk:JLINE3",
++        "//sdk:LAUNCHER_COMMON",
++        ":SANDBOXED_TOOLCHAIN_LAUNCHERS",
++    ],
++    java_args = [
++        "-Dorg.graalvm.launcher.executablePath={argv0}",
++        "-Dorg.graalvm.llvm.relative.path=../llvm",
++        "-Dorg.graalos.targetTriple=x86_64-unknown-linux-musl",
++        "-Dorg.graalos.rustTargetTriple=x86_64-unknown-linux-musl",
++        "com.oracle.truffle.llvm.toolchain.launchers.sandboxed.SandboxedTool",
++    ],
++    jdk_archive = "@rules_mx//graal:standalone_jdk_archive",
++    output = "graalvm-musl-nocfi-tool",
++    visibility = ["//visibility:public"],
++)
++
++mx_jvm_tool_launcher(
++    name = "graalvm-musl-swcfi-tool-bash",
++    classpath = [
++        "//sdk:COLLECTIONS",
++        "//sdk:WORD",
++        "//sdk:NATIVEIMAGE",
++        "//sdk:POLYGLOT",
++        "//sdk:JLINE3",
++        "//sdk:LAUNCHER_COMMON",
++        ":SANDBOXED_TOOLCHAIN_LAUNCHERS",
++    ],
++    java_args = [
++        "-Dorg.graalvm.launcher.executablePath={argv0}",
++        "-Dorg.graalvm.llvm.relative.path=../llvm",
++        "-Dorg.graalos.targetTriple=x86_64-unknown-linux-musl_swcfi",
++        "-Dorg.graalos.rustTargetTriple=x86_64-graalos_swcfi-linux-musl",
++        "com.oracle.truffle.llvm.toolchain.launchers.sandboxed.SandboxedTool",
++    ],
++    jdk_archive = "@rules_mx//graal:standalone_jdk_archive",
++    output = "graalvm-musl-swcfi-tool",
++    visibility = ["//visibility:public"],
 +)
 +
 +mx_native_image_executable(
