@@ -6,6 +6,7 @@ from functools import cache
 import json
 import os
 import re
+import shlex
 import textwrap
 from pathlib import Path
 from types import SimpleNamespace
@@ -996,6 +997,63 @@ def _project_files(project):
     }
 
 
+def _thin_launcher(project):
+    return (type(project).__module__, type(project).__name__) == (
+        "mx_sdk_vm_ng",
+        "ThinLauncherProject",
+    )
+
+
+def _thin_launcher_recipe(project):
+    # mx computes the language home, extracted libraries, option arrays and main
+    # module from the launcher and its resolved Java distributions.
+    if project.setup_relative_resources:
+        raise _UnsupportedLowering(
+            f"{project.name}: thin launcher requires an extracted resource distribution"
+        )
+    if project._cflags or project._ldflags or project._ldlibs:
+        raise _UnsupportedLowering(
+            f"{project.name}: custom thin launcher flags require a target toolchain mapping"
+        )
+    flags = []
+    for flag in project.cflags:
+        if flag.startswith(("-DLAUNCHER_", "-DGRAALVM_VERSION=", "-DLIBLANG_RELPATH=")):
+            (argument,) = shlex.split(flag)
+            if "PATH" in argument.split("=", 1)[0]:
+                argument = argument.replace(os.sep, "/")
+            flags.append(argument)
+    supported = {}
+    for system, library_suffix in (("linux", ".so"), ("macos", ".dylib")):
+        copts = [
+            re.sub(r"<lib:([a-zA-Z0-9_.+-]+)>", r"lib\1" + library_suffix, flag)
+            for flag in flags
+        ]
+        if any("<" in flag or ">" in flag for flag in copts):
+            raise _UnsupportedLowering(
+                f"{project.name}: unbound thin launcher substitution"
+            )
+        jre = project.relative_jre_path.replace(os.sep, "/")
+        copts.append(f"-DLIBJVM_RELPATH={jre}/lib/server/libjvm{library_suffix}")
+        if system == "macos":
+            copts.append(f"-DLIBJLI_RELPATH={jre}/lib/libjli.dylib")
+        supported[system] = copts
+    sdk = mx.suite("sdk")
+    src_dir = Path(project.dir) / "src"
+    sources = sorted(src_dir.glob("*.cc"))
+    if not sources:
+        raise _UnsupportedLowering(
+            f"{project.name}: thin launcher sources are missing from {src_dir}"
+        )
+    return {
+        "name": project.name,
+        "srcs": [
+            "//" + sdk.name + ":" + src.relative_to(sdk.dir).as_posix()
+            for src in sources
+        ],
+        "platform_copts": supported,
+    }
+
+
 def _native_image_executable(dep):
     return (type(dep).__module__, type(dep).__name__) == (
         "mx_sdk_vm_ng",
@@ -1124,6 +1182,7 @@ def _can_lower_root(dep):
             "LayoutJARDistribution",
         )
         or _native_tool_layout(dep)
+        or _thin_launcher(dep)
         or _native_image_executable(dep)
         or _source_project(dep)
         or _wat_project(dep)
@@ -1941,6 +2000,7 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
     layouts = {}
     tar_layouts = {}
     tool_layouts = {}
+    thin_launchers = {}
     image_projects = {}
     bitcode_suites = {}
     source_projects = {}
@@ -1959,6 +2019,7 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             or project.name in layouts
             or project.name in tar_layouts
             or project.name in tool_layouts
+            or project.name in thin_launchers
             or project.name in image_projects
             or project.name in bitcode_suites
             or project.name in source_projects
@@ -2030,6 +2091,9 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             image_projects[project.name] = _image_recipe(
                 project, suite, java_deps, pending
             )
+            continue
+        if options.gazelle and project.suite == suite and _thin_launcher(project):
+            thin_launchers[project.name] = _thin_launcher_recipe(project)
             continue
         if options.gazelle and project.suite == suite and _source_project(project):
             source_projects[project.name] = _project_files(project)
@@ -2428,6 +2492,7 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             | layouts.keys()
             | distributions.keys()
             | tool_layouts.keys()
+            | thin_launchers.keys()
             | image_projects.keys()
             | source_projects.keys()
             | wasm_programs.keys()
@@ -2498,6 +2563,8 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             result["layouts"] = [layouts[n] for n in sorted(layouts)]
         if tool_layouts:
             result["tool_layouts"] = [tool_layouts[n] for n in sorted(tool_layouts)]
+        if thin_launchers:
+            result["thin_launchers"] = [thin_launchers[n] for n in sorted(thin_launchers)]
         if image_projects:
             result["image_projects"] = [
                 image_projects[n] for n in sorted(image_projects)

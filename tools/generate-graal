@@ -2408,7 +2408,8 @@ def prepare_suite(suite, stage):
             print(f"  {reason}: {', '.join(names)}", file=sys.stderr)
     elif suite == "sdk":
         (directory / "BUILD.bazel").write_text(
-            sdk_native_projects(directory)
+            'exports_files(glob(["src/org.graalvm.launcher.native/src/*.cc"]))\n'
+            + sdk_native_projects(directory)
             + sdk_llvm_rules(directory)
             + sdk_descriptor_rules(directory)
             + 'test_suite(name = "tests", visibility = ["//visibility:public"])\n'
