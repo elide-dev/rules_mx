@@ -11,11 +11,14 @@ import zipfile
 def main():
     output = Path(sys.argv[1])
     args = sys.argv[2:]
+    directory = args[:1] == ["--directory"]
+    if directory:
+        args = args[1:]
     links = {}
     if args[:1] == ["--links"]:
         links = json.loads(args[1])
         args = args[2:]
-    tree = None
+    tree = output if directory else None
     if args[:1] == ["--source-tree"]:
         tree = Path(args[1])
         args = args[2:]
@@ -38,6 +41,10 @@ def main():
                 destination.symlink_to(links[name])
             else:
                 shutil.copyfile(source, destination)
+                if directory:
+                    destination.chmod(0o755 if source.stat().st_mode & 0o111 else 0o644)
+    if directory:
+        return
 
     if output.suffix in (".jar", ".zip"):
         with zipfile.ZipFile(output, "w") as archive:

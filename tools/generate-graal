@@ -1738,10 +1738,13 @@ def svm_native_rules(directory):
     if zstd := suite["libraries"].get("ZSTD_JNI"):
         # The builder loads zstd-jni by file name from lib/svm/builder/lib.
         builder_libs[":ZSTD_JNI"] = f"zstd-jni-{zstd['maven']['version']}.jar"
+    components = json.loads((directory / "mx-graph.json").read_text())["svm_components"]
     return (
         'load("@rules_mx//graal:svm.bzl", "svm_launcher", "svm_native_projects")\n'
         f"svm_native_projects(projects = {repr(projects)})\n"
         'svm_launcher(name = "native-image"'
+        + ", component_jars = " + json.dumps({"//" + dep: path for dep, path in components["builder_jars"].items()}, sort_keys=True)
+        + ", component_layouts = " + json.dumps({"//" + dep: path for dep, path in components["support_layouts"].items()}, sort_keys=True)
         + (f", builder_libs = {json.dumps(builder_libs)}" if builder_libs else "")
         + ")\n"
         + svm_graalvm_support(directory)
@@ -2138,6 +2141,7 @@ def prepare_suite(suite, stage):
     if suite in PARTIAL_SUITES:
         export_options = [
             "--all",
+            "--standalone-jdk-release", "@rules_mx//graal:standalone_jdk_release",
             "--declared-only",
             "--partial",
             *(
@@ -2281,6 +2285,8 @@ def prepare_suite(suite, stage):
                 for arg in ("--provided-target", name)
             ),
         ]
+    if suite == "substratevm":
+        export_options += ["--svm-macro", "tflsm"]
     with (directory / "mx-graph.json").open("w") as graph:
         subprocess.run(
             [

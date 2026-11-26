@@ -1054,11 +1054,44 @@ def _thin_launcher_recipe(project):
     }
 
 
+def _svm_macro_components(names):
+    import mx_sdk_vm
+
+    components = {component.short_name: component for component in mx_sdk_vm.graalvm_components()}
+    todo = list(names)
+    seen = set()
+    jars = {}
+    layouts = {}
+    while todo:
+        name = todo.pop()
+        if name in seen:
+            continue
+        seen.add(name)
+        component = components.get(name)
+        if isinstance(component, mx_sdk_vm.GraalVMSvmMacro):
+            directory = "lib/svm/macros/" + component.dir_name
+        elif isinstance(component, mx_sdk_vm.GraalVmTruffleLibrary):
+            directory = "lib/" + component.dir_name
+        else:
+            raise _UnsupportedLowering(f"Unsupported Native Image macro component {name}")
+        for dep in component.builder_jar_distributions:
+            dist = mx.distribution(dep)
+            jars[dist.qualifiedName()] = directory + "/builder/" + dist.default_filename()
+        for dep in component.support_distributions:
+            layouts[mx.distribution(dep).qualifiedName()] = directory
+        todo.extend(component.dependency_names)
+    return {"builder_jars": jars, "support_layouts": layouts}
+
+
 def _native_image_executable(dep):
     return (type(dep).__module__, type(dep).__name__) == (
         "mx_sdk_vm_ng",
         "NativeImageExecutableProject",
     )
+
+
+def _language_library(dep):
+    return (type(dep).__module__, type(dep).__name__) == ("mx_sdk_vm_ng", "LanguageLibraryProject")
 
 
 def _native_tool_layout(dist):
@@ -1110,6 +1143,9 @@ def _image_recipe(project, suite, mappings, pending):
         "build_args",
         "deliverable",
     }
+    shared = _language_library(project)
+    if shared:
+        unsupported -= {"dynamicBuildArgs", "dynamicDependencies"}
     if unsupported:
         raise _UnsupportedLowering(
             f"{project.name}: unsupported native image settings {sorted(unsupported)}"
@@ -1140,19 +1176,17 @@ def _image_recipe(project, suite, mappings, pending):
     )
     with mx.runtime_classpath_formatter(render):
         command = project.getBuildTask(args).get_build_args()
-    if not command or not re.fullmatch(
-        r"(?:[A-Za-z_$][\w$]*\.)+[A-Za-z_$][\w$]*", command[-1]
-    ):
-        raise _UnsupportedLowering(
-            f"{project.name}: expected a Java main class for the native image"
-        )
-    recipe = {
-        "name": project.name,
-        "main": command[-1],
-        "output": project.base_file_name(),
-        "flags": [],
-    }
-    tokens = iter(command[:-1])
+    recipe = {"name": project.name, "output": project.base_file_name(), "flags": []}
+    if shared:
+        if "--shared" not in command:
+            raise _UnsupportedLowering(f"{project.name}: missing shared library image option")
+        recipe["shared"] = True
+        command = [arg for arg in command if arg != "--shared"]
+    elif command and re.fullmatch(r"(?:[A-Za-z_$][\w$]*\.)+[A-Za-z_$][\w$]*", command[-1]):
+        recipe["main"] = command.pop()
+    else:
+        raise _UnsupportedLowering(f"{project.name}: expected a Java main class for the native image")
+    tokens = iter(command)
     for arg in tokens:
         if arg in ("-cp", "-p"):
             marker = next(tokens, None)
@@ -1184,6 +1218,7 @@ def _can_lower_root(dep):
         or _native_tool_layout(dep)
         or _thin_launcher(dep)
         or _native_image_executable(dep)
+        or _language_library(dep)
         or _source_project(dep)
         or _wat_project(dep)
         or _emscripten_project(dep)
@@ -1417,6 +1452,80 @@ def _tar_layout(dist, pending, mappings):
             target: "\n".join(entries) for target, entries in imports.items()
         },
         "testonly": dist.is_test_distribution(),
+    }
+
+
+def _install_layout(dist, pending, mappings, jdk_release):
+    attrs = dist._orig_attrs
+    if (
+        not dist.isPlatformDependent() or not attrs.get("layout")
+        or attrs.keys() & {"os", "arch", "os_arch"}
+        or dist.deps or dist.excludedLibs or dist.fileListEntry or dist.hashEntry
+        or dist.fileListPurpose or dist._removed_deps
+    ):
+        raise _UnsupportedLowering(f"{dist.name}: needs a target-specific install recipe")
+    members = {}
+    imports = {}
+    inputs = set()
+    # Keep platform substitutions symbolic until we know the supplying project.
+    # Asking mx for _walk_layout() here would expand them for the Gazelle host.
+    for destination, source in mx.LayoutDistribution._walk_static_layout(
+        dist.layout, dist.name, distribution_object=dist, context=dist
+    ):
+        if source["source_type"] not in ("dependency", "extracted-dependency") or source.keys() - {
+            "_str_", "source_type", "dependency", "path", "optional"
+        } or source.get("optional"):
+            raise _UnsupportedLowering(f"{dist.name}: unsupported install source {source['_str_']}")
+        dep = mx.dependency(source["dependency"], context=dist)
+        inputs.add(dep)
+        dest = destination.removeprefix("./")
+        directory = destination.endswith("/")
+        path = source.get("path")
+        kind = source["source_type"]
+        if kind == "dependency" and path == "release" and dep.qualifiedName() == "sdk:STANDALONE_JAVA_HOME":
+            if not jdk_release:
+                raise _UnsupportedLowering(f"{dist.name}: bind the release file of STANDALONE_JAVA_HOME")
+            target = jdk_release
+        else:
+            if dep.suite == dist.suite:
+                target = ":" + dep.name
+                pending.append(dep)
+            else:
+                labels = mappings.get(dep.qualifiedName(), [])
+                if len(labels) != 1:
+                    raise _UnsupportedLowering(f"{dist.name}: bind install input {dep.qualifiedName()}")
+                target = labels[0]
+            if directory and (
+                (kind == "extracted-dependency" and path is None and type(dep).__name__ == "LayoutTARDistribution")
+                or (kind == "dependency" and path == "*" and (
+                    _source_project(dep) or _native_tool_layout(dep)
+                    or (type(dep).__name__ == "LayoutDirDistribution" and dep.isPlatformDependent())
+                ))
+            ):
+                if dest and not _resource_path(dest.rstrip("/")):
+                    raise _UnsupportedLowering(f"{dist.name}: invalid imported directory {dest}")
+                imports.setdefault(target, []).append("=" + dest)
+                continue
+            if _thin_launcher(dep) and kind == "dependency" and path == (
+                "<os>-<arch>/<multitarget_libc_selection>/<exe:" + dep.name + ">"
+            ):
+                # Linux and macOS use the unadorned executable name.
+                dest = re.sub(r"<exe:([A-Za-z0-9_.+-]+)>", r"\1", dest)
+            elif not (kind == "dependency" and path is None and (_language_library(dep) or _native_image_executable(dep))):
+                raise _UnsupportedLowering(f"{dist.name}: unsupported install member {source['_str_']}")
+        if directory:
+            if dest and not _resource_path(dest.rstrip("/")):
+                raise _UnsupportedLowering(f"{dist.name}: invalid install directory {dest}")
+            dest += "{basename}"
+        elif not _resource_path(dest):
+            raise _UnsupportedLowering(f"{dist.name}: invalid install destination {dest}")
+        members.setdefault(target, []).append(dest)
+    if inputs != set(dist.buildDependencies) or not (members or imports):
+        raise _UnsupportedLowering(f"{dist.name}: install inputs differ from its resolved build dependencies")
+    return {
+        "name": dist.name, "format": "dir", "testonly": dist.is_test_distribution(),
+        "members": {key: "\n".join(paths) for key, paths in members.items()},
+        "archive_imports": {key: "\n".join(paths) for key, paths in imports.items()},
     }
 
 
@@ -1776,6 +1885,8 @@ def bazel_buildfile(args):
         metavar="//PACKAGE=FILE",
         help="import the Java bindings published by another suite",
     )
+    parser.add_argument("--standalone-jdk-release", metavar="LABEL", help="bind the release file from mx STANDALONE_JAVA_HOME")
+    parser.add_argument("--svm-macro", action="append", default=[], metavar="COMPONENT", help="export the registered Native Image macro and its component dependencies")
     parser.add_argument("projects", nargs="*")
     options = parser.parse_args(args)
     if options.all:
@@ -1818,6 +1929,8 @@ def bazel_buildfile(args):
                     selected.update(closure)
         result = _lower_buildfile(parser, options, bindings, selected)
         if options.gazelle:
+            if options.svm_macro:
+                result["svm_components"] = _svm_macro_components(options.svm_macro)
             if options.partial:
                 result["blocked_roots"] = {k: sorted(v) for k, v in blocked.items()}
             if options.bindings_out:
@@ -2065,7 +2178,10 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
                 tar_layouts[project.name] = _tar_layout(project, pending, java_deps)
                 continue
             if type(project).__name__ == "LayoutDirDistribution":
-                layouts[project.name] = _resource_layout(project, pending, java_deps)
+                if project.isPlatformDependent() and options.standalone_jdk_release:
+                    tar_layouts[project.name] = _install_layout(project, pending, java_deps, options.standalone_jdk_release)
+                else:
+                    layouts[project.name] = _resource_layout(project, pending, java_deps)
                 continue
         if (
             options.gazelle
@@ -2086,7 +2202,7 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
         if (
             options.gazelle
             and project.suite == suite
-            and _native_image_executable(project)
+            and (_native_image_executable(project) or _language_library(project))
         ):
             image_projects[project.name] = _image_recipe(
                 project, suite, java_deps, pending

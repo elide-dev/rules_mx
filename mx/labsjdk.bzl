@@ -20,6 +20,8 @@ def _register(pin, prefix, repository):
             version = jdk.removeprefix("ce-").split(".")[0],
             prefix = prefix,
             sha256 = digest,
+            patches = [Label("//mx:jdk_release.patch")] if prefix == "labsjdk" else [],
+            patch_args = ["-p1"],
             strip_prefix = home + ("/Contents/Home" if os == "macos" else ""),
             urls = ["https://github.com/graalvm/%s/releases/download/%s/labsjdk-%s-%s.tar.gz" % (repository, release, version.replace("+", "%2B"), platform)],
             target_compatible_with = ["@platforms//cpu:" + cpu, "@platforms//os:" + os],

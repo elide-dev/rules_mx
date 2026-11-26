@@ -32,7 +32,8 @@ def _add_entry(entries, path, file):
     entries[path] = file
 
 def _layout_impl(ctx):
-    output = ctx.actions.declare_file(ctx.label.name.lower().replace("_", "-") + "." + ctx.attr.format)
+    directory = ctx.attr.format == "dir"
+    output = ctx.actions.declare_directory(ctx.label.name + ".files") if directory else ctx.actions.declare_file(ctx.label.name.lower().replace("_", "-") + "." + ctx.attr.format)
     entries = {}
     links = {}
     for target, destinations in ctx.attr.members.items():
@@ -64,7 +65,9 @@ def _layout_impl(ctx):
                     if path in source_links:
                         links[destination + path] = source_links[path]
     args = ctx.actions.args()
-    args.add(output)
+    args.add(output.path)
+    if directory:
+        args.add("--directory")
     if links:
         args.add("--links")
         args.add(json.encode(links))
@@ -87,7 +90,7 @@ def _layout_impl(ctx):
         files.append(file_list)
     return [
         DefaultInfo(files = depset(files)),
-        MxArchiveLayoutInfo(archive = output, entries = entries, links = links),
+        MxArchiveLayoutInfo(archive = None if directory else output, entries = entries, links = links),
     ]
 
 mx_archive_layout = rule(
@@ -98,7 +101,7 @@ mx_archive_layout = rule(
         # Map a member to a new path, or use an empty selector to import an entire layout.
         "archive_imports": attr.label_keyed_string_dict(providers = [MxArchiveLayoutInfo]),
         "file_list": attr.string_list(),
-        "format": attr.string(mandatory = True, values = ["jar", "tar"]),
+        "format": attr.string(mandatory = True, values = ["dir", "jar", "tar"]),
         "target_prefix": attr.string(),
         "_pack": attr.label(default = Label("//mx:pack_layout"), executable = True, cfg = "exec"),
     },

@@ -37,6 +37,31 @@ exports_files([
     "toolchain_test.py",
 ])
 
+[
+    config_setting(
+        name = "standalone_" + key,
+        constraint_values = [
+            "@platforms//os:" + os,
+            "@platforms//cpu:" + cpu,
+        ],
+    )
+    for key, os, cpu in [
+        ("darwin_aarch64", "macos", "aarch64"),
+        ("linux_aarch64", "linux", "aarch64"),
+        ("linux_amd64", "linux", "x86_64"),
+    ]
+]
+
+alias(
+    name = "standalone_jdk_release",
+    actual = select({
+        ":standalone_darwin_aarch64": "@labsjdk_darwin_aarch64//:release",
+        ":standalone_linux_aarch64": "@labsjdk_linux_aarch64//:release",
+        ":standalone_linux_amd64": "@labsjdk_linux_amd64//:release",
+    }),
+    visibility = ["//visibility:public"],
+)
+
 filegroup(
     name = "wasm_standalone_jars",
     srcs = ["@graal//wasm:GRAALWASM_STANDALONE_DEPENDENCIES"],
@@ -56,6 +81,17 @@ java_test(
         "WASM_LAUNCHER": "$(rootpath @graal//wasm:graalwasm_thin_launcher)",
         "MODULE_JARS": "$(rootpaths :wasm_standalone_jars)",
     },
+    tags = ["manual"],
+    test_class = "graal.WasmThinLauncherTest",
+    deps = ["@contrib_rules_jvm_deps//:junit_junit"],
+)
+
+java_test(
+    name = "wasm_native_launcher_test",
+    size = "small",
+    srcs = ["WasmThinLauncherTest.java"],
+    data = ["@graal//wasm:GRAALWASM_NATIVE_STANDALONE"],
+    env = {"WASM_INSTALL": "$(rootpath @graal//wasm:GRAALWASM_NATIVE_STANDALONE)"},
     tags = ["manual"],
     test_class = "graal.WasmThinLauncherTest",
     deps = ["@contrib_rules_jvm_deps//:junit_junit"],

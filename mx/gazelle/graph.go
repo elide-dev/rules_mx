@@ -145,6 +145,7 @@ func (g *importer) loadGraph(root, filename string, seen map[label.Label]bool) e
 			PlatformCopts map[string][]string `json:"platform_copts"`
 		} `json:"thin_launchers"`
 		ImageProjects []struct {
+			Shared                       bool
 			Name, Main, Output           string
 			Classpath, Modulepath, Flags []string
 		} `json:"image_projects"`
@@ -463,7 +464,11 @@ func (g *importer) loadGraph(root, filename string, seen map[label.Label]bool) e
 	}
 	for _, image := range graph.ImageProjects {
 		r := rule.NewRule("mx_native_image_executable", image.Name)
-		r.SetAttr("main_class", image.Main)
+		if image.Shared {
+			r.SetKind("mx_native_image_library")
+		} else {
+			r.SetAttr("main_class", image.Main)
+		}
 		r.SetAttr("output", image.Output)
 		r.SetAttr("image_args", image.Flags)
 		if len(image.Classpath) != 0 {
@@ -612,7 +617,7 @@ func (g *importer) loadGraph(root, filename string, seen map[label.Label]bool) e
 
 func graphKind(k string) bool {
 	switch k {
-	case "mx_thin_launcher", "mx_toolchain_tool_layout", "mx_native_image_executable", "mx_patch_module", "mx_native_image_properties", "mx_source_archive", "mx_wasm_programs", "mx_project_files", "mx_wat_project", "mx_sulong_cmake_suite", "mx_bitcode_suite", "mx_exported_tar", "mx_jvmci_library", "mx_shaded_java", "mx_jar_dist", "mx_pom_dist", "mx_resource_layout", "mx_classpath_dist", "mx_files", "mx_project", "mx_whole_java", "mx_processed_java", "mx_processor", "mx_test_class":
+	case "mx_native_image_library", "mx_thin_launcher", "mx_toolchain_tool_layout", "mx_native_image_executable", "mx_patch_module", "mx_native_image_properties", "mx_source_archive", "mx_wasm_programs", "mx_project_files", "mx_wat_project", "mx_sulong_cmake_suite", "mx_bitcode_suite", "mx_exported_tar", "mx_jvmci_library", "mx_shaded_java", "mx_jar_dist", "mx_pom_dist", "mx_resource_layout", "mx_classpath_dist", "mx_files", "mx_project", "mx_whole_java", "mx_processed_java", "mx_processor", "mx_test_class":
 		return true
 	}
 	return false
@@ -631,6 +636,7 @@ func (g *importer) Kinds() map[string]rule.KindInfo {
 	kinds["mx_source_archive"] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"groups": true}, MergeableAttrs: managed}
 	kinds["mx_project_files"] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"members": true, "srcs": true}, MergeableAttrs: managed}
 	kinds["mx_toolchain_tool_layout"] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"tool": true}, MergeableAttrs: managed}
+	kinds["mx_native_image_library"] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"output": true}, MergeableAttrs: managed}
 	kinds["mx_native_image_executable"] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"main_class": true}, MergeableAttrs: managed}
 	kinds["mx_wasm_programs"] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"cases": true}, MergeableAttrs: managed}
 	kinds["mx_wat_project"] = rule.KindInfo{NonEmptyAttrs: map[string]bool{"cases": true}, MergeableAttrs: managed}
@@ -655,7 +661,7 @@ func (g *importer) Kinds() map[string]rule.KindInfo {
 func (g *importer) Loads() []rule.LoadInfo {
 	return append(g.javaLanguage.Loads(),
 		rule.LoadInfo{Name: "@rules_mx//mx:thin_launcher.bzl", Symbols: []string{"mx_thin_launcher"}},
-		rule.LoadInfo{Name: "@rules_mx//mx:native_image.bzl", Symbols: []string{"mx_native_image_executable", "mx_toolchain_tool_layout"}},
+		rule.LoadInfo{Name: "@rules_mx//mx:native_image.bzl", Symbols: []string{"mx_native_image_executable", "mx_native_image_library", "mx_toolchain_tool_layout"}},
 		rule.LoadInfo{Name: "@rules_mx//mx:wasm_programs.bzl", Symbols: []string{"mx_wasm_programs"}},
 		rule.LoadInfo{Name: "@rules_mx//mx:jvmci.bzl", Symbols: []string{"mx_patch_module"}},
 		rule.LoadInfo{Name: "@rules_mx//mx:jar.bzl", Symbols: []string{"mx_native_image_properties"}},

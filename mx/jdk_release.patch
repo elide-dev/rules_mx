@@ -1,0 +1,7 @@
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -4,3 +4,3 @@
+ 
+-exports_files(["WORKSPACE", "BUILD.bazel"])
++exports_files(["WORKSPACE", "BUILD.bazel", "release"])
+ 

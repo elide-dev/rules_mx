@@ -20,8 +20,8 @@ tools/buildbuddy test --config=buildbuddy-rbe --config=elide-processors //graal/
 | Regex | All three projects and all five distributions, including Native Image metadata archives. | All 20 discovered upstream JUnit classes. |
 | Tools | All 18 projects and all 29 distributions, including the Maven POMs, Native Image support TARs and platform-specific VisualVM support archive. The upstream warmup test project declares dependencies and has an empty source tree. | All 60 discovered JUnit classes. |
 | Sandbox Toolchains | 5 of 31 projects and 8 of 31 distributions. The three native musl launchers, their tool aliases, the Rust tool aliases and the Java distributions build from source. | A packaged compiler alias invokes the pinned SDK clang and compiles a C object for stock x86-64 musl. |
-| Sulong | 32 of 77 projects and 13 of 51 distributions on Linux x86-64, including the Sulong core, native-mode and NFI JARs. | CI builds ten LLVM IR fixtures and 4,731 bitcode or native reference outputs from 1,086 additional cases. A separate test runs three reference programs and their bitcode against an upstream CMake build. The Polyglot discovery test reads the installed LLVM language options. |
-| Wasm | 14 of 15 projects and 11 of 16 distributions, including the language, launcher, test case and benchmark JARs. | Gazelle emits 55 JUnit targets. The 45 classes in `@graal//wasm:qualified_tests` include the C and WAT suites. Bazel builds each fixture with Emscripten or WABT and packages the upstream sidecars and test index. |
+| Sulong | 33 of 77 projects and 14 of 51 distributions on Linux x86-64, including the Sulong core, native-mode and NFI JARs. | CI builds ten LLVM IR fixtures and 4,731 bitcode or native reference outputs from 1,086 additional cases. A separate test runs three reference programs and their bitcode against an upstream CMake build. The Polyglot discovery test reads the installed LLVM language options. |
+| Wasm | All 15 projects and 13 of 16 distributions, including the language library, native standalone, launcher, test case and benchmark JARs. | Gazelle emits 55 JUnit targets. The 45 classes in `@graal//wasm:qualified_tests` include the C and WAT suites. Bazel builds each fixture with Emscripten or WABT and packages the upstream sidecars and test index. |
 | Espresso | 18 of 25 projects and 11 of 24 distributions, including the language, JVMCI and the versioned Java I/O module patches. | The packaging test checks release-specific class entries. |
 | Espresso Compiler Stub | Both projects and all three distributions. | The packaging test opens the compiler support TAR and checks corresponding classes and sources. |
 | Web Image | All eight projects and all 12 distributions, including both Native Image macros. | `@graal//web-image:unit_tests` selects the four unit classes. The integration suites need an installed Web Image toolchain. |
@@ -41,12 +41,12 @@ Truffle's eight declared processors run on the execution platform. Its DSL proce
 
 Gazelle gets the Native Image main class, ordered classpath, module path and image options from the mx build task. Each image has its own Bazel target. The Bazel compilation mode controls debug information, so Linux and macOS generate the same overlay. Tool distributions expose individual files and preserve the aliases specified by mx when embedded in another archive. For discovery, Bazel fetches the LLVM and musl suite definitions at the revisions imported by Sandbox Toolchains. The patched LLVM, musl and Rust bootstraps still need build rules.
 
-The Espresso, Sulong and Wasm thin launchers use the SDK’s C++ JNI launcher. Gazelle gets the main module, Java class and installation paths from mx. Bazel compiles each executable with the registered C++ toolchain on Linux or macOS. The Wasm integration test installs its generated POM’s runtime JARs next to the launcher and executes a WebAssembly guest on the selected JDK.
+The Espresso, Sulong and Wasm thin launchers use the SDK’s C++ JNI launcher. Gazelle gets the main module, Java class and installation paths from mx. Bazel compiles each executable with the registered C++ toolchain on Linux or macOS. The Wasm integration test installs its generated POM’s runtime JARs next to the launcher and executes a WebAssembly guest on the selected JDK. The native standalone runs the same guest using its installed language library. Its release metadata comes from the pinned Labs JDK, matching an explicit mx `STANDALONE_JAVA_HOME`.
 
 ```sh
 bazelisk query 'deps(@graal//sandbox-toolchains:SANDBOXED_MUSL_TOOLS_SWCFI, 2)'
 tools/buildbuddy build --config=buildbuddy-rbe --config=source-native-image @graal//sulong:SULONG_NATIVE_TOOLS
-tools/buildbuddy test --config=buildbuddy-rbe --config=source-native-image //graal:sandbox_launcher_test
+tools/buildbuddy test --config=buildbuddy-rbe --config=source-native-image //graal:sandbox_launcher_test //graal:wasm_native_launcher_test
 tools/buildbuddy test --config=buildbuddy-rbe --config=labsjdk --config=elide-processors //graal:wasm_thin_launcher_test
 ```
 
