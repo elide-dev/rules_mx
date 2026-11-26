@@ -63,7 +63,7 @@ The standalone BUILD exporter handles plain Java projects with a single resource
 
 ### Generate a whole suite
 
-`bazel-graph --imports` emits the resolved projects, distributions and libraries for the primary suite and its loaded imports. It includes the dependency edge kinds, Java archive membership, and distribution layout data. This command discovers inputs without fetching or building the suite's artifacts.
+`bazel-graph --imports` emits the resolved projects, distributions and libraries for the primary suite and its loaded imports. It includes the dependency edge kinds, Java archive membership, and distribution layout data. This command discovers inputs without fetching or building the suite's artifacts. Local projects use suite-relative `path` and `source_roots`. When a project uses another suite or a packed source library, `directory_input` or `source_inputs` identifies the owning suite or qualified library and the relative path.
 
 `bazel-buildfile --gazelle --all` takes its roots from the resolved primary suite. It exports supported Java projects, JARs, POMs, resource layouts and TARs with explicit file and archive inputs. It also discovers JUnit classes. If a test project belongs to exactly one test JAR, the generated tests use that packaged runtime. Explicit test bindings take precedence.
 

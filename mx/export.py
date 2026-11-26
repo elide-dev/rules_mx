@@ -3,6 +3,7 @@
 import argparse
 from functools import cache
 import json
+import os
 import re
 import textwrap
 from pathlib import Path
@@ -47,6 +48,15 @@ def bazel_projects(args):
     print(json.dumps({"version": 1, "projects": result}, indent=2, sort_keys=True))
 
 
+def _graph_path(path, suite, owners):
+    path = Path(os.path.normpath(path))
+    for candidate in (path, path.resolve()):
+        for owner_root, owner in owners:
+            if candidate.is_relative_to(owner_root):
+                return {**owner, "path": candidate.relative_to(owner_root).as_posix()}
+    mx.abort(f"{suite.name}: graph input has no suite or packed-resource owner: {path}")
+
+
 @mx.optional_suite_context
 @mx.command(
     "mx", "bazel-graph", "[--imports]", props={"keepUnsatisfiedDependencies": True}
@@ -59,7 +69,13 @@ def bazel_graph(args):
     )
     options = parser.parse_args(args)
     primary = mx.primary_suite() or mx.suite("mx")
-    suites = mx.suites(include_mx=True) if options.imports else [primary]
+    loaded = mx.suites(include_mx=True)
+    suites = loaded if options.imports else [primary]
+    suite_roots = [
+        (root, {"suite": s.name})
+        for s in loaded
+        for root in {Path(s.dir), Path(s.dir).resolve()}
+    ]
     result = {}
     for suite in sorted(suites, key=lambda item: item.name):
         nodes = {}
@@ -86,12 +102,25 @@ def bazel_graph(args):
                     "platform_dependent": dep.isPlatformDependent(),
                 }
                 if kind == "project":
-                    root = Path(suite.dir)
-                    node["path"] = Path(dep.dir).relative_to(root).as_posix()
-                    node["source_roots"] = [
-                        Path(path).relative_to(root).as_posix()
-                        for path in dep.source_dirs()
-                    ]
+                    owners = [
+                        (
+                            Path(lib.get_path(resolve=False)).resolve(),
+                            {"library": lib.qualifiedName()},
+                        )
+                        for lib in getattr(dep, "buildDependencies", []) + dep.deps
+                        if lib.isPackedResourceLibrary() and lib.extract_path
+                    ] + suite_roots
+                    owners.sort(key=lambda item: len(item[0].parts), reverse=True)
+                    directory = _graph_path(dep.dir, suite, owners)
+                    if directory.get("suite") == suite.name:
+                        node["path"] = directory["path"]
+                    else:
+                        node["directory_input"] = directory
+                    inputs = [_graph_path(p, suite, owners) for p in dep.source_dirs()]
+                    if all(p.get("suite") == suite.name for p in inputs):
+                        node["source_roots"] = [p["path"] for p in inputs]
+                    else:
+                        node["source_inputs"] = inputs
                 if dep.isJavaProject():
                     node["compliance"] = repr(dep.javaCompliance)
                     node["testonly"] = dep.is_test_project()
