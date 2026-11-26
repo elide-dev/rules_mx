@@ -358,6 +358,10 @@ def _module_directives(dist, members, external, archives, mappings, library_modu
                 visit(child)
 
     for dep in external:
+        if dep.isLibrary() and library_modules.get(dep.qualifiedName(), "") is None:
+            if dep.qualifiedName() not in mappings:
+                mx.abort(f"{dep.qualifiedName()}: --platform-library needs a --java-dep mapping")
+            continue
         module = getattr(dep, "moduleName", None) or library_modules.get(
             dep.qualifiedName()
         )
@@ -828,6 +832,13 @@ def bazel_buildfile(args):
         help="JPMS name of a mapped automatic module",
     )
     parser.add_argument(
+        "--platform-library",
+        action="append",
+        default=[],
+        metavar="SUITE:LIB",
+        help="mapped library whose module name mx resolves for the host: depend on it without a requires directive",
+    )
+    parser.add_argument(
         "--suite-package",
         action="append",
         default=[],
@@ -983,6 +994,11 @@ def bazel_buildfile(args):
         if name in library_modules:
             parser.error(f"duplicate --library-module mapping for {name}")
         library_modules[name] = module
+    for name in options.platform_library:
+        if ":" not in name or name in library_modules:
+            parser.error(f"expected one --platform-library SUITE:LIB for {name}")
+        # None marks a module that the generated descriptor must not name.
+        library_modules[name] = None
     test_launchers = _mappings(parser, options.test_launcher, "--test-launcher")
     test_runtimes = _mappings(parser, options.test_runtime, "--test-runtime")
     test_paths = _mappings(parser, options.test_path, "--test-path")
