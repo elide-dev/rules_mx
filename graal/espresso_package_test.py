@@ -1,12 +1,14 @@
 """Check the distribution paths and release overlays consumed by Espresso."""
 
 import io
+from pathlib import Path
+import os
 import sys
 import tarfile
 from zipfile import ZipFile
 
 
-def main(support, io_jar):
+def main(support, io_jar, launchers, benchmarks):
     with tarfile.open(support) as archive:
         jars = {member.name for member in archive if member.isfile()}
         assert jars == {"lib/espresso-graal.jar", "lib/espresso-graal.src.zip"}, jars
@@ -27,6 +29,23 @@ def main(support, io_jar):
             assert any(
                 name.startswith(prefix) and name.endswith(".class") for name in members
             ), prefix
+
+    scripts = Path(launchers, "bin")
+    suffix = ".cmd" if os.name == "nt" else ""
+    assert {script.name for script in scripts.iterdir()} == {
+        "java" + suffix,
+        "javac" + suffix,
+    }
+    if os.name != "nt":
+        assert all(os.access(script, os.X_OK) for script in scripts.iterdir())
+    with ZipFile(benchmarks) as archive:
+        names = ("DeltaBlue", "Fibonacci", "Richards", "Sieve")
+        assert set(archive.namelist()) == {f"interpreter/{name}.jar" for name in names}
+        for name in names:
+            with ZipFile(io.BytesIO(archive.read(f"interpreter/{name}.jar"))) as jar:
+                assert f"{name}.class" in jar.namelist()
+                manifest = jar.read("META-INF/MANIFEST.MF").decode().splitlines()
+                assert f"Main-Class: {name}" in manifest
 
 
 if __name__ == "__main__":

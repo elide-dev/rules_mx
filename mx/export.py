@@ -12,6 +12,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import mx
+from mx._impl.mx import glob_match
 from mx._impl.mx_maven import _genPom
 
 
@@ -1097,7 +1098,10 @@ def _native_image_executable(dep):
 
 
 def _language_library(dep):
-    return (type(dep).__module__, type(dep).__name__) == ("mx_sdk_vm_ng", "LanguageLibraryProject")
+    return (type(dep).__module__, type(dep).__name__) == (
+        "mx_sdk_vm_ng",
+        "LanguageLibraryProject",
+    )
 
 
 def _native_tool_layout(dist):
@@ -1107,14 +1111,71 @@ def _native_tool_layout(dist):
     )
 
 
+def _bash_launcher(project):
+    return (type(project).__module__, type(project).__name__) == (
+        "mx_sandbox_toolchains",
+        "ToolchainBashLauncherProject",
+    )
+
+
+def _bash_launcher_recipe(project, mappings, pending, jdk_archive):
+    if not jdk_archive:
+        raise _UnsupportedLowering(f"{project.name}: bind the target JDK archive")
+    if getattr(project, "buildDependencies", ()) or not all(
+        isinstance(dep, mx.ClasspathDependency) for dep in project.deps
+    ):
+        raise _UnsupportedLowering(
+            f"{project.name}: launcher needs additional build inputs"
+        )
+    paths = {}
+
+    def render(entries, cp_prefix=None, cp_suffix=None, jdk=None):
+        if (
+            cp_prefix
+            or cp_suffix
+            or not all(dep.isJARDistribution() or dep.isLibrary() for dep in entries)
+        ):
+            raise _UnsupportedLowering(
+                f"{project.name}: undeclared launcher classpath input"
+            )
+        marker = f"MX_BAZEL_PATH_{len(paths)}"
+        paths[marker] = _dependency_labels(
+            entries, project.suite, mappings, pending, True
+        )
+        return marker
+
+    with mx.runtime_classpath_formatter(render):
+        args = mx.get_runtime_jvm_args(project.deps, include_system_properties=False)
+    result = {
+        "name": project.name,
+        "output": project.exeName,
+        "jdk_archive": jdk_archive,
+    }
+    flags = []
+    tokens = iter(args)
+    for flag in tokens:
+        if flag in ("-p", "-cp"):
+            result["classpath" if flag == "-cp" else "modulepath"] = paths[next(tokens)]
+        else:
+            flags.append(flag)
+    # The upstream launcher passes the invoked alias as its executablePath.
+    result["java_args"] = (
+        flags + ["-Dorg.graalvm.launcher.executablePath={argv0}"] + project.jvmArgs
+    )
+    return result
+
+
 def _tool_links(dist, pending):
     tool = dist.tool_project
-    if not _native_image_executable(tool) or tool.suite != dist.suite:
+    if (
+        not (_native_image_executable(tool) or _bash_launcher(tool))
+        or tool.suite != dist.suite
+    ):
         raise _UnsupportedLowering(
             f"{dist.name}: needs the packaged launcher {tool.qualifiedName()}"
         )
     aliases = {}
-    main = tool.base_file_name()
+    main = tool.exeName if _bash_launcher(tool) else tool.base_file_name()
     if not _resource_path(main) or "/" in main:
         raise _UnsupportedLowering(f"{dist.name}: invalid executable name {main}")
     for name, alternates in dist.tool_links.items():
@@ -1136,6 +1197,7 @@ def _tool_links(dist, pending):
     return {
         "name": dist.name,
         "tool": ":" + tool.name,
+        **({"launcher": main} if _bash_launcher(tool) else {}),
         "links": aliases,
         "windows_command": mx_sdk_vm_ng._make_windows_link(main + ".exe"),
     }
@@ -1270,6 +1332,7 @@ def _can_lower_root(dep):
         or _standalone_archive(dep)
         or _native_tool_layout(dep)
         or _thin_launcher(dep)
+        or _bash_launcher(dep)
         or _native_image_executable(dep)
         or _language_library(dep)
         or _source_project(dep)
@@ -1351,7 +1414,113 @@ def _web_image_macro_layout(dist, pending, mappings):
     }
 
 
-def _tar_layout(dist, pending, mappings):
+def _source_layout_branch(dist, layout, os_name):
+    members, imports, paths = {}, {}, {}
+    projects = []
+    for destination, source in mx.LayoutDistribution._walk_static_layout(
+        layout, dist.name, distribution_object=dist, context=dist
+    ):
+        directory = destination.endswith("/")
+        dest = destination.removeprefix("./")
+        path = source.get("path")
+        kind = source["source_type"]
+        keys = source.keys() - {"source_type", "_str_"}
+        if (
+            kind == "file"
+            and keys == {"path"}
+            and _resource_path(path)
+            and (Path(dist.suite.dir) / path).is_file()
+        ):
+            entries = {path: dest + Path(path).name if directory else dest}
+            dep = None
+        elif (
+            kind == "dependency"
+            and directory
+            and path
+            and keys == {"dependency", "path", "optional"}
+            and not source["optional"]
+        ):
+            dep = mx.dependency(
+                source["dependency"], fatalIfMissing=False, context=dist
+            )
+            if not dep or dep.suite != dist.suite or not _source_project(dep):
+                # A platform may need an additional compiled project, e.g. pthread on Windows.
+                return None, []
+            projects.append(dep)
+            entries = {}
+            for member in _project_files(dep)["members"].values():
+                matched = glob_match(path, member)
+                if matched is not None:
+                    prefix = matched.rpartition("/")[0]
+                    entries[member] = dest + (
+                        member.removeprefix(prefix + "/") if prefix else member
+                    )
+            if not entries:
+                raise _UnsupportedLowering(
+                    f"{dist.name}: no results for {source['_str_']}"
+                )
+        else:
+            raise _UnsupportedLowering(
+                f"{dist.name}: unsupported {os_name} source {source['_str_']}"
+            )
+        for src, target in entries.items():
+            if target in paths or not _resource_path(target):
+                raise _UnsupportedLowering(
+                    f"{dist.name}: duplicate or invalid member {target}"
+                )
+            paths[target] = None
+            if dep:
+                imports.setdefault(":" + dep.name, []).append(src + "=" + target)
+            else:
+                members.setdefault(src, []).append(target)
+    return {
+        "members": {k: "\n".join(v) for k, v in members.items()},
+        "archive_imports": {k: "\n".join(v) for k, v in imports.items()},
+        "file_list": list(paths) if dist.fileListPurpose else [],
+    }, projects
+
+
+def _os_layout(dist, pending):
+    """Lower OS-specific source layouts without expanding them for the Gazelle host."""
+    attrs = dist._orig_attrs
+    if (
+        attrs.keys()
+        & {"arch", "os_arch", "layout", "buildDependencies", "dependencies"}
+        or dist.excludedLibs
+        or dist.hashEntry
+        or dist.fileListEntry
+        or dist.compress
+    ):
+        raise _UnsupportedLowering(
+            f"{dist.name}: needs additional platform layout inputs"
+        )
+    recipes = {}
+    for os_name, bazel_os in (
+        ("linux", "linux"),
+        ("darwin", "macos"),
+        ("windows", "windows"),
+    ):
+        branch = attrs["os"].get(os_name, attrs["os"].get("<others>", {}))
+        if branch.keys() != {"layout"}:
+            raise _UnsupportedLowering(f"{dist.name}: expected a layout for {os_name}")
+        recipe, projects = _source_layout_branch(dist, branch["layout"], os_name)
+        if recipe is None:
+            if os_name == "windows":
+                continue
+            raise _UnsupportedLowering(
+                f"{dist.name}: needs native project results for {os_name}"
+            )
+        pending.extend(projects)
+        recipes[bazel_os] = recipe
+    return {
+        "name": dist.name,
+        "format": "dir" if type(dist).__name__ == "LayoutDirDistribution" else "tar",
+        "os_layouts": recipes,
+        "testonly": dist.is_test_distribution(),
+    }
+
+
+def _tar_layout(dist, pending, mappings, archives):
     if len(dist.deps) == 1 and (
         type(dist.deps[0]).__module__,
         type(dist.deps[0]).__name__,
@@ -1416,7 +1585,6 @@ def _tar_layout(dist, pending, mappings):
                 continue
             if (
                 kind == "dependency"
-                and directory
                 and path in ("*", "*.jar")
                 and dep.suite == dist.suite
                 and type(dep).__name__ == "JARDistribution"
@@ -1425,13 +1593,14 @@ def _tar_layout(dist, pending, mappings):
                 for _, filename in dep.getArchivableResults():
                     if not fnmatch.fnmatchcase(filename, path):
                         continue
-                    member = destination + filename
+                    member = destination + filename if directory else destination
                     if not _resource_path(member) or member in destinations:
                         raise _UnsupportedLowering(
                             f"{dist.name}: duplicate or invalid archive path {member}"
                         )
                     destinations[member] = None
                     if filename == dep.default_filename():
+                        archives.add(dep.name)
                         label = ":" + dep.name
                     elif filename == dep.default_source_filename():
                         name = dist.name + ".sources." + dep.name
@@ -1504,7 +1673,9 @@ def _tar_layout(dist, pending, mappings):
         "archive_imports": {
             target: "\n".join(entries) for target, entries in imports.items()
         },
-        "testonly": dist.is_test_distribution(),
+        "testonly": dist.is_test_distribution() or any(
+            dep.isDistribution() and dep.is_test_distribution() for dep in inputs
+        ),
     }
 
 
@@ -2291,6 +2462,7 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
     release_archives = {}
     tar_layouts = {}
     tool_layouts = {}
+    bash_launchers = {}
     thin_launchers = {}
     image_projects = {}
     bitcode_suites = {}
@@ -2311,6 +2483,7 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             or project.name in release_archives
             or project.name in tar_layouts
             or project.name in tool_layouts
+            or project.name in bash_launchers
             or project.name in thin_launchers
             or project.name in image_projects
             or project.name in bitcode_suites
@@ -2327,8 +2500,11 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             if _native_tool_layout(project):
                 tool_layouts[project.name] = _tool_links(project, pending)
                 continue
+            if type(project).__name__ in ("LayoutDirDistribution", "LayoutTARDistribution") and "os" in getattr(project, "_orig_attrs", {}):
+                tar_layouts[project.name] = _os_layout(project, pending)
+                continue
             if type(project).__name__ == "LayoutJARDistribution":
-                tar_layouts[project.name] = _tar_layout(project, pending, java_deps)
+                tar_layouts[project.name] = _tar_layout(project, pending, java_deps, archives)
                 continue
             if project.isJARDistribution():
                 if project.name in archives:
@@ -2357,7 +2533,7 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
                 }
                 continue
             if type(project).__name__ == "LayoutTARDistribution":
-                tar_layouts[project.name] = _tar_layout(project, pending, java_deps)
+                tar_layouts[project.name] = _tar_layout(project, pending, java_deps, archives)
                 continue
             if type(project).__name__ == "LayoutDirDistribution":
                 if project.isPlatformDependent() and options.standalone_jdk_release:
@@ -2393,6 +2569,9 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             image_projects[project.name] = _image_recipe(
                 project, suite, java_deps, pending
             )
+            continue
+        if options.gazelle and project.suite == suite and _bash_launcher(project):
+            bash_launchers[project.name] = _bash_launcher_recipe(project, java_deps, pending, options.standalone_jdk_archive)
             continue
         if options.gazelle and project.suite == suite and _thin_launcher(project):
             thin_launchers[project.name] = _thin_launcher_recipe(project)
@@ -2432,7 +2611,7 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
         excluded_from_jacoco = project._orig_attrs.get("jacoco") == "exclude"
         if options.gazelle:
             # SpotBugs is a separate mx analysis pass.
-            allowed = allowed | {"spotbugs", "spotbugsIgnoresGenerated", "javadocType"}
+            allowed = allowed | {"spotbugs", "spotbugsIgnoresGenerated", "javadocType", "eclipseformat", "skipVerifyImports", "checkstyleProj"}
             if getattr(project, "patchModule", None):
                 allowed = allowed | {"patchModule"}
             if getattr(project, "multiReleaseJarVersion", None):
@@ -2794,6 +2973,7 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             | layouts.keys()
             | distributions.keys()
             | tool_layouts.keys()
+            | bash_launchers.keys()
             | thin_launchers.keys()
             | image_projects.keys()
             | source_projects.keys()
@@ -2875,6 +3055,8 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             result["layouts"] = [layouts[n] for n in sorted(layouts)]
         if tool_layouts:
             result["tool_layouts"] = [tool_layouts[n] for n in sorted(tool_layouts)]
+        if bash_launchers:
+            result["bash_launchers"] = [bash_launchers[n] for n in sorted(bash_launchers)]
         if thin_launchers:
             result["thin_launchers"] = [thin_launchers[n] for n in sorted(thin_launchers)]
         if image_projects:

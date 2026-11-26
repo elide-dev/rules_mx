@@ -11,9 +11,24 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def inactive_reason(attrs):
+    ignore = attrs.get("ignore")
+    if ignore and str(ignore).lower() != "false":
+        return "ignored by mx" if ignore is True else "ignored by mx: " + str(ignore)
+    description = attrs.get("description", "").strip()
+    if description.lower().startswith("deprecated:"):
+        return description
+    return None
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--missing", action="store_true", help="list each missing rule")
+    parser.add_argument(
+        "--active-only",
+        action="store_true",
+        help="exclude explicitly ignored or deprecated declarations",
+    )
     parser.add_argument(
         "--require-complete",
         action="store_true",
@@ -44,13 +59,19 @@ def main():
             continue
         coverage = []
         for category in ("projects", "distributions"):
-            declared = set(suite.get(category, {}))
+            declarations = suite.get(category, {})
+            reasons = {n: inactive_reason(attrs) for n, attrs in declarations.items()}
+            declared = {
+                n
+                for n, reason in reasons.items()
+                if not (options.active_only and reason)
+            }
             present = len(declared & rules[name])
             coverage.append(f"{present}/{len(declared)}")
             counts[category][0] += present
             counts[category][1] += len(declared)
             missing.extend(
-                f"{name} {category} {target}"
+                (bool(reasons[target]), f"{name} {category} {target}", reasons[target])
                 for target in sorted(declared - rules[name])
             )
         print(f"{name:24} {coverage[0]:>11} {coverage[1]:>14}")
@@ -60,8 +81,8 @@ def main():
         f"{'Total':24} {'/'.join(map(str, counts['projects'])):>11} {'/'.join(map(str, counts['distributions'])):>14}"
     )
     if options.missing:
-        for target in missing:
-            print(target)
+        for _, target, reason in sorted(missing, key=lambda item: item[0]):
+            print(f"{target} ({reason})" if reason else target)
     return int(options.require_complete and bool(missing))
 
 

@@ -145,3 +145,16 @@ def mx_release_archive(name, install, prefix, **kwargs):
         }),
         **kwargs
     )
+
+def mx_os_layout(name, os_layouts, **kwargs):
+    """Select the mx layout using the target operating system."""
+    branches = {"@platforms//os:" + os: recipe for os, recipe in os_layouts.items()}
+    attrs = {
+        key: select({os: recipe[key] for os, recipe in branches.items()} | {"//conditions:default": empty})
+        for key, empty in [("members", {}), ("archive_imports", {}), ("file_list", [])]
+    }
+    mx_archive_layout(
+        name = name,
+        target_compatible_with = select({os: [] for os in branches} | {"//conditions:default": ["@platforms//:incompatible"]}),
+        **(kwargs | attrs)
+    )

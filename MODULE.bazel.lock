@@ -584,7 +584,7 @@
     },
     "//mx:extensions.bzl%mx_sources": {
       "general": {
-        "bzlTransitiveDigest": "WhEDNhLKmpjcKvSt7lPEyxhymUkEPG67tK9XhEq7zQM=",
+        "bzlTransitiveDigest": "vi4deS1znZ/EmhRHq368g/ndRn8tTD89/0K1eyptIDw=",
         "usagesDigest": "dxCJDfVKOZaNXO+n+nKHCOz1xnXb/8TY9y22raU6kQc=",
         "recordedInputs": [
           "REPO_MAPPING:,bazel_tools bazel_tools"
@@ -607,7 +607,8 @@
                 "@@//mx:register.patch",
                 "@@//mx:module_descriptor.patch",
                 "@@//mx:symbolic_classpath.patch",
-                "@@//mx:declaration_name.patch"
+                "@@//mx:declaration_name.patch",
+                "@@//mx:dynamic_java_project.patch"
               ],
               "patch_args": [
                 "-p1"

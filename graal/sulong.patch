@@ -2,7 +2,8 @@ diff --git a/sulong/BUILD.bazel b/sulong/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/sulong/BUILD.bazel
-@@ -0,0 +1,2427 @@
+@@ -0,0 +1,2475 @@
++load("@rules_mx//graal:layout.bzl", "mx_os_layout")
 +load("@rules_mx//graal:sulong_fixture_check.bzl", "sulong_fixture_check")
 +load("@rules_mx//mx:bitcode.bzl", "mx_bitcode_suite")
 +load("@rules_mx//mx:graph.bzl", "mx_exported_tar", "mx_jar_dist", "mx_pom_dist", "mx_processed_java", "mx_project", "mx_whole_java")
@@ -18,6 +19,7 @@ new file mode 100644
 +        ":SULONG_API",
 +        ":SULONG_CMAKE_TOOLCHAIN",
 +        ":SULONG_CORE",
++        ":SULONG_CORE_HOME",
 +        ":SULONG_GRAALVM_DOCS",
 +        ":SULONG_GRAALVM_LICENSES",
 +        ":SULONG_LAUNCHER",
@@ -2376,6 +2378,52 @@ new file mode 100644
 +    format = "tar",
 +    members = {
 +        "cmake/toolchain.cmake": "cmake/toolchain.cmake",
++    },
++    visibility = ["//visibility:public"],
++)
++
++mx_os_layout(
++    name = "SULONG_CORE_HOME",
++    format = "tar",
++    os_layouts = {
++        "linux": {
++            "archive_imports": {
++                ":com.oracle.truffle.llvm.libraries.graalvm.llvm": "include/graalvm/llvm/handles.h=include/graalvm/llvm/handles.h\ninclude/graalvm/llvm/polyglot.h=include/graalvm/llvm/polyglot.h\ninclude/graalvm/llvm/polyglot-buffer.h=include/graalvm/llvm/polyglot-buffer.h\ninclude/graalvm/llvm/polyglot-time.h=include/graalvm/llvm/polyglot-time.h\ninclude/graalvm/llvm/toolchain-api.h=include/graalvm/llvm/toolchain-api.h\ninclude/graalvm/llvm/internal/handles-impl.h=include/graalvm/llvm/internal/handles-impl.h\ninclude/graalvm/llvm/internal/polyglot-impl.h=include/graalvm/llvm/internal/polyglot-impl.h\ninclude/graalvm/llvm/internal/polyglot-time-impl.h=include/graalvm/llvm/internal/polyglot-time-impl.h\ninclude/polyglot.h=include/polyglot.h\ninclude/llvm/api/toolchain.h=include/llvm/api/toolchain.h",
++            },
++            "file_list": [
++                "include/graalvm/llvm/handles.h",
++                "include/graalvm/llvm/polyglot.h",
++                "include/graalvm/llvm/polyglot-buffer.h",
++                "include/graalvm/llvm/polyglot-time.h",
++                "include/graalvm/llvm/toolchain-api.h",
++                "include/graalvm/llvm/internal/handles-impl.h",
++                "include/graalvm/llvm/internal/polyglot-impl.h",
++                "include/graalvm/llvm/internal/polyglot-time-impl.h",
++                "include/polyglot.h",
++                "include/llvm/api/toolchain.h",
++            ],
++            "members": {
++            },
++        },
++        "macos": {
++            "archive_imports": {
++                ":com.oracle.truffle.llvm.libraries.graalvm.llvm": "include/graalvm/llvm/handles.h=include/graalvm/llvm/handles.h\ninclude/graalvm/llvm/polyglot.h=include/graalvm/llvm/polyglot.h\ninclude/graalvm/llvm/polyglot-buffer.h=include/graalvm/llvm/polyglot-buffer.h\ninclude/graalvm/llvm/polyglot-time.h=include/graalvm/llvm/polyglot-time.h\ninclude/graalvm/llvm/toolchain-api.h=include/graalvm/llvm/toolchain-api.h\ninclude/graalvm/llvm/internal/handles-impl.h=include/graalvm/llvm/internal/handles-impl.h\ninclude/graalvm/llvm/internal/polyglot-impl.h=include/graalvm/llvm/internal/polyglot-impl.h\ninclude/graalvm/llvm/internal/polyglot-time-impl.h=include/graalvm/llvm/internal/polyglot-time-impl.h\ninclude/polyglot.h=include/polyglot.h\ninclude/llvm/api/toolchain.h=include/llvm/api/toolchain.h",
++            },
++            "file_list": [
++                "include/graalvm/llvm/handles.h",
++                "include/graalvm/llvm/polyglot.h",
++                "include/graalvm/llvm/polyglot-buffer.h",
++                "include/graalvm/llvm/polyglot-time.h",
++                "include/graalvm/llvm/toolchain-api.h",
++                "include/graalvm/llvm/internal/handles-impl.h",
++                "include/graalvm/llvm/internal/polyglot-impl.h",
++                "include/graalvm/llvm/internal/polyglot-time-impl.h",
++                "include/polyglot.h",
++                "include/llvm/api/toolchain.h",
++            ],
++            "members": {
++            },
++        },
 +    },
 +    visibility = ["//visibility:public"],
 +)
