@@ -113,6 +113,8 @@ def mx_cmake_project(name, srcs, compiler, config, include_dirs, profiles, testo
             out_include_dir = "",
             out_data_files = recipe["members"],
             out_data_dirs = directories,
+            # The libraries are inside the declared install tree.
+            out_headers_only = bool(directories),
             testonly = testonly,
             target_compatible_with = select({condition: [], "//conditions:default": ["@platforms//:incompatible"]}),
         )
