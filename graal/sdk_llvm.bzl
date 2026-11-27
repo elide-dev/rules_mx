@@ -131,23 +131,13 @@ def sdk_toolchain_descriptors(descriptors):
 
 def _llvm_link_impl(ctx):
     tool = ctx.actions.declare_file(ctx.label.name + "/bin/llvm-link")
-    libraries = ctx.actions.declare_directory(ctx.label.name + "/lib")
-    ctx.actions.run(
-        executable = ctx.executable._extract,
-        inputs = [ctx.file.archive],
-        outputs = [tool, libraries],
-        arguments = [ctx.file.archive.path, tool.path, libraries.path],
-        mnemonic = "ExtractSDKLLVMLink",
-    )
-    return [DefaultInfo(executable = tool, files = depset([tool, libraries]), runfiles = ctx.runfiles(files = [libraries]))]
+    ctx.actions.symlink(output = tool, target_file = ctx.file.binary, is_executable = True)
+    return [DefaultInfo(executable = tool, runfiles = ctx.runfiles(files = [ctx.file.binary]))]
 
 sdk_llvm_link = rule(
     implementation = _llvm_link_impl,
     executable = True,
-    attrs = {
-        "archive": attr.label(allow_single_file = True, mandatory = True),
-        "_extract": attr.label(default = Label("//graal:extract_llvm_link"), cfg = "exec", executable = True),
-    },
+    attrs = {"binary": attr.label(allow_single_file = True, mandatory = True)},
 )
 
 def _fixture_sdk_impl(ctx):

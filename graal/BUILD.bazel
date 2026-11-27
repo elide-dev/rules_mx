@@ -895,14 +895,9 @@ py_test(
     }),
 )
 
-py_binary(
-    name = "extract_llvm_link",
-    srcs = ["extract_llvm_link.py"],
-)
-
 sdk_llvm_link(
     name = "sdk_llvm_link",
-    archive = "@graal//sdk:LLVM_TOOLCHAIN_FULL",
+    binary = "//tools/cc:llvm_link",
     tags = ["manual"],
     visibility = ["//visibility:public"],
 )
