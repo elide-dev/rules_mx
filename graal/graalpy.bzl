@@ -155,14 +155,30 @@ def _cmake_files(name, sources, data, config, outputs, targets, compatible):
         target_compatible_with = compatible,
     )
 
-def _native_extensions(profile, os, arch, compatible, soabi, abiflags, extension, multiarch, python_version, graal_version_full, graal_version_hex, pyconfig_srcs, cext_srcs, cext_results):
+def _native_extensions(
+        profile,
+        os,
+        arch,
+        compatible,
+        soabi,
+        abiflags,
+        extension,
+        multiarch,
+        python_version,
+        graal_version_full,
+        graal_version_hex,
+        pyconfig_srcs,
+        cext_srcs,
+        cext_results):
+    # Match the deployment target built into the registered Elide C/C++ driver.
+    platform_config = {"CMAKE_OSX_DEPLOYMENT_TARGET": "12.0"} if os == "darwin" else {}
     sysconfig = "_sysconfigdata_" + abiflags + "_" + os + "_" + multiarch + ".py"
     config = "pyconfig_" + profile
     _cmake_files(
         config,
         pyconfig_srcs,
         [],
-        {
+        platform_config | {
             "GRAALPY_VERSION": graal_version_full,
             "GRAALPY_VERSION_NUM": graal_version_hex,
             "GRAALPY_SYSCONFIGDATA_NAME": sysconfig.removesuffix(".py"),
@@ -201,7 +217,7 @@ def _native_extensions(profile, os, arch, compatible, soabi, abiflags, extension
         cext,
         cext_srcs,
         [":py_capi_headers", ":" + include, ":" + ffi],
-        {
+        platform_config | {
             "CMAKE_BUILD_TYPE": "Release",
             "CAPI_INC_DIR": "$$EXT_BUILD_ROOT$$/$(execpath :py_capi_headers)",
             "PYCONFIG_INCLUDE_DIR": "$$EXT_BUILD_ROOT$$/$(execpath :%s)" % include,
@@ -220,7 +236,24 @@ def _native_extensions(profile, os, arch, compatible, soabi, abiflags, extension
         artifacts[":" + target] = member.removeprefix("bin/")
     return artifacts, ":" + header, ":" + sysconfig_target, sysconfig
 
-def graalpy_resources(version, abi, abiflags, graal_version, python_version, libraries, headers, zsupport_srcs, zsupport_copts, posix_srcs, posix_copts, posix_linkopts, graal_version_full, graal_version_hex, pyconfig_srcs, cext_srcs, cext_results):
+def graalpy_resources(
+        version,
+        abi,
+        abiflags,
+        graal_version,
+        python_version,
+        libraries,
+        headers,
+        zsupport_srcs,
+        zsupport_copts,
+        posix_srcs,
+        posix_copts,
+        posix_linkopts,
+        graal_version_full,
+        graal_version_hex,
+        pyconfig_srcs,
+        cext_srcs,
+        cext_results):
     """Package the inputs read by GraalPy's upstream InternalResource provider."""
     resource_jars = []
     for category, files in libraries.items():
@@ -288,9 +321,20 @@ def graalpy_resources(version, abi, abiflags, graal_version, python_version, lib
         })
         home = "py_install_home_" + profile
         extensions, pyconfig, sysconfig_file, sysconfig = _native_extensions(
-            profile, os, arch, compatible, soabi, abiflags, extension, multiarch,
-            python_version, graal_version_full, graal_version_hex,
-            pyconfig_srcs, cext_srcs, cext_results,
+            profile = profile,
+            os = os,
+            arch = arch,
+            compatible = compatible,
+            soabi = soabi,
+            abiflags = abiflags,
+            extension = extension,
+            multiarch = multiarch,
+            python_version = python_version,
+            graal_version_full = graal_version_full,
+            graal_version_hex = graal_version_hex,
+            pyconfig_srcs = pyconfig_srcs,
+            cext_srcs = cext_srcs,
+            cext_results = cext_results,
         )
         mx_archive_layout(
             name = home,

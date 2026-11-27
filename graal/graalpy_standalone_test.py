@@ -11,8 +11,10 @@ import tempfile
 PROBE = """
 import _imp
 import _sha3
+import ctypes
 import encodings
 import os
+import pyexpat
 import sqlite3
 import sys
 import zlib
@@ -20,6 +22,9 @@ import zlib
 assert _imp.is_frozen("encodings")
 assert sqlite3.connect(":memory:").execute("select 6 * 7").fetchone() == (42,)
 assert _sha3.sha3_256(b"graalpy").digest_size == 32
+assert pyexpat.ParserCreate().Parse("<graalpy/>", True) == 1
+callback = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_int)(lambda value: value + 2)
+assert callback(40) == 42
 assert "Z_TREES" in vars(zlib), zlib.ZLIB_RUNTIME_VERSION
 assert zlib.decompress(zlib.compress(b"graalpy")) == b"graalpy"
 read_fd, write_fd = os.pipe()

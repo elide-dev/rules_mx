@@ -23,6 +23,7 @@ def main():
         subprocess.run(
             [
                 args.java,
+                "--enable-native-access=ALL-UNNAMED",
                 "-Duser.home=" + temp,
                 "-cp",
                 args.classpath,
