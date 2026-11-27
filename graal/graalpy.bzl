@@ -213,11 +213,17 @@ def _native_extensions(
         path.replace("<lib:python-native>", "libpython-native" + extension).replace("<graalpy_ext>", "." + soabi + ".so")
         for path in cext_results
     ]
+    cext_config = dict(platform_config)
+    data = [":py_capi_headers", ":" + include, ":" + ffi]
+    if os == "darwin":
+        exports = Label(":graalpy_darwin_exports.cmake")
+        data.append(exports)
+        cext_config["CMAKE_PROJECT_INCLUDE"] = "$$EXT_BUILD_ROOT$$/$(execpath %s)" % exports
     _cmake_files(
         cext,
         cext_srcs,
-        [":py_capi_headers", ":" + include, ":" + ffi],
-        platform_config | {
+        data,
+        cext_config | {
             "CMAKE_BUILD_TYPE": "Release",
             "CAPI_INC_DIR": "$$EXT_BUILD_ROOT$$/$(execpath :py_capi_headers)",
             "PYCONFIG_INCLUDE_DIR": "$$EXT_BUILD_ROOT$$/$(execpath :%s)" % include,

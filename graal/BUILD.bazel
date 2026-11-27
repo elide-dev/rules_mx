@@ -17,6 +17,7 @@ exports_files([
     "jfr_allocation_samples.patch",
     "js_regression.py",
     "graalpy_test.py",
+    "graalpy_darwin_exports.cmake",
     "graalpy_standalone_test.py",
     "svm_llvm_scalar_vector.patch",
     "profiler_sample_timeout.patch",
