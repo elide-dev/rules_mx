@@ -2,7 +2,6 @@
 """Qualify live Truffle edits, guest-language test selection and Bazel caching."""
 
 import json
-import os
 from pathlib import Path
 import runpy
 import subprocess
@@ -74,11 +73,12 @@ def main(config):
             try:
                 result = invoke(
                     "run",
+                    f"--run_env=XDG_CACHE_HOME={workspace}",
+                    f"--run_env=JAVA_TOOL_OPTIONS=-Duser.home={workspace}",
                     launcher,
                     "--",
                     "--engine.WarnInterpreterOnly=false",
                     *marker,
-                    env=dict(os.environ, XDG_CACHE_HOME=str(workspace)),
                     capture_output=True,
                     text=True,
                 )
