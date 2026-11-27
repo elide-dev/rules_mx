@@ -27,6 +27,8 @@ def _jar_impl(ctx):
             args.add(version)
             args.add(member)
             overlay_inputs.append(member)
+    if ctx.attr.platform_artifact_name:
+        args.add("--manifest-entry", "Name=" + ctx.attr.platform_artifact_name)
     for key, value in ctx.attr.manifest.items():
         args.add("--manifest-entry", key + "=" + value)
     if ctx.attr.snippets_pattern:
@@ -102,6 +104,7 @@ _jar_dist = rule(
         "contents": attr.label_list(providers = [JavaInfo], mandatory = True),
         "deps": attr.label_list(providers = [JavaInfo]),
         "manifest": attr.string_dict(),
+        "platform_artifact_name": attr.string(),
         "module_name": attr.string(),
         "release": attr.int(),
         "directives": attr.string_list(),
@@ -120,7 +123,7 @@ _jar_dist = rule(
     provides = [JavaInfo],
 )
 
-def mx_jar_dist(name, directives = [], platform_directives = [], **kwargs):
+def mx_jar_dist(name, directives = [], platform_directives = [], platform_artifact_names = {}, **kwargs):
     """Use the Labs system image for descriptors that read JVMCI.
 
     Args:
@@ -128,12 +131,14 @@ def mx_jar_dist(name, directives = [], platform_directives = [], **kwargs):
       directives: module directives.
       platform_directives: a select() of further directives that depend on the target platform,
         such as `requires` of a library whose module name mx resolves for the host.
+      platform_artifact_names: mx Maven artifact names keyed by target platform.
       **kwargs: the remaining _jar_dist attributes.
     """
     jvmci = any([d.split(" ")[-1] in ["jdk.internal.vm.ci", "jdk.graal.compiler"] for d in directives if d.startswith("requires ")])
     _jar_dist(
         name = name,
         directives = directives + platform_directives,
+        platform_artifact_name = select({Label("//tools:exec_" + key): value for key, value in platform_artifact_names.items()}) if platform_artifact_names else "",
         requires_jvmci = jvmci,
         **kwargs
     )
