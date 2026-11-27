@@ -2,7 +2,7 @@ diff --git a/substratevm/BUILD.bazel b/substratevm/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/substratevm/BUILD.bazel
-@@ -0,0 +1,7195 @@
+@@ -0,0 +1,7203 @@
 +load("@rules_java//java:java_import.bzl", "java_import")
 +load("@rules_mx//graal:layout.bzl", "mx_archive_layout")
 +load("@rules_mx//graal:simplelanguage.bzl", "svm_driver_test_runner", "svm_test_runner")
@@ -392,6 +392,14 @@ new file mode 100644
 +        "//substratevm:SVM_TRUFFLE_RUNTIME_GRAALVM_SUPPORT": "lib/svm/macros/truffle-svm",
 +        "//substratevm:TRUFFLE_SVM_GRAALVM_SUPPORT": "lib/svm/macros/truffle-svm",
 +    },
++    llvm_jars = {
++        "//substratevm:JAVACPP_PLATFORM_SPECIFIC_SHADOWED": "lib/svm/tools/llvm-backend/builder/javacpp-platform-specific-shadowed.jar",
++        "//substratevm:JAVACPP_SHADOWED": "lib/svm/tools/llvm-backend/builder/javacpp-shadowed.jar",
++        "//substratevm:LLVM_PLATFORM_SPECIFIC_SHADOWED": "lib/svm/tools/llvm-backend/builder/llvm-platform-specific-shadowed.jar",
++        "//substratevm:LLVM_WRAPPER_SHADOWED": "lib/svm/tools/llvm-backend/builder/llvm-wrapper-shadowed.jar",
++        "//substratevm:SVM_LLVM": "lib/svm/tools/llvm-backend/builder/svm-llvm.jar",
++    },
++    llvm_layouts = {"//substratevm:SVM_LLVM_GRAALVM_SUPPORT": "lib/svm/tools/llvm-backend"},
 +)
 +
 +mx_archive_layout(
@@ -12576,7 +12584,7 @@ diff --git a/substratevm/src/com.oracle.svm.core.graal.llvm/src/com/oracle/svm/c
 new file mode 100644
 --- /dev/null
 +++ b/substratevm/src/com.oracle.svm.core.graal.llvm/src/com/oracle/svm/core/graal/llvm/lowering/BUILD.bazel
-@@ -0,0 +1,11 @@
+@@ -0,0 +1,12 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -12584,6 +12592,7 @@ new file mode 100644
 +    srcs = [
 +        "LLVMAddressLowering.java",
 +        "LLVMLoadExceptionObjectLowering.java",
++        "ScalarVectorArchitecture.java",
 +        "SubstrateLLVMLoweringProvider.java",
 +    ],
 +    visibility = ["//substratevm:__pkg__"],

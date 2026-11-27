@@ -15,6 +15,7 @@ exports_files([
     "netbeans_maven.json",
     "benchmark_timer.patch",
     "jfr_allocation_samples.patch",
+    "svm_llvm_scalar_vector.patch",
     "profiler_sample_timeout.patch",
     "wasm_exports_test.patch",
     "compiler.patch",
@@ -804,6 +805,26 @@ py_test(
     data = [":source_native_image_executable"],
     main = "source_native_image_test.py",
     tags = ["manual"],
+)
+
+py_test(
+    name = "source_native_image_llvm_test",
+    size = "large",
+    srcs = ["source_native_image_test.py"],
+    args = [
+        "$(rootpath @graal//substratevm:native-image)",
+        "$(rootpath :source_native_image_guest)",
+        "--tool:llvm-backend",
+        "-H:LLVMMaxFunctionsPerBatch=100",
+        "-H:+ReportExceptionStackTraces",
+    ],
+    data = [
+        ":source_native_image_guest",
+        "@graal//substratevm:native-image",
+    ],
+    main = "source_native_image_test.py",
+    tags = ["manual"],
+    target_compatible_with = ["@platforms//os:linux"],
 )
 
 py_test(

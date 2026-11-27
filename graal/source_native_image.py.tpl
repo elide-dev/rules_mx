@@ -25,6 +25,8 @@ def main():
             "-H:-UnlockExperimentalVMOptions",
             *args,
         ]
+    if llvm_config := {LLVM_CONFIG}:
+        args = ["-J-Dllvm.bin.dir=" + str((runfiles / llvm_config).parent), *args]
     flags = (builder / "driver-exports").read_text().splitlines()
     os.execv(java, [
         str(java),
