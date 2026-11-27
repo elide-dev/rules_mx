@@ -172,4 +172,4 @@ filegroup(
     ],
 )
 
-exports_files(["cc"])
+exports_files(["bin/llvm-link", "cc"])

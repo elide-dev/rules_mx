@@ -112,3 +112,13 @@ alias(
     }),
     visibility = ["//visibility:public"],
 )
+
+alias(
+    name = "llvm_link",
+    actual = select({
+        "//tools:exec_linux_amd64": "@elide_toolchain_linux_amd64//:bin/llvm-link",
+        "//tools:exec_linux_arm64": "@elide_toolchain_linux_arm64//:bin/llvm-link",
+        "//tools:exec_macos_arm64": "@elide_toolchain_darwin_arm64//:bin/llvm-link",
+    }),
+    visibility = ["//visibility:public"],
+)
