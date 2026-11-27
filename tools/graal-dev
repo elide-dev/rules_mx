@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run Bazel against live sibling Graal and GraalJS checkouts."""
+"""Run Bazel against live sibling GraalVM checkouts."""
 
 import argparse
 import hashlib
@@ -141,17 +141,21 @@ def check_input_pins(generated):
 
 def create_repository(workspace, state, force_sync):
     graal = (workspace / "graal").resolve(strict=True)
-    js = workspace / "graaljs"
     checkouts = [graal]
+    peer_flags = []
     sources = {path: graal / path for path in checkout_files(graal)}
-    if (js / "graal-js/mx.graal-js/suite.py").is_file():
-        js = js.resolve()
-        checkouts.append(js)
+    for suite, spec in json.loads((OVERLAYS / "live_suites.json").read_text()).items():
+        checkout = (workspace / spec["checkout"]).resolve()
+        directory = Path(spec["path"])
+        if not (checkout / directory / f"mx.{suite}/suite.py").is_file():
+            continue
+        checkouts.append(checkout)
+        peer_flags.extend(["--peer", f"{suite}={checkout / directory}"])
         sources.update(
             {
-                path: js / path
-                for path in checkout_files(js)
-                if path.parts[0] == "graal-js"
+                Path(suite) / path.relative_to(directory): checkout / path
+                for path in checkout_files(checkout)
+                if path.is_relative_to(directory)
             }
         )
     patches = overlay_paths()
@@ -166,8 +170,7 @@ def create_repository(workspace, state, force_sync):
         work = Path(work)
         generated = work / "generated"
         subprocess.run(
-            [ROOT / "tools/generate-graal", graal, "--output", generated]
-            + (["--graaljs", js] if len(checkouts) == 2 else []),
+            [ROOT / "tools/generate-graal", graal, "--output", generated, *peer_flags],
             check=True,
             cwd=ROOT,
         )
@@ -213,7 +216,7 @@ def main():
         "--workspace",
         type=Path,
         default=ROOT.parent,
-        help="directory containing graal and the optional graaljs peer",
+        help="directory containing graal and optional graaljs and graalpython peers",
     )
     parser.add_argument(
         "--state-dir",

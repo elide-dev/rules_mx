@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Qualify live Truffle edits, GraalJS test selection and Bazel caching."""
+"""Qualify live Truffle edits, guest-language test selection and Bazel caching."""
 
 import json
+import os
 from pathlib import Path
 import runpy
 import subprocess
@@ -9,7 +10,11 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-ARCHIVES = {"graal": "source.json", "graaljs": "graaljs_source.json"}
+ARCHIVES = {
+    "graal": "source.json",
+    "graaljs": "graaljs_source.json",
+    "graalpython": "graalpython_source.json",
+}
 TRUFFLE_SOURCE = (
     "truffle/src/com.oracle.truffle.api/src/com/oracle/truffle/api/Truffle.java"
 )
@@ -18,12 +23,24 @@ FIBONACCI = "@graal//truffle:sl.test.Fibonacci"
 REGRESSIONS = {
     "@graal//graal-js:regression/direct_eval",
     "@graal//graal-js:regression/indirect_eval",
+    "@graal//graalpython:zlib/ChecksumTestCase.test_crc32start",
+    "@graal//graalpython:zlib/ChecksumTestCase.test_adler32start",
     FIBONACCI,
 }
-MARKER = """
+JS_MARKER = """
 const Truffle = Java.type("com.oracle.truffle.api.Truffle");
 print(typeof Truffle.rulesMxLiveMarker === "function" ? Truffle.rulesMxLiveMarker() : "before");
 """
+PY_MARKER = """
+import java
+Truffle = java.type("com.oracle.truffle.api.Truffle")
+marker = getattr(Truffle, "rulesMxLiveMarker", None)
+print(marker() if marker else "before")
+"""
+LAUNCHERS = {
+    "@graal//graal-js:js": ("-e", JS_MARKER),
+    "@graal//graalpython:python": ("-c", PY_MARKER),
+}
 
 
 def main(config):
@@ -46,22 +63,22 @@ def main(config):
         ]
         if "--config=buildbuddy-rbe" in config:
             dev.append("--buildbuddy")
-        options = ["--config=elide-processors", *config]
+        options = ["--config=elide-processors", "--config=labsjdk", *config]
 
         def invoke(command, *args, **kwargs):
             return subprocess.run(
                 [*dev, command, *options, *args], cwd=ROOT, check=True, **kwargs
             )
 
-        def read_marker():
+        def read_marker(launcher, marker):
             try:
                 result = invoke(
                     "run",
-                    "@graal//graal-js:js",
+                    launcher,
                     "--",
                     "--engine.WarnInterpreterOnly=false",
-                    "-e",
-                    MARKER,
+                    *marker,
+                    env=dict(os.environ, XDG_CACHE_HOME=str(workspace)),
                     capture_output=True,
                     text=True,
                 )
@@ -75,7 +92,7 @@ def main(config):
             [
                 *dev,
                 "query",
-                f'kind(".*_test rule", rdeps(@graal//graal-js:all + {FIBONACCI}, {TRUFFLE_LABEL}))',
+                f'kind(".*_test rule", rdeps(@graal//graal-js:all + @graal//graalpython:all + {FIBONACCI}, {TRUFFLE_LABEL}))',
             ],
             cwd=ROOT,
             text=True,
@@ -87,9 +104,10 @@ def main(config):
         configured = sorted((workspace / "overlays").glob("*.current"))
         if len(configured) != 1:
             raise SystemExit(f"Expected one live overlay. Found {configured!r}")
-        baseline = read_marker()
-        if baseline != "before":
-            raise SystemExit(f"Unexpected baseline GraalJS output {baseline!r}")
+        for launcher, marker in LAUNCHERS.items():
+            baseline = read_marker(launcher, marker)
+            if baseline != "before":
+                raise SystemExit(f"Unexpected baseline output from {launcher}: {baseline!r}")
         invoke("test", "--test_output=errors", *affected)
         truffle = workspace / "graal" / TRUFFLE_SOURCE
         source = truffle.read_text()
@@ -109,13 +127,14 @@ def main(config):
 """,
             )
         )
-        changed = read_marker()
+        for launcher, marker in LAUNCHERS.items():
+            changed = read_marker(launcher, marker)
+            if changed != "after":
+                raise SystemExit(
+                    f"{launcher} did not see the Truffle edit. Output was {changed!r}"
+                )
         if sorted((workspace / "overlays").glob("*.current")) != configured:
             raise SystemExit("Editing an existing Truffle source regenerated the graph")
-        if changed != "after":
-            raise SystemExit(
-                f"GraalJS did not see the Truffle edit. Output was {changed!r}"
-            )
         invoke("test", "--test_output=errors", *affected)
         events = workspace / "cached.json"
         invoke(
@@ -139,7 +158,7 @@ def main(config):
             raise SystemExit(
                 f"Expected cached results for the selected tests. Events {results!r}"
             )
-        print("The Truffle edit reached GraalJS and the selected Graal and GraalJS tests were cached on repeat.")
+        print("The Truffle edit reached GraalJS and GraalPy, and all selected tests were cached on repeat.")
 
 
 if __name__ == "__main__":

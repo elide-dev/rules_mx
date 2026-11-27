@@ -2101,9 +2101,10 @@ def svm_support_layouts(directory):
     )
 
 
-def binding_providers(suite, source):
+def binding_providers(suite, source, peers=()):
     """Find known providers in mx import order, including transitive suite imports."""
     found = []
+    visited = {suite}
 
     def visit(name):
         metadata = runpy.run_path(str(source / name / f"mx.{name}/suite.py"))["suite"]
@@ -2111,9 +2112,10 @@ def binding_providers(suite, source):
             owner = dep["name"]
             if (
                 not dep.get("dynamic")
-                and owner in (*SUITES, *PARTIAL_SUITES)
-                and owner not in found
+                and owner in (*SUITES, *PARTIAL_SUITES, *peers)
+                and owner not in visited
             ):
+                visited.add(owner)
                 visit(owner)
                 found.append(owner)
 
@@ -2121,15 +2123,17 @@ def binding_providers(suite, source):
     return found
 
 
-def stage_external_suites(source, stage, suites):
+def stage_external_suites(source, stage, suites, peers):
     """Stage only the pinned discovery metadata for external imports of selected suites."""
     imports = {}
-    for suite in suites:
-        metadata = runpy.run_path(str(source / suite / f"mx.{suite}/suite.py"))["suite"]
+    for suite in (*suites, *peers):
+        directory = peers.get(suite, source / suite)
+        metadata = runpy.run_path(str(directory / f"mx.{suite}/suite.py"))["suite"]
         for dep in metadata.get("imports", {}).get("suites", []):
             if (
                 dep.get("version")
                 and dep.get("urls")
+                and dep["name"] not in peers
                 and not (source / dep["name"]).is_dir()
                 and not dep.get("dynamic")
             ):
@@ -2160,9 +2164,8 @@ def stage_external_suites(source, stage, suites):
         (checkout / ".mx_vcs_root").touch()
 
 
-def js_processors(directory):
-    project = "com.oracle.truffle.js.factory.processor"
-    services = directory / "src" / project / "src/META-INF/services/javax.annotation.processing.Processor"
+def processors(directory, project):
+    services = directory / project / "src/META-INF/services/javax.annotation.processing.Processor"
     return [
         (processor.rsplit(".", 1)[-1], processor)
         for line in services.read_text().splitlines()
@@ -2170,7 +2173,21 @@ def js_processors(directory):
     ]
 
 
-def prepare_suite(suite, stage):
+def graalpy_resource_files(directory, project):
+    """Enumerate the source payload of mx's PythonResourceProject."""
+    source = directory / project["sourceDir"]
+    ignored = [re.compile(pattern) for pattern in project.get("ignorePatterns", [])]
+    return {
+        path.relative_to(directory).as_posix(): path.relative_to(source).as_posix()
+        for path in sorted(source.rglob("*"))
+        if path.is_file()
+        and path.suffix != ".pyc"
+        and "__pycache__" not in path.relative_to(source).parts
+        and not any(pattern.search("/" + path.relative_to(source).as_posix()) for pattern in ignored)
+    }
+
+
+def prepare_suite(suite, stage, peers=()):
     directory = stage / suite
     if suite == "vm":
         (directory / "BUILD.bazel").write_text(
@@ -2181,7 +2198,7 @@ def prepare_suite(suite, stage):
         export_options = [
             "GRAALJS", "GRAALJS_LAUNCHER", "com.oracle.truffle.js.factory.processor",
             *(
-                arg for name, _ in js_processors(directory)
+                arg for name, _ in processors(directory, "src/com.oracle.truffle.js.factory.processor")
                 for arg in ("--processor-plugin", f"graal-js:TRUFFLE_JS_FACTORY_PROCESSOR=:js_processor.{name}")
             ),
             "--javac-only-processor", "graal-js:TRUFFLE_JS_FACTORY_PROCESSOR",
@@ -2191,11 +2208,46 @@ def prepare_suite(suite, stage):
             "--javac-only-processor", "truffle:TRUFFLE_DSL_PROCESSOR",
             "--java-dep", "truffle:TRUFFLE_ICU4J=//truffle:TRUFFLE_ICU4J",
             "--java-dep", "sdk:JLINE3=//sdk:JLINE3",
+        ]
+    elif suite == "graalpython":
+        roots = (
+            "com.oracle.graal.python",
+            "com.oracle.graal.python.processor",
+            "com.oracle.graal.python.shell",
+            "com.oracle.graal.python.resources",
+        )
+        export_options = [
+            *roots,
+            *(
+                arg for name, _ in processors(directory, "graalpython/com.oracle.graal.python.processor")
+                for arg in ("--processor-plugin", f"graalpython:GRAALPYTHON_PROCESSOR=:py_processor.{name}")
+            ),
+            "--javac-only-processor", "graalpython:GRAALPYTHON_PROCESSOR",
+            "--javac-only-processor", "truffle:TRUFFLE_DSL_PROCESSOR",
+            *(
+                arg for project in roots
+                for arg in ("--whole-project", project)
+            ),
+            "--whole-project", "com.oracle.graal.python.pegparser",
+            "--java-dep", "truffle:TRUFFLE_ICU4J=//truffle:TRUFFLE_ICU4J",
+            "--java-dep", "truffle:TRUFFLE_XZ=//truffle:TRUFFLE_XZ",
+            "--java-dep", "sdk:JLINE3=//sdk:JLINE3",
+            "--java-dep", "graalpython:GRAALPYTHON=:com.oracle.graal.python",
+            "--checked-in-generated-sources", "com.oracle.graal.python.pegparser",
+            "--project-release", "com.oracle.graal.python=25",
+            # mx javac and the Truffle generators do not run Error Prone.
             *(
                 arg
-                for owner in ("sdk", "truffle", "regex")
-                for arg in ("--bindings", f"//{owner}={stage / (owner + '-bindings.json')}")
+                for check in (
+                    "BadAnnotationImplementation", "ComparableType", "ComparisonOutOfRange",
+                    "FormatString", "IdentityBinaryExpression", "ReturnValueIgnored",
+                )
+                for arg in ("--javac-opt", f"com.oracle.graal.python=-Xep:{check}:WARN")
             ),
+            "--substitution", "version", "<py_ver:binary><graal_ver:binary><release_level:binary><abi_version>",
+            "--substitution", "abiflags", "<graalpy_abiflags>",
+            "--substitution", "abi", "<abi_version>",
+            "--substitution", "graal_version", "<graal_ver:major_minor>",
         ]
     elif suite in PARTIAL_SUITES:
         truffle = runpy.run_path(str(stage / "truffle/mx.truffle/suite.py"))["suite"]
@@ -2234,6 +2286,11 @@ def prepare_suite(suite, stage):
         ]
     else:
         export_options = suite_args(directory)
+    if suite in peers:
+        export_options += [
+            arg for owner in binding_providers(suite, stage, peers)
+            for arg in ("--bindings", f"//{owner}={stage / (owner + '-bindings.json')}")
+        ]
     if suite == "sdk":
         export_options += ["--export-source-archive", "VMACCESS_GUEST"]
     if suite == "espresso":
@@ -2403,7 +2460,7 @@ def prepare_suite(suite, stage):
             + "".join(
                 f'java_plugin(name = "js_processor.{name}", processor_class = {json.dumps(processor)}, '
                 'generates_api = True, deps = [":com.oracle.truffle.js.factory.processor"])\n'
-                for name, processor in js_processors(directory)
+                for name, processor in processors(directory, "src/com.oracle.truffle.js.factory.processor")
             )
             + f'java_binary(name = "js", main_class = {json.dumps(main_class)}, '
             'runtime_deps = [":GRAALJS", ":GRAALJS_LAUNCHER", "//truffle:TRUFFLE_RUNTIME"], '
@@ -2414,6 +2471,51 @@ def prepare_suite(suite, stage):
                 f'args = ["$(rootpath :js)", "$(rootpath test/regression/{case}.js)"], '
                 f'data = [":js", "test/regression/{case}.js"], visibility = ["//visibility:public"])\n'
                 for case in ("direct_eval", "indirect_eval")
+            )
+        )
+        return
+    if suite == "graalpython":
+        metadata = runpy.run_path(str(directory / "mx.graalpython/suite.py"))["suite"]
+        values = json.loads((directory / "mx-graph.json").read_text())["substitutions"]
+        projects = metadata["projects"]
+        main_class = projects["graalpy_thin_launcher"]["mainClass"]
+        header_dir = "graalpython/com.oracle.graal.python.cext/include"
+        libraries = {
+            category: graalpy_resource_files(directory, projects[project])
+            for category, project in {
+                "libpython": "python-lib",
+                "libgraalpy": "python-libgraalpy",
+            }.items()
+        }
+        (directory / "BUILD.bazel").write_text(
+            'load("@rules_java//java:java_binary.bzl", "java_binary")\n'
+            'load("@rules_java//java:java_plugin.bzl", "java_plugin")\n'
+            'load("@rules_mx//graal:graalpy.bzl", "graalpy_resources")\n'
+            'load("@rules_python//python:py_test.bzl", "py_test")\n'
+            + "".join(
+                f'java_plugin(name = "py_processor.{name}", processor_class = {json.dumps(processor)}, '
+                'generates_api = True, deps = [":com.oracle.graal.python.processor"])\n'
+                for name, processor in processors(directory, "graalpython/com.oracle.graal.python.processor")
+            )
+            + "PY_RESOURCES = graalpy_resources(\n"
+            + "".join(f"    {name} = {json.dumps(value)},\n" for name, value in values.items())
+            + f"    libraries = {json.dumps(libraries)},\n"
+            + f'    headers = {{p: p[len("{header_dir}/"):] for p in glob(["{header_dir}/**"])}},\n'
+            + '    zsupport_srcs = glob(["graalpython/python-libzsupport/src/**/*.c"]),\n'
+            + f'    zsupport_copts = {json.dumps(projects["python-libzsupport"]["cflags"])},\n'
+            + ")\n"
+            + f'java_binary(name = "python", main_class = {json.dumps(main_class)}, '
+            'jvm_flags = ["--enable-native-access=ALL-UNNAMED"], '
+            'runtime_deps = [":com.oracle.graal.python", ":com.oracle.graal.python.resources", '
+            '":com.oracle.graal.python.shell", "//truffle:TRUFFLE_RUNTIME"] + PY_RESOURCES, '
+            'visibility = ["//visibility:public"])\n'
+            + "".join(
+                f'py_test(name = "zlib/{case}", size = "small", '
+                'srcs = ["@rules_mx//graal:graalpy_test.py"], main = "graalpy_test.py", '
+                f'args = ["$(rootpath :python)", "$(rootpath graalpython/lib-python/3/test/test_zlib.py)", "{case}"], '
+                'data = [":python", "graalpython/lib-python/3/test/test_zlib.py"], '
+                'visibility = ["//visibility:public"])\n'
+                for case in ("ChecksumTestCase.test_crc32start", "ChecksumTestCase.test_adler32start")
             )
         )
         return
@@ -2723,6 +2825,8 @@ def main():
         help="only regenerate the named BUILD overlays",
     )
     parser.add_argument("--graaljs", type=Path, help="also generate the GraalJS suite from this checkout")
+    parser.add_argument("--peer", action="append", default=[], metavar="SUITE=DIR",
+                        help="generate another suite from the directory containing its mx metadata")
     parser.add_argument("--archive", help="Graal source archive URL to generate for")
     parser.add_argument("--sha256", help="expected SHA-256 of --archive")
     parser.add_argument(
@@ -2740,6 +2844,17 @@ def main():
         help="directory for the overlay patches and input pins (default: graal/)",
     )
     args = parser.parse_args()
+    peers = {}
+    peer_registry = json.loads((ROOT / "graal/live_suites.json").read_text())
+    if args.graaljs:
+        peers["graal-js"] = args.graaljs.resolve() / "graal-js"
+    for value in args.peer:
+        suite, sep, path = value.partition("=")
+        if (not sep or suite in peers or
+                suite not in peer_registry or
+                not (Path(path) / f"mx.{suite}/suite.py").is_file()):
+            parser.error(f"Expected a unique --peer SUITE=DIR containing mx suite metadata: {value}")
+        peers[suite] = Path(path).resolve()
     if args.archive and args.graal:
         parser.error("Pass either a checkout or --archive")
     if args.pin and not args.archive:
@@ -2806,7 +2921,7 @@ def main():
                 for owner in binding_providers(suite, source)
             )
         )
-        stage_external_suites(source, stage, [*selected, *providers])
+        stage_external_suites(source, stage, [*selected, *providers], peers)
         for suite in PARTIAL_SUITES:
             if suite in selected or suite in providers:
                 shutil.copytree(
@@ -2958,18 +3073,20 @@ def main():
             args.check,
             "Shaded dependency pins differ. Regenerate with tools/generate-graal.",
         )
-        if args.graaljs:
+        for suite, peer in peers.items():
             shutil.copytree(
-                args.graaljs.resolve() / "graal-js",
-                stage / "graal-js",
-                ignore=shutil.ignore_patterns("BUILD", "BUILD.bazel", "mxbuild", "__pycache__"),
+                peer,
+                stage / suite,
+                ignore=shutil.ignore_patterns(
+                    ".git", ".mx_vcs_root", "ci.hocon", "BUILD", "BUILD.bazel", "mxbuild", "__pycache__",
+                ),
             )
-            selected.append("graal-js")
-            for provider in ("sdk", "truffle", "regex"):
-                if provider not in selected and provider not in providers:
-                    providers.append(provider)
+        peer_order = list(dict.fromkeys(
+            owner for suite in peers for owner in (*binding_providers(suite, stage, peers), suite)
+        ))
+        selected.extend(suite for suite in peer_order if suite not in selected)
         for suite in dict.fromkeys([*providers, *selected]):
-            prepare_suite(suite, stage)
+            prepare_suite(suite, stage, peers)
         generate_build_files(selected, stage)
         if "substratevm" in selected:
             svm_platform_requires(stage / "substratevm")

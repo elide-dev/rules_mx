@@ -1,0 +1,30 @@
+"""Run one upstream Python test with GraalPy's source-built native zlib."""
+
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+
+def main():
+    launcher, script = (str(Path(arg).absolute()) for arg in sys.argv[1:3])
+    command = [
+        launcher,
+        "--engine.WarnInterpreterOnly=false",
+        "--experimental-options",
+        "--python.CompressionModulesBackend=native",
+        "-B",
+    ]
+    work = Path(os.environ["TEST_TMPDIR"])
+    env = dict(os.environ, XDG_CACHE_HOME=str(work), JAVA_TOOL_OPTIONS=f"-Duser.home={work}")
+    subprocess.run(
+        [*command, "-c", "import zlib; assert hasattr(zlib, 'Z_TREES'), zlib.ZLIB_RUNTIME_VERSION"],
+        cwd=work,
+        env=env,
+        check=True,
+    )
+    subprocess.run([*command, script, *sys.argv[3:]], cwd=work, env=env, check=True)
+
+
+if __name__ == "__main__":
+    main()

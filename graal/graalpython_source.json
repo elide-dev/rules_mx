@@ -1,0 +1,7 @@
+{
+  "sha256": "1cba1815b82e5cc64a3a2b69421604a63bc26c8570ff8683f694cb784943ff30",
+  "strip_prefix": "graalpython-11344f37984375b07b001bb3508366afefc7c71c",
+  "urls": [
+    "https://codeload.github.com/elide-dev/graalpython/tar.gz/11344f37984375b07b001bb3508366afefc7c71c"
+  ]
+}
