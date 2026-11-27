@@ -12,31 +12,30 @@ tools/buildbuddy test --config=buildbuddy-rbe --config=elide-processors //graal/
 
 ## Work on sibling checkouts
 
-Use `tools/graal-dev` from the `rules_mx` checkout. It looks for a sibling `graal` checkout and optional `graaljs` and `graalpython` checkouts. If your source checkouts live in a separate parent directory, pass it with `--workspace`.
+Keep `rules_mx`, `graal`, and any `graaljs` and `graalpython` checkouts beside each other. Run Bazel from `rules_mx` with `--config=dev`. Bazel locates the sibling checkouts and selects the Elide processor toolchain and Labs JDK 25. Add `common --config=dev` to your local `user.bazelrc` to use the checkouts with plain `bazel` commands.
 
 ```sh
-tools/graal-dev test --config=elide-processors @graal//sdk:org.graalvm.word.test.org.graalvm.word.test.WordTests
-tools/graal-dev run --config=elide-processors @graal//graal-js:js -- -e 'print(6 * 7)'
-tools/graal-dev test --config=elide-processors @graal//graal-js:regression/direct_eval
-tools/graal-dev run --config=elide-processors --config=labsjdk @graal//graalpython:python -- -c 'import sys; print(sys.version)'
-tools/graal-dev test --config=elide-processors --config=labsjdk @graal//graalpython:zlib/ChecksumTestCase.test_crc32start
+bazel run --config=dev @graal//graal-js:js -- -e 'print(6 * 7)'
+bazel test --config=dev @graal//graal-js:regression/direct_eval
+bazel test --config=dev @graal//graalpython:zlib/ChecksumTestCase.test_crc32start
+bazel build --config=dev @graal//graalpython:GRAALPY_JVM_STANDALONE_RELEASE_ARCHIVE
 ```
 
 Use a reverse-dependency query to select tests from the packages and targets you want to check. This example finds GraalJS regressions and the Truffle SimpleLanguage Fibonacci test affected by an edit to the Truffle API.
 
 ```sh
-tools/graal-dev query 'kind(".*_test rule", rdeps(@graal//graal-js:all + @graal//truffle:sl.test.Fibonacci, @graal//truffle:com.oracle.truffle.api))'
+bazel query --config=dev 'kind(".*_test rule", rdeps(@graal//graal-js:all + @graal//truffle:sl.test.Fibonacci, @graal//truffle:com.oracle.truffle.api))'
 ```
 
-The command generates the local BUILD overlays from mx and Gazelle and symlinks source files into the same Bazel repository. Edits to existing sources are visible to Bazel immediately. Adding, removing, or renaming a file and changing mx suite metadata refresh the generated graph. Use `--sync` after changing Java imports or other source content that changes Gazelle’s dependency analysis. The checkouts need to match the Bazel input pins in `rules_mx`. CI qualifies Graal at `21dea4d`, GraalJS at `747d45b`, and GraalPy at `11344f3`.
+Bazel generates BUILD files from mx and Gazelle on first use. Edits to existing source files flow directly into compilation and tests. File additions, removals, renames, and changes to mx suite metadata refresh the graph. After editing Java imports that change Gazelle’s dependency analysis, refresh it with `bazel fetch --config=dev --force --repo=@graal`. The checkouts need to match the Bazel input pins in `rules_mx`. CI qualifies Graal at `21dea4d`, GraalJS at `747d45b`, and GraalPy at `11344f3`.
 
 The live GraalPy launcher uses Labs JDK 25 and bundles the standard library, GraalPy core library, headers, platform versions, and source-built zlib. The first two upstream zlib checks are individually selectable.
 
-Build `@graal//graalpython:GRAALPY_JVM_STANDALONE_RELEASE_ARCHIVE` with `--config=elide-processors --config=labsjdk` for an installable tarball. It bundles the pinned JDK, package-relative launchers, frozen bytecode from the upstream freezer, native POSIX and zlib support, and the C API extensions built with the upstream CMake project. The installed launcher uses the bundled runtime in the `jvm/` and `modules/` directories. `@graal//graalpython:jvm_standalone_test` extracts the archive into a path containing spaces and tests frozen imports, native modules, and upstream zlib checks.
+The GraalPy JVM standalone tarball bundles the pinned JDK, package-relative launchers, frozen bytecode from the upstream freezer, native POSIX and zlib support, and the C API extensions built with the upstream CMake project. The installed launcher uses the bundled runtime in the `jvm/` and `modules/` directories. `@graal//graalpython:jvm_standalone_test` extracts the archive into a path containing spaces and tests frozen imports, native modules, and upstream zlib checks.
 
 The JVM archive uses a classpath launcher and compiles from the checked-in PEG parser. Native Image and GraalOS standalones, native bzip2 and LZMA, and the virtualenv seeder remain separate work.
 
-Pass `--buildbuddy` before the Bazel command to use the existing BuildBuddy wrapper. The generated repository lives under `.graal-dev/` or the path supplied by `--state-dir`.
+For BuildBuddy, use `tools/buildbuddy test --config=dev --config=buildbuddy-rbe` with the same target labels. If your source checkouts live under a different parent, set `common:dev --repo_env=RULES_MX_CHECKOUTS=/path/to/parent` in `user.bazelrc`.
 
 ## Current coverage
 
