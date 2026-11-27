@@ -1,0 +1,259 @@
+#!/usr/bin/env python3
+"""Run Bazel against live sibling Graal and GraalJS checkouts."""
+
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import tempfile
+
+ROOT = Path(__file__).resolve().parents[1]
+OVERLAYS = ROOT / "graal"
+
+
+def checkout_files(checkout):
+    if (checkout / ".git").exists():
+        files = (
+            subprocess.check_output(
+                ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+                cwd=checkout,
+            )
+            .decode()
+            .split("\0")
+        )
+        return sorted(
+            {Path(file) for file in files if file and (checkout / file).is_file()}
+        )
+    return sorted(
+        file.relative_to(checkout) for file in checkout.rglob("*") if file.is_file()
+    )
+
+
+def overlay_paths():
+    return [
+        OVERLAYS / name
+        for name in re.findall(
+            r'Label\("//graal:([^"]+\.patch)"\)',
+            (OVERLAYS / "extensions.bzl").read_text(),
+        )
+    ]
+
+
+def changed_paths(patch):
+    # The checked-in overlays have simple unified-diff paths. Only copy existing
+    # patched files so git apply never sees a writable path into either checkout.
+    return [
+        Path(name)
+        for name in re.findall(r"^--- a/(.+)$", patch.read_text(), re.MULTILINE)
+    ]
+
+
+def apply_patch(root, patch):
+    result = subprocess.run(
+        ["git", "apply", "--unidiff-zero", "--reverse", "--check", str(patch)],
+        cwd=root,
+        capture_output=True,
+    )
+    if result.returncode:
+        subprocess.run(
+            ["git", "apply", "--unidiff-zero", str(patch)], cwd=root, check=True
+        )
+
+
+def graph_digest(sources, fixes, checkouts):
+    digest = hashlib.sha256()
+    for checkout in checkouts:
+        digest.update(os.fsencode(checkout) + b"\0")
+        if (checkout / ".git").exists():
+            digest.update(
+                subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=checkout)
+            )
+    for path, source in sorted(sources.items()):
+        digest.update(os.fsencode(path) + b"\0")
+        if path.name in {"common.json", "BUILD", "BUILD.bazel"} or any(
+            part.startswith("mx.") for part in path.parts
+        ):
+            digest.update(source.read_bytes())
+    for patch in fixes:
+        digest.update(patch.read_bytes())
+        for path in changed_paths(patch):
+            if path not in sources:
+                raise SystemExit(
+                    f"{patch.name} requires {path} in the selected checkout"
+                )
+            digest.update(sources[path].read_bytes())
+    graph_tools = [
+        "tools/generate-graal",
+        "mx/export.py",
+        "mx/gazelle/graph.go",
+        "MODULE.bazel",
+    ]
+    for path in [
+        Path(__file__),
+        *(ROOT / tool for tool in graph_tools),
+        *sorted(OVERLAYS.glob("*.json")),
+        *sorted((ROOT / "mx").glob("labsjdk*.json")),
+    ]:
+        digest.update(path.read_bytes())
+    return digest.hexdigest()
+
+
+def provenance(checkout):
+    if not (checkout / ".git").exists():
+        return {}
+    rev, timestamp, committer = subprocess.check_output(
+        ["git", "show", "-s", "--format=%H%n%ct%n%cn <%ce>", "HEAD"],
+        cwd=checkout,
+        text=True,
+    ).splitlines()
+    return {
+        "commit": {
+            "commit.rev": rev,
+            "commit.committer-ts": int(timestamp),
+            "commit.committer": committer,
+        },
+    }
+
+
+def check_input_pins(generated):
+    differences = []
+    for file in sorted(generated.glob("*.json")):
+        lock = (
+            ROOT / "mx" / file.name
+            if file.name in {"labsjdk.json", "labsjdk21.json"}
+            else OVERLAYS / file.name
+        )
+        if not lock.is_file() or json.loads(file.read_text()) != json.loads(
+            lock.read_text()
+        ):
+            differences.append(file.name)
+    if differences:
+        raise SystemExit(
+            "This checkout requires different Bazel input pins. Update the rules_mx "
+            "pins or select a compatible checkout. Changed pins "
+            + ", ".join(differences)
+        )
+
+
+def create_repository(workspace, state, force_sync):
+    graal = (workspace / "graal").resolve(strict=True)
+    js = workspace / "graaljs"
+    checkouts = [graal]
+    sources = {path: graal / path for path in checkout_files(graal)}
+    if (js / "graal-js/mx.graal-js/suite.py").is_file():
+        js = js.resolve()
+        checkouts.append(js)
+        sources.update(
+            {
+                path: js / path
+                for path in checkout_files(js)
+                if path.parts[0] == "graal-js"
+            }
+        )
+    patches = overlay_paths()
+    fixes = [patch for patch in patches if changed_paths(patch)]
+    key = graph_digest(sources, patches, checkouts)
+    state.mkdir(parents=True, exist_ok=True)
+    current = state / (key + ".current")
+    if current.is_dir() and not force_sync:
+        return current.resolve()
+
+    with tempfile.TemporaryDirectory(dir=state) as work:
+        work = Path(work)
+        generated = work / "generated"
+        subprocess.run(
+            [ROOT / "tools/generate-graal", graal, "--output", generated]
+            + (["--graaljs", js] if len(checkouts) == 2 else []),
+            check=True,
+            cwd=ROOT,
+        )
+        check_input_pins(generated)
+        repo = work / "repository"
+        repo.mkdir()
+        for patch in fixes:
+            for path in changed_paths(patch):
+                target = repo / path
+                if not target.exists():
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(sources[path], target)
+            apply_patch(repo, patch)
+        for patch in sorted(generated.glob("*.patch")):
+            apply_patch(repo, patch)
+        root_files = {
+            Path(name)
+            for name in ("BUILD", "BUILD.bazel", "REPO.bazel", "mx-source.json")
+        }
+        for path, source in sources.items():
+            target = repo / path
+            if not target.exists() and path not in root_files:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.symlink_to(source)
+        (repo / "REPO.bazel").write_text(
+            "# Local overlay generated by tools/graal-dev.\n"
+        )
+        (repo / "BUILD.bazel").write_text('exports_files(["mx-source.json"])\n')
+        (repo / "mx-source.json").write_text(
+            json.dumps(provenance(graal), indent=2) + "\n"
+        )
+        destination = state / (key + "-" + work.name)
+        repo.rename(destination)
+        pointer = work / "current"
+        pointer.symlink_to(destination, target_is_directory=True)
+        pointer.replace(current)
+    return destination
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--workspace",
+        type=Path,
+        default=ROOT.parent,
+        help="directory containing graal and the optional graaljs peer",
+    )
+    parser.add_argument(
+        "--state-dir",
+        type=Path,
+        default=ROOT / ".graal-dev",
+        help="directory for generated local repositories",
+    )
+    parser.add_argument(
+        "--sync",
+        action="store_true",
+        help="regenerate BUILD files for edits to imports or source discovery",
+    )
+    parser.add_argument(
+        "--buildbuddy",
+        action="store_true",
+        help="invoke the BuildBuddy wrapper instead of Bazelisk",
+    )
+    parser.add_argument(
+        "command", choices=["build", "test", "run", "query", "cquery", "aquery"]
+    )
+    parser.add_argument("arguments", nargs=argparse.REMAINDER)
+    opts = parser.parse_args()
+    repo = create_repository(
+        opts.workspace.resolve(), opts.state_dir.resolve(), opts.sync
+    )
+    use_buildbuddy = opts.buildbuddy and opts.command != "query"
+    bazel = str(ROOT / "tools/buildbuddy") if use_buildbuddy else shutil.which("bazelisk")
+    if not bazel:
+        parser.error("Bazelisk is required")
+    os.chdir(ROOT)
+    os.execv(
+        bazel,
+        [
+            bazel,
+            opts.command,
+            "--override_repository=graal=" + str(repo),
+            *opts.arguments,
+        ],
+    )
+
+
+if __name__ == "__main__":
+    main()

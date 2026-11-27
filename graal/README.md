@@ -10,6 +10,26 @@ bazelisk query 'somepath(@graal//truffle:com.oracle.truffle.api.library, @graal/
 tools/buildbuddy test --config=buildbuddy-rbe --config=elide-processors //graal/... @graal//sdk/... @graal//truffle/... @graal//compiler/...
 ```
 
+## Work on sibling checkouts
+
+Use `tools/graal-dev` from the `rules_mx` checkout. It looks for sibling directories named `graal` and, when present, `graaljs`. If your source checkouts live in a separate parent directory, pass it with `--workspace`.
+
+```sh
+tools/graal-dev test --config=elide-processors @graal//sdk:org.graalvm.word.test.org.graalvm.word.test.WordTests
+tools/graal-dev run --config=elide-processors @graal//graal-js:js -- -e 'print(6 * 7)'
+tools/graal-dev test --config=elide-processors @graal//graal-js:regression/direct_eval
+```
+
+Use a reverse-dependency query to select tests from the packages and targets you want to check. This example finds GraalJS regressions and the Truffle SimpleLanguage Fibonacci test affected by an edit to the Truffle API.
+
+```sh
+tools/graal-dev query 'kind(".*_test rule", rdeps(@graal//graal-js:all + @graal//truffle:sl.test.Fibonacci, @graal//truffle:com.oracle.truffle.api))'
+```
+
+The command generates the local BUILD overlays and symlinks source files into the same Bazel repository. Edits to existing sources are visible to Bazel immediately. Adding, removing, or renaming a file and changing mx suite metadata refresh the generated graph. Use `--sync` after changing Java imports or other source content that changes Gazelle’s dependency analysis. The checkouts need to match the Bazel input pins in `rules_mx`. The initial GraalJS JVM launcher was developed against Graal 25.6 at `21dea4d` and GraalJS at `747d45b`.
+
+Pass `--buildbuddy` before the Bazel command to use the existing BuildBuddy wrapper. The generated repository lives under `.graal-dev/` or the path supplied by `--state-dir`.
+
 ## Current coverage
 
 | Suite | Native Bazel build | Test coverage |

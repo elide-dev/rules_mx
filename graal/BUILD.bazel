@@ -15,6 +15,7 @@ exports_files([
     "netbeans_maven.json",
     "benchmark_timer.patch",
     "jfr_allocation_samples.patch",
+    "js_regression.py",
     "svm_llvm_scalar_vector.patch",
     "profiler_sample_timeout.patch",
     "wasm_exports_test.patch",
