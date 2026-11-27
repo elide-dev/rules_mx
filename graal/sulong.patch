@@ -2,7 +2,7 @@ diff --git a/sulong/BUILD.bazel b/sulong/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/sulong/BUILD.bazel
-@@ -0,0 +1,6637 @@
+@@ -0,0 +1,6641 @@
 +load("@rules_mx//graal:layout.bzl", "mx_os_layout")
 +load("@rules_mx//graal:sulong_fixture_check.bzl", "sulong_fixture_check")
 +load("@rules_mx//mx:bitcode.bzl", "mx_bitcode_suite")
@@ -1937,9 +1937,13 @@ new file mode 100644
 +    manifest = {
 +        "Implementation-Vendor": "Oracle Corporation",
 +        "Implementation-Version": "25.6.0-dev",
-+        "Name": "sulong-test-darwin-aarch64",
 +        "Specification-Vendor": "Oracle Corporation",
 +        "Specification-Version": "25.6.0-dev",
++    },
++    platform_artifact_names = {
++        "linux_amd64": "sulong-test-linux-amd64",
++        "linux_arm64": "sulong-test-linux-aarch64",
++        "macos_arm64": "sulong-test-darwin-aarch64",
 +    },
 +    truffle_services = True,
 +    visibility = ["//visibility:public"],
