@@ -914,7 +914,20 @@ def _jar_archive(dist, suite, mappings, pending, release, archives, library_modu
             dist, members, external, archives, mappings, library_modules
         )
     if dist.maven:
-        manifest = {"Name": dist.maven_artifact_id()}
+        manifest = {}
+        if dist.isPlatformDependent() and not (
+            isinstance(dist.maven, dict) and dist.maven.get("artifactId")
+        ):
+            result["platform_artifact_names"] = {
+                key: dist.maven_artifact_id(platform=platform)
+                for key, platform in (
+                    ("linux_amd64", "linux_amd64"),
+                    ("linux_arm64", "linux_aarch64"),
+                    ("macos_arm64", "darwin_aarch64"),
+                )
+            }
+        else:
+            manifest["Name"] = dist.maven_artifact_id()
         version = suite.release_version_from_suite()
         vendor = suite.developer.get("organization")
         for prefix in ("Specification", "Implementation"):
