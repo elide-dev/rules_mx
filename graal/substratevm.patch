@@ -12584,7 +12584,7 @@ diff --git a/substratevm/src/com.oracle.svm.core.graal.llvm/src/com/oracle/svm/c
 new file mode 100644
 --- /dev/null
 +++ b/substratevm/src/com.oracle.svm.core.graal.llvm/src/com/oracle/svm/core/graal/llvm/lowering/BUILD.bazel
-@@ -0,0 +1,11 @@
+@@ -0,0 +1,12 @@
 +load("@rules_mx//mx:graph.bzl", "mx_files")
 +
 +mx_files(
@@ -12592,6 +12592,7 @@ new file mode 100644
 +    srcs = [
 +        "LLVMAddressLowering.java",
 +        "LLVMLoadExceptionObjectLowering.java",
++        "ScalarVectorArchitecture.java",
 +        "SubstrateLLVMLoweringProvider.java",
 +    ],
 +    visibility = ["//substratevm:__pkg__"],
