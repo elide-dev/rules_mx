@@ -74,8 +74,9 @@ set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd -P)
 exec "$root/jvm/bin/java" --enable-native-access=ALL-UNNAMED \\
     -Dorg.graalvm.launcher.executablename="$0" \\
-    -cp "%s" %s %s --python.PythonHome="$root" "$@"
-""" % (cp, ctx.attr.launcher, " ".join(ctx.attr.args)),
+    -Dpolyglot.python.PythonHome="$root" \\
+    -cp "%s" %s "$@"
+""" % (cp, ctx.attr.launcher),
         is_executable = True,
     )
     for path in ctx.attr.launchers:
@@ -88,15 +89,13 @@ _runtime_layout = rule(
         "deps": attr.label_list(providers = [JavaInfo]),
         "launcher": attr.string(mandatory = True),
         "launchers": attr.string_list(mandatory = True),
-        "args": attr.string_list(),
     },
 )
 
-def graalpy_jvm_standalone(runtime, main_class, launchers, args, licenses, jdk_exclude, prefix):
+def graalpy_jvm_standalone(runtime, main_class, launchers, licenses, jdk_exclude, prefix):
     _runtime_layout(
         name = "py_jvm_runtime",
         deps = runtime,
-        args = args,
         launcher = main_class,
         launchers = launchers,
     )

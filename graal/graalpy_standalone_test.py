@@ -52,6 +52,12 @@ def main():
             [str(test), "ChecksumTestCase"],
         ):
             subprocess.run([launcher, "-B", *arguments], cwd=home, env=env, check=True)
+        includes = subprocess.check_output(
+            [root / "bin/graalpy-config", "--includes"], cwd=home, env=env, text=True
+        )
+        expected = root.resolve() / "include"
+        if str(expected) not in includes:
+            raise AssertionError(f"graalpy-config did not select the installed headers: {includes}")
 
 
 if __name__ == "__main__":
