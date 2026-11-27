@@ -2158,6 +2158,16 @@ def stage_external_suites(source, stage, suites):
         (checkout / ".mx_vcs_root").touch()
 
 
+def js_processors(directory):
+    project = "com.oracle.truffle.js.factory.processor"
+    services = directory / "src" / project / "src/META-INF/services/javax.annotation.processing.Processor"
+    return [
+        (processor.rsplit(".", 1)[-1], processor)
+        for line in services.read_text().splitlines()
+        if (processor := line.partition("#")[0].strip())
+    ]
+
+
 def prepare_suite(suite, stage):
     directory = stage / suite
     if suite == "vm":
@@ -2165,7 +2175,27 @@ def prepare_suite(suite, stage):
             support_layout_rules(directory, ("VM_GRAALVM_SUPPORT",))
         )
         return
-    if suite in PARTIAL_SUITES:
+    if suite == "graal-js":
+        export_options = [
+            "GRAALJS", "GRAALJS_LAUNCHER", "com.oracle.truffle.js.factory.processor",
+            *(
+                arg for name, _ in js_processors(directory)
+                for arg in ("--processor-plugin", f"graal-js:TRUFFLE_JS_FACTORY_PROCESSOR=:js_processor.{name}")
+            ),
+            "--javac-only-processor", "graal-js:TRUFFLE_JS_FACTORY_PROCESSOR",
+            "--whole-project", "com.oracle.truffle.js.shell",
+            "--archive-dist", "GRAALJS",
+            "--archive-dist", "GRAALJS_LAUNCHER",
+            "--javac-only-processor", "truffle:TRUFFLE_DSL_PROCESSOR",
+            "--java-dep", "truffle:TRUFFLE_ICU4J=//truffle:TRUFFLE_ICU4J",
+            "--java-dep", "sdk:JLINE3=//sdk:JLINE3",
+            *(
+                arg
+                for owner in ("sdk", "truffle", "regex")
+                for arg in ("--bindings", f"//{owner}={stage / (owner + '-bindings.json')}")
+            ),
+        ]
+    elif suite in PARTIAL_SUITES:
         truffle = runpy.run_path(str(stage / "truffle/mx.truffle/suite.py"))["suite"]
         export_options = [
             "--all",
@@ -2361,6 +2391,30 @@ def prepare_suite(suite, stage):
         raise RuntimeError(
             "Graph discovery unexpectedly populated the mx artifact cache"
         )
+    if suite == "graal-js":
+        metadata = runpy.run_path(str(directory / "mx.graal-js/suite.py"))["suite"]
+        main_class = metadata["distributions"]["GRAALJS_LAUNCHER"]["mainClass"]
+        (directory / "BUILD.bazel").write_text(
+            'load("@rules_java//java:java_binary.bzl", "java_binary")\n'
+            'load("@rules_java//java:java_plugin.bzl", "java_plugin")\n'
+            'load("@rules_python//python:py_test.bzl", "py_test")\n'
+            + "".join(
+                f'java_plugin(name = "js_processor.{name}", processor_class = {json.dumps(processor)}, '
+                'generates_api = True, deps = [":com.oracle.truffle.js.factory.processor"])\n'
+                for name, processor in js_processors(directory)
+            )
+            + f'java_binary(name = "js", main_class = {json.dumps(main_class)}, '
+            'runtime_deps = [":GRAALJS", ":GRAALJS_LAUNCHER", "//truffle:TRUFFLE_RUNTIME"], '
+            'visibility = ["//visibility:public"])\n'
+            + "".join(
+                f'py_test(name = "regression/{case}", size = "small", '
+                'srcs = ["@rules_mx//graal:js_regression.py"], main = "js_regression.py", '
+                f'args = ["$(rootpath :js)", "$(rootpath test/regression/{case}.js)"], '
+                f'data = [":js", "test/regression/{case}.js"], visibility = ["//visibility:public"])\n'
+                for case in ("direct_eval", "indirect_eval")
+            )
+        )
+        return
     # An implicit Bazel test_suite includes the generated JUnit targets in
     # this package, so new test classes join the CI qualification on regeneration.
     if suite in PARTIAL_SUITES:
@@ -2666,6 +2720,7 @@ def main():
         choices=[*SUITES, *PARTIAL_SUITES, "vm"],
         help="only regenerate the named BUILD overlays",
     )
+    parser.add_argument("--graaljs", type=Path, help="also generate the GraalJS suite from this checkout")
     parser.add_argument("--archive", help="Graal source archive URL to generate for")
     parser.add_argument("--sha256", help="expected SHA-256 of --archive")
     parser.add_argument(
@@ -2900,6 +2955,16 @@ def main():
             args.check,
             "Shaded dependency pins differ. Regenerate with tools/generate-graal.",
         )
+        if args.graaljs:
+            shutil.copytree(
+                args.graaljs.resolve() / "graal-js",
+                stage / "graal-js",
+                ignore=shutil.ignore_patterns("BUILD", "BUILD.bazel", "mxbuild", "__pycache__"),
+            )
+            selected.append("graal-js")
+            for provider in ("sdk", "truffle", "regex"):
+                if provider not in selected and provider not in providers:
+                    providers.append(provider)
         for suite in dict.fromkeys([*providers, *selected]):
             prepare_suite(suite, stage)
         generate_build_files(selected, stage)

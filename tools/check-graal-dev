@@ -1,0 +1,126 @@
+#!/usr/bin/env python3
+"""Qualify live Truffle edits, GraalJS test selection and Bazel caching."""
+
+import json
+from pathlib import Path
+import runpy
+import subprocess
+import sys
+import tempfile
+
+ROOT = Path(__file__).resolve().parents[1]
+ARCHIVES = {"graal": "source.json", "graaljs": "graaljs_source.json"}
+REGRESSION = "@graal//graal-js:regression/direct_eval"
+MARKER = """
+const Truffle = Java.type("com.oracle.truffle.api.Truffle");
+print(typeof Truffle.rulesMxLiveMarker === "function" ? Truffle.rulesMxLiveMarker() : "before");
+"""
+
+
+def main(config):
+    fetch_source = runpy.run_path(str(ROOT / "tools/generate-graal"))["fetch_source"]
+    with tempfile.TemporaryDirectory() as temp:
+        workspace = Path(temp)
+        for name, manifest in ARCHIVES.items():
+            download = workspace / ("download-" + name)
+            download.mkdir()
+            spec = json.loads((ROOT / "graal" / manifest).read_text())
+            source, _ = fetch_source(spec, download)
+            source.rename(workspace / name)
+
+        dev = [
+            ROOT / "tools/graal-dev",
+            "--workspace",
+            workspace,
+            "--state-dir",
+            workspace / "overlays",
+        ]
+        if "--config=buildbuddy-rbe" in config:
+            dev.append("--buildbuddy")
+        options = ["--config=elide-processors", *config]
+
+        def invoke(command, *args, **kwargs):
+            return subprocess.run(
+                [*dev, command, *options, *args], cwd=ROOT, check=True, **kwargs
+            )
+
+        def read_marker():
+            result = invoke(
+                "run",
+                "@graal//graal-js:js",
+                "--",
+                "--engine.WarnInterpreterOnly=false",
+                "-e",
+                MARKER,
+                capture_output=True,
+                text=True,
+            )
+            return result.stdout.strip()
+
+        affected = subprocess.check_output(
+            [
+                *dev,
+                "query",
+                f"somepath({REGRESSION}, @graal//truffle:com.oracle.truffle.api)",
+            ],
+            cwd=ROOT,
+            text=True,
+        )
+        if "//graal-js:regression/direct_eval" not in affected:
+            raise SystemExit(
+                "The selected GraalJS regression has no dependency path to Truffle"
+            )
+        baseline = read_marker()
+        if baseline != "before":
+            raise SystemExit(f"Unexpected baseline GraalJS output {baseline!r}")
+        invoke("test", "--test_output=errors", REGRESSION)
+        truffle = (
+            workspace
+            / "graal/truffle/src/com.oracle.truffle.api/src/com/oracle/truffle/api/Truffle.java"
+        )
+        source = truffle.read_text()
+        anchor = "public final class Truffle {"
+        if source.count(anchor) != 1:
+            raise SystemExit(
+                "The Truffle API moved. Update the live checkout edit probe."
+            )
+        truffle.write_text(
+            source.replace(
+                anchor,
+                anchor
+                + """
+    public static String rulesMxLiveMarker() {
+        return "after";
+    }
+""",
+            )
+        )
+        changed = read_marker()
+        if changed != "after":
+            raise SystemExit(
+                f"GraalJS did not see the Truffle edit. Output was {changed!r}"
+            )
+        invoke("test", "--test_output=errors", REGRESSION)
+        events = workspace / "cached.json"
+        invoke(
+            "test",
+            "--test_output=errors",
+            f"--build_event_json_file={events}",
+            REGRESSION,
+        )
+        results = [
+            event["testResult"]
+            for line in events.read_text().splitlines()
+            if "testResult" in (event := json.loads(line))
+        ]
+        if len(results) != 1 or not (
+            results[0].get("cachedLocally")
+            or results[0].get("executionInfo", {}).get("cachedRemotely")
+        ):
+            raise SystemExit(
+                f"Expected the selected GraalJS test to be cached. Events {results!r}"
+            )
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
