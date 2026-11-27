@@ -35,7 +35,10 @@ def _jni_headers_impl(ctx):
     args = ctx.actions.args()
     args.add_all(["x", ctx.file.jar, "-d", tree.path])
     ctx.actions.run(executable = ctx.executable._zipper, arguments = [args], inputs = [ctx.file.jar], outputs = [tree], mnemonic = "MxJniHeaders")
-    return [CcInfo(compilation_context = cc_common.create_compilation_context(headers = depset([tree]), includes = depset([tree.path])))]
+    return [
+        DefaultInfo(files = depset([tree])),
+        CcInfo(compilation_context = cc_common.create_compilation_context(headers = depset([tree]), includes = depset([tree.path]))),
+    ]
 
 _jni_headers = rule(
     implementation = _jni_headers_impl,
@@ -44,6 +47,8 @@ _jni_headers = rule(
         "_zipper": attr.label(default = "@bazel_tools//tools/zip:zipper", cfg = "exec", executable = True),
     },
 )
+
+mx_jni_header_tree = _jni_headers
 
 def mx_native_shared_project(name, srcs, headers, root, profiles, deps = [], jni = [], use_jdk_headers = False, jdk_static_libraries = [], testonly = False, visibility = None):
     public = [header for header in headers if header.startswith(root + "/include/")]

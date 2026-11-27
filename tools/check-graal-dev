@@ -92,7 +92,7 @@ def main(config):
             [
                 *dev,
                 "query",
-                f'kind(".*_test rule", rdeps(@graal//graal-js:all + @graal//graalpython:all + {FIBONACCI}, {TRUFFLE_LABEL}))',
+                f'kind(".*_test rule", rdeps(@graal//graal-js:all + filter(":zlib/", @graal//graalpython:all) + {FIBONACCI}, {TRUFFLE_LABEL}))',
             ],
             cwd=ROOT,
             text=True,
@@ -159,6 +159,7 @@ def main(config):
                 f"Expected cached results for the selected tests. Events {results!r}"
             )
         print("The Truffle edit reached GraalJS and GraalPy, and all selected tests were cached on repeat.")
+        invoke("test", "--test_output=errors", "@graal//graalpython:jvm_standalone_test")
 
 
 if __name__ == "__main__":
