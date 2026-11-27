@@ -45,16 +45,21 @@ def main(config):
             )
 
         def read_marker():
-            result = invoke(
-                "run",
-                "@graal//graal-js:js",
-                "--",
-                "--engine.WarnInterpreterOnly=false",
-                "-e",
-                MARKER,
-                capture_output=True,
-                text=True,
-            )
+            try:
+                result = invoke(
+                    "run",
+                    "@graal//graal-js:js",
+                    "--",
+                    "--engine.WarnInterpreterOnly=false",
+                    "-e",
+                    MARKER,
+                    capture_output=True,
+                    text=True,
+                )
+            except subprocess.CalledProcessError as error:
+                sys.stderr.write(error.stderr)
+                sys.stderr.write(error.stdout)
+                raise
             return result.stdout.strip()
 
         affected = subprocess.check_output(
@@ -70,6 +75,9 @@ def main(config):
             raise SystemExit(
                 "The selected GraalJS regression has no dependency path to Truffle"
             )
+        configured = sorted((workspace / "overlays").glob("*.current"))
+        if len(configured) != 1:
+            raise SystemExit(f"Expected one live overlay. Found {configured!r}")
         baseline = read_marker()
         if baseline != "before":
             raise SystemExit(f"Unexpected baseline GraalJS output {baseline!r}")
@@ -96,6 +104,8 @@ def main(config):
             )
         )
         changed = read_marker()
+        if sorted((workspace / "overlays").glob("*.current")) != configured:
+            raise SystemExit("Editing an existing Truffle source regenerated the graph")
         if changed != "after":
             raise SystemExit(
                 f"GraalJS did not see the Truffle edit. Output was {changed!r}"

@@ -104,7 +104,7 @@ def graph_digest(sources, fixes, checkouts):
 
 def provenance(checkout):
     if not (checkout / ".git").exists():
-        return {"commit": {}}
+        return {}
     rev, timestamp, committer = subprocess.check_output(
         ["git", "show", "-s", "--format=%H%n%ct%n%cn <%ce>", "HEAD"],
         cwd=checkout,
