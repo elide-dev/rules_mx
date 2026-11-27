@@ -10,7 +10,16 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 ARCHIVES = {"graal": "source.json", "graaljs": "graaljs_source.json"}
-REGRESSION = "@graal//graal-js:regression/direct_eval"
+TRUFFLE_SOURCE = (
+    "truffle/src/com.oracle.truffle.api/src/com/oracle/truffle/api/Truffle.java"
+)
+TRUFFLE_LABEL = "@graal//" + TRUFFLE_SOURCE.replace("/Truffle.java", ":Truffle.java")
+FIBONACCI = "@graal//truffle:sl.test.Fibonacci"
+REGRESSIONS = {
+    "@graal//graal-js:regression/direct_eval",
+    "@graal//graal-js:regression/indirect_eval",
+    FIBONACCI,
+}
 MARKER = """
 const Truffle = Java.type("com.oracle.truffle.api.Truffle");
 print(typeof Truffle.rulesMxLiveMarker === "function" ? Truffle.rulesMxLiveMarker() : "before");
@@ -66,14 +75,14 @@ def main(config):
             [
                 *dev,
                 "query",
-                f"somepath({REGRESSION}, @graal//truffle:com.oracle.truffle.api)",
+                f'kind(".*_test rule", rdeps(@graal//graal-js:all + {FIBONACCI}, {TRUFFLE_LABEL}))',
             ],
             cwd=ROOT,
             text=True,
-        )
-        if "//graal-js:regression/direct_eval" not in affected:
+        ).splitlines()
+        if set(affected) != REGRESSIONS:
             raise SystemExit(
-                "The selected GraalJS regression has no dependency path to Truffle"
+                f"Unexpected test selection for the Truffle source edit {affected!r}"
             )
         configured = sorted((workspace / "overlays").glob("*.current"))
         if len(configured) != 1:
@@ -81,11 +90,8 @@ def main(config):
         baseline = read_marker()
         if baseline != "before":
             raise SystemExit(f"Unexpected baseline GraalJS output {baseline!r}")
-        invoke("test", "--test_output=errors", REGRESSION)
-        truffle = (
-            workspace
-            / "graal/truffle/src/com.oracle.truffle.api/src/com/oracle/truffle/api/Truffle.java"
-        )
+        invoke("test", "--test_output=errors", *affected)
+        truffle = workspace / "graal" / TRUFFLE_SOURCE
         source = truffle.read_text()
         anchor = "public final class Truffle {"
         if source.count(anchor) != 1:
@@ -110,26 +116,30 @@ def main(config):
             raise SystemExit(
                 f"GraalJS did not see the Truffle edit. Output was {changed!r}"
             )
-        invoke("test", "--test_output=errors", REGRESSION)
+        invoke("test", "--test_output=errors", *affected)
         events = workspace / "cached.json"
         invoke(
             "test",
             "--test_output=errors",
             f"--build_event_json_file={events}",
-            REGRESSION,
+            *affected,
         )
         results = [
             event["testResult"]
             for line in events.read_text().splitlines()
             if "testResult" in (event := json.loads(line))
         ]
-        if len(results) != 1 or not (
-            results[0].get("cachedLocally")
-            or results[0].get("executionInfo", {}).get("cachedRemotely")
+        if len(results) != len(affected) or any(
+            not (
+                result.get("cachedLocally")
+                or result.get("executionInfo", {}).get("cachedRemotely")
+            )
+            for result in results
         ):
             raise SystemExit(
-                f"Expected the selected GraalJS test to be cached. Events {results!r}"
+                f"Expected cached results for the selected tests. Events {results!r}"
             )
+        print("The Truffle edit reached GraalJS and the selected Graal and GraalJS tests were cached on repeat.")
 
 
 if __name__ == "__main__":
