@@ -2504,7 +2504,16 @@ def prepare_suite(suite, stage, peers=()):
             + '    zsupport_srcs = glob(["graalpython/python-libzsupport/src/**/*.c"]),\n'
             + f'    zsupport_copts = {json.dumps(projects["python-libzsupport"]["cflags"])},\n'
             + ")\n"
+            + "PY_OPTIONS = [\n"
+            '    "--experimental-options",\n'
+            '    "--python.PosixModuleBackend=java",\n'
+            '    "--python.Sha3ModuleBackend=java",\n'
+            '    "--python.PyExpatModuleBackend=java",\n'
+            '    "--python.UnicodeCharacterDatabaseNativeFallback=false",\n'
+            '    "--python.CompressionModulesBackend=native",\n'
+            "]\n"
             + f'java_binary(name = "python", main_class = {json.dumps(main_class)}, '
+            'args = PY_OPTIONS, '
             'jvm_flags = ["--enable-native-access=ALL-UNNAMED"], '
             'runtime_deps = [":com.oracle.graal.python", ":com.oracle.graal.python.resources", '
             '":com.oracle.graal.python.shell", "//truffle:TRUFFLE_RUNTIME"] + PY_RESOURCES, '
@@ -2512,7 +2521,7 @@ def prepare_suite(suite, stage, peers=()):
             + "".join(
                 f'py_test(name = "zlib/{case}", size = "small", '
                 'srcs = ["@rules_mx//graal:graalpy_test.py"], main = "graalpy_test.py", '
-                f'args = ["$(rootpath :python)", "$(rootpath graalpython/lib-python/3/test/test_zlib.py)", "{case}"], '
+                f'args = ["$(rootpath :python)", "$(rootpath graalpython/lib-python/3/test/test_zlib.py)", "{case}"] + PY_OPTIONS, '
                 'data = [":python", "graalpython/lib-python/3/test/test_zlib.py"], '
                 'visibility = ["//visibility:public"])\n'
                 for case in ("ChecksumTestCase.test_crc32start", "ChecksumTestCase.test_adler32start")

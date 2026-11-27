@@ -10,9 +10,8 @@ def main():
     launcher, script = (str(Path(arg).absolute()) for arg in sys.argv[1:3])
     command = [
         launcher,
+        *sys.argv[4:],
         "--engine.WarnInterpreterOnly=false",
-        "--experimental-options",
-        "--python.CompressionModulesBackend=native",
         "-B",
     ]
     work = Path(os.environ["TEST_TMPDIR"])
@@ -23,7 +22,7 @@ def main():
         env=env,
         check=True,
     )
-    subprocess.run([*command, script, *sys.argv[3:]], cwd=work, env=env, check=True)
+    subprocess.run([*command, script, sys.argv[3]], cwd=work, env=env, check=True)
 
 
 if __name__ == "__main__":

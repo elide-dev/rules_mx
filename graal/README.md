@@ -30,7 +30,7 @@ tools/graal-dev query 'kind(".*_test rule", rdeps(@graal//graal-js:all + @graal/
 
 The command generates the local BUILD overlays from mx and Gazelle and symlinks source files into the same Bazel repository. Edits to existing sources are visible to Bazel immediately. Adding, removing, or renaming a file and changing mx suite metadata refresh the generated graph. Use `--sync` after changing Java imports or other source content that changes Gazelle’s dependency analysis. The checkouts need to match the Bazel input pins in `rules_mx`. CI qualifies Graal at `21dea4d`, GraalJS at `747d45b`, and GraalPy at `11344f3`.
 
-The GraalPy JVM launcher uses Labs JDK 25 and bundles the standard library, GraalPy core library, headers, platform versions, and the source-built zlib support library. The parser compiles from its checked-in generated Java source. The JVM loads Python sources from the packaged resources. The first two upstream zlib checks are individually selectable. Full extension, frozen-module, and standalone distribution coverage is separate work.
+The GraalPy JVM launcher uses Labs JDK 25 and bundles the standard library, GraalPy core library, headers, platform versions, and the source-built zlib support library. The launcher uses the JVM backends for POSIX, SHA3, and Expat. The parser compiles from its checked-in generated Java source. The JVM loads Python sources from the packaged resources. The first two upstream zlib checks are individually selectable. Full extension, frozen-module, and standalone distribution coverage is separate work.
 
 Pass `--buildbuddy` before the Bazel command to use the existing BuildBuddy wrapper. The generated repository lives under `.graal-dev/` or the path supplied by `--state-dir`.
 
