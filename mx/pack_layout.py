@@ -183,6 +183,8 @@ def _install_image_group(tree, image, kinds, mount):
 
 
 def main():
+    if len(sys.argv) == 2 and sys.argv[1].startswith("--args-file="):
+        sys.argv[1:] = Path(sys.argv[1].removeprefix("--args-file=")).read_text().splitlines()
     if sys.argv[1] == "--materialize-install-links":
         tree, sources, build = [Path(arg).resolve() for arg in sys.argv[2:]]
         source_files = None

@@ -3359,6 +3359,21 @@ def bazel_buildfile(args):
         help="export the registered Native Image macro and its component dependencies",
     )
     parser.add_argument("projects", nargs="*")
+    parser.add_argument(
+        "--substitution",
+        action="append",
+        nargs=2,
+        default=[],
+        metavar=("NAME", "TEMPLATE"),
+        help="include a resolved suite path substitution in the Gazelle graph",
+    )
+    parser.add_argument(
+        "--checked-in-generated-sources",
+        action="append",
+        default=[],
+        metavar="PROJECT",
+        help="compile checked-in sources of a project whose mx build regenerates them",
+    )
     options = parser.parse_args(args)
     if options.all:
         if not options.gazelle or options.projects:
@@ -3400,6 +3415,13 @@ def bazel_buildfile(args):
                     selected.update(closure)
         result = _lower_buildfile(parser, options, bindings, selected)
         if options.gazelle:
+            if options.substitution:
+                from mx._impl import mx_subst
+
+                result["substitutions"] = {
+                    name: mx_subst.path_substitutions.substitute(template)
+                    for name, template in options.substitution
+                }
             if options.svm_macro:
                 result["svm_components"] = _svm_macro_components(options.svm_macro)
             if options.partial:
@@ -3823,6 +3845,8 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
                 "exports",
                 "distDependencies",
             }
+            if project.name in options.checked_in_generated_sources:
+                allowed = allowed | {"buildDependencies"}
             if project._orig_attrs.get("jacoco") == "include":
                 allowed = allowed | {
                     "jacoco",

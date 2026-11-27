@@ -30,6 +30,13 @@ def _add_entry(entries, path, file):
         fail("Duplicate archive member: " + path)
     entries[path] = file
 
+def _layout_args(ctx):
+    args = ctx.actions.args()
+    if ctx.attr.use_param_file:
+        args.use_param_file("--args-file=%s", use_always = True)
+        args.set_param_file_format("multiline")
+    return args
+
 def _layout_impl(ctx):
     directory = ctx.attr.format == "dir"
     release_prefix = ctx.attr.release_prefix
@@ -124,7 +131,7 @@ def _layout_impl(ctx):
             fail("Resource metadata requires a directory of regular files")
         manifest = ctx.actions.declare_file(ctx.label.name + ".metadata/files")
         digest = ctx.actions.declare_file(ctx.label.name + ".metadata/sha256")
-        args = ctx.actions.args()
+        args = _layout_args(ctx)
         args.add_all(["--metadata", manifest, digest])
         for path in sorted(entries):
             args.add(path)
@@ -134,7 +141,7 @@ def _layout_impl(ctx):
         _add_entry(entries, ctx.attr.file_list_entry, manifest)
         _add_entry(entries, ctx.attr.hash_entry, digest)
         resource_jar = ctx.actions.declare_file(ctx.label.name + ".resources.jar")
-        args = ctx.actions.args()
+        args = _layout_args(ctx)
         args.add(resource_jar)
         args.add("--modes")
         args.add(json.encode(modes))
@@ -142,7 +149,7 @@ def _layout_impl(ctx):
             args.add(path)
             args.add(entries[path])
         ctx.actions.run(executable = ctx.executable._pack, arguments = [args], inputs = entries.values(), outputs = [resource_jar], mnemonic = "MxResourceJar")
-    args = ctx.actions.args()
+    args = _layout_args(ctx)
     args.add(output.path)
     if directory:
         args.add("--directory")
@@ -209,6 +216,7 @@ mx_archive_layout = rule(
         "format": attr.string(mandatory = True, values = ["dir", "jar", "tar"]),
         "target_prefix": attr.string(),
         "release_prefix": attr.string(),
+        "use_param_file": attr.bool(),
         "_pack": attr.label(default = Label("//mx:pack_layout"), executable = True, cfg = "exec"),
     },
 )

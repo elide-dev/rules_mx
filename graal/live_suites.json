@@ -1,0 +1,10 @@
+{
+  "graal-js": {
+    "checkout": "graaljs",
+    "path": "graal-js"
+  },
+  "graalpython": {
+    "checkout": "graalpython",
+    "path": "."
+  }
+}

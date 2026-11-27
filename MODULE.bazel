@@ -19,6 +19,7 @@ archive_override(
 )
 
 bazel_dep(name = "rules_foreign_cc", version = "0.17.0")
+bazel_dep(name = "zlib", version = "1.3.2.bcr.3", dev_dependency = True)
 
 foreign_tools = use_extension("@rules_foreign_cc//foreign_cc:extensions.bzl", "tools", dev_dependency = True)
 foreign_tools.cmake(
