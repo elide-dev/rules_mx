@@ -18,6 +18,7 @@ def _runtime_jars(deps):
 def _freeze_impl(ctx):
     runtime = ctx.attr._jdk[java_common.JavaRuntimeInfo]
     jars = _runtime_jars(ctx.attr.runtime)
+    [index] = [file for file in ctx.files.index if file.basename == "FrozenModules.java"]
     jar = ctx.actions.declare_file(ctx.label.name + ".jar")
     args = ctx.actions.args()
     args.add("--java", runtime.java_executable_exec_path)
@@ -25,12 +26,12 @@ def _freeze_impl(ctx):
     args.add("--launcher", ctx.attr.launcher)
     args.add("--script", ctx.file.script)
     args.add("--stdlib", ctx.file.stdlib)
-    args.add("--index", ctx.file.index)
+    args.add("--index", index)
     args.add("--output", jar)
     ctx.actions.run(
         executable = ctx.executable._freeze,
         inputs = depset(
-            ctx.files.srcs + jars + [ctx.file.script, ctx.file.stdlib, ctx.file.index],
+            ctx.files.srcs + jars + [ctx.file.script, ctx.file.stdlib, index],
             transitive = [runtime.files],
         ),
         outputs = [jar],
@@ -49,7 +50,7 @@ graalpy_frozen_modules = rule(
         "launcher": attr.string(mandatory = True),
         "script": attr.label(allow_single_file = [".py"], mandatory = True),
         "stdlib": attr.label(allow_single_file = [".py"], mandatory = True),
-        "index": attr.label(allow_single_file = [".java"], mandatory = True),
+        "index": attr.label(mandatory = True),
         "srcs": attr.label_list(allow_files = True),
         "_jdk": attr.label(default = Label("//tools:labs_runtime"), cfg = "exec"),
         "_freeze": attr.label(default = Label(":graalpy_freeze"), cfg = "exec", executable = True),
