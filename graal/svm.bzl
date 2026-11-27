@@ -400,18 +400,23 @@ def _native_image_root_impl(ctx):
         arguments = [args],
         mnemonic = "SvmAssembly",
     )
+    llvm_config = ""
+    if ctx.files.llvm_tools:
+        [config] = [f for f in ctx.files.llvm_tools if f.basename == "llvm-config"]
+        llvm_config = _runfile(ctx, config)
     ctx.actions.expand_template(
         template = ctx.file._template,
         output = ctx.outputs.out,
         substitutions = {
             "{SVM_ROOT}": repr(_runfile(ctx, root)),
             "{CC}": repr(_runfile(ctx, compiler)),
+            "{LLVM_CONFIG}": repr(llvm_config),
         },
     )
     return [
         DefaultInfo(
             files = depset([ctx.outputs.out]),
-            runfiles = ctx.runfiles(transitive_files = depset([root], transitive = [cc.all_files])),
+            runfiles = ctx.runfiles(transitive_files = depset([root] + ctx.files.llvm_tools, transitive = [cc.all_files])),
         ),
         OutputGroupInfo(distribution = depset([root])),
     ]
@@ -429,6 +434,7 @@ _native_image_root = rule(
         "macros": attr.label_keyed_string_dict(allow_files = True),
         "component_jars": attr.label_keyed_string_dict(providers = [JavaInfo]),
         "component_layouts": attr.label_keyed_string_dict(providers = [MxArchiveLayoutInfo]),
+        "llvm_tools": attr.label(),
         "native_archive": attr.label(allow_single_file = [".tar"], mandatory = True),
         "platform": attr.string(mandatory = True),
         "_jdk": attr.label(default = Label("//tools:labs_runtime")),
@@ -442,19 +448,25 @@ _native_image_root = rule(
     toolchains = use_cc_toolchain(),
 )
 
-def svm_launcher(name, builder_libs = {}, component_jars = {}, component_layouts = {}):
+def svm_launcher(name, builder_libs = {}, component_jars = {}, component_layouts = {}, llvm_jars = {}, llvm_layouts = {}):
     """Assemble a Native Image distribution root and its launcher.
 
     Args:
       name: launcher name.
       builder_libs: JARs that the builder loads from lib/svm/builder/lib, keyed to their file names.
+      component_jars: builder JAR installation paths by target.
+      component_layouts: component support directories by target.
+      llvm_jars: LLVM backend JAR installation paths by target.
+      llvm_layouts: LLVM backend support directories by target.
     """
+    linux = "@platforms//os:linux"
     _native_image_root(
         name = name + ".root",
         out = name + ".py",
         driver = ":SVM_DRIVER",
-        component_jars = component_jars,
-        component_layouts = component_layouts,
+        component_jars = component_jars | select({linux: llvm_jars, "//conditions:default": {}}),
+        component_layouts = component_layouts | select({linux: llvm_layouts, "//conditions:default": {}}),
+        llvm_tools = select({linux: Label("//tools/cc:llvm_backend_tools"), "//conditions:default": None}) if llvm_jars else None,
         management = "//compiler:GRAAL_MANAGEMENT",
         builder = _BUILDER_JARS,
         guest = _GUEST_JARS,

@@ -239,9 +239,8 @@ def main():
     repo = create_repository(
         opts.workspace.resolve(), opts.state_dir.resolve(), opts.sync
     )
-    bazel = (
-        str(ROOT / "tools/buildbuddy") if opts.buildbuddy else shutil.which("bazelisk")
-    )
+    use_buildbuddy = opts.buildbuddy and opts.command != "query"
+    bazel = str(ROOT / "tools/buildbuddy") if use_buildbuddy else shutil.which("bazelisk")
     if not bazel:
         parser.error("Bazelisk is required")
     os.chdir(ROOT)

@@ -1339,21 +1339,33 @@ def _thin_launcher_recipe(project):
 
 def _svm_macro_components(names):
     import mx_sdk_vm
+    import mx_substratevm
 
     components = {
         component.short_name: component for component in mx_sdk_vm.graalvm_components()
     }
+    # The suite keeps the LLVM tool definition even on hosts where mx does not
+    # register it. Bazel selects the tool for a supported target platform.
+    llvm = getattr(mx_substratevm, "ce_llvm_backend", None)
+    if llvm:
+        components[llvm.short_name] = llvm
     todo = list(names)
     seen = set()
     jars = {}
     layouts = {}
+    tool_jars = {}
+    tool_layouts = {}
     while todo:
         name = todo.pop()
         if name in seen:
             continue
         seen.add(name)
         component = components.get(name)
-        if isinstance(component, mx_sdk_vm.GraalVMSvmMacro):
+        is_llvm = llvm is not None and component is llvm
+        selected_jars, selected_layouts = (tool_jars, tool_layouts) if is_llvm else (jars, layouts)
+        if is_llvm:
+            directory = "lib/svm/tools/" + component.dir_name
+        elif isinstance(component, mx_sdk_vm.GraalVMSvmMacro):
             directory = "lib/svm/macros/" + component.dir_name
         elif isinstance(component, mx_sdk_vm.GraalVmTruffleLibrary):
             directory = "lib/" + component.dir_name
@@ -1361,15 +1373,23 @@ def _svm_macro_components(names):
             raise _UnsupportedLowering(
                 f"Unsupported Native Image macro component {name}"
             )
-        for dep in component.builder_jar_distributions:
-            dist = mx.distribution(dep)
-            jars[dist.qualifiedName()] = (
-                directory + "/builder/" + dist.default_filename()
+        for dependency in component.builder_jar_distributions:
+            dep = mx.dependency(dependency)
+            filename = (
+                dep.default_filename() if dep.isDistribution()
+                else dep.name.lower().replace("_", "-") + ".jar"
             )
+            selected_jars[dep.qualifiedName()] = directory + "/builder/" + filename
         for dep in component.support_distributions:
-            layouts[mx.distribution(dep).qualifiedName()] = directory
-        todo.extend(component.dependency_names)
-    return {"builder_jars": jars, "support_layouts": layouts}
+            selected_layouts[mx.distribution(dep).qualifiedName()] = directory
+        if not is_llvm:
+            todo.extend(component.dependency_names)
+    return {
+        "builder_jars": jars,
+        "support_layouts": layouts,
+        "llvm_jars": tool_jars,
+        "llvm_layouts": tool_layouts,
+    }
 
 
 def _native_image_executable(dep):

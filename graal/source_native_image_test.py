@@ -15,7 +15,7 @@ def check_output(executable):
         raise AssertionError(f"Unexpected image output: {result.stdout!r}")
 
 
-def main(builder, guest=None):
+def main(builder, guest=None, *options):
     if guest is None:
         check_output(Path(builder))
         return
@@ -25,6 +25,7 @@ def main(builder, guest=None):
             [
                 Path(builder).absolute(),
                 "--parallelism=2",
+                *options,
                 "-cp",
                 Path(guest).absolute(),
                 "-o",

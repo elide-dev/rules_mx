@@ -2,12 +2,12 @@
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
-ELIDE_TOOLCHAIN = "2026.11.7"
+ELIDE_TOOLCHAIN = "2026.11.8"
 
 ELIDE_TOOLCHAIN_BUNDLES = {
-    "darwin_arm64": ("darwin-arm64", "arm64-apple-darwin", "69d312ff9d0bf7158942e9d7220278930c4106d5b246482485e2f7da1a6db4c7"),
-    "linux_amd64": ("linux-amd64", "x86_64-unknown-linux-gnu", "697cb494450d47630629e5ac905bca8400611030361305e32b86eb818ae407a5"),
-    "linux_arm64": ("linux-arm64", "aarch64-unknown-linux-gnu", "ed353fbc779d2179de2c0631c6e1de56fe9ebda3a981460d01d34239da4058a8"),
+    "darwin_arm64": ("darwin-arm64", "arm64-apple-darwin", "c17a16c5d93e5ff146cf2550b53cb937334aa06f10c598b372e0d8ed69d67a9f"),
+    "linux_amd64": ("linux-amd64", "x86_64-unknown-linux-gnu", "6e4f7ac552af064d92d04b103d7b4904c5d7ab0d054d1ccd4f374c1d4c63dc72"),
+    "linux_arm64": ("linux-arm64", "aarch64-unknown-linux-gnu", "7d5f7c2bf61fbdc9fd1d9a1e89ab732857c4a2ca1693ce9bd5e53c45cfef0045"),
 }
 
 def _installed_apple_sdk(ctx):

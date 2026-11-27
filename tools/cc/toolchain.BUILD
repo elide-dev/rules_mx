@@ -162,4 +162,14 @@ filegroup(
     srcs = ["bin/" + TRIPLE + ".cfg"],
 )
 
+filegroup(
+    name = "llvm_backend_tools",
+    srcs = [
+        "bin/llc",
+        "bin/llvm-config",
+        "bin/llvm-link",
+        "bin/opt",
+    ],
+)
+
 exports_files(["cc"])
