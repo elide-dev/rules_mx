@@ -162,9 +162,7 @@ def scan(workspace, patches):
         watch_files.update(git_inputs(checkout))
     for patch in patches:
         for path in changed_paths(patch):
-            if path not in sources:
-                raise SystemExit(f"{patch.name} requires {path} in {graal}")
-            watch_files.add(sources[path])
+            watch_files.add(sources.get(path, graal / path))
     print(
         json.dumps(
             {
@@ -204,6 +202,8 @@ def generate(repo, bazel, output_base, patches):
         for patch in patches:
             paths = changed_paths(patch)
             for path in paths:
+                if path not in sources:
+                    raise SystemExit(f"{patch.name} requires {path} in {graal}")
                 target = repo / path
                 if not target.exists():
                     target.parent.mkdir(parents=True, exist_ok=True)
