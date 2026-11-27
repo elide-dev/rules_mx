@@ -2845,13 +2845,18 @@ def fetch_source(pin, stage):
     return root / pin["strip_prefix"], digest.hexdigest()
 
 
-def labsjdk_pin(source, current, selector, repository):
-    """Pin labsjdk-ce-latest from the selected source's common.json."""
+def labsjdk_pin(source, current, selector, repository, *, update):
+    """Resolve a Labs JDK version declared in the source's common.json."""
     version = json.loads((source / "common.json").read_text())["jdks"][selector][
         "version"
     ]
     if current.get("version") == version:
         return current
+    if not update:
+        raise SystemExit(
+            f"{source} requires {version}, but rules_mx pins {current['version']}. "
+            "Use a compatible Graal checkout or update the rules_mx input pins."
+        )
     jdk, jvmci = version.split("-jvmci-")
     request = urllib.request.Request(
         f"https://api.github.com/repos/graalvm/{repository}/releases/tags/jvmci-{jvmci}",
@@ -2937,10 +2942,7 @@ def main():
     if args.archive and args.strip_prefix is None:
         parser.error("--archive requires --strip-prefix")
     output = args.output.resolve()
-    if os.environ.get("RULES_MX_GRAPH_OUTPUT_BASE"):
-        # Bootstrap Gazelle before staging the sources so its cold build and the
-        # staged tree do not need temporary disk space at the same time.
-        subprocess.run([*bazel_command("build"), "//:gazelle"], cwd=ROOT, check=True)
+    live = bool(os.environ.get("RULES_MX_GRAPH_OUTPUT_BASE"))
     # Keep a downloaded tree outside the stage so mx sees one copy of each suite.
     with (
         tempfile.TemporaryDirectory() as temp,
@@ -2971,7 +2973,7 @@ def main():
             emit(
                 labsjdk if output == ROOT / "graal" else output / filename,
                 json.dumps(
-                    labsjdk_pin(source, current, selector, repository),
+                    labsjdk_pin(source, current, selector, repository, update=not live),
                     indent=2,
                     sort_keys=True,
                 )
@@ -2979,6 +2981,10 @@ def main():
                 args.check,
                 "Regenerate the Labs JDK pin with tools/generate-graal",
             )
+        if live:
+            # Bootstrap Gazelle before staging the sources so its cold build and
+            # the staged tree do not need temporary disk space at the same time.
+            subprocess.run([*bazel_command("build"), "//:gazelle"], cwd=ROOT, check=True)
         mx_suite = bazel_source("@graal_mx//:mx.mx/suite.py")
         shutil.copyfile(mx_suite, stage / "mx-suite.py")
         for family in ("gcc", "msvc"):
