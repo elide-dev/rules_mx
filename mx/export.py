@@ -3202,6 +3202,14 @@ def bazel_buildfile(args):
         help="tag generated JUnit classes for explicit invocation",
     )
     parser.add_argument(
+        "--qualified-test-class",
+        action="append",
+        nargs=2,
+        default=[],
+        metavar=("PROJECT", "CLASS"),
+        help="emit only the named JUnit classes for a project whose mx test runtime is partially bound",
+    )
+    parser.add_argument(
         "--manual-test-class",
         action="append",
         default=[],
@@ -3415,6 +3423,9 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
         if not sep or ":" not in name or not value.startswith("-"):
             parser.error("expected --test-jvm-flag SUITE:PROJECT=FLAG")
         test_flags.setdefault(name, []).append(value)
+    qualified_tests = {}
+    for project, test_class in options.qualified_test_class:
+        qualified_tests.setdefault(project, set()).add(test_class)
     manual_tests = set(options.manual_test_project)
     manual_classes = set(options.manual_test_class)
     labs_javac = set(options.labs_javac_project)
@@ -3796,6 +3807,7 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
             "<others>": {"<others>": {"ignore": False}},
         }:
             allowed = allowed | {"os_arch"}
+        selected_tests = qualified_tests.pop(project.name, None)
         property_flags = []
         property_data = (
             test_data.pop(project.qualifiedName(), [])
@@ -3822,6 +3834,8 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
                     if dep
                     else []
                 )
+                if not labels and selected_tests is not None:
+                    continue
                 if len(labels) != 1:
                     raise _UnsupportedLowering(
                         f"{project.name}: bind {key}={value} using --test-path"
@@ -4091,7 +4105,13 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
                 if test:
                     record["testonly"] = True
                 if discover_tests:
-                    record["tests"] = _junit_classes(project)
+                    classes = _junit_classes(project)
+                    if selected_tests is not None:
+                        missing = selected_tests.difference(classes)
+                        if missing:
+                            raise _UnsupportedLowering(f"{project.name}: unknown qualified tests {sorted(missing)}")
+                        classes = [name for name in classes if name in selected_tests]
+                    record["tests"] = classes
                     if launchers:
                         if (
                             len(launchers) != 1
@@ -4158,6 +4178,8 @@ def _lower_buildfile(parser, options, bindings, selected, probe=False):
         | empty_projects
     ):
         mx.abort(f"Unused project configuration: {sorted(unused_projects)}")
+    if qualified_tests:
+        mx.abort(f"Unknown qualified JUnit project: {sorted(qualified_tests)}")
     if unused_paths := test_paths.keys() - used_test_paths:
         mx.abort(f"Unused test path mappings: {sorted(unused_paths)}")
     if test_launchers or test_runtimes or test_flags or test_data:

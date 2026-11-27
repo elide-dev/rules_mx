@@ -2,7 +2,7 @@ diff --git a/sulong/BUILD.bazel b/sulong/BUILD.bazel
 new file mode 100644
 --- /dev/null
 +++ b/sulong/BUILD.bazel
-@@ -0,0 +1,5644 @@
+@@ -0,0 +1,6637 @@
 +load("@rules_mx//graal:layout.bzl", "mx_os_layout")
 +load("@rules_mx//graal:sulong_fixture_check.bzl", "sulong_fixture_check")
 +load("@rules_mx//mx:bitcode.bzl", "mx_bitcode_suite")
@@ -18,6 +18,7 @@ new file mode 100644
 +    name = "all_distributions",
 +    testonly = True,
 +    srcs = [
++        ":LLIR_TEST_GEN",
 +        ":LLVM_NATIVE_POM",
 +        ":LLVM_POM",
 +        ":SULONG_API",
@@ -50,6 +51,8 @@ new file mode 100644
 +        ":SULONG_PARSER_TORTURE",
 +        ":SULONG_STANDALONE_COMMON",
 +        ":SULONG_STANDALONE_DEPENDENCIES",
++        ":SULONG_TEST",
++        ":SULONG_TEST_API",
 +        ":SULONG_TEST_NATIVE",
 +        ":SULONG_TOOLCHAIN_LAUNCHERS",
 +    ],
@@ -79,11 +82,16 @@ new file mode 100644
 +        ":com.oracle.truffle.llvm.parser.factories",
 +        ":com.oracle.truffle.llvm.runtime",
 +        ":com.oracle.truffle.llvm.spi",
++        ":com.oracle.truffle.llvm.tests",
 +        ":com.oracle.truffle.llvm.tests.api",
 +        ":com.oracle.truffle.llvm.tests.bitcode.other.native",
 +        ":com.oracle.truffle.llvm.tests.cmake",
++        ":com.oracle.truffle.llvm.tests.debug",
 +        ":com.oracle.truffle.llvm.tests.harness",
++        ":com.oracle.truffle.llvm.tests.internal",
++        ":com.oracle.truffle.llvm.tests.interop",
 +        ":com.oracle.truffle.llvm.tests.irdebug.native",
++        ":com.oracle.truffle.llvm.tests.llirtestgen",
 +        ":com.oracle.truffle.llvm.tests.native",
 +        ":com.oracle.truffle.llvm.tests.pipe",
 +        ":com.oracle.truffle.llvm.toolchain.launchers",
@@ -532,6 +540,57 @@ new file mode 100644
 +)
 +
 +mx_processed_java(
++    name = "com.oracle.truffle.llvm.tests",
++    testonly = True,
++    srcs = [
++        "//sulong/tests/com.oracle.truffle.llvm.tests/src/com/oracle/truffle/llvm/tests:com.oracle.truffle.llvm.tests.srcs",
++        "//sulong/tests/com.oracle.truffle.llvm.tests/src/com/oracle/truffle/llvm/tests/linker:com.oracle.truffle.llvm.tests.srcs",
++        "//sulong/tests/com.oracle.truffle.llvm.tests/src/com/oracle/truffle/llvm/tests/options:com.oracle.truffle.llvm.tests.srcs",
++        "//sulong/tests/com.oracle.truffle.llvm.tests/src/com/oracle/truffle/llvm/tests/other:com.oracle.truffle.llvm.tests.srcs",
++        "//sulong/tests/com.oracle.truffle.llvm.tests/src/com/oracle/truffle/llvm/tests/services:com.oracle.truffle.llvm.tests.srcs",
++        "//sulong/tests/com.oracle.truffle.llvm.tests/src/com/oracle/truffle/llvm/tests/util:com.oracle.truffle.llvm.tests.srcs",
++    ],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++        "--add-modules",
++        "java.logging",
++    ],
++    mx_resource_root = "tests/com.oracle.truffle.llvm.tests/src",
++    plugins = [
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    resources = ["//sulong/tests/com.oracle.truffle.llvm.tests/src/META-INF/services:com.oracle.truffle.llvm.tests.resources"],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":com.oracle.truffle.llvm.tests.harness",
++        ":com.oracle.truffle.llvm.tests.pipe",
++        "//sdk:POLYGLOT",
++        "//truffle:TRUFFLE_API",
++        "//truffle:TRUFFLE_TCK",
++        "@contrib_rules_jvm_deps//:junit_junit",
++        "@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
++    ],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.com.oracle.truffle.llvm.tests.CaptureOutputTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    test_class = "com.oracle.truffle.llvm.tests.CaptureOutputTest",
++    runtime_deps = [":SULONG_TEST"],
++)
++
++mx_processed_java(
 +    name = "com.oracle.truffle.llvm.tests.api",
 +    testonly = True,
 +    srcs = ["//sulong/tests/com.oracle.truffle.llvm.tests.api/src/com/oracle/truffle/llvm/tests/api:com.oracle.truffle.llvm.tests.api.srcs"],
@@ -567,8 +626,69 @@ new file mode 100644
 +    name = "com.oracle.truffle.llvm.tests.api.com.oracle.truffle.llvm.tests.api.ToolchainAPITest",
 +    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
 +    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
-+    project = ":com.oracle.truffle.llvm.tests.api",
 +    test_class = "com.oracle.truffle.llvm.tests.api.ToolchainAPITest",
++    runtime_deps = [":SULONG_TEST_API"],
++)
++
++mx_processed_java(
++    name = "com.oracle.truffle.llvm.tests.debug",
++    testonly = True,
++    srcs = ["//sulong/tests/com.oracle.truffle.llvm.tests.debug/src/com/oracle/truffle/llvm/tests/debug:com.oracle.truffle.llvm.tests.debug.srcs"],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++        "--add-modules",
++        "java.logging",
++    ],
++    plugins = [
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":com.oracle.truffle.llvm.tests",
++        ":com.oracle.truffle.llvm.tests.pipe",
++        "//sdk:POLYGLOT",
++        "//truffle:TRUFFLE_API",
++        "//truffle:TRUFFLE_TCK",
++        "@contrib_rules_jvm_deps//:junit_junit",
++        "@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
++    ],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.debug.com.oracle.truffle.llvm.tests.debug.LLVMDebugExprParserTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.debug",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.debug.LLVMDebugExprParserTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.debug.com.oracle.truffle.llvm.tests.debug.LLVMDebugTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.debug",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.debug.LLVMDebugTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.debug.com.oracle.truffle.llvm.tests.debug.LLVMIRDebugTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.debug",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.debug.LLVMIRDebugTest",
 +)
 +
 +mx_processed_java(
@@ -601,6 +721,814 @@ new file mode 100644
 +        "@contrib_rules_jvm_deps//:junit_junit",
 +        "@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
 +    ],
++)
++
++mx_whole_java(
++    name = "com.oracle.truffle.llvm.tests.internal",
++    testonly = True,
++    srcs = [
++        "//sulong/tests/com.oracle.truffle.llvm.tests.internal/src/com/oracle/truffle/llvm/tests/internal:com.oracle.truffle.llvm.tests.internal.srcs",
++        "//sulong/tests/com.oracle.truffle.llvm.tests.internal/src/com/oracle/truffle/llvm/tests/internal/bitcode:com.oracle.truffle.llvm.tests.internal.srcs",
++        "//sulong/tests/com.oracle.truffle.llvm.tests.internal/src/com/oracle/truffle/llvm/tests/internal/bitcodeformat:com.oracle.truffle.llvm.tests.internal.srcs",
++        "//sulong/tests/com.oracle.truffle.llvm.tests.internal/src/com/oracle/truffle/llvm/tests/internal/types:com.oracle.truffle.llvm.tests.internal.srcs",
++        "//sulong/tests/com.oracle.truffle.llvm.tests.internal/src/com/oracle/truffle/llvm/tests/internal/types/floating:com.oracle.truffle.llvm.tests.internal.srcs",
++    ],
++    javac_opts = [
++        "--release",
++        "21",
++        "-parameters",
++    ],
++    unified_release = 21,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":com.oracle.truffle.llvm.parser",
++        ":com.oracle.truffle.llvm.runtime",
++        ":com.oracle.truffle.llvm.tests",
++        ":com.oracle.truffle.llvm.tests.pipe",
++        "//sdk:POLYGLOT",
++        "//truffle:TRUFFLE_API",
++        "//truffle:TRUFFLE_TCK",
++        "@contrib_rules_jvm_deps//:junit_junit",
++        "@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
++    ],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.internal.com.oracle.truffle.llvm.tests.internal.MDTypeTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.internal",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.internal.MDTypeTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.internal.com.oracle.truffle.llvm.tests.internal.RoundingModeTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.internal",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.internal.RoundingModeTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.internal.com.oracle.truffle.llvm.tests.internal.TargetTripleTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.internal",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.internal.TargetTripleTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.internal.com.oracle.truffle.llvm.tests.internal.bitcode.AllocationLimitsTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.internal",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.internal.bitcode.AllocationLimitsTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.internal.com.oracle.truffle.llvm.tests.internal.bitcode.BigEndianTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.internal",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.internal.bitcode.BigEndianTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.internal.com.oracle.truffle.llvm.tests.internal.bitcodeformat.BitcodeFormatTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.internal",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.internal.bitcodeformat.BitcodeFormatTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.internal.com.oracle.truffle.llvm.tests.internal.bitcodeformat.InvalidBitcodeTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.internal",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.internal.bitcodeformat.InvalidBitcodeTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.internal.com.oracle.truffle.llvm.tests.internal.types.LLVMIVarBitSmallTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.internal",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.internal.types.LLVMIVarBitSmallTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.internal.com.oracle.truffle.llvm.tests.internal.types.RecursiveTypesTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.internal",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.internal.types.RecursiveTypesTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.internal.com.oracle.truffle.llvm.tests.internal.types.VariableBitLimitsTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.internal",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.internal.types.VariableBitLimitsTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.internal.com.oracle.truffle.llvm.tests.internal.types.floating.LLVM80BitCompareTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.internal",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.internal.types.floating.LLVM80BitCompareTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.internal.com.oracle.truffle.llvm.tests.internal.types.floating.LLVM80BitConstantsTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.internal",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.internal.types.floating.LLVM80BitConstantsTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.internal.com.oracle.truffle.llvm.tests.internal.types.floating.LLVM80BitFromBytesTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.internal",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.internal.types.floating.LLVM80BitFromBytesTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.internal.com.oracle.truffle.llvm.tests.internal.types.floating.LLVM80BitFromDoubleTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.internal",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.internal.types.floating.LLVM80BitFromDoubleTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.internal.com.oracle.truffle.llvm.tests.internal.types.floating.LLVM80BitFromIntTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.internal",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.internal.types.floating.LLVM80BitFromIntTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.internal.com.oracle.truffle.llvm.tests.internal.types.floating.LLVM80BitFromLongTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.internal",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.internal.types.floating.LLVM80BitFromLongTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.internal.com.oracle.truffle.llvm.tests.internal.types.floating.LLVM80BitFromUnsignedIntTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.internal",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.internal.types.floating.LLVM80BitFromUnsignedIntTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.internal.com.oracle.truffle.llvm.tests.internal.types.floating.LLVM80BitFromUnsignedLongTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.internal",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.internal.types.floating.LLVM80BitFromUnsignedLongTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.internal.com.oracle.truffle.llvm.tests.internal.types.floating.LLVM80BitGetByteTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.internal",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.internal.types.floating.LLVM80BitGetByteTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.internal.com.oracle.truffle.llvm.tests.internal.types.floating.LLVM80BitGetDoubleTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.internal",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.internal.types.floating.LLVM80BitGetDoubleTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.internal.com.oracle.truffle.llvm.tests.internal.types.floating.LLVM80BitGetFloatTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.internal",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.internal.types.floating.LLVM80BitGetFloatTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.internal.com.oracle.truffle.llvm.tests.internal.types.floating.LLVM80BitGetIntTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.internal",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.internal.types.floating.LLVM80BitGetIntTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.internal.com.oracle.truffle.llvm.tests.internal.types.floating.LLVM80BitGetLongTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.internal",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.internal.types.floating.LLVM80BitGetLongTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.internal.com.oracle.truffle.llvm.tests.internal.types.floating.LLVM80BitGetShortTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.internal",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.internal.types.floating.LLVM80BitGetShortTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.internal.com.oracle.truffle.llvm.tests.internal.types.floating.LLVM80BitMixedTests",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.internal",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.internal.types.floating.LLVM80BitMixedTests",
++)
++
++mx_processed_java(
++    name = "com.oracle.truffle.llvm.tests.interop",
++    testonly = True,
++    srcs = [
++        "//sulong/tests/com.oracle.truffle.llvm.tests.interop/src/com/oracle/truffle/llvm/tests/interop:com.oracle.truffle.llvm.tests.interop.srcs",
++        "//sulong/tests/com.oracle.truffle.llvm.tests.interop/src/com/oracle/truffle/llvm/tests/interop/nfi:com.oracle.truffle.llvm.tests.interop.srcs",
++        "//sulong/tests/com.oracle.truffle.llvm.tests.interop/src/com/oracle/truffle/llvm/tests/interop/values:com.oracle.truffle.llvm.tests.interop.srcs",
++    ],
++    abi_after_javac = True,
++    javacopts = [
++        "--release",
++        "21",
++        "-parameters",
++        "--add-modules",
++        "jdk.unsupported",
++    ],
++    plugins = [
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.TruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyTruffleProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.LanguageRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionalResourceRegistrationProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.InstrumentableProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.verify.VerifyCompilationFinalProcessor",
++        "//truffle:mx_plugin.TRUFFLE_DSL_PROCESSOR.com.oracle.truffle.dsl.processor.OptionProcessor",
++    ],
++    visibility = ["//visibility:public"],
++    deps = [
++        ":SULONG_API",
++        ":com.oracle.truffle.llvm",
++        ":com.oracle.truffle.llvm.api",
++        ":com.oracle.truffle.llvm.runtime",
++        ":com.oracle.truffle.llvm.spi",
++        ":com.oracle.truffle.llvm.tests",
++        ":com.oracle.truffle.llvm.tests.pipe",
++        "//sdk:POLYGLOT",
++        "//truffle:TRUFFLE_API",
++        "//truffle:TRUFFLE_NFI",
++        "//truffle:TRUFFLE_TCK",
++        "@contrib_rules_jvm_deps//:junit_junit",
++        "@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
++    ],
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.BufferInteropTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.BufferInteropTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.BufferNativeInteropTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.BufferNativeInteropTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.CancelTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.CancelTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.CmpXChgTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.CmpXChgTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.CxxInheritedFieldsTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.CxxInheritedFieldsTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.CxxInheritedFieldsTest2",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.CxxInheritedFieldsTest2",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.CxxMembersTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.CxxMembersTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.CxxMethodsTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.CxxMethodsTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.CxxVTableTest1",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.CxxVTableTest1",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.CxxVTableTest2",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.CxxVTableTest2",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.CxxVTableTest3",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.CxxVTableTest3",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.CxxVirtualInheritanceFieldTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.CxxVirtualInheritanceFieldTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.DecorateFunctionTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.DecorateFunctionTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.DelayedInitTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.DelayedInitTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.DerefHandleTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.DerefHandleTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.DynamicTypeCastInteropTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.DynamicTypeCastInteropTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.FitsInTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.FitsInTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.HardExitTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.HardExitTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.HostAllocatedNativePointer",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.HostAllocatedNativePointer",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.InteropCallTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.InteropCallTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.LLVMInteropTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.LLVMInteropTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.ManagedMemmoveTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.ManagedMemmoveTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.ManagedMemsetTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.ManagedMemsetTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.MembersTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.MembersTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.MultiContextBuiltinsTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.MultiContextBuiltinsTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.NameBasedInteropTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.NameBasedInteropTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.NativeMemsetTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.NativeMemsetTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.NativeSignatureTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.NativeSignatureTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.NaturalExitTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.NaturalExitTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.PThreadDestructorTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.PThreadDestructorTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.PointerArithmeticDerefTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.PointerArithmeticDerefTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.PointerArithmeticTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.PointerArithmeticTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.PointerCompareTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.PointerCompareTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.PolyglotArrayToNativeTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.PolyglotArrayToNativeTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.PolyglotBuiltinTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.PolyglotBuiltinTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.PolyglotPrimitivesTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.PolyglotPrimitivesTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.PolyglotScopeTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.PolyglotScopeTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.PolyglotToolchainTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.PolyglotToolchainTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.PrimitiveArrayInteropTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.PrimitiveArrayInteropTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.PyObjectTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.PyObjectTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.ReadPolyglotArrayTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.ReadPolyglotArrayTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.ResolveFunctionTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.ResolveFunctionTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.SlowPathCallTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.SlowPathCallTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.StringTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.StringTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.SulongBuiltinsTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.SulongBuiltinsTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.ThreadsInteropTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.ThreadsInteropTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.TimeConversionTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.TimeConversionTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.TimeZoneConversionTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.TimeZoneConversionTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.TmStructConversionTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.TmStructConversionTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.TypeCheckTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.TypeCheckTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.TypedExportTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.TypedExportTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.TypedInteropTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.TypedInteropTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.VAListInteropTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.VAListInteropTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.WritePolyglotArrayTest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.WritePolyglotArrayTest",
++)
++
++mx_test_class(
++    name = "com.oracle.truffle.llvm.tests.interop.com.oracle.truffle.llvm.tests.interop.nfi.BasicNFIAPITest",
++    data = [":com.oracle.truffle.llvm.tests.pipe.native.library"],
++    jvm_flags = ["-Dtest.pipe.lib=$${TEST_SRCDIR}/$(rlocationpath :com.oracle.truffle.llvm.tests.pipe.native.library)"],
++    project = ":com.oracle.truffle.llvm.tests.interop",
++    tags = ["manual"],
++    test_class = "com.oracle.truffle.llvm.tests.interop.nfi.BasicNFIAPITest",
++)
++
++mx_whole_java(
++    name = "com.oracle.truffle.llvm.tests.llirtestgen",
++    testonly = True,
++    srcs = ["//sulong/tests/com.oracle.truffle.llvm.tests.llirtestgen/src/com/oracle/truffle/llvm/tests/llirtestgen:com.oracle.truffle.llvm.tests.llirtestgen.srcs"],
++    javac_opts = [
++        "--release",
++        "21",
++        "-parameters",
++    ],
++    unified_release = 21,
++    visibility = ["//visibility:public"],
++    deps = [":com.oracle.truffle.llvm.tests"],
 +)
 +
 +mx_processed_java(
@@ -647,6 +1575,24 @@ new file mode 100644
 +        ":com.oracle.truffle.llvm.parser",
 +        "//sdk:POLYGLOT",
 +    ],
++)
++
++mx_jar_dist(
++    name = "LLIR_TEST_GEN",
++    testonly = True,
++    contents = [":com.oracle.truffle.llvm.tests.llirtestgen"],
++    jni_services = True,
++    manifest = {
++        "Implementation-Vendor": "Oracle Corporation",
++        "Implementation-Version": "25.6.0-dev",
++        "Main-Class": "com.oracle.truffle.llvm.tests.llirtestgen.LLIRTestGen",
++        "Name": "llir-test-gen",
++        "Specification-Vendor": "Oracle Corporation",
++        "Specification-Version": "25.6.0-dev",
++    },
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [":SULONG_TEST"],
 +)
 +
 +mx_pom_dist(
@@ -976,6 +1922,53 @@ new file mode 100644
 +        ":SULONG_NFI",
 +        ":SULONG_TOOLCHAIN_LAUNCHERS",
 +        "//truffle:TRUFFLE_RUNTIME",
++    ],
++)
++
++mx_jar_dist(
++    name = "SULONG_TEST",
++    testonly = True,
++    contents = [
++        ":com.oracle.truffle.llvm.tests.pipe",
++        ":com.oracle.truffle.llvm.tests.harness",
++        ":com.oracle.truffle.llvm.tests",
++    ],
++    jni_services = True,
++    manifest = {
++        "Implementation-Vendor": "Oracle Corporation",
++        "Implementation-Version": "25.6.0-dev",
++        "Name": "sulong-test-darwin-aarch64",
++        "Specification-Vendor": "Oracle Corporation",
++        "Specification-Version": "25.6.0-dev",
++    },
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [
++        "//truffle:TRUFFLE_TCK",
++        "@contrib_rules_jvm_deps//:junit_junit",
++        "@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
++    ],
++)
++
++mx_jar_dist(
++    name = "SULONG_TEST_API",
++    testonly = True,
++    contents = [":com.oracle.truffle.llvm.tests.api"],
++    jni_services = True,
++    manifest = {
++        "Implementation-Vendor": "Oracle Corporation",
++        "Implementation-Version": "25.6.0-dev",
++        "Name": "sulong-test-api",
++        "Specification-Vendor": "Oracle Corporation",
++        "Specification-Version": "25.6.0-dev",
++    },
++    truffle_services = True,
++    visibility = ["//visibility:public"],
++    deps = [
++        ":SULONG_API",
++        ":SULONG_TEST",
++        "@contrib_rules_jvm_deps//:junit_junit",
++        "@contrib_rules_jvm_deps//:org_hamcrest_hamcrest_core",
 +    ],
 +)
 +
@@ -8316,6 +9309,120 @@ new file mode 100644
 +    visibility = ["//visibility:public"],
 +    runtime_deps = [":tools"],
 +)
+diff --git a/sulong/tests/com.oracle.truffle.llvm.tests/src/META-INF/services/BUILD.bazel b/sulong/tests/com.oracle.truffle.llvm.tests/src/META-INF/services/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/tests/com.oracle.truffle.llvm.tests/src/META-INF/services/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.tests.resources",
++    srcs = ["com.oracle.truffle.llvm.tests.services.TestEngineConfig"],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/tests/com.oracle.truffle.llvm.tests/src/com/oracle/truffle/llvm/tests/BUILD.bazel b/sulong/tests/com.oracle.truffle.llvm.tests/src/com/oracle/truffle/llvm/tests/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/tests/com.oracle.truffle.llvm.tests/src/com/oracle/truffle/llvm/tests/BUILD.bazel
+@@ -0,0 +1,25 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.tests.srcs",
++    srcs = [
++        "BaseSuiteHarness.java",
++        "BaseSulongOnlyHarness.java",
++        "CallbackTest.java",
++        "CaptureOutputTest.java",
++        "CommonTestUtils.java",
++        "GccCSuite.java",
++        "GccCppSuite.java",
++        "GccSuiteBase.java",
++        "LLVMSuite.java",
++        "MainArgsTest.java",
++        "NWCCSuite.java",
++        "ParserTortureSuite.java",
++        "Platform.java",
++        "ShootoutsSuite.java",
++        "SulongSuite.java",
++        "TestCaseCollector.java",
++        "VAArgsTest.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/tests/com.oracle.truffle.llvm.tests/src/com/oracle/truffle/llvm/tests/linker/BUILD.bazel b/sulong/tests/com.oracle.truffle.llvm.tests/src/com/oracle/truffle/llvm/tests/linker/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/tests/com.oracle.truffle.llvm.tests/src/com/oracle/truffle/llvm/tests/linker/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.tests.srcs",
++    srcs = ["LoaderTest.java"],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/tests/com.oracle.truffle.llvm.tests/src/com/oracle/truffle/llvm/tests/options/BUILD.bazel b/sulong/tests/com.oracle.truffle.llvm.tests/src/com/oracle/truffle/llvm/tests/options/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/tests/com.oracle.truffle.llvm.tests/src/com/oracle/truffle/llvm/tests/options/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.tests.srcs",
++    srcs = ["TestOptions.java"],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/tests/com.oracle.truffle.llvm.tests/src/com/oracle/truffle/llvm/tests/other/BUILD.bazel b/sulong/tests/com.oracle.truffle.llvm.tests/src/com/oracle/truffle/llvm/tests/other/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/tests/com.oracle.truffle.llvm.tests/src/com/oracle/truffle/llvm/tests/other/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.tests.srcs",
++    srcs = ["EagerParsingLazyFailingTest.java"],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/tests/com.oracle.truffle.llvm.tests/src/com/oracle/truffle/llvm/tests/services/BUILD.bazel b/sulong/tests/com.oracle.truffle.llvm.tests/src/com/oracle/truffle/llvm/tests/services/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/tests/com.oracle.truffle.llvm.tests/src/com/oracle/truffle/llvm/tests/services/BUILD.bazel
+@@ -0,0 +1,15 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.tests.srcs",
++    srcs = [
++        "AOTCacheLoadNativeTestEngineConfig.java",
++        "AOTCacheStoreNativeTestEngineConfig.java",
++        "AOTDebugCacheTestEngineConfig.java",
++        "DryRunTestEngineConfig.java",
++        "NativeTestEngineConfig.java",
++        "TestEngineConfig.java",
++        "TestEngineConfigBase.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/tests/com.oracle.truffle.llvm.tests/src/com/oracle/truffle/llvm/tests/util/BUILD.bazel b/sulong/tests/com.oracle.truffle.llvm.tests/src/com/oracle/truffle/llvm/tests/util/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/tests/com.oracle.truffle.llvm.tests/src/com/oracle/truffle/llvm/tests/util/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.tests.srcs",
++    srcs = [
++        "PathUtil.java",
++        "ProcessHarnessManager.java",
++        "ProcessUtil.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
 diff --git a/sulong/tests/com.oracle.truffle.llvm.tests.api/src/com/oracle/truffle/llvm/tests/api/BUILD.bazel b/sulong/tests/com.oracle.truffle.llvm.tests.api/src/com/oracle/truffle/llvm/tests/api/BUILD.bazel
 new file mode 100644
 --- /dev/null
@@ -8328,6 +9435,29 @@ new file mode 100644
 +    srcs = ["ToolchainAPITest.java"],
 +    visibility = ["//sulong:__pkg__"],
 +)
+diff --git a/sulong/tests/com.oracle.truffle.llvm.tests.debug/src/com/oracle/truffle/llvm/tests/debug/BUILD.bazel b/sulong/tests/com.oracle.truffle.llvm.tests.debug/src/com/oracle/truffle/llvm/tests/debug/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/tests/com.oracle.truffle.llvm.tests.debug/src/com/oracle/truffle/llvm/tests/debug/BUILD.bazel
+@@ -0,0 +1,18 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.tests.debug.srcs",
++    srcs = [
++        "ContinueStrategy.java",
++        "LLVMDebugExprParserTest.java",
++        "LLVMDebugTest.java",
++        "LLVMDebugTestBase.java",
++        "LLVMDebugValue.java",
++        "LLVMIRDebugTest.java",
++        "StopRequest.java",
++        "TestExpressions.java",
++        "Trace.java",
++        "TraceWriter.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
 diff --git a/sulong/tests/com.oracle.truffle.llvm.tests.harness/src/com/oracle/truffle/llvm/tests/harness/BUILD.bazel b/sulong/tests/com.oracle.truffle.llvm.tests.harness/src/com/oracle/truffle/llvm/tests/harness/BUILD.bazel
 new file mode 100644
 --- /dev/null
@@ -8338,6 +9468,227 @@ new file mode 100644
 +mx_files(
 +    name = "com.oracle.truffle.llvm.tests.harness.srcs",
 +    srcs = ["TestHarness.java"],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/tests/com.oracle.truffle.llvm.tests.internal/src/com/oracle/truffle/llvm/tests/internal/BUILD.bazel b/sulong/tests/com.oracle.truffle.llvm.tests.internal/src/com/oracle/truffle/llvm/tests/internal/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/tests/com.oracle.truffle.llvm.tests.internal/src/com/oracle/truffle/llvm/tests/internal/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.tests.internal.srcs",
++    srcs = [
++        "MDTypeTest.java",
++        "RoundingModeTest.java",
++        "TargetTripleTest.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/tests/com.oracle.truffle.llvm.tests.internal/src/com/oracle/truffle/llvm/tests/internal/bitcode/BUILD.bazel b/sulong/tests/com.oracle.truffle.llvm.tests.internal/src/com/oracle/truffle/llvm/tests/internal/bitcode/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/tests/com.oracle.truffle.llvm.tests.internal/src/com/oracle/truffle/llvm/tests/internal/bitcode/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.tests.internal.srcs",
++    srcs = [
++        "AllocationLimitsTest.java",
++        "BigEndianTest.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/tests/com.oracle.truffle.llvm.tests.internal/src/com/oracle/truffle/llvm/tests/internal/bitcodeformat/BUILD.bazel b/sulong/tests/com.oracle.truffle.llvm.tests.internal/src/com/oracle/truffle/llvm/tests/internal/bitcodeformat/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/tests/com.oracle.truffle.llvm.tests.internal/src/com/oracle/truffle/llvm/tests/internal/bitcodeformat/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.tests.internal.srcs",
++    srcs = [
++        "BitcodeFormatTest.java",
++        "InvalidBitcodeTest.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/tests/com.oracle.truffle.llvm.tests.internal/src/com/oracle/truffle/llvm/tests/internal/types/BUILD.bazel b/sulong/tests/com.oracle.truffle.llvm.tests.internal/src/com/oracle/truffle/llvm/tests/internal/types/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/tests/com.oracle.truffle.llvm.tests.internal/src/com/oracle/truffle/llvm/tests/internal/types/BUILD.bazel
+@@ -0,0 +1,11 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.tests.internal.srcs",
++    srcs = [
++        "LLVMIVarBitSmallTest.java",
++        "RecursiveTypesTest.java",
++        "VariableBitLimitsTest.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/tests/com.oracle.truffle.llvm.tests.internal/src/com/oracle/truffle/llvm/tests/internal/types/floating/BUILD.bazel b/sulong/tests/com.oracle.truffle.llvm.tests.internal/src/com/oracle/truffle/llvm/tests/internal/types/floating/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/tests/com.oracle.truffle.llvm.tests.internal/src/com/oracle/truffle/llvm/tests/internal/types/floating/BUILD.bazel
+@@ -0,0 +1,25 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.tests.internal.srcs",
++    srcs = [
++        "LLVM80BitCompareTest.java",
++        "LLVM80BitConstantsTest.java",
++        "LLVM80BitFromBytesTest.java",
++        "LLVM80BitFromDoubleTest.java",
++        "LLVM80BitFromIntTest.java",
++        "LLVM80BitFromLongTest.java",
++        "LLVM80BitFromUnsignedIntTest.java",
++        "LLVM80BitFromUnsignedLongTest.java",
++        "LLVM80BitGetByteTest.java",
++        "LLVM80BitGetDoubleTest.java",
++        "LLVM80BitGetFloatTest.java",
++        "LLVM80BitGetIntTest.java",
++        "LLVM80BitGetLongTest.java",
++        "LLVM80BitGetShortTest.java",
++        "LLVM80BitMixedTests.java",
++        "LLVM80BitTest.java",
++        "LLVMIVarBitTest.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/tests/com.oracle.truffle.llvm.tests.interop/src/com/oracle/truffle/llvm/tests/interop/BUILD.bazel b/sulong/tests/com.oracle.truffle.llvm.tests.interop/src/com/oracle/truffle/llvm/tests/interop/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/tests/com.oracle.truffle.llvm.tests.interop/src/com/oracle/truffle/llvm/tests/interop/BUILD.bazel
+@@ -0,0 +1,71 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.tests.interop.srcs",
++    srcs = [
++        "AbstractExitTest.java",
++        "BufferInteropTest.java",
++        "BufferNativeInteropTest.java",
++        "CancelTest.java",
++        "CmpXChgTest.java",
++        "CxxInheritedFieldsTest.java",
++        "CxxInheritedFieldsTest2.java",
++        "CxxInheritedFieldsTest2_Helpers.java",
++        "CxxMembersTest.java",
++        "CxxMethodsTest.java",
++        "CxxVTableTest1.java",
++        "CxxVTableTest1_TestClass.java",
++        "CxxVTableTest2.java",
++        "CxxVTableTest3.java",
++        "CxxVirtualInheritanceFieldTest.java",
++        "DecorateFunctionTest.java",
++        "DelayedInitTest.java",
++        "DerefHandleTest.java",
++        "DynamicTypeCastInteropTest.java",
++        "FitsInTest.java",
++        "HardExitTest.java",
++        "HostAllocatedNativePointer.java",
++        "InteropCallTest.java",
++        "InteropTestBase.java",
++        "LLVMInteropTest.java",
++        "ManagedMemAccessTestBase.java",
++        "ManagedMemmoveTest.java",
++        "ManagedMemsetTest.java",
++        "MembersTest.java",
++        "MultiContextBuiltinsTest.java",
++        "NameBasedInteropTest.java",
++        "NativeMemsetTest.java",
++        "NativeSignatureTest.java",
++        "NaturalExitTest.java",
++        "PThreadDestructorTest.java",
++        "PointerArithmeticDerefTest.java",
++        "PointerArithmeticTest.java",
++        "PointerCompareTest.java",
++        "PolyglotArrayTestBase.java",
++        "PolyglotArrayToNativeTest.java",
++        "PolyglotBuiltinTest.java",
++        "PolyglotPrimitivesTest.java",
++        "PolyglotScopeTest.java",
++        "PolyglotToolchainTest.java",
++        "PrimitiveArrayInteropTest.java",
++        "PyObjectTest.java",
++        "ReadPolyglotArrayTest.java",
++        "ReadPolyglotArrayTestBase.java",
++        "ResolveFunctionTest.java",
++        "SlowPathCallTest.java",
++        "StringTest.java",
++        "SulongBuiltinsTest.java",
++        "ThreadsInteropTest.java",
++        "TimeConversionTest.java",
++        "TimeZoneConversionTest.java",
++        "TmStructConversionTest.java",
++        "TypeCheckTest.java",
++        "TypedExportTest.java",
++        "TypedInteropTest.java",
++        "VAListInteropTest.java",
++        "WritePolyglotArrayTest.java",
++        "WritePolyglotArrayTestBase.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/tests/com.oracle.truffle.llvm.tests.interop/src/com/oracle/truffle/llvm/tests/interop/nfi/BUILD.bazel b/sulong/tests/com.oracle.truffle.llvm.tests.interop/src/com/oracle/truffle/llvm/tests/interop/nfi/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/tests/com.oracle.truffle.llvm.tests.interop/src/com/oracle/truffle/llvm/tests/interop/nfi/BUILD.bazel
+@@ -0,0 +1,10 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.tests.interop.srcs",
++    srcs = [
++        "BasicNFIAPITest.java",
++        "NFIAPITest.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/tests/com.oracle.truffle.llvm.tests.interop/src/com/oracle/truffle/llvm/tests/interop/values/BUILD.bazel b/sulong/tests/com.oracle.truffle.llvm.tests.interop/src/com/oracle/truffle/llvm/tests/interop/values/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/tests/com.oracle.truffle.llvm.tests.interop/src/com/oracle/truffle/llvm/tests/interop/values/BUILD.bazel
+@@ -0,0 +1,21 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.tests.interop.srcs",
++    srcs = [
++        "ArrayObject.java",
++        "BoxedIntValue.java",
++        "BoxedStringValue.java",
++        "DoubleArrayObject.java",
++        "LongArrayObject.java",
++        "NativeValue.java",
++        "NullValue.java",
++        "StructObject.java",
++        "TestCallback.java",
++        "TestConstructor.java",
++        "TypedArrayObject.java",
++        "UntypedArrayObject.java",
++        "package-info.java",
++    ],
++    visibility = ["//sulong:__pkg__"],
++)
+diff --git a/sulong/tests/com.oracle.truffle.llvm.tests.llirtestgen/src/com/oracle/truffle/llvm/tests/llirtestgen/BUILD.bazel b/sulong/tests/com.oracle.truffle.llvm.tests.llirtestgen/src/com/oracle/truffle/llvm/tests/llirtestgen/BUILD.bazel
+new file mode 100644
+--- /dev/null
++++ b/sulong/tests/com.oracle.truffle.llvm.tests.llirtestgen/src/com/oracle/truffle/llvm/tests/llirtestgen/BUILD.bazel
+@@ -0,0 +1,7 @@
++load("@rules_mx//mx:graph.bzl", "mx_files")
++
++mx_files(
++    name = "com.oracle.truffle.llvm.tests.llirtestgen.srcs",
++    srcs = ["LLIRTestGen.java"],
 +    visibility = ["//sulong:__pkg__"],
 +)
 diff --git a/sulong/tests/com.oracle.truffle.llvm.tests.pipe/src/com/oracle/truffle/llvm/tests/pipe/BUILD.bazel b/sulong/tests/com.oracle.truffle.llvm.tests.pipe/src/com/oracle/truffle/llvm/tests/pipe/BUILD.bazel

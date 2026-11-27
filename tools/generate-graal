@@ -2236,6 +2236,13 @@ def prepare_suite(suite, stage):
     if suite == "sulong":
         export_options.extend(
             [
+                # CaptureOutputTest uses the inherited pipe runfile. The other
+                # classes also require the Sulong fixture configuration.
+                "--qualified-test-class", "com.oracle.truffle.llvm.tests",
+                "com.oracle.truffle.llvm.tests.CaptureOutputTest",
+                "--manual-test-project", "com.oracle.truffle.llvm.tests.debug",
+                "--manual-test-project", "com.oracle.truffle.llvm.tests.internal",
+                "--manual-test-project", "com.oracle.truffle.llvm.tests.interop",
                 "--whole-project",
                 "com.oracle.truffle.llvm.toolchain.launchers",
                 "--layout-dep", "sdk:LLVM_TOOLCHAIN=//sdk:LLVM_TOOLCHAIN",
