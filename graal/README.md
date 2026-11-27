@@ -217,7 +217,7 @@ The hosted tests (`SVM_HOSTED_TESTS`, mx's `svm-invariants-tests` configuration)
 
 ### Platform-specific parts
 
-- The LLVM backend (`SVM_LLVM`) compiles against the shadowed LLVM and JavaCPP JARs that mx downloads by URL. `graal/svm_inputs.json` pins them for Linux AMD64, Linux AArch64 and macOS AArch64, and a module extension fetches each one only when a build needs it. mx names the modules of the platform-specific JARs for the host it runs on, so `SVM_LLVM` requires them through a `select()`. The `llvm.bin.dir` property that mx passes to images using the backend is not set, and no test builds an image with the LLVM backend.
+- The LLVM backend (`SVM_LLVM`) compiles against the shadowed LLVM and JavaCPP JARs that mx downloads by URL. `graal/svm_inputs.json` pins them for Linux AMD64, Linux AArch64 and macOS AArch64, and a module extension fetches each one only when a build needs it. mx names the modules of the platform-specific JARs for the host it runs on, so `SVM_LLVM` requires them through a `select()`. On Linux x86-64 and AArch64 the source-built launcher installs the tool declared by mx and sets `llvm.bin.dir` to the checksum-pinned Elide toolchain. `//graal:source_native_image_llvm_test` builds and runs an LLVM-backend executable on Linux RBE. Sulong IR fixture actions also use Elide’s `llvm-link`. The Graal LLVM redistribution, guest runtime sources, and shadowed LLVM Java binding are still separate inputs. [LLVM consolidation](https://github.com/elide-dev/toolchain/issues/55)
 - `SVM_GRAALVM_SUPPORT` packages the debug helpers, `SVM_HOSTED_NATIVE`, the reporter library, zstd-jni, the reachability metadata schema and the skills. On macOS AArch64 it also contains the pinned standalone `ld64.lld`.
 - `com.oracle.svm.native.jvm.windows` is compatible only with Windows targets. rules_mx pins no Windows Labs JDK, so building it also needs a Windows Labs JDK registered as `//tools:labs_runtime` for the JVM function fallbacks.
 
@@ -262,7 +262,7 @@ Run `tools/generate-graal --check` to reproduce the checked-in patches and pins 
 | Truffle upstream gates | Qualify the remaining gate configurations, including broader optimized-runtime and platform coverage. |
 | Tools upstream gates | Run the signature checks and qualify the test harness on the named module path. |
 | Compiler test gates | Qualify more classes from the compiler distribution, including architecture-specific backends and VM-specific test configurations. |
-| SubstrateVM gates | Run the remaining native unit test groups, the debug info tests and an LLVM backend image, and qualify Windows. |
+| SubstrateVM gates | Run the remaining native unit test groups, the debug info tests, and qualify Windows. |
 | Languages and tools | Complete the remaining Sulong, Wasm, Espresso, Visualizer and Sandbox Toolchains roots. Qualify each language installation with its upstream tests. |
 | VM assembly | Pin the external components required by each selected VM configuration. Assemble the distribution and run its launchers, component tests and corresponding mx gate equivalents from a clean Linux RBE build. |
 

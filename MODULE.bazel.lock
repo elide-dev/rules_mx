@@ -327,7 +327,7 @@
   "moduleExtensions": {
     "//graal:sdk_llvm.bzl%sdk_llvm_inputs": {
       "general": {
-        "bzlTransitiveDigest": "vt1bHAGSmSFACFSKmaodG60gGr7526E6gRoSMYTygE4=",
+        "bzlTransitiveDigest": "XkThUl2LuoBoYuYm/H7psw7jciOa4NGjyveaAvgSjSI=",
         "usagesDigest": "mdfQkY+sx6AtTtEIwXZiYGzN+1t0M0aErz90qzFE17Q=",
         "recordedInputs": [
           "REPO_MAPPING:,bazel_tools bazel_tools",
