@@ -400,13 +400,17 @@ def _native_image_root_impl(ctx):
         arguments = [args],
         mnemonic = "SvmAssembly",
     )
+    llvm_config = ""
+    if ctx.files.llvm_tools:
+        [config] = [f for f in ctx.files.llvm_tools if f.basename == "llvm-config"]
+        llvm_config = _runfile(ctx, config)
     ctx.actions.expand_template(
         template = ctx.file._template,
         output = ctx.outputs.out,
         substitutions = {
             "{SVM_ROOT}": repr(_runfile(ctx, root)),
             "{CC}": repr(_runfile(ctx, compiler)),
-            "{LLVM_BACKEND}": repr(bool(ctx.attr.llvm_tools)),
+            "{LLVM_CONFIG}": repr(llvm_config),
         },
     )
     return [
