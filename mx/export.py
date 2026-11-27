@@ -3374,6 +3374,13 @@ def bazel_buildfile(args):
         metavar="PROJECT",
         help="compile checked-in sources of a project whose mx build regenerates them",
     )
+    parser.add_argument(
+        "--standalone-archive-recipe",
+        action="append",
+        default=[],
+        metavar="DIST",
+        help="export the release prefix and installation label for a custom standalone",
+    )
     options = parser.parse_args(args)
     if options.all:
         if not options.gazelle or options.projects:
@@ -3415,6 +3422,19 @@ def bazel_buildfile(args):
                     selected.update(closure)
         result = _lower_buildfile(parser, options, bindings, selected)
         if options.gazelle:
+            if options.standalone_archive_recipe:
+                recipes = {}
+                for name in options.standalone_archive_recipe:
+                    matches = [
+                        dist
+                        for dist in mx.primary_suite().dists
+                        if _standalone_archive(dist)
+                        and name in (dist.name, getattr(dist, "declaration_name", None))
+                    ]
+                    if len(matches) != 1:
+                        raise _UnsupportedLowering(f"{name}: expected one standalone release archive")
+                    recipes[name] = _release_archive(matches[0], [])
+                result["standalone_archive_recipes"] = recipes
             if options.substitution:
                 from mx._impl import mx_subst
 

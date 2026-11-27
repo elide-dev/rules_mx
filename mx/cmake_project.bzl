@@ -21,6 +21,8 @@ _installed = rule(
     attrs = {"project": attr.label(mandatory = True), "member": attr.string(mandatory = True), "with_archive": attr.bool()},
 )
 
+mx_cmake_output = _installed
+
 def mx_cmake_project(name, srcs, compiler, config, include_dirs, profiles, testonly = False, visibility = None, source_subdir = "", wrapper = None, max_jobs = 0, directories = {}):
     """Apply the selected mx CMake configuration, build targets, and installed results."""
     src_group = name + ".cmake_sources"

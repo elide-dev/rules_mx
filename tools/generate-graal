@@ -2248,6 +2248,10 @@ def prepare_suite(suite, stage, peers=()):
             "--substitution", "abiflags", "<graalpy_abiflags>",
             "--substitution", "abi", "<abi_version>",
             "--substitution", "graal_version", "<graal_ver:major_minor>",
+            "--substitution", "graal_version_full", "<graal_ver:default>",
+            "--substitution", "graal_version_hex", "<graal_ver:hex>",
+            "--substitution", "python_version", "<py_ver:major_minor>",
+            "--standalone-archive-recipe", "GRAALPY_JVM_STANDALONE_RELEASE_ARCHIVE",
         ]
     elif suite in PARTIAL_SUITES:
         truffle = runpy.run_path(str(stage / "truffle/mx.truffle/suite.py"))["suite"]
@@ -2476,7 +2480,8 @@ def prepare_suite(suite, stage, peers=()):
         return
     if suite == "graalpython":
         metadata = runpy.run_path(str(directory / "mx.graalpython/suite.py"))["suite"]
-        values = json.loads((directory / "mx-graph.json").read_text())["substitutions"]
+        graph = json.loads((directory / "mx-graph.json").read_text())
+        values = graph["substitutions"]
         projects = metadata["projects"]
         main_class = projects["graalpy_thin_launcher"]["mainClass"]
         header_dir = "graalpython/com.oracle.graal.python.cext/include"
@@ -2487,10 +2492,36 @@ def prepare_suite(suite, stage, peers=()):
                 "libgraalpy": "python-libgraalpy",
             }.items()
         }
+        posix = projects["python-libposix"]
+        posix_platforms = {
+            system: posix["os_arch"].get(system, posix["os_arch"]["<others>"])["<others>"]
+            for system in ("linux", "darwin")
+        }
+        posix_copts = {
+            system: posix["cflags"] + platform.get("cflags", [])
+            for system, platform in posix_platforms.items()
+        }
+        posix_linkopts = {
+            system: platform.get("ldlibs", []) for system, platform in posix_platforms.items()
+        }
+        layouts = metadata["distributions"]
+        launchers = [
+            path.replace("<exe:", "").replace(">", "")
+            for path in layouts["GRAALPY_STANDALONE_COMMON"]["layout"]
+            if path.startswith(("bin/<exe:", "libexec/<exe:"))
+        ]
+        jdk_exclude = layouts["GRAALPY_JVM_STANDALONE"]["layout"]["jvm/"]["exclude"]
+        release_recipe = graph["standalone_archive_recipes"]["GRAALPY_JVM_STANDALONE_RELEASE_ARCHIVE"]
+        licenses = {
+            projects["graalpy_licenses"][key]: projects["graalpy_licenses"][key]
+            for key in ("community_license_file", "community_3rd_party_license_file")
+        }
+        cext = "graalpython/com.oracle.graal.python.cext"
+        cext_results = projects["com.oracle.graal.python.cext"]["os_arch"]["<others>"]["<others>"]["results"]
         (directory / "BUILD.bazel").write_text(
             'load("@rules_java//java:java_binary.bzl", "java_binary")\n'
             'load("@rules_java//java:java_plugin.bzl", "java_plugin")\n'
-            'load("@rules_mx//graal:graalpy.bzl", "graalpy_resources")\n'
+            'load("@rules_mx//graal:graalpy.bzl", "graalpy_frozen_modules", "graalpy_jvm_standalone", "graalpy_resources")\n'
             'load("@rules_python//python:py_test.bzl", "py_test")\n'
             + "".join(
                 f'java_plugin(name = "py_processor.{name}", processor_class = {json.dumps(processor)}, '
@@ -2503,6 +2534,12 @@ def prepare_suite(suite, stage, peers=()):
             + f'    headers = {{p: p[len("{header_dir}/"):] for p in glob(["{header_dir}/**"])}},\n'
             + '    zsupport_srcs = glob(["graalpython/python-libzsupport/src/**/*.c"]),\n'
             + f'    zsupport_copts = {json.dumps(projects["python-libzsupport"]["cflags"])},\n'
+            + '    posix_srcs = glob(["graalpython/python-libposix/src/**/*"]),\n'
+            + f"    posix_copts = {json.dumps(posix_copts)},\n"
+            + f"    posix_linkopts = {json.dumps(posix_linkopts)},\n"
+            + '    pyconfig_srcs = glob(["graalpython/graalpy-pyconfig/**/*"]),\n'
+            + f'    cext_srcs = glob(["{cext}/**/*"]),\n'
+            + f"    cext_results = {json.dumps(cext_results)},\n"
             + ")\n"
             + "PY_OPTIONS = [\n"
             '    "--experimental-options",\n'
@@ -2513,11 +2550,29 @@ def prepare_suite(suite, stage, peers=()):
             '    "--python.UnicodeCharacterDatabaseNativeFallback=false",\n'
             '    "--python.CompressionModulesBackend=native",\n'
             "]\n"
+            + 'PY_RUNTIME = [":com.oracle.graal.python", ":com.oracle.graal.python.resources", '
+            '":com.oracle.graal.python.shell", "//truffle:TRUFFLE_RUNTIME"] + PY_RESOURCES\n'
+            + 'graalpy_frozen_modules(name = "frozen_modules", runtime = PY_RUNTIME, '
+            f'launcher = {json.dumps(main_class)}, '
+            'script = "graalpython/com.oracle.graal.python.frozen/freeze_modules.py", '
+            'stdlib = "graalpython/lib-python/3/__future__.py", '
+            'index = "//graalpython/graalpython/com.oracle.graal.python/src/com/oracle/graal/python/builtins/objects/module:FrozenModules.java", '
+            'srcs = glob(["graalpython/lib-python/3/**/*.py", "graalpython/lib-graalpython/**/*.py", '
+            '"graalpython/com.oracle.graal.python.frozen/flag.py"]), visibility = ["//visibility:public"])\n'
+            + 'graalpy_jvm_standalone(runtime = PY_RUNTIME + [":frozen_modules"], '
+            f'main_class = {json.dumps(main_class)}, launchers = {json.dumps(launchers)}, '
+            f'licenses = {json.dumps(licenses)}, jdk_exclude = {json.dumps(jdk_exclude)}, '
+            f'prefix = {json.dumps(release_recipe["prefix"])}, '
+            'args = ["--experimental-options"])\n'
             + f'java_binary(name = "python", main_class = {json.dumps(main_class)}, '
             'args = PY_OPTIONS, '
             'jvm_flags = ["--enable-native-access=ALL-UNNAMED"], '
-            'runtime_deps = [":com.oracle.graal.python", ":com.oracle.graal.python.resources", '
-            '":com.oracle.graal.python.shell", "//truffle:TRUFFLE_RUNTIME"] + PY_RESOURCES, '
+            'runtime_deps = PY_RUNTIME, '
+            'visibility = ["//visibility:public"])\n'
+            + 'py_test(name = "jvm_standalone_test", size = "medium", '
+            'srcs = ["@rules_mx//graal:graalpy_standalone_test.py"], main = "graalpy_standalone_test.py", '
+            'args = ["$(rootpath :GRAALPY_JVM_STANDALONE_RELEASE_ARCHIVE)", "$(rootpath graalpython/lib-python/3/test/test_zlib.py)"], '
+            'data = [":GRAALPY_JVM_STANDALONE_RELEASE_ARCHIVE", "graalpython/lib-python/3/test/test_zlib.py"], '
             'visibility = ["//visibility:public"])\n'
             + "".join(
                 f'py_test(name = "zlib/{case}", size = "small", '

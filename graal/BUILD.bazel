@@ -17,6 +17,7 @@ exports_files([
     "jfr_allocation_samples.patch",
     "js_regression.py",
     "graalpy_test.py",
+    "graalpy_standalone_test.py",
     "svm_llvm_scalar_vector.patch",
     "profiler_sample_timeout.patch",
     "wasm_exports_test.patch",
@@ -49,6 +50,11 @@ exports_files([
     "visualvm.json",
     "toolchain_test.py",
 ])
+
+py_binary(
+    name = "graalpy_freeze",
+    srcs = ["graalpy_freeze.py"],
+)
 
 [
     config_setting(
