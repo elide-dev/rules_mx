@@ -2758,18 +2758,6 @@ def main():
                 shutil.copytree(
                     source / suite / f"mx.{suite}", stage / suite / f"mx.{suite}"
                 )
-        for suite, patches in {
-            "espresso": ("espresso_static_libraries.patch", "espresso_platform_properties.patch"),
-            "sulong": ("sulong_external_tests.patch",),
-        }.items():
-            if suite in (*selected, *providers):
-                for filename in patches:
-                    patch = ROOT / "graal" / filename
-                    if subprocess.run(
-                        ["git", "apply", "--reverse", "--check", str(patch)],
-                        cwd=stage, stderr=subprocess.DEVNULL,
-                    ).returncode:
-                        subprocess.run(["git", "apply", str(patch)], cwd=stage, check=True)
         for suite in SUITES:
             for directory in (f"mx.{suite}", "src"):
                 rel = Path(suite) / directory
@@ -2780,6 +2768,19 @@ def main():
                         "BUILD", "BUILD.bazel", "__pycache__"
                     ),
                 )
+        for suite, patches in {
+            "espresso": ("espresso_static_libraries.patch", "espresso_platform_properties.patch"),
+            "sulong": ("sulong_external_tests.patch",),
+            "substratevm": ("svm_llvm_scalar_vector.patch",),
+        }.items():
+            if suite in (*selected, *providers):
+                for filename in patches:
+                    patch = ROOT / "graal" / filename
+                    if subprocess.run(
+                        ["git", "apply", "--reverse", "--check", str(patch)],
+                        cwd=stage, stderr=subprocess.DEVNULL,
+                    ).returncode:
+                        subprocess.run(["git", "apply", str(patch)], cwd=stage, check=True)
         if "espresso" in (*selected, *providers):
             patch = ROOT / "graal/espresso_native_image.patch"
             if subprocess.run(["git", "apply", "--reverse", "--check", str(patch)], cwd=stage, stderr=subprocess.DEVNULL).returncode:
