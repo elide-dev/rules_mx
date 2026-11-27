@@ -1772,6 +1772,8 @@ def svm_native_rules(directory):
         'svm_launcher(name = "native-image"'
         + ", component_jars = " + json.dumps({"//" + dep: path for dep, path in components["builder_jars"].items()}, sort_keys=True)
         + ", component_layouts = " + json.dumps({"//" + dep: path for dep, path in components["support_layouts"].items()}, sort_keys=True)
+        + ", llvm_jars = " + json.dumps({"//" + dep: path for dep, path in components["llvm_jars"].items()}, sort_keys=True)
+        + ", llvm_layouts = " + json.dumps({"//" + dep: path for dep, path in components["llvm_layouts"].items()}, sort_keys=True)
         + (f", builder_libs = {json.dumps(builder_libs)}" if builder_libs else "")
         + ")\n"
         + svm_graalvm_support(directory)
@@ -2316,7 +2318,7 @@ def prepare_suite(suite, stage):
             ),
         ]
     if suite == "substratevm":
-        export_options += ["--svm-macro", "tflsm"]
+        export_options += ["--svm-macro", "tflsm", "--svm-macro", "svml"]
     with (directory / "mx-graph.json").open("w") as graph:
         subprocess.run(
             [

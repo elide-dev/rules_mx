@@ -102,3 +102,13 @@ config_setting(
         "@platforms//cpu:aarch64",
     ],
 }.items()]
+
+
+alias(
+    name = "llvm_backend_tools",
+    actual = select({
+        "//tools:exec_linux_amd64": "@elide_toolchain_linux_amd64//:llvm_backend_tools",
+        "//tools:exec_linux_arm64": "@elide_toolchain_linux_arm64//:llvm_backend_tools",
+    }),
+    visibility = ["//visibility:public"],
+)
