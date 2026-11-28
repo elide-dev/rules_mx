@@ -47,9 +47,16 @@ build:buildbuddy-rbe --remote_executor=grpcs://elide-dev.buildbuddy.io
 
 build:elide-unified --@rules_elide//elide:unified_jvm_compile
 build:labsjdk --java_runtime_version=labsjdk_25
+
+common:dev --repo_env=RULES_MX_LIVE=1
+build:dev --config=elide-processors
+build:dev --config=labsjdk
+
 build:native-image-linux --extra_toolchains=//tools/cc:elide_cc_linux_amd64
 
 build:source-native-image --config=labsjdk
 build:source-native-image --tool_java_runtime_version=labsjdk_25
 build:source-native-image --config=elide-processors
 build:source-native-image --extra_toolchains=//graal:source_native_image_toolchain
+
+try-import %workspace%/user.bazelrc

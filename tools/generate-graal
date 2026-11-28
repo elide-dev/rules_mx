@@ -18,6 +18,19 @@ import tempfile
 import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def bazel_command(command):
+    bazel = os.environ.get("RULES_MX_GRAPH_BAZEL", "bazelisk")
+    output_base = os.environ.get("RULES_MX_GRAPH_OUTPUT_BASE")
+    if output_base:
+        args = [bazel, "--output_base=" + output_base, command, "--repo_env=RULES_MX_LIVE=0"]
+        if command in {"build", "run"}:
+            args.append("--symlink_prefix=/")
+        return args
+    return [bazel, command]
+
+
 SVM_SUPPORT_JARS = (
     "JVMTI_AGENT_BASE",
     "SVM_AGENT",
@@ -2420,8 +2433,7 @@ def prepare_suite(suite, stage, peers=()):
     with (directory / "mx-graph.json").open("w") as graph:
         subprocess.run(
             [
-                "bazelisk",
-                "run",
+                *bazel_command("run"),
                 "--config=labsjdk",
                 "//:mx",
                 "--",
@@ -2760,8 +2772,7 @@ def generate_build_files(suites, stage):
         return
     subprocess.run(
         [
-            "bazelisk",
-            "run",
+            *bazel_command("run"),
             "//:gazelle",
             "--",
             "-repo_root=" + str(stage),
@@ -2791,7 +2802,7 @@ def build_patch(directory, stage):
 
 def bazel_source(label):
     location = subprocess.check_output(
-        ["bazelisk", "query", "--output=location", label], cwd=ROOT, text=True
+        [*bazel_command("query"), "--output=location", label], cwd=ROOT, text=True
     )
     return Path(location.split(": source file ", 1)[0].rsplit(":", 2)[0])
 
@@ -2834,13 +2845,18 @@ def fetch_source(pin, stage):
     return root / pin["strip_prefix"], digest.hexdigest()
 
 
-def labsjdk_pin(source, current, selector, repository):
-    """Pin labsjdk-ce-latest from the selected source's common.json."""
+def labsjdk_pin(source, current, selector, repository, *, update):
+    """Resolve a Labs JDK version declared in the source's common.json."""
     version = json.loads((source / "common.json").read_text())["jdks"][selector][
         "version"
     ]
     if current.get("version") == version:
         return current
+    if not update:
+        raise SystemExit(
+            f"{source} requires {version}, but rules_mx pins {current['version']}. "
+            "Use a compatible Graal checkout or update the rules_mx input pins."
+        )
     jdk, jvmci = version.split("-jvmci-")
     request = urllib.request.Request(
         f"https://api.github.com/repos/graalvm/{repository}/releases/tags/jvmci-{jvmci}",
@@ -2926,6 +2942,7 @@ def main():
     if args.archive and args.strip_prefix is None:
         parser.error("--archive requires --strip-prefix")
     output = args.output.resolve()
+    live = bool(os.environ.get("RULES_MX_GRAPH_OUTPUT_BASE"))
     # Keep a downloaded tree outside the stage so mx sees one copy of each suite.
     with (
         tempfile.TemporaryDirectory() as temp,
@@ -2956,7 +2973,7 @@ def main():
             emit(
                 labsjdk if output == ROOT / "graal" else output / filename,
                 json.dumps(
-                    labsjdk_pin(source, current, selector, repository),
+                    labsjdk_pin(source, current, selector, repository, update=not live),
                     indent=2,
                     sort_keys=True,
                 )
@@ -2964,6 +2981,10 @@ def main():
                 args.check,
                 "Regenerate the Labs JDK pin with tools/generate-graal",
             )
+        if live:
+            # Bootstrap Gazelle before staging the sources so its cold build and
+            # the staged tree do not need temporary disk space at the same time.
+            subprocess.run([*bazel_command("build"), "//:gazelle"], cwd=ROOT, check=True)
         mx_suite = bazel_source("@graal_mx//:mx.mx/suite.py")
         shutil.copyfile(mx_suite, stage / "mx-suite.py")
         for family in ("gcc", "msvc"):

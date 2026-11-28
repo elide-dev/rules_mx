@@ -53,20 +53,17 @@ def main(config):
             source, _ = fetch_source(spec, download)
             source.rename(workspace / name)
 
-        dev = [
-            ROOT / "tools/graal-dev",
-            "--workspace",
-            workspace,
-            "--state-dir",
-            workspace / "overlays",
-        ]
-        if "--config=buildbuddy-rbe" in config:
-            dev.append("--buildbuddy")
-        options = ["--config=elide-processors", "--config=labsjdk", *config]
+        remote = "--config=buildbuddy-rbe" in config
+        options = ["--config=dev", f"--repo_env=RULES_MX_CHECKOUTS={workspace}"]
 
         def invoke(command, *args, **kwargs):
+            bazel = "bazelisk"
+            flags = options
+            if command != "query":
+                bazel = ROOT / "tools/buildbuddy" if remote else bazel
+                flags = [*flags, *config]
             return subprocess.run(
-                [*dev, command, *options, *args], cwd=ROOT, check=True, **kwargs
+                [bazel, command, *flags, *args], cwd=ROOT, check=True, **kwargs
             )
 
         def read_marker(launcher, marker):
@@ -88,26 +85,31 @@ def main(config):
                 raise
             return result.stdout.strip()
 
-        affected = subprocess.check_output(
-            [
-                *dev,
-                "query",
-                f'kind(".*_test rule", rdeps(@graal//graal-js:all + filter(":zlib/", @graal//graalpython:all) + {FIBONACCI}, {TRUFFLE_LABEL}))',
-            ],
-            cwd=ROOT,
+        affected = invoke(
+            "query",
+            f'kind(".*_test rule", rdeps(@graal//graal-js:all + filter(":zlib/", @graal//graalpython:all) + {FIBONACCI}, {TRUFFLE_LABEL}))',
+            stdout=subprocess.PIPE,
             text=True,
-        ).splitlines()
+        ).stdout.splitlines()
         if set(affected) != REGRESSIONS:
             raise SystemExit(
                 f"Unexpected test selection for the Truffle source edit {affected!r}"
             )
-        configured = sorted((workspace / "overlays").glob("*.current"))
-        if len(configured) != 1:
-            raise SystemExit(f"Expected one live overlay. Found {configured!r}")
+        location = invoke(
+            "query",
+            "--output=location",
+            "@graal//:mx-source.json",
+            stdout=subprocess.PIPE,
+            text=True,
+        ).stdout
+        manifest = Path(location.split(": source file ", 1)[0].rsplit(":", 2)[0])
+        configured = manifest.stat().st_mtime_ns
         for launcher, marker in LAUNCHERS.items():
             baseline = read_marker(launcher, marker)
             if baseline != "before":
-                raise SystemExit(f"Unexpected baseline output from {launcher}: {baseline!r}")
+                raise SystemExit(
+                    f"Unexpected baseline output from {launcher}: {baseline!r}"
+                )
         invoke("test", "--test_output=errors", *affected)
         truffle = workspace / "graal" / TRUFFLE_SOURCE
         source = truffle.read_text()
@@ -133,7 +135,7 @@ def main(config):
                 raise SystemExit(
                     f"{launcher} did not see the Truffle edit. Output was {changed!r}"
                 )
-        if sorted((workspace / "overlays").glob("*.current")) != configured:
+        if manifest.stat().st_mtime_ns != configured:
             raise SystemExit("Editing an existing Truffle source regenerated the graph")
         invoke("test", "--test_output=errors", *affected)
         events = workspace / "cached.json"
@@ -158,8 +160,12 @@ def main(config):
             raise SystemExit(
                 f"Expected cached results for the selected tests. Events {results!r}"
             )
-        print("The Truffle edit reached GraalJS and GraalPy, and all selected tests were cached on repeat.")
-        invoke("test", "--test_output=errors", "@graal//graalpython:jvm_standalone_test")
+        print(
+            "The Truffle edit reached GraalJS and GraalPy, and all selected tests were cached on repeat."
+        )
+        invoke(
+            "test", "--test_output=errors", "@graal//graalpython:jvm_standalone_test"
+        )
 
 
 if __name__ == "__main__":
