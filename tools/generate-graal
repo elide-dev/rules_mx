@@ -2584,6 +2584,7 @@ def prepare_suite(suite, stage, peers=()):
             'srcs = ["@rules_mx//graal:graalpy_standalone_test.py"], main = "graalpy_standalone_test.py", '
             'args = ["$(rootpath :GRAALPY_JVM_STANDALONE_RELEASE_ARCHIVE)", "$(rootpath graalpython/lib-python/3/test/test_zlib.py)"], '
             'data = [":GRAALPY_JVM_STANDALONE_RELEASE_ARCHIVE", "graalpython/lib-python/3/test/test_zlib.py"], '
+            'tags = ["manual"], '
             'visibility = ["//visibility:public"])\n'
             + "".join(
                 f'py_test(name = "zlib/{case}", size = "small", '

@@ -7,9 +7,12 @@ load("@rules_python//python:py_test.bzl", "py_test")
 load("//mx:bitcode.bzl", "mx_bitcode_suite")
 load("//mx:netbeans.bzl", "netbeans_test_java")
 load(":automatic_module.bzl", "automatic_module")
+load(":developer_targets.bzl", "graal_workspace_targets")
 load(":layout.bzl", "mx_archive_layout")
 load(":pom_classpath_test.bzl", "pom_classpath_test")
 load(":sdk_llvm.bzl", "sdk_llvm_link", "sulong_fixture_sdk")
+
+graal_workspace_targets()
 
 exports_files([
     "netbeans_maven.json",

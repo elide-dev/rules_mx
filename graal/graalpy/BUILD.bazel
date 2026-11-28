@@ -1,0 +1,13 @@
+load("//graal:developer_targets.bzl", "graal_component")
+
+graal_component(
+    artifacts = {"release": "@graal//graalpython:GRAALPY_JVM_STANDALONE_RELEASE_ARCHIVE"},
+    build = ["@graal//graalpython:python"],
+    live_suite = "graalpython",
+    packaging_tests = {"release_test": ["@graal//graalpython:jvm_standalone_test"]},
+    run = "@graal//graalpython:python",
+    tests = [
+        "@graal//graalpython:zlib/ChecksumTestCase.test_adler32start",
+        "@graal//graalpython:zlib/ChecksumTestCase.test_crc32start",
+    ],
+)

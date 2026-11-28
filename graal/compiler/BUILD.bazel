@@ -1,0 +1,7 @@
+load("//graal:developer_targets.bzl", "graal_component")
+
+graal_component(
+    build = ["@graal//compiler:GRAAL"],
+    run = "@graal//compiler:sl_jit",
+    tests = ["@graal//compiler:GR36613Test"],
+)

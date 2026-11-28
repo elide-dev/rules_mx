@@ -1,0 +1,15 @@
+load("//graal:developer_targets.bzl", "graal_component")
+
+graal_component(
+    artifacts = {
+        "install": "@graal//espresso:ESPRESSO_JVM_STANDALONE",
+        "native_install": "@graal//espresso:ESPRESSO_NATIVE_STANDALONE",
+    },
+    build = ["@graal//espresso:ESPRESSO"],
+    manual = True,
+    packaging_tests = {
+        "install_test": ["//graal:espresso_standalone_test"],
+        "native_install_test": ["//graal:espresso_native_standalone_test"],
+    },
+    tests = ["//graal:espresso_guest_test"],
+)

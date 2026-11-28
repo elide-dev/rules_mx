@@ -1,0 +1,11 @@
+load("//graal:developer_targets.bzl", "graal_component")
+
+graal_component(
+    build = ["@graal//graal-js:js"],
+    live_suite = "graal-js",
+    run = "@graal//graal-js:js",
+    tests = [
+        "@graal//graal-js:regression/direct_eval",
+        "@graal//graal-js:regression/indirect_eval",
+    ],
+)
