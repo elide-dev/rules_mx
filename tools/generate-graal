@@ -3033,7 +3033,7 @@ def main():
                 )
         for suite, patches in {
             "espresso": ("espresso_static_libraries.patch", "espresso_platform_properties.patch"),
-            "sulong": ("sulong_stock_javac.patch", "sulong_external_tests.patch"),
+            "sulong": ("sulong_external_tests.patch",),
             "substratevm": ("svm_llvm_scalar_vector.patch",),
         }.items():
             if suite in (*selected, *providers):

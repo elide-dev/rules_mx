@@ -1,6 +1,6 @@
 # Building GraalVM
 
-Bazel uses the Graal source pin by default. With `--config=dev`, it generates the BUILD graph from your sibling checkouts with mx and Gazelle. Both source modes use the same public targets. [Pinned source tree](https://github.com/elide-dev/graal/tree/21dea4deb60d8aa9b07cbd3cc77b1581b61b6fb2)
+Bazel uses the Graal source pin by default. With `--config=dev`, it generates the BUILD graph from your sibling checkouts with mx and Gazelle. The shared suites have the same public labels in both modes. [Pinned source tree](https://github.com/elide-dev/graal/tree/21dea4deb60d8aa9b07cbd3cc77b1581b61b6fb2)
 
 ## Daily build and test
 
@@ -26,7 +26,7 @@ bazel build --config=dev //graal/graalpy:release
 bazel test --config=dev //graal/graalpy:release_test
 ```
 
-Use a reverse-dependency query to select tests from the packages and targets you want to check. This example finds GraalJS regressions and the Truffle SimpleLanguage Fibonacci test affected by an edit to the Truffle API.
+Use a reverse-dependency query to find which daily tests depend on the Truffle API, including tests in GraalJS and GraalPy.
 
 ```sh
 bazel query --config=dev 'kind(".*_test rule", rdeps(tests(//graal:test), @graal//truffle:com.oracle.truffle.api))'
