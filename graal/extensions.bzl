@@ -25,6 +25,7 @@ OVERLAYS = [
     Label("//graal:vm.patch"),
     Label("//graal:regex.patch"),
     Label("//graal:tools.patch"),
+    Label("//graal:sulong_stock_javac.patch"),
     Label("//graal:sulong_external_tests.patch"),
     Label("//graal:sulong_setjmp.patch"),
     Label("//graal:sulong.patch"),
@@ -84,7 +85,9 @@ def _graal_impl(ctx):
         build_file_content = """exports_files(["mx-source.json"])""" if source.provenance else """load("@bazel_skylib//rules:write_file.bzl", "write_file")
 write_file(name = "mx-source.json", out = "source-info.json", content = ["{}"], visibility = ["//visibility:public"])
 """,
-        files = {"mx-source.json": source.provenance} if source.provenance else {},
+        files = {"live_suites.bzl": Label("//graal:no_live_suites.bzl")} | (
+            {"mx-source.json": source.provenance} if source.provenance else {}
+        ),
         patch_strip = 1,
         patches = source.patches,
         sha256 = source.sha256,

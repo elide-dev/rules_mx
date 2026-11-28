@@ -1,0 +1,12 @@
+load("//graal:developer_targets.bzl", "graal_component")
+
+graal_component(
+    build = ["@graal//sdk:GRAAL_SDK"],
+    tests = [
+        "//graal:launcher_modules_test",
+        "//graal:sdk_classpath_test",
+        "//graal:sdk_tests",
+        "//graal/nativebridge:launcher_test",
+        "//graal/nativebridge:module_test",
+    ],
+)

@@ -1,0 +1,8 @@
+load("//graal:developer_targets.bzl", "graal_component")
+
+graal_component(
+    build = ["@graal//substratevm:native-image"],
+    manual = True,
+    run = "@graal//substratevm:native-image",
+    tests = ["//graal:source_native_image_test"],
+)

@@ -1,0 +1,14 @@
+load("//graal:developer_targets.bzl", "graal_component")
+
+graal_component(
+    artifacts = {
+        "release": "@graal//wasm:GRAALWASM_JVM_STANDALONE_RELEASE_ARCHIVE",
+        "native_release": "@graal//wasm:GRAALWASM_NATIVE_STANDALONE_RELEASE_ARCHIVE",
+    },
+    build = ["@graal//wasm:WASM"],
+    packaging_tests = {
+        "release_test": ["//graal:wasm_jvm_release_test"],
+        "native_release_test": ["//graal:wasm_native_release_test"],
+    },
+    tests = ["@graal//wasm:org.graalvm.wasm.test.org.graalvm.wasm.test.WasmIndirectCallTest"],
+)

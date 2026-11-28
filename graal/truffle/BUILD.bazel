@@ -1,0 +1,20 @@
+load("//graal:developer_targets.bzl", "graal_component")
+
+graal_component(
+    build = [
+        "@graal//truffle:TRUFFLE_API",
+        "@graal//truffle:TRUFFLE_RUNTIME",
+        "@graal//truffle:sl",
+    ],
+    run = "@graal//truffle:sl",
+    tests = [
+        "//graal:panama_module_test",
+        "//graal:truffle_archive_test",
+        "//graal:truffle_distributions_test",
+        "//graal:truffle_layout_test",
+        "//graal:truffle_polyglot_test",
+        "//graal:truffle_processor_test",
+        "//graal:truffle_runtime_modules_test",
+        "@graal//truffle:sl.test.Fibonacci",
+    ],
+)

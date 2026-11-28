@@ -1,0 +1,14 @@
+load("//graal:developer_targets.bzl", "graal_component")
+
+graal_component(
+    artifacts = {
+        "release": "@graal//sulong:SULONG_JVM_STANDALONE_RELEASE_ARCHIVE",
+        "native_release": "@graal//sulong:SULONG_NATIVE_STANDALONE_RELEASE_ARCHIVE",
+    },
+    build = ["@graal//sulong:SULONG_CORE"],
+    packaging_tests = {"release_test": ["//graal:sulong_standalone_install_test"]},
+    tests = [
+        "//graal:sulong_language_test",
+        "//graal:sulong_pipe_test",
+    ],
+)

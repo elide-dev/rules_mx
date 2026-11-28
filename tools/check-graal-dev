@@ -37,8 +37,8 @@ marker = getattr(Truffle, "rulesMxLiveMarker", None)
 print(marker() if marker else "before")
 """
 LAUNCHERS = {
-    "@graal//graal-js:js": ("-e", JS_MARKER),
-    "@graal//graalpython:python": ("-c", PY_MARKER),
+    "//graal/graaljs:run": ("-e", JS_MARKER),
+    "//graal/graalpy:run": ("-c", PY_MARKER),
 }
 
 
@@ -95,6 +95,14 @@ def main(config):
             raise SystemExit(
                 f"Unexpected test selection for the Truffle source edit {affected!r}"
             )
+        daily = invoke(
+            "query",
+            "tests(//graal/graaljs:test + //graal/graalpy:test)",
+            stdout=subprocess.PIPE,
+            text=True,
+        ).stdout.splitlines()
+        if set(daily) != REGRESSIONS - {FIBONACCI}:
+            raise SystemExit(f"Unexpected public language test targets {daily!r}")
         location = invoke(
             "query",
             "--output=location",
@@ -164,7 +172,7 @@ def main(config):
             "The Truffle edit reached GraalJS and GraalPy, and all selected tests were cached on repeat."
         )
         invoke(
-            "test", "--test_output=errors", "@graal//graalpython:jvm_standalone_test"
+            "test", "--test_output=errors", "//graal/graalpy:release_test"
         )
 
 
