@@ -35,6 +35,7 @@ exports_files([
     "sdk_llvm.json",
     "sdk_musl.json",
     "packed_sources.json",
+    "sulong_stock_javac.patch",
     "sulong_external_tests.patch",
     "sulong_setjmp.patch",
     "sl.py.tpl",

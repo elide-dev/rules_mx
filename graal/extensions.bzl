@@ -25,6 +25,7 @@ OVERLAYS = [
     Label("//graal:vm.patch"),
     Label("//graal:regex.patch"),
     Label("//graal:tools.patch"),
+    Label("//graal:sulong_stock_javac.patch"),
     Label("//graal:sulong_external_tests.patch"),
     Label("//graal:sulong_setjmp.patch"),
     Label("//graal:sulong.patch"),
